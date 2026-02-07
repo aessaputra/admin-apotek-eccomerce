@@ -144,7 +144,7 @@ const authProvider: AuthProvider = {
           await supabaseClient.auth.signOut();
           return rejectNonAdmin();
         }
-        return { success: true, redirectTo: "/" };
+        return { success: true };
       }
     } catch (error) {
       return {
