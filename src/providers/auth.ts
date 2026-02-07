@@ -24,6 +24,16 @@ async function getProfileRole(userId: string): Promise<string | null> {
   return data?.role ?? null;
 }
 
+async function getProfileIdentity(userId: string) {
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .select("full_name, avatar_url")
+    .eq("id", userId)
+    .single();
+  if (error) return null;
+  return data;
+}
+
 function rejectNonAdmin() {
   return {
     success: false as const,
@@ -217,13 +227,16 @@ const authProvider: AuthProvider = {
 
   getIdentity: async () => {
     const { data } = await supabaseClient.auth.getUser();
-    if (data?.user) {
-      return {
-        ...data.user,
-        name: data.user.email,
-      };
-    }
-    return null;
+    if (!data?.user) return null;
+
+    const profile = await getProfileIdentity(data.user.id);
+    const name = profile?.full_name || data.user.email || "User";
+
+    return {
+      id: data.user.id,
+      name,
+      avatar: profile?.avatar_url ?? undefined,
+    };
   },
 };
 
