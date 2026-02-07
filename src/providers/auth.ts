@@ -1,53 +1,73 @@
 import { AuthProvider } from "@refinedev/core";
 import { supabaseClient } from "./supabase-client";
 
+const ADMIN_ROLE = "admin";
+
+function toAuthError(error: unknown): { name: string; message: string } {
+  if (error && typeof error === "object" && "message" in error) {
+    const err = error as { name?: string; message: string };
+    return {
+      name: typeof err.name === "string" ? err.name : "AuthError",
+      message: String(err.message),
+    };
+  }
+  return { name: "AuthError", message: "An unexpected error occurred" };
+}
+
+async function getProfileRole(userId: string): Promise<string | null> {
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .single();
+  if (error) return null;
+  return data?.role ?? null;
+}
+
+function rejectNonAdmin() {
+  return {
+    success: false as const,
+    error: {
+      message: "Akses ditolak. Hanya admin yang dapat login ke panel ini.",
+      name: "Unauthorized",
+    },
+  };
+}
+
 const authProvider: AuthProvider = {
   login: async ({ email, password, providerName }) => {
-    // sign in with oauth
     try {
       if (providerName) {
-        const { data, error } = await supabaseClient.auth.signInWithOAuth({
-          provider: providerName,
-        });
-
-        if (error) {
-          return {
-            success: false,
-            error,
-          };
-        }
-
-        if (data?.url) {
-          return {
-            success: true,
-            redirectTo: "/",
-          };
-        }
+        return {
+          success: false,
+          error: {
+            message: "Panel admin hanya mendukung login dengan email dan password.",
+            name: "OAuth not allowed",
+          },
+        };
       }
 
-      // sign in with email and password
       const { data, error } = await supabaseClient.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
-        return {
-          success: false,
-          error,
-        };
+        return { success: false, error };
       }
 
       if (data?.user) {
-        return {
-          success: true,
-          redirectTo: "/",
-        };
+        const role = await getProfileRole(data.user.id);
+        if (role !== ADMIN_ROLE) {
+          await supabaseClient.auth.signOut();
+          return rejectNonAdmin();
+        }
+        return { success: true, redirectTo: "/" };
       }
-    } catch (error: any) {
+    } catch (error) {
       return {
         success: false,
-        error,
+        error: toAuthError(error),
       };
     }
 
@@ -59,66 +79,33 @@ const authProvider: AuthProvider = {
       },
     };
   },
-  register: async ({ email, password }) => {
-    try {
-      const { data, error } = await supabaseClient.auth.signUp({
-        email,
-        password,
-      });
 
-      if (error) {
-        return {
-          success: false,
-          error,
-        };
-      }
+  register: async () => ({
+    success: false,
+    error: {
+      message: "Registrasi tidak tersedia. Hubungi administrator.",
+      name: "Registration disabled",
+    },
+  }),
 
-      if (data) {
-        return {
-          success: true,
-          redirectTo: "/",
-        };
-      }
-    } catch (error: any) {
-      return {
-        success: false,
-        error,
-      };
-    }
-
-    return {
-      success: false,
-      error: {
-        message: "Register failed",
-        name: "Invalid email or password",
-      },
-    };
-  },
   forgotPassword: async ({ email }) => {
     try {
       const { data, error } = await supabaseClient.auth.resetPasswordForEmail(
         email,
-        {
-          redirectTo: `${window.location.origin}/update-password`,
-        }
+        { redirectTo: `${window.location.origin}/update-password` }
       );
 
       if (error) {
-        return {
-          success: false,
-          error,
-        };
+        return { success: false, error };
       }
 
       if (data) {
-        return {
-          success: true,
-        };
+        return { success: true };
       }
-    } catch (error: any) {
+    } catch (error) {
       return {
         success: false,
-        error,
+        error: toAuthError(error),
       };
     }
 
@@ -130,6 +117,7 @@ const authProvider: AuthProvider = {
       },
     };
   },
+
   updatePassword: async ({ password }) => {
     try {
       const { data, error } = await supabaseClient.auth.updateUser({
@@ -137,24 +125,24 @@ const authProvider: AuthProvider = {
       });
 
       if (error) {
-        return {
-          success: false,
-          error,
-        };
+        return { success: false, error };
       }
 
-      if (data) {
-        return {
-          success: true,
-          redirectTo: "/",
-        };
+      if (data?.user) {
+        const role = await getProfileRole(data.user.id);
+        if (role !== ADMIN_ROLE) {
+          await supabaseClient.auth.signOut();
+          return rejectNonAdmin();
+        }
+        return { success: true, redirectTo: "/" };
       }
-    } catch (error: any) {
+    } catch (error) {
       return {
         success: false,
-        error,
+        error: toAuthError(error),
       };
     }
+
     return {
       success: false,
       error: {
@@ -163,31 +151,25 @@ const authProvider: AuthProvider = {
       },
     };
   },
+
   logout: async () => {
     const { error } = await supabaseClient.auth.signOut();
-
     if (error) {
-      return {
-        success: false,
-        error,
-      };
+      return { success: false, error };
     }
-
-    return {
-      success: true,
-      redirectTo: "/",
-    };
+    return { success: true, redirectTo: "/" };
   },
+
   onError: async (error) => {
     console.error(error);
     return { error };
   },
+
   check: async () => {
     try {
-      const { data } = await supabaseClient.auth.getSession();
-      const { session } = data;
+      const { data: userData } = await supabaseClient.auth.getUser();
 
-      if (!session) {
+      if (!userData?.user) {
         return {
           authenticated: false,
           error: {
@@ -198,41 +180,49 @@ const authProvider: AuthProvider = {
           redirectTo: "/login",
         };
       }
-    } catch (error: any) {
+
+      const role = await getProfileRole(userData.user.id);
+      if (role !== ADMIN_ROLE) {
+        await supabaseClient.auth.signOut();
+        return {
+          authenticated: false,
+          error: {
+            message: "Akses ditolak. Hanya admin yang dapat mengakses panel ini.",
+            name: "Unauthorized",
+          },
+          logout: true,
+          redirectTo: "/login",
+        };
+      }
+    } catch (error) {
       return {
         authenticated: false,
-        error: error || {
-          message: "Check failed",
-          name: "Not authenticated",
-        },
+        error: toAuthError(error),
         logout: true,
         redirectTo: "/login",
       };
     }
 
-    return {
-      authenticated: true,
-    };
+    return { authenticated: true };
   },
+
   getPermissions: async () => {
-    const user = await supabaseClient.auth.getUser();
-
-    if (user) {
-      return user.data.user?.role;
+    const { data: userData } = await supabaseClient.auth.getUser();
+    if (userData?.user) {
+      const role = await getProfileRole(userData.user.id);
+      return role ? [role] : null;
     }
-
     return null;
   },
+
   getIdentity: async () => {
     const { data } = await supabaseClient.auth.getUser();
-
     if (data?.user) {
       return {
         ...data.user,
         name: data.user.email,
       };
     }
-
     return null;
   },
 };

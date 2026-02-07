@@ -35,6 +35,19 @@ Refine's hooks and components simplifies the development process and eliminates 
     pnpm start
 ```
 
+## Supabase Auth Setup
+
+### Custom Access Token Hook (Admin Role)
+
+Aplikasi ini menggunakan Custom Access Token Hook untuk memasukkan `user_role` ke JWT. Setelah migration dijalankan, **aktifkan hook di Supabase Dashboard**:
+
+1. Buka [Supabase Dashboard](https://supabase.com/dashboard) → proyek Anda
+2. **Authentication** → **Hooks** (Beta)
+3. **Custom Access Token** → pilih fungsi `public.custom_access_token_hook`
+4. Simpan
+
+Tanpa langkah ini, role akan tetap diambil dari database (fallback). Hook aktif = performa lebih baik (role di JWT, tanpa query tambahan).
+
 ## Learn More
 
 To learn more about **Refine**, please check out the [Documentation](https://refine.dev/docs)
