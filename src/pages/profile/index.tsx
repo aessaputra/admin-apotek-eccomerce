@@ -7,10 +7,14 @@ export const Profile: React.FC = () => {
   const { data: user } = useGetIdentity<{ id: string }>();
   const invalidate = useInvalidate();
   const { formProps, saveButtonProps } = useForm({
+    action: "edit",
     resource: "profiles",
     id: user?.id ?? "",
     redirect: false,
     mutationMode: "pessimistic",
+    queryOptions: {
+      enabled: !!user?.id,
+    },
     onMutationSuccess: () => {
       invalidate({ invalidates: ["all"] });
     },

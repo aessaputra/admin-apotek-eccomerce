@@ -2,7 +2,7 @@ import { Authenticated, GitHubBanner, Refine } from "@refinedev/core";
 import { DevtoolsPanel, DevtoolsProvider } from "@refinedev/devtools";
 import { RefineKbar, RefineKbarProvider } from "@refinedev/kbar";
 
-import { AuthPage, ThemedLayout, useNotificationProvider } from "@refinedev/antd";
+import { AuthPage, ThemedLayout, ThemedSider, useNotificationProvider } from "@refinedev/antd";
 import "@refinedev/antd/dist/reset.css";
 
 import {
@@ -124,7 +124,16 @@ function App() {
                         key="protected"
                         fallback={<CatchAllNavigate to="/login" />}
                       >
-                        <ThemedLayout Header={Header} Title={Title}>
+                        <ThemedLayout
+                          Header={Header}
+                          Title={Title}
+                          Sider={({ Title }) => (
+                            <ThemedSider
+                              Title={Title}
+                              render={({ items }) => <>{items}</>}
+                            />
+                          )}
+                        >
                           <Outlet />
                         </ThemedLayout>
                       </Authenticated>
