@@ -3,13 +3,13 @@ import { Card, Col, Row, Statistic } from "antd";
 import { ShoppingCartOutlined, UserOutlined, InboxOutlined } from "@ant-design/icons";
 
 export const Dashboard: React.FC = () => {
-  const { data: ordersData } = useList({ resource: "orders" });
-  const { data: customersData } = useList({ resource: "profiles" });
-  const { data: productsData } = useList({ resource: "products" });
+  const { result: ordersResult } = useList({ resource: "orders" });
+  const { result: customersResult } = useList({ resource: "profiles" });
+  const { result: productsResult } = useList({ resource: "products" });
 
-  const totalOrders = ordersData?.total ?? 0;
-  const totalCustomers = customersData?.total ?? 0;
-  const totalProducts = productsData?.total ?? 0;
+  const totalOrders = ordersResult?.total ?? 0;
+  const totalCustomers = customersResult?.total ?? 0;
+  const totalProducts = productsResult?.total ?? 0;
 
   return (
     <Row gutter={[16, 16]}>

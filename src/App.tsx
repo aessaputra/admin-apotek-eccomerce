@@ -40,6 +40,7 @@ import { ProductEdit } from "./pages/products/edit";
 import { CategoryList } from "./pages/categories/list";
 import { CategoryCreate } from "./pages/categories/create";
 import { CategoryEdit } from "./pages/categories/edit";
+import { Profile } from "./pages/profile";
 
 function App() {
   return (
@@ -130,6 +131,7 @@ function App() {
                     }
                   >
                     <Route index element={<Dashboard />} />
+                    <Route path="/profile" element={<Profile />} />
                     <Route path="/orders" element={<OrderList />} />
                     <Route path="/customers">
                       <Route index element={<CustomerList />} />

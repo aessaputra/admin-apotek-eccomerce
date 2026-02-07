@@ -1,4 +1,92 @@
+import type { DataProvider } from "@refinedev/core";
 import { dataProvider as supabaseDataProvider } from "@refinedev/supabase";
 import { supabaseClient } from "./supabase-client";
+import { getStoragePathFromPublicUrl, PRODUCT_IMAGES_BUCKET } from "../utils/storage";
 
-export const dataProvider = supabaseDataProvider(supabaseClient);
+const CATEGORY_LOGO_BUCKET = "category-logos";
+
+const baseDataProvider = supabaseDataProvider(supabaseClient);
+
+async function deleteCategoryLogo(logoUrl: string | null | undefined): Promise<void> {
+  if (!logoUrl) return;
+  const path = getStoragePathFromPublicUrl(logoUrl, CATEGORY_LOGO_BUCKET);
+  if (!path) return;
+  await supabaseClient.storage.from(CATEGORY_LOGO_BUCKET).remove([path]);
+}
+
+async function deleteProductImages(productImages: { url: string }[]): Promise<void> {
+  for (const img of productImages || []) {
+    const path = getStoragePathFromPublicUrl(img.url, PRODUCT_IMAGES_BUCKET);
+    if (path) {
+      await supabaseClient.storage.from(PRODUCT_IMAGES_BUCKET).remove([path]);
+    }
+  }
+}
+
+export const dataProvider: DataProvider = {
+  ...baseDataProvider,
+  deleteOne: async (params) => {
+    if (params.resource === "categories") {
+      try {
+        const { data } = await baseDataProvider.getOne({
+          resource: "categories",
+          id: params.id,
+          meta: params.meta,
+        });
+        const logoUrl = (data as { logo_url?: string })?.logo_url;
+        await deleteCategoryLogo(logoUrl);
+      } catch {
+        // Continue with delete even if logo fetch/remove fails (e.g. RLS, orphaned URL)
+      }
+    }
+    if (params.resource === "products") {
+      try {
+        const { data } = await baseDataProvider.getOne({
+          resource: "products",
+          id: params.id,
+          meta: { select: "*, product_images(*)" },
+        });
+        const images = (data as { product_images?: { url: string }[] })?.product_images ?? [];
+        await deleteProductImages(images);
+      } catch {
+        // Continue with delete even if fetch/remove fails
+      }
+    }
+    return baseDataProvider.deleteOne(params);
+  },
+  deleteMany: async (params) => {
+    if (params.resource === "categories") {
+      try {
+        const { data } = await baseDataProvider.getMany({
+          resource: "categories",
+          ids: params.ids,
+          meta: params.meta,
+        });
+        const items = Array.isArray(data) ? data : [];
+        for (const item of items) {
+          const logoUrl = (item as { logo_url?: string })?.logo_url;
+          await deleteCategoryLogo(logoUrl);
+        }
+      } catch {
+        // Continue with delete even if logo fetch/remove fails
+      }
+    }
+    if (params.resource === "products") {
+      try {
+        const { data } = await baseDataProvider.getMany({
+          resource: "products",
+          ids: params.ids,
+          meta: { select: "*, product_images(*)" },
+        });
+        const items = Array.isArray(data) ? data : [];
+        for (const item of items) {
+          const images = (item as { product_images?: { url: string }[] })?.product_images ?? [];
+          await deleteProductImages(images);
+        }
+      } catch {
+        // Continue with delete even if fetch/remove fails
+      }
+    }
+    return baseDataProvider.deleteMany(params);
+  },
+};

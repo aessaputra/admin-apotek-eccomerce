@@ -35,6 +35,26 @@ Refine's hooks and components simplifies the development process and eliminates 
     pnpm start
 ```
 
+## Storage & Orphan Cleanup
+
+Image uploads use immediate upload (Refine best practice). Orphan files (uploaded but form never saved) are cleaned up automatically via **pg_cron** weekly (every Sunday at 02:00 UTC).
+
+### One-time setup: Vault secrets
+
+Add the project URL and service role key to Vault so the cron job can call the Edge Function. Run in **Supabase Dashboard → SQL Editor** (replace `YOUR_SERVICE_ROLE_KEY` with the key from Project Settings → API):
+
+```sql
+select vault.create_secret('https://ibmpikevzfuqtfpdpkyy.supabase.co', 'project_url');
+select vault.create_secret('YOUR_SERVICE_ROLE_KEY', 'service_role_key');
+```
+
+### Manual run (optional)
+
+```bash
+curl -X POST "https://ibmpikevzfuqtfpdpkyy.supabase.co/functions/v1/cleanup-orphan-storage" \
+  -H "Authorization: Bearer YOUR_SERVICE_ROLE_KEY"
+```
+
 ## Learn More
 
 To learn more about **Refine**, please check out the [Documentation](https://refine.dev/docs)
