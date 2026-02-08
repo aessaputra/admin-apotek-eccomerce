@@ -82,7 +82,7 @@ export const Profile: React.FC = () => {
           name="password"
           rules={[
             { required: true, message: translate("profile.passwordRequired") },
-            { min: 6, message: translate("profile.passwordMinLength") },
+            { min: 8, message: translate("profile.passwordMinLength") },
           ]}
         >
           <Input.Password

@@ -1,6 +1,6 @@
 import { Create, useForm, useSelect } from "@refinedev/antd";
 import { useTranslation } from "@refinedev/core";
-import { Form, Input, InputNumber, Select } from "antd";
+import { Form, Input, InputNumber, Select, message } from "antd";
 import { ProductImageUpload } from "../../components/product-image-upload";
 import { slugify } from "../../utils/slugify";
 import { supabaseClient } from "../../providers/supabase-client";
@@ -31,13 +31,17 @@ export const ProductCreate: React.FC = () => {
       | undefined;
     const productId = result?.data?.id;
     if (productId && Array.isArray(images) && images.length > 0) {
-      await supabaseClient.from("product_images").insert(
+      const { error } = await supabaseClient.from("product_images").insert(
         (images as string[]).map((url, i) => ({
           product_id: productId,
           url,
           sort_order: i,
         }))
       );
+      if (error) {
+        message.error(translate("products.imagesSaveError"));
+        throw error;
+      }
     }
     return result;
   };

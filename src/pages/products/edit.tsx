@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Edit, useForm, useSelect } from "@refinedev/antd";
 import { useTranslation } from "@refinedev/core";
-import { Form, Input, InputNumber, Select } from "antd";
+import { Form, Input, InputNumber, Select, message } from "antd";
 import { ProductImageUpload } from "../../components/product-image-upload";
 import { slugify } from "../../utils/slugify";
 import { supabaseClient } from "../../providers/supabase-client";
@@ -55,30 +55,43 @@ export const ProductEdit: React.FC = () => {
     const currentUrls = Array.isArray(images) ? (images as string[]) : [];
     const original = (data?.product_images ?? []) as ProductImage[];
 
-    const removed = original.filter((o) => !currentUrls.includes(o.url));
-    for (const img of removed) {
-      const path = getStoragePathFromPublicUrl(img.url, PRODUCT_IMAGES_BUCKET);
-      if (path) {
-        await supabaseClient.storage.from(PRODUCT_IMAGES_BUCKET).remove([path]);
-      }
-      await supabaseClient.from("product_images").delete().eq("id", img.id);
-    }
-
-    for (let i = 0; i < currentUrls.length; i++) {
-      const url = currentUrls[i];
-      const existing = original.find((o) => o.url === url);
-      if (existing) {
-        await supabaseClient
+    try {
+      const removed = original.filter((o) => !currentUrls.includes(o.url));
+      for (const img of removed) {
+        const path = getStoragePathFromPublicUrl(img.url, PRODUCT_IMAGES_BUCKET);
+        if (path) {
+          await supabaseClient.storage.from(PRODUCT_IMAGES_BUCKET).remove([path]);
+        }
+        const { error: deleteError } = await supabaseClient
           .from("product_images")
-          .update({ sort_order: i })
-          .eq("id", existing.id);
-      } else {
-        await supabaseClient.from("product_images").insert({
-          product_id: productId,
-          url,
-          sort_order: i,
-        });
+          .delete()
+          .eq("id", img.id);
+        if (deleteError) throw deleteError;
       }
+
+      for (let i = 0; i < currentUrls.length; i++) {
+        const url = currentUrls[i];
+        const existing = original.find((o) => o.url === url);
+        if (existing) {
+          const { error: updateError } = await supabaseClient
+            .from("product_images")
+            .update({ sort_order: i })
+            .eq("id", existing.id);
+          if (updateError) throw updateError;
+        } else {
+          const { error: insertError } = await supabaseClient
+            .from("product_images")
+            .insert({
+              product_id: productId,
+              url,
+              sort_order: i,
+            });
+          if (insertError) throw insertError;
+        }
+      }
+    } catch (err) {
+      message.error(translate("products.imagesSaveError"));
+      throw err;
     }
 
     return result;

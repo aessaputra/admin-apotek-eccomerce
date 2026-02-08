@@ -1,6 +1,7 @@
-import { Upload } from "antd";
+import { message, Upload } from "antd";
 import type { RcFile } from "antd/es/upload/interface";
 import { supabaseClient } from "../../providers/supabase-client";
+import { getStoragePathFromPublicUrl, sanitizeFilename, validateImageFile } from "../../utils/storage";
 
 const BUCKET = "category-logos";
 
@@ -17,17 +18,51 @@ export const CategoryLogoUpload: React.FC<CategoryLogoUploadProps> = ({
     ? [{ uid: "-1", name: "logo", url: value, status: "done" as const }]
     : [];
 
+  const beforeUpload = (file: RcFile) => {
+    const { valid, error } = validateImageFile(file);
+    if (!valid) {
+      message.error(error);
+      return false;
+    }
+    return true;
+  };
+
   return (
     <Upload
       listType="picture-card"
       maxCount={1}
-      accept="image/*"
+      accept="image/jpeg,image/png,image/webp,image/gif"
       fileList={fileList}
-      onRemove={() => onChange?.(undefined)}
+      beforeUpload={beforeUpload}
+      onRemove={async () => {
+        if (value) {
+          const oldPath = getStoragePathFromPublicUrl(value, BUCKET);
+          if (oldPath) {
+            try {
+              await supabaseClient.storage.from(BUCKET).remove([oldPath]);
+            } catch {
+              // Continue even if delete fails
+            }
+          }
+        }
+        onChange?.(undefined);
+      }}
       customRequest={async ({ file, onError, onSuccess }) => {
         try {
+          if (value) {
+            const oldPath = getStoragePathFromPublicUrl(value, BUCKET);
+            if (oldPath) {
+              try {
+                await supabaseClient.storage.from(BUCKET).remove([oldPath]);
+              } catch {
+                // Continue even if delete fails
+              }
+            }
+          }
+
           const rcFile = file as RcFile;
-          const path = `logos/${Date.now()}-${rcFile.name}`;
+          const safeName = sanitizeFilename(rcFile.name);
+          const path = `logos/${Date.now()}-${safeName}`;
           const { error } = await supabaseClient.storage
             .from(BUCKET)
             .upload(path, rcFile, {

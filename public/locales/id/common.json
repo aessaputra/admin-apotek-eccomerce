@@ -1,12 +1,13 @@
 {
   "app": {
-    "title": "Admin Apotek",
-    "titleShort": "ADM"
+    "title": "Pharmacy",
+    "titleShort": "PH"
   },
   "resources": {
     "dashboard": "Dashboard",
     "orders": "Pesanan",
     "customers": "Pelanggan",
+    "profiles": "Pelanggan",
     "stores": "Toko",
     "products": "Produk",
     "categories": "Kategori"
@@ -60,7 +61,8 @@
     "status": {
       "active": "Aktif",
       "inactive": "Nonaktif"
-    }
+    },
+    "imagesSaveError": "Gagal menyimpan gambar produk"
   },
   "categories": {
     "categories": "Kategori",
@@ -161,7 +163,7 @@
     "confirmPasswordPlaceholder": "Ulangi password baru",
     "passwordMismatch": "Konfirmasi password tidak cocok.",
     "passwordRequired": "Masukkan password baru",
-    "passwordMinLength": "Password minimal 6 karakter",
+    "passwordMinLength": "Password minimal 8 karakter",
     "confirmRequired": "Konfirmasi password",
     "passwordNotMatch": "Password tidak cocok",
     "passwordSuccess": "Password berhasil diubah.",

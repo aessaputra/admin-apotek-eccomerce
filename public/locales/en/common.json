@@ -1,12 +1,13 @@
 {
   "app": {
-    "title": "Admin Pharmacy",
-    "titleShort": "ADM"
+    "title": "Pharmacy",
+    "titleShort": "PH"
   },
   "resources": {
     "dashboard": "Dashboard",
     "orders": "Orders",
     "customers": "Customers",
+    "profiles": "Customers",
     "stores": "Stores",
     "products": "Products",
     "categories": "Categories"
@@ -60,7 +61,8 @@
     "status": {
       "active": "Active",
       "inactive": "Inactive"
-    }
+    },
+    "imagesSaveError": "Failed to save product images"
   },
   "categories": {
     "categories": "Categories",

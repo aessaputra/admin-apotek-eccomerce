@@ -9,28 +9,30 @@ import {
 
 type ColorModeContextType = {
   mode: string;
-  setMode: (mode: string) => void;
+  setMode: () => void;
 };
 
 export const ColorModeContext = createContext<ColorModeContextType>(
   {} as ColorModeContextType
 );
 
+function getInitialColorMode(): string {
+  if (typeof window === "undefined") return "light";
+  const stored = localStorage.getItem("colorMode");
+  if (stored) return stored;
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return prefersDark ? "dark" : "light";
+}
+
 export const ColorModeContextProvider: React.FC<PropsWithChildren> = ({
   children,
 }) => {
-  const colorModeFromLocalStorage = localStorage.getItem("colorMode");
-  const isSystemPreferenceDark = window?.matchMedia(
-    "(prefers-color-scheme: dark)"
-  ).matches;
-
-  const systemPreference = isSystemPreferenceDark ? "dark" : "light";
-  const [mode, setMode] = useState(
-    colorModeFromLocalStorage || systemPreference
-  );
+  const [mode, setMode] = useState(getInitialColorMode);
 
   useEffect(() => {
-    window.localStorage.setItem("colorMode", mode);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("colorMode", mode);
+    }
   }, [mode]);
 
   const setColorMode = () => {

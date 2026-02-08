@@ -83,11 +83,7 @@ export const CustomerList: React.FC = () => {
   const { tableProps, sorters } = useTable({
     syncWithLocation: true,
     filters: {
-      initial: [
-        { field: "role", operator: "eq" as const, value: "customer" },
-        { field: "full_name", operator: "contains" as const, value: "" },
-        { field: "phone_number", operator: "contains" as const, value: "" },
-      ],
+      initial: [{ field: "role", operator: "eq" as const, value: "customer" }],
     },
   });
 

@@ -1,7 +1,7 @@
-import { Upload } from "antd";
+import { message, Upload } from "antd";
 import type { RcFile } from "antd/es/upload/interface";
 import { supabaseClient } from "../../providers/supabase-client";
-import { PRODUCT_IMAGES_BUCKET } from "../../utils/storage";
+import { PRODUCT_IMAGES_BUCKET, sanitizeFilename, validateImageFile } from "../../utils/storage";
 
 interface ProductImageUploadProps {
   value?: string[];
@@ -24,13 +24,23 @@ export const ProductImageUpload: React.FC<ProductImageUploadProps> = ({
     onChange?.(next);
   };
 
+  const beforeUpload = (file: RcFile) => {
+    const { valid, error } = validateImageFile(file);
+    if (!valid) {
+      message.error(error);
+      return false;
+    }
+    return true;
+  };
+
   return (
     <Upload
       listType="picture-card"
       maxCount={10}
       multiple
-      accept="image/*"
+      accept="image/jpeg,image/png,image/webp,image/gif"
       fileList={fileList}
+      beforeUpload={beforeUpload}
       onRemove={(file) => {
         const url = (file as { url?: string }).url;
         if (url) handleRemove(url);
@@ -38,7 +48,8 @@ export const ProductImageUpload: React.FC<ProductImageUploadProps> = ({
       customRequest={async ({ file, onError, onSuccess }) => {
         try {
           const rcFile = file as RcFile;
-          const path = `images/${Date.now()}-${rcFile.name}`;
+          const safeName = sanitizeFilename(rcFile.name);
+          const path = `images/${Date.now()}-${safeName}`;
           const { error } = await supabaseClient.storage
             .from(PRODUCT_IMAGES_BUCKET)
             .upload(path, rcFile, {

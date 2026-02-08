@@ -27,6 +27,7 @@ import { BrowserRouter, Outlet, Route, Routes } from "react-router";
 import { useTranslation } from "react-i18next";
 import { ColorModeContextProvider } from "./contexts/color-mode";
 import { Header } from "./components/header";
+import { AuthTitle } from "./components/layout/auth-title";
 import { Title } from "./components/layout/title";
 import authProvider from "./providers/auth";
 import { dataProvider } from "./providers/data";
@@ -67,7 +68,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <GitHubBanner />
+      {import.meta.env.DEV && <GitHubBanner />}
       <RefineKbarProvider>
         <ColorModeContextProvider>
           <AntdApp>
@@ -176,16 +177,32 @@ function App() {
                       </Authenticated>
                     }
                   >
-                    <Route path="/login" element={<AuthPage type="login" providers={[]} registerLink={false} />} />
-                    <Route path="/forgot-password" element={<AuthPage type="forgotPassword" />} />
-                    <Route path="/update-password" element={<AuthPage type="updatePassword" />} />
+                    <Route path="/login" element={<AuthPage type="login" title={<AuthTitle />} providers={[]} registerLink={false} />} />
+                    <Route path="/forgot-password" element={<AuthPage type="forgotPassword" title={<AuthTitle />} />} />
+                    <Route path="/update-password" element={<AuthPage type="updatePassword" title={<AuthTitle />} />} />
                   </Route>
                 </Routes>
                 <RefineKbar />
                 <UnsavedChangesNotifier />
-                <DocumentTitleHandler />
+                <DocumentTitleHandler
+                  handler={({ resource, action, params }) => {
+                    const resourceLabel = resource?.name ? t(`resources.${resource.name}`) : "Dashboard";
+                    const id = params?.id ?? "";
+
+                    const actionPrefixMatcher: Record<string, string> = {
+                      create: `${t("actions.create")} ${resourceLabel}`,
+                      clone: `#${id} ${resourceLabel}`,
+                      edit: `#${id} ${t("actions.edit")} ${resourceLabel}`,
+                      show: `#${id} ${t("actions.show")} ${resourceLabel}`,
+                      list: resourceLabel,
+                    };
+
+                    const title = actionPrefixMatcher[action || "list"] ?? resourceLabel;
+                    return `${title} | Pharmacy`;
+                  }}
+                />
               </Refine>
-              <DevtoolsPanel />
+              {import.meta.env.DEV && <DevtoolsPanel />}
             </DevtoolsProvider>
           </AntdApp>
         </ColorModeContextProvider>

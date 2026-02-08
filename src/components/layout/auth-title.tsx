@@ -1,18 +1,17 @@
-import type { RefineLayoutThemedTitleProps } from "@refinedev/antd";
 import { ThemedTitle } from "@refinedev/antd";
 import { useTranslation } from "@refinedev/core";
 
 /**
- * Title component menggunakan ThemedTitle dari Refine.
- * Logo (icon) dan text dipisah sesuai dokumentasi:
- * @see https://refine.dev/docs/ui-integrations/ant-design/components/themed-layout/
+ * Title untuk AuthPage (login, forgot-password, update-password).
+ * Logo dan text terpisah sesuai dokumentasi Refine.
+ * @see https://refine.dev/docs/ui-integrations/ant-design/components/auth-page/
  */
-export const Title: React.FC<RefineLayoutThemedTitleProps> = ({ collapsed }) => {
+export const AuthTitle: React.FC = () => {
   const { translate } = useTranslation();
 
   return (
     <ThemedTitle
-      collapsed={collapsed}
+      collapsed={false}
       icon={
         <img
           src="/logo-icon.png"
