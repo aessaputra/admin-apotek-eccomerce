@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useShow, useUpdate } from "@refinedev/core";
 import { Show, DateField, NumberField } from "@refinedev/antd";
-import { Typography, Table, Tag, Descriptions, Form, Select, Input, Button, Card } from "antd";
+import { Typography, Table, Tag, Descriptions, Form, Select, Input, Button, Card, App } from "antd";
 
 const { Title, Text } = Typography;
 
@@ -61,12 +61,12 @@ export const OrderShow: React.FC = () => {
   });
 
   const { mutate, mutation: { isPending: isUpdating } } = useUpdate();
-
+  const { modal } = App.useApp();
   const [form] = Form.useForm<{ status: string; waybill_number?: string }>();
 
   const items = record?.order_items ?? [];
 
-  const handleUpdate = (values: { status: string; waybill_number?: string }) => {
+  const doMutate = (values: { status: string; waybill_number?: string }) => {
     if (!record?.id) return;
     mutate(
       {
@@ -86,6 +86,21 @@ export const OrderShow: React.FC = () => {
         }),
       }
     );
+  };
+
+  const handleUpdate = (values: { status: string; waybill_number?: string }) => {
+    if (values.status === "cancelled") {
+      modal.confirm({
+        title: "Batalkan pesanan?",
+        content: "Status pesanan akan diubah menjadi Dibatalkan. Tindakan ini tidak dapat dibatalkan.",
+        okText: "Ya, Batalkan",
+        cancelText: "Batal",
+        okButtonProps: { danger: true },
+        onOk: () => doMutate(values),
+      });
+      return;
+    }
+    doMutate(values);
   };
 
   useEffect(() => {
@@ -191,7 +206,22 @@ export const OrderShow: React.FC = () => {
             >
               <Select options={STATUS_OPTIONS} style={{ minWidth: 160 }} />
             </Form.Item>
-            <Form.Item name="waybill_number" label="No. Resi">
+            <Form.Item
+              name="waybill_number"
+              label="No. Resi"
+              dependencies={["status"]}
+              rules={[
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    const status = getFieldValue("status");
+                    if (status === "shipped" && !value?.trim()) {
+                      return Promise.reject(new Error("No. resi wajib diisi saat status Shipped"));
+                    }
+                    return Promise.resolve();
+                  },
+                }),
+              ]}
+            >
               <Input placeholder="Masukkan nomor resi setelah pengiriman" />
             </Form.Item>
             <Form.Item>
