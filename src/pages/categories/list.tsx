@@ -2,6 +2,7 @@ import {
   List,
   useTable,
   EditButton,
+  ShowButton,
   DeleteButton,
 } from "@refinedev/antd";
 import { Table, Image, Space, Tooltip } from "antd";
@@ -37,6 +38,11 @@ export const CategoryList: React.FC = () => {
           fixed="right"
           render={(_, record: { id: string }) => (
             <Space size="small">
+              <Tooltip title="Lihat">
+                <span>
+                  <ShowButton hideText size="small" recordItemId={record.id} />
+                </span>
+              </Tooltip>
               <Tooltip title="Edit">
                 <span>
                   <EditButton hideText size="small" recordItemId={record.id} />

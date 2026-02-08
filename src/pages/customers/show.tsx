@@ -12,12 +12,13 @@ const ROLE_COLORS: Record<string, string> = {
 
 export const CustomerShow: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { query } = useShow({
+  const {
+    result: record,
+    query: { isLoading },
+  } = useShow({
     resource: "profiles",
     id: id ?? "",
   });
-  const { data, isLoading } = query;
-  const record = data?.data;
 
   return (
     <Show isLoading={isLoading}>

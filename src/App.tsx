@@ -2,7 +2,7 @@ import { Authenticated, GitHubBanner, Refine } from "@refinedev/core";
 import { DevtoolsPanel, DevtoolsProvider } from "@refinedev/devtools";
 import { RefineKbar, RefineKbarProvider } from "@refinedev/kbar";
 
-import { AuthPage, ThemedLayout, ThemedSider, useNotificationProvider } from "@refinedev/antd";
+import { AuthPage, ErrorComponent, ThemedLayout, ThemedSider, useNotificationProvider } from "@refinedev/antd";
 import "@refinedev/antd/dist/reset.css";
 
 import {
@@ -32,14 +32,17 @@ import { supabaseClient } from "./providers/supabase-client";
 
 import { Dashboard } from "./pages/dashboard";
 import { OrderList } from "./pages/orders/list";
+import { OrderShow } from "./pages/orders/show";
 import { CustomerList } from "./pages/customers/list";
 import { CustomerShow } from "./pages/customers/show";
 import { ProductList } from "./pages/products/list";
 import { ProductCreate } from "./pages/products/create";
 import { ProductEdit } from "./pages/products/edit";
+import { ProductShow } from "./pages/products/show";
 import { CategoryList } from "./pages/categories/list";
 import { CategoryCreate } from "./pages/categories/create";
 import { CategoryEdit } from "./pages/categories/edit";
+import { CategoryShow } from "./pages/categories/show";
 import { Profile } from "./pages/profile";
 
 function App() {
@@ -68,6 +71,7 @@ function App() {
                   {
                     name: "orders",
                     list: "/orders",
+                    show: "/orders/show/:id",
                     meta: {
                       label: "Orders",
                       icon: <ShoppingCartOutlined />,
@@ -94,6 +98,7 @@ function App() {
                     list: "/products",
                     create: "/products/create",
                     edit: "/products/edit/:id",
+                    show: "/products/show/:id",
                     meta: {
                       label: "Products",
                       parent: "stores",
@@ -105,6 +110,7 @@ function App() {
                     list: "/categories",
                     create: "/categories/create",
                     edit: "/categories/edit/:id",
+                    show: "/categories/show/:id",
                     meta: {
                       label: "Categories",
                       parent: "stores",
@@ -141,7 +147,10 @@ function App() {
                   >
                     <Route index element={<Dashboard />} />
                     <Route path="/profile" element={<Profile />} />
-                    <Route path="/orders" element={<OrderList />} />
+                    <Route path="/orders">
+                      <Route index element={<OrderList />} />
+                      <Route path="show/:id" element={<OrderShow />} />
+                    </Route>
                     <Route path="/customers">
                       <Route index element={<CustomerList />} />
                       <Route path="show/:id" element={<CustomerShow />} />
@@ -149,13 +158,16 @@ function App() {
                     <Route path="/products">
                       <Route index element={<ProductList />} />
                       <Route path="create" element={<ProductCreate />} />
+                      <Route path="show/:id" element={<ProductShow />} />
                       <Route path="edit/:id" element={<ProductEdit />} />
                     </Route>
                     <Route path="/categories">
                       <Route index element={<CategoryList />} />
                       <Route path="create" element={<CategoryCreate />} />
+                      <Route path="show/:id" element={<CategoryShow />} />
                       <Route path="edit/:id" element={<CategoryEdit />} />
                     </Route>
+                    <Route path="*" element={<ErrorComponent />} />
                   </Route>
                   <Route
                     element={
