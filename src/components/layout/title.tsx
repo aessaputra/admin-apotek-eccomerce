@@ -1,5 +1,5 @@
 import type { RefineLayoutThemedTitleProps } from "@refinedev/antd";
-import { useLink } from "@refinedev/core";
+import { useLink, useTranslation } from "@refinedev/core";
 import { Typography, theme } from "antd";
 
 export const Title: React.FC<RefineLayoutThemedTitleProps> = ({
@@ -7,6 +7,7 @@ export const Title: React.FC<RefineLayoutThemedTitleProps> = ({
 }) => {
   const Link = useLink();
   const { token } = theme.useToken();
+  const { translate } = useTranslation();
 
   return (
     <Link
@@ -30,7 +31,7 @@ export const Title: React.FC<RefineLayoutThemedTitleProps> = ({
           textOverflow: "ellipsis",
         }}
       >
-        {collapsed ? "ADM" : "Admin Apotek"}
+        {collapsed ? translate("app.titleShort") : translate("app.title")}
       </Typography.Title>
     </Link>
   );

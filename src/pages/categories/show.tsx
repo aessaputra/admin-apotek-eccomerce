@@ -1,4 +1,4 @@
-import { useShow } from "@refinedev/core";
+import { useShow, useTranslation } from "@refinedev/core";
 import { Show } from "@refinedev/antd";
 import { Typography, Image } from "antd";
 
@@ -13,6 +13,7 @@ interface CategoryRecord {
 }
 
 export const CategoryShow: React.FC = () => {
+  const { translate } = useTranslation();
   const {
     result: record,
     query: { isLoading },
@@ -20,7 +21,7 @@ export const CategoryShow: React.FC = () => {
 
   return (
     <Show isLoading={isLoading}>
-      <Title level={5}>Logo</Title>
+      <Title level={5}>{translate("categories.fields.logo")}</Title>
       {record?.logo_url ? (
         <Image
           src={record.logo_url}
@@ -33,15 +34,15 @@ export const CategoryShow: React.FC = () => {
         <Text type="secondary">-</Text>
       )}
 
-      <Title level={5}>Nama</Title>
+      <Title level={5}>{translate("categories.fields.name")}</Title>
       <Text>{record?.name ?? "-"}</Text>
 
-      <Title level={5}>Slug</Title>
+      <Title level={5}>{translate("categories.fields.slug")}</Title>
       <Text>{record?.slug ?? "-"}</Text>
 
       {record?.created_at && (
         <>
-          <Title level={5}>Dibuat</Title>
+          <Title level={5}>{translate("categories.fields.created")}</Title>
           <Text>{new Date(record.created_at).toLocaleString("id-ID")}</Text>
         </>
       )}

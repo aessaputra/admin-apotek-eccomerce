@@ -1,8 +1,9 @@
-import { useList } from "@refinedev/core";
+import { useList, useTranslation } from "@refinedev/core";
 import { Card, Col, Row, Statistic } from "antd";
 import { ShoppingCartOutlined, UserOutlined, InboxOutlined } from "@ant-design/icons";
 
 export const Dashboard: React.FC = () => {
+  const { translate } = useTranslation();
   const { result: ordersResult } = useList({ resource: "orders" });
   const { result: customersResult } = useList({ resource: "profiles" });
   const { result: productsResult } = useList({ resource: "products" });
@@ -16,7 +17,7 @@ export const Dashboard: React.FC = () => {
       <Col xs={24} sm={12} lg={8}>
         <Card>
           <Statistic
-            title="Total Orders"
+            title={translate("dashboard.totalOrders")}
             value={totalOrders}
             prefix={<ShoppingCartOutlined />}
           />
@@ -25,7 +26,7 @@ export const Dashboard: React.FC = () => {
       <Col xs={24} sm={12} lg={8}>
         <Card>
           <Statistic
-            title="Total Customers"
+            title={translate("dashboard.totalCustomers")}
             value={totalCustomers}
             prefix={<UserOutlined />}
           />
@@ -34,7 +35,7 @@ export const Dashboard: React.FC = () => {
       <Col xs={24} sm={12} lg={8}>
         <Card>
           <Statistic
-            title="Total Products"
+            title={translate("dashboard.totalProducts")}
             value={totalProducts}
             prefix={<InboxOutlined />}
           />

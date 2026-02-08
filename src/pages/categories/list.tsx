@@ -5,9 +5,11 @@ import {
   ShowButton,
   DeleteButton,
 } from "@refinedev/antd";
+import { useTranslation } from "@refinedev/core";
 import { Table, Image, Space, Tooltip } from "antd";
 
 export const CategoryList: React.FC = () => {
+  const { translate } = useTranslation();
   const { tableProps } = useTable({
     syncWithLocation: true,
   });
@@ -17,7 +19,7 @@ export const CategoryList: React.FC = () => {
       <Table {...tableProps} rowKey="id">
         <Table.Column
           dataIndex="logo_url"
-          title="Logo"
+          title={translate("categories.fields.logo")}
           width={80}
           render={(url: string) =>
             url ? (
@@ -27,10 +29,10 @@ export const CategoryList: React.FC = () => {
             )
           }
         />
-        <Table.Column dataIndex="name" title="Name" />
-        <Table.Column dataIndex="slug" title="Slug" />
+        <Table.Column dataIndex="name" title={translate("categories.fields.name")} />
+        <Table.Column dataIndex="slug" title={translate("categories.fields.slug")} />
         <Table.Column
-          title="Aksi"
+          title={translate("table.actions")}
           dataIndex="actions"
           key="actions"
           align="center"
@@ -38,17 +40,17 @@ export const CategoryList: React.FC = () => {
           fixed="right"
           render={(_, record: { id: string }) => (
             <Space size="small">
-              <Tooltip title="Lihat">
+              <Tooltip title={translate("actions.show")}>
                 <span>
                   <ShowButton hideText size="small" recordItemId={record.id} />
                 </span>
               </Tooltip>
-              <Tooltip title="Edit">
+              <Tooltip title={translate("actions.edit")}>
                 <span>
                   <EditButton hideText size="small" recordItemId={record.id} />
                 </span>
               </Tooltip>
-              <Tooltip title="Hapus">
+              <Tooltip title={translate("actions.delete")}>
                 <span>
                   <DeleteButton hideText size="small" recordItemId={record.id} />
                 </span>

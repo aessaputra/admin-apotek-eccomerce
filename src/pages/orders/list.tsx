@@ -1,20 +1,6 @@
 import { List, useTable, ShowButton, FilterDropdown, getDefaultFilter } from "@refinedev/antd";
+import { useTranslation } from "@refinedev/core";
 import { Table, Space, Tooltip, Select, Tag } from "antd";
-
-const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending" },
-  { value: "processing", label: "Processing" },
-  { value: "paid", label: "Paid" },
-  { value: "shipped", label: "Shipped" },
-  { value: "delivered", label: "Delivered" },
-  { value: "cancelled", label: "Cancelled" },
-];
-
-const PAYMENT_OPTIONS = [
-  { value: "pending", label: "Pending" },
-  { value: "success", label: "Success" },
-  { value: "failed", label: "Failed" },
-];
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "orange",
@@ -32,18 +18,34 @@ const PAYMENT_COLORS: Record<string, string> = {
 };
 
 export const OrderList: React.FC = () => {
+  const { translate } = useTranslation();
   const { tableProps, filters } = useTable({
     syncWithLocation: true,
   });
 
+  const STATUS_OPTIONS = [
+    { value: "pending", label: translate("orderStatus.pending") },
+    { value: "processing", label: translate("orderStatus.processing") },
+    { value: "paid", label: translate("orderStatus.paid") },
+    { value: "shipped", label: translate("orderStatus.shipped") },
+    { value: "delivered", label: translate("orderStatus.delivered") },
+    { value: "cancelled", label: translate("orderStatus.cancelled") },
+  ];
+
+  const PAYMENT_OPTIONS = [
+    { value: "pending", label: translate("paymentStatus.pending") },
+    { value: "success", label: translate("paymentStatus.success") },
+    { value: "failed", label: translate("paymentStatus.failed") },
+  ];
+
   return (
     <List>
       <Table {...tableProps} rowKey="id">
-        <Table.Column dataIndex="id" title="ID" width={80} />
-        <Table.Column dataIndex="total_amount" title="Total" render={(v) => `Rp ${Number(v || 0).toLocaleString("id-ID")}`} />
+        <Table.Column dataIndex="id" title={translate("orders.fields.id")} width={80} />
+        <Table.Column dataIndex="total_amount" title={translate("orders.fields.total")} render={(v) => `Rp ${Number(v || 0).toLocaleString("id-ID")}`} />
         <Table.Column
           dataIndex="status"
-          title="Status"
+          title={translate("orders.fields.status")}
           render={(v: string) => (
             <Tag color={STATUS_COLORS[v] ?? "default"}>{v ?? "-"}</Tag>
           )}
@@ -60,7 +62,7 @@ export const OrderList: React.FC = () => {
             >
               <Select
                 style={{ minWidth: 120 }}
-                placeholder="Pilih Status"
+                placeholder={translate("orders.filterStatus")}
                 allowClear
                 options={STATUS_OPTIONS}
               />
@@ -70,7 +72,7 @@ export const OrderList: React.FC = () => {
         />
         <Table.Column
           dataIndex="payment_status"
-          title="Payment"
+          title={translate("orders.fields.payment")}
           render={(v: string) => (
             <Tag color={PAYMENT_COLORS[v] ?? "default"}>{v ?? "-"}</Tag>
           )}
@@ -87,7 +89,7 @@ export const OrderList: React.FC = () => {
             >
               <Select
                 style={{ minWidth: 120 }}
-                placeholder="Pilih Payment"
+                placeholder={translate("orders.filterPayment")}
                 allowClear
                 options={PAYMENT_OPTIONS}
               />
@@ -95,15 +97,15 @@ export const OrderList: React.FC = () => {
           )}
           defaultFilteredValue={getDefaultFilter("payment_status", filters, "eq")}
         />
-        <Table.Column dataIndex="created_at" title="Created" render={(v) => v ? new Date(v).toLocaleDateString() : "-"} />
+        <Table.Column dataIndex="created_at" title={translate("orders.fields.created")} render={(v) => v ? new Date(v).toLocaleDateString() : "-"} />
         <Table.Column
-          title="Aksi"
+          title={translate("table.actions")}
           key="actions"
           align="center"
           width={80}
           render={(_, record: { id: string }) => (
             <Space size="small">
-              <Tooltip title="Lihat Detail">
+              <Tooltip title={translate("orders.showDetail")}>
                 <ShowButton hideText size="small" recordItemId={record.id} resource="orders" />
               </Tooltip>
             </Space>

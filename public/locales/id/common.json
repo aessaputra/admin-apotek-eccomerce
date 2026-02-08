@@ -1,0 +1,181 @@
+{
+  "app": {
+    "title": "Admin Apotek",
+    "titleShort": "ADM"
+  },
+  "resources": {
+    "dashboard": "Dashboard",
+    "orders": "Pesanan",
+    "customers": "Pelanggan",
+    "stores": "Toko",
+    "products": "Produk",
+    "categories": "Kategori"
+  },
+  "actions": {
+    "show": "Lihat",
+    "edit": "Edit",
+    "delete": "Hapus",
+    "create": "Buat",
+    "list": "Daftar"
+  },
+  "buttons": {
+    "save": "Simpan",
+    "create": "Buat",
+    "cancel": "Batal",
+    "logout": "Keluar"
+  },
+  "table": {
+    "actions": "Aksi"
+  },
+  "dashboard": {
+    "dashboard": "Dashboard",
+    "totalOrders": "Total Pesanan",
+    "totalCustomers": "Total Pelanggan",
+    "totalProducts": "Total Produk"
+  },
+  "profiles": {
+    "profiles": "Pelanggan"
+  },
+  "stores": {
+    "stores": "Toko"
+  },
+  "products": {
+    "products": "Produk",
+    "fields": {
+      "image": "Gambar",
+      "name": "Nama",
+      "slug": "Slug",
+      "category": "Kategori",
+      "price": "Harga",
+      "stock": "Stok",
+      "active": "Aktif",
+      "description": "Deskripsi",
+      "images": "Gambar",
+      "created": "Dibuat"
+    },
+    "active": {
+      "yes": "Ya",
+      "no": "Tidak"
+    },
+    "status": {
+      "active": "Aktif",
+      "inactive": "Nonaktif"
+    }
+  },
+  "categories": {
+    "categories": "Kategori",
+    "fields": {
+      "logo": "Logo",
+      "name": "Nama",
+      "slug": "Slug",
+      "created": "Dibuat"
+    }
+  },
+  "orders": {
+    "orders": "Pesanan",
+    "fields": {
+      "id": "ID",
+      "total": "Total",
+      "status": "Status",
+      "payment": "Pembayaran",
+      "created": "Dibuat",
+      "product": "Produk",
+      "quantity": "Qty",
+      "unitPrice": "Harga Satuan",
+      "subtotal": "Subtotal",
+      "paymentStatus": "Status Pembayaran",
+      "paymentType": "Tipe Pembayaran",
+      "date": "Tanggal",
+      "productSubtotal": "Subtotal Produk",
+      "shippingCost": "Ongkos Kirim",
+      "courier": "Kurir",
+      "waybillNumber": "No. Resi"
+    },
+    "updateOrder": "Update Pesanan",
+    "productList": "Daftar Produk",
+    "orderInfo": "Informasi Pesanan",
+    "totalAndShipping": "Total & Ongkir",
+    "waybillRequired": "No. resi wajib diisi saat status {{status}}",
+    "waybillPlaceholder": "Masukkan nomor resi setelah pengiriman",
+    "saveSuccess": "Pesanan berhasil diperbarui",
+    "saveError": "Gagal memperbarui pesanan",
+    "cancelConfirm": "Batalkan pesanan?",
+    "cancelContent": "Status pesanan akan diubah menjadi Dibatalkan. Tindakan ini tidak dapat dibatalkan.",
+    "cancelOk": "Ya, Batalkan",
+    "cancelButton": "Batal",
+    "filterStatus": "Pilih Status",
+    "filterPayment": "Pilih Pembayaran",
+    "showDetail": "Lihat Detail"
+  },
+  "orderStatus": {
+    "pending": "Pending",
+    "processing": "Processing",
+    "paid": "Paid",
+    "shipped": "Shipped",
+    "delivered": "Delivered",
+    "cancelled": "Cancelled"
+  },
+  "paymentStatus": {
+    "pending": "Pending",
+    "success": "Success",
+    "failed": "Failed"
+  },
+  "customers": {
+    "fields": {
+      "customer": "Pelanggan",
+      "phone": "Telepon",
+      "joined": "Bergabung",
+      "profile": "Profil",
+      "fullName": "Nama Lengkap",
+      "role": "Role",
+      "status": "Status"
+    },
+    "searchName": "Cari nama",
+    "searchPhone": "Cari nomor",
+    "showDetail": "Lihat detail",
+    "statusBanned": "Banned",
+    "statusActive": "Aktif",
+    "ban": "Ban",
+    "unban": "Unban",
+    "banConfirm": "Ban customer?",
+    "banContent": "Customer \"{{name}}\" akan diblokir dan tidak dapat login.",
+    "banOk": "Ya, Ban",
+    "banSuccess": "Customer berhasil diban",
+    "banError": "Gagal ban customer",
+    "unbanSuccess": "Customer berhasil di-unban",
+    "unbanError": "Gagal unban customer",
+    "banTooltip": "Ban customer",
+    "unbanTooltip": "Unban customer"
+  },
+  "profile": {
+    "title": "Profil Saya",
+    "fields": {
+      "fullName": "Nama Lengkap",
+      "avatar": "Avatar",
+      "fullNamePlaceholder": "Masukkan nama lengkap"
+    },
+    "changePassword": "Ganti Password",
+    "newPassword": "Password Baru",
+    "confirmPassword": "Konfirmasi Password",
+    "newPasswordPlaceholder": "Masukkan password baru",
+    "confirmPasswordPlaceholder": "Ulangi password baru",
+    "passwordMismatch": "Konfirmasi password tidak cocok.",
+    "passwordRequired": "Masukkan password baru",
+    "passwordMinLength": "Password minimal 6 karakter",
+    "confirmRequired": "Konfirmasi password",
+    "passwordNotMatch": "Password tidak cocok",
+    "passwordSuccess": "Password berhasil diubah.",
+    "passwordError": "Gagal mengubah password.",
+    "myProfile": "Profil saya"
+  },
+  "auth": {
+    "accessDenied": "Akses ditolak. Hanya admin yang dapat login ke panel ini.",
+    "oauthNotAllowed": "Panel admin hanya mendukung login dengan email dan password.",
+    "registerDisabled": "Registrasi tidak tersedia. Hubungi administrator.",
+    "checkFailed": "Akses ditolak. Hanya admin yang dapat mengakses panel ini."
+  },
+  "notifications": {
+    "success": "Berhasil",
+    "error": "Error"
+  }
+}

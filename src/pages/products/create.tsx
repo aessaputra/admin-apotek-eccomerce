@@ -1,10 +1,12 @@
 import { Create, useForm, useSelect } from "@refinedev/antd";
+import { useTranslation } from "@refinedev/core";
 import { Form, Input, InputNumber, Select } from "antd";
 import { ProductImageUpload } from "../../components/product-image-upload";
 import { slugify } from "../../utils/slugify";
 import { supabaseClient } from "../../providers/supabase-client";
 
 export const ProductCreate: React.FC = () => {
+  const { translate } = useTranslation();
   const { formProps, saveButtonProps, form } = useForm();
   const { selectProps } = useSelect({
     resource: "categories",
@@ -48,29 +50,29 @@ export const ProductCreate: React.FC = () => {
         onValuesChange={handleValuesChange}
         onFinish={handleFinish}
       >
-        <Form.Item label="Name" name="name" rules={[{ required: true }]}>
+        <Form.Item label={translate("products.fields.name")} name="name" rules={[{ required: true }]}>
           <Input />
         </Form.Item>
-        <Form.Item label="Slug" name="slug" rules={[{ required: true }]}>
+        <Form.Item label={translate("products.fields.slug")} name="slug" rules={[{ required: true }]}>
           <Input />
         </Form.Item>
-        <Form.Item label="Description" name="description">
+        <Form.Item label={translate("products.fields.description")} name="description">
           <Input.TextArea />
         </Form.Item>
-        <Form.Item label="Price" name="price" rules={[{ required: true }]}>
+        <Form.Item label={translate("products.fields.price")} name="price" rules={[{ required: true }]}>
           <InputNumber style={{ width: "100%" }} min={0} />
         </Form.Item>
-        <Form.Item label="Stock" name="stock" initialValue={0}>
+        <Form.Item label={translate("products.fields.stock")} name="stock" initialValue={0}>
           <InputNumber style={{ width: "100%" }} min={0} />
         </Form.Item>
-        <Form.Item label="Category" name="category_id">
+        <Form.Item label={translate("products.fields.category")} name="category_id">
           <Select {...selectProps} />
         </Form.Item>
-        <Form.Item label="Images" name="images">
+        <Form.Item label={translate("products.fields.images")} name="images">
           <ProductImageUpload />
         </Form.Item>
-        <Form.Item label="Active" name="is_active" initialValue={true}>
-          <Select options={[{ value: true, label: "Yes" }, { value: false, label: "No" }]} />
+        <Form.Item label={translate("products.fields.active")} name="is_active" initialValue={true}>
+          <Select options={[{ value: true, label: translate("products.active.yes") }, { value: false, label: translate("products.active.no") }]} />
         </Form.Item>
       </Form>
     </Create>

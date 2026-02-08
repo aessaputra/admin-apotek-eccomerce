@@ -1,4 +1,4 @@
-import { useShow } from "@refinedev/core";
+import { useShow, useTranslation } from "@refinedev/core";
 import { Show, NumberField } from "@refinedev/antd";
 import { Typography, Image, Tag, Space } from "antd";
 
@@ -26,6 +26,7 @@ interface ProductRecord {
 }
 
 export const ProductShow: React.FC = () => {
+  const { translate } = useTranslation();
   const {
     result: record,
     query: { isLoading },
@@ -39,7 +40,7 @@ export const ProductShow: React.FC = () => {
 
   return (
     <Show isLoading={isLoading}>
-      <Title level={5}>Gambar</Title>
+      <Title level={5}>{translate("products.fields.image")}</Title>
       {images.length > 0 ? (
         <Space wrap size="middle">
           {images.map((img) => (
@@ -57,35 +58,35 @@ export const ProductShow: React.FC = () => {
         <Text type="secondary">-</Text>
       )}
 
-      <Title level={5}>Nama</Title>
+      <Title level={5}>{translate("products.fields.name")}</Title>
       <Text>{record?.name ?? "-"}</Text>
 
-      <Title level={5}>Slug</Title>
+      <Title level={5}>{translate("products.fields.slug")}</Title>
       <Text>{record?.slug ?? "-"}</Text>
 
-      <Title level={5}>Deskripsi</Title>
+      <Title level={5}>{translate("products.fields.description")}</Title>
       <Text>{record?.description || "-"}</Text>
 
-      <Title level={5}>Harga</Title>
+      <Title level={5}>{translate("products.fields.price")}</Title>
       <NumberField
         value={record?.price}
         options={{ style: "currency", currency: "IDR" }}
       />
 
-      <Title level={5}>Stok</Title>
+      <Title level={5}>{translate("products.fields.stock")}</Title>
       <Text>{record?.stock ?? 0}</Text>
 
-      <Title level={5}>Kategori</Title>
+      <Title level={5}>{translate("products.fields.category")}</Title>
       <Text>{record?.categories?.name ?? "-"}</Text>
 
-      <Title level={5}>Status</Title>
+      <Title level={5}>{translate("products.fields.active")}</Title>
       <Tag color={record?.is_active ? "green" : "default"}>
-        {record?.is_active ? "Aktif" : "Nonaktif"}
+        {record?.is_active ? translate("products.status.active") : translate("products.status.inactive")}
       </Tag>
 
       {record?.created_at && (
         <>
-          <Title level={5}>Dibuat</Title>
+          <Title level={5}>{translate("products.fields.created")}</Title>
           <Text>{new Date(record.created_at).toLocaleString("id-ID")}</Text>
         </>
       )}

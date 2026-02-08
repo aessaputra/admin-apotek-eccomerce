@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useShow, useUpdate } from "@refinedev/core";
+import { useShow, useUpdate, useTranslation } from "@refinedev/core";
 import { Show, DateField, NumberField } from "@refinedev/antd";
 import { Typography, Table, Tag, Descriptions, Form, Select, Input, Button, Card, App } from "antd";
 
@@ -43,16 +43,8 @@ const PAYMENT_COLORS: Record<string, string> = {
   failed: "red",
 };
 
-const STATUS_OPTIONS = [
-  { value: "pending", label: "Pending" },
-  { value: "processing", label: "Processing" },
-  { value: "paid", label: "Paid" },
-  { value: "shipped", label: "Shipped" },
-  { value: "delivered", label: "Delivered" },
-  { value: "cancelled", label: "Cancelled" },
-];
-
 export const OrderShow: React.FC = () => {
+  const { translate } = useTranslation();
   const {
     result: record,
     query: { isLoading },
@@ -77,11 +69,11 @@ export const OrderShow: React.FC = () => {
           waybill_number: values.waybill_number?.trim() || null,
         },
         successNotification: () => ({
-          message: "Pesanan berhasil diperbarui",
+          message: translate("orders.saveSuccess"),
           type: "success",
         }),
         errorNotification: () => ({
-          message: "Gagal memperbarui pesanan",
+          message: translate("orders.saveError"),
           type: "error",
         }),
       }
@@ -91,10 +83,10 @@ export const OrderShow: React.FC = () => {
   const handleUpdate = (values: { status: string; waybill_number?: string }) => {
     if (values.status === "cancelled") {
       modal.confirm({
-        title: "Batalkan pesanan?",
-        content: "Status pesanan akan diubah menjadi Dibatalkan. Tindakan ini tidak dapat dibatalkan.",
-        okText: "Ya, Batalkan",
-        cancelText: "Batal",
+        title: translate("orders.cancelConfirm"),
+        content: translate("orders.cancelContent"),
+        okText: translate("orders.cancelOk"),
+        cancelText: translate("orders.cancelButton"),
         okButtonProps: { danger: true },
         onOk: () => doMutate(values),
       });
@@ -102,6 +94,15 @@ export const OrderShow: React.FC = () => {
     }
     doMutate(values);
   };
+
+  const STATUS_OPTIONS = [
+    { value: "pending", label: translate("orderStatus.pending") },
+    { value: "processing", label: translate("orderStatus.processing") },
+    { value: "paid", label: translate("orderStatus.paid") },
+    { value: "shipped", label: translate("orderStatus.shipped") },
+    { value: "delivered", label: translate("orderStatus.delivered") },
+    { value: "cancelled", label: translate("orderStatus.cancelled") },
+  ];
 
   useEffect(() => {
     if (record) {
@@ -114,26 +115,26 @@ export const OrderShow: React.FC = () => {
 
   const columns = [
     {
-      title: "Produk",
+      title: translate("orders.fields.product"),
       dataIndex: ["products", "name"],
       key: "product",
       render: (_: unknown, row: OrderItem) => row.products?.name ?? "-",
     },
     {
-      title: "Qty",
+      title: translate("orders.fields.quantity"),
       dataIndex: "quantity",
       key: "quantity",
       width: 80,
     },
     {
-      title: "Harga Satuan",
+      title: translate("orders.fields.unitPrice"),
       dataIndex: "price_at_purchase",
       key: "price",
       render: (v: string | number) =>
         `Rp ${Number(v || 0).toLocaleString("id-ID")}`,
     },
     {
-      title: "Subtotal",
+      title: translate("orders.fields.subtotal"),
       key: "subtotal",
       render: (_: unknown, row: OrderItem) =>
         `Rp ${(Number(row.price_at_purchase || 0) * (row.quantity || 0)).toLocaleString("id-ID")}`,
@@ -142,54 +143,54 @@ export const OrderShow: React.FC = () => {
 
   return (
     <Show isLoading={isLoading}>
-      <Title level={5}>Informasi Pesanan</Title>
+      <Title level={5}>{translate("orders.orderInfo")}</Title>
       <Descriptions bordered size="small" column={1}>
-        <Descriptions.Item label="ID">{record?.id ?? "-"}</Descriptions.Item>
-        <Descriptions.Item label="Status">
+        <Descriptions.Item label={translate("orders.fields.id")}>{record?.id ?? "-"}</Descriptions.Item>
+        <Descriptions.Item label={translate("orders.fields.status")}>
           <Tag color={STATUS_COLORS[record?.status ?? ""] ?? "default"}>
             {record?.status ?? "-"}
           </Tag>
         </Descriptions.Item>
-        <Descriptions.Item label="Status Pembayaran">
+        <Descriptions.Item label={translate("orders.fields.paymentStatus")}>
           <Tag color={PAYMENT_COLORS[record?.payment_status ?? ""] ?? "default"}>
             {record?.payment_status ?? "-"}
           </Tag>
         </Descriptions.Item>
-        <Descriptions.Item label="Tipe Pembayaran">
+        <Descriptions.Item label={translate("orders.fields.paymentType")}>
           <Text>{record?.payment_type ?? "-"}</Text>
         </Descriptions.Item>
-        <Descriptions.Item label="Tanggal">
+        <Descriptions.Item label={translate("orders.fields.date")}>
           <DateField value={record?.created_at} format="LLL" />
         </Descriptions.Item>
       </Descriptions>
 
       <Title level={5} style={{ marginTop: 24 }}>
-        Total & Ongkir
+        {translate("orders.totalAndShipping")}
       </Title>
       <Descriptions bordered size="small" column={1}>
-        <Descriptions.Item label="Subtotal Produk">
+        <Descriptions.Item label={translate("orders.fields.productSubtotal")}>
           <NumberField
             value={record?.total_amount}
             options={{ style: "currency", currency: "IDR" }}
           />
         </Descriptions.Item>
-        <Descriptions.Item label="Ongkos Kirim">
+        <Descriptions.Item label={translate("orders.fields.shippingCost")}>
           {record?.shipping_cost != null
             ? `Rp ${Number(record.shipping_cost).toLocaleString("id-ID")}`
             : "-"}
         </Descriptions.Item>
-        <Descriptions.Item label="Kurir">
+        <Descriptions.Item label={translate("orders.fields.courier")}>
           {record?.courier_code
             ? `${record.courier_code} - ${record.courier_service ?? ""} (${record.shipping_etd ?? ""})`
             : "-"}
         </Descriptions.Item>
-        <Descriptions.Item label="No. Resi">
+        <Descriptions.Item label={translate("orders.fields.waybillNumber")}>
           <Text strong>{record?.waybill_number ?? "-"}</Text>
         </Descriptions.Item>
       </Descriptions>
 
       {record && !isLoading && (
-        <Card title="Update Pesanan" style={{ marginTop: 24 }}>
+        <Card title={translate("orders.updateOrder")} style={{ marginTop: 24 }}>
           <Form
             form={form}
             layout="vertical"
@@ -201,32 +202,32 @@ export const OrderShow: React.FC = () => {
           >
             <Form.Item
               name="status"
-              label="Status"
+              label={translate("orders.fields.status")}
               rules={[{ required: true }]}
             >
               <Select options={STATUS_OPTIONS} style={{ minWidth: 160 }} />
             </Form.Item>
             <Form.Item
               name="waybill_number"
-              label="No. Resi"
+              label={translate("orders.fields.waybillNumber")}
               dependencies={["status"]}
               rules={[
                 ({ getFieldValue }) => ({
                   validator(_, value) {
                     const status = getFieldValue("status");
                     if (status === "shipped" && !value?.trim()) {
-                      return Promise.reject(new Error("No. resi wajib diisi saat status Shipped"));
+                      return Promise.reject(new Error(translate("orders.waybillRequired", { status: translate("orderStatus.shipped") })));
                     }
                     return Promise.resolve();
                   },
                 }),
               ]}
             >
-              <Input placeholder="Masukkan nomor resi setelah pengiriman" />
+              <Input placeholder={translate("orders.waybillPlaceholder")} />
             </Form.Item>
             <Form.Item>
               <Button type="primary" htmlType="submit" loading={isUpdating}>
-                Simpan
+                {translate("buttons.save")}
               </Button>
             </Form.Item>
           </Form>
@@ -234,7 +235,7 @@ export const OrderShow: React.FC = () => {
       )}
 
       <Title level={5} style={{ marginTop: 24 }}>
-        Daftar Produk
+        {translate("orders.productList")}
       </Title>
       <Table
         dataSource={items}

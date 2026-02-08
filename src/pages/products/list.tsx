@@ -5,6 +5,7 @@ import {
   ShowButton,
   DeleteButton,
 } from "@refinedev/antd";
+import { useTranslation } from "@refinedev/core";
 import { Table, Image, Space, Tooltip } from "antd";
 
 interface ProductImage { url: string }
@@ -15,6 +16,7 @@ interface ProductRecord {
 }
 
 export const ProductList: React.FC = () => {
+  const { translate } = useTranslation();
   const { tableProps } = useTable({
     syncWithLocation: true,
     meta: { select: "*, product_images(*), categories(name)" },
@@ -25,7 +27,7 @@ export const ProductList: React.FC = () => {
       <Table {...tableProps} rowKey="id">
         <Table.Column
           dataIndex={["product_images", 0, "url"]}
-          title="Gambar"
+          title={translate("products.fields.image")}
           width={80}
           render={(_, record: ProductRecord) => {
             const url = record.product_images?.[0]?.url;
@@ -36,18 +38,18 @@ export const ProductList: React.FC = () => {
             );
           }}
         />
-        <Table.Column dataIndex="name" title="Name" />
-        <Table.Column dataIndex="slug" title="Slug" />
+        <Table.Column dataIndex="name" title={translate("products.fields.name")} />
+        <Table.Column dataIndex="slug" title={translate("products.fields.slug")} />
         <Table.Column
           dataIndex={["categories", "name"]}
-          title="Category"
+          title={translate("products.fields.category")}
           render={(_, record: ProductRecord) => record.categories?.name ?? "-"}
         />
-        <Table.Column dataIndex="price" title="Price" render={(v) => `Rp ${Number(v || 0).toLocaleString("id-ID")}`} />
-        <Table.Column dataIndex="stock" title="Stock" />
-        <Table.Column dataIndex="is_active" title="Active" render={(v) => (v ? "Yes" : "No")} />
+        <Table.Column dataIndex="price" title={translate("products.fields.price")} render={(v) => `Rp ${Number(v || 0).toLocaleString("id-ID")}`} />
+        <Table.Column dataIndex="stock" title={translate("products.fields.stock")} />
+        <Table.Column dataIndex="is_active" title={translate("products.fields.active")} render={(v) => (v ? translate("products.active.yes") : translate("products.active.no"))} />
         <Table.Column
-          title="Aksi"
+          title={translate("table.actions")}
           dataIndex="actions"
           key="actions"
           align="center"
@@ -55,17 +57,17 @@ export const ProductList: React.FC = () => {
           fixed="right"
           render={(_, record: ProductRecord) => (
             <Space size="small">
-              <Tooltip title="Lihat">
+              <Tooltip title={translate("actions.show")}>
                 <span>
                   <ShowButton hideText size="small" recordItemId={record.id} />
                 </span>
               </Tooltip>
-              <Tooltip title="Edit">
+              <Tooltip title={translate("actions.edit")}>
                 <span>
                   <EditButton hideText size="small" recordItemId={record.id} />
                 </span>
               </Tooltip>
-              <Tooltip title="Hapus">
+              <Tooltip title={translate("actions.delete")}>
                 <span>
                   <DeleteButton hideText size="small" recordItemId={record.id} />
                 </span>

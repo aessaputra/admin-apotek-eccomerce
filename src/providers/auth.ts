@@ -1,4 +1,5 @@
 import { AuthProvider } from "@refinedev/core";
+import i18n from "../i18n";
 import { supabaseClient } from "./supabase-client";
 
 const ADMIN_ROLE = "admin";
@@ -38,7 +39,7 @@ function rejectNonAdmin() {
   return {
     success: false as const,
     error: {
-      message: "Akses ditolak. Hanya admin yang dapat login ke panel ini.",
+      message: i18n.t("auth.accessDenied"),
       name: "Unauthorized",
     },
   };
@@ -51,7 +52,7 @@ const authProvider: AuthProvider = {
         return {
           success: false,
           error: {
-            message: "Panel admin hanya mendukung login dengan email dan password.",
+            message: i18n.t("auth.oauthNotAllowed"),
             name: "OAuth not allowed",
           },
         };
@@ -93,7 +94,7 @@ const authProvider: AuthProvider = {
   register: async () => ({
     success: false,
     error: {
-      message: "Registrasi tidak tersedia. Hubungi administrator.",
+      message: i18n.t("auth.registerDisabled"),
       name: "Registration disabled",
     },
   }),
@@ -197,7 +198,7 @@ const authProvider: AuthProvider = {
         return {
           authenticated: false,
           error: {
-            message: "Akses ditolak. Hanya admin yang dapat mengakses panel ini.",
+            message: i18n.t("auth.checkFailed"),
             name: "Unauthorized",
           },
           logout: true,

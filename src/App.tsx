@@ -1,3 +1,4 @@
+import type { I18nProvider } from "@refinedev/core";
 import { Authenticated, GitHubBanner, Refine } from "@refinedev/core";
 import { DevtoolsPanel, DevtoolsProvider } from "@refinedev/devtools";
 import { RefineKbar, RefineKbarProvider } from "@refinedev/kbar";
@@ -23,6 +24,7 @@ import routerProvider, {
 import { liveProvider } from "@refinedev/supabase";
 import { App as AntdApp } from "antd";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router";
+import { useTranslation } from "react-i18next";
 import { ColorModeContextProvider } from "./contexts/color-mode";
 import { Header } from "./components/header";
 import { Title } from "./components/layout/title";
@@ -46,6 +48,23 @@ import { CategoryShow } from "./pages/categories/show";
 import { Profile } from "./pages/profile";
 
 function App() {
+  const { t, i18n } = useTranslation();
+
+  const i18nProvider: I18nProvider = {
+    translate: (key: string, options?: any, defaultMessage?: string): string => {
+      const result =
+        defaultMessage !== undefined
+          ? t(key, defaultMessage, options ?? {})
+          : t(key, options ?? {});
+      return typeof result === "string" ? result : String(result);
+    },
+    changeLocale: (lang: string) => i18n.changeLanguage(lang),
+    getLocale: () => {
+      const lang = i18n.language || i18n.resolvedLanguage || "id";
+      return lang.startsWith("en") ? "en" : "id";
+    },
+  };
+
   return (
     <BrowserRouter>
       <GitHubBanner />
@@ -59,39 +78,28 @@ function App() {
                 authProvider={authProvider}
                 routerProvider={routerProvider}
                 notificationProvider={useNotificationProvider}
+                i18nProvider={i18nProvider}
                 resources={[
                   {
                     name: "dashboard",
                     list: "/",
-                    meta: {
-                      label: "Dashboard",
-                      icon: <DashboardOutlined />,
-                    },
+                    meta: { icon: <DashboardOutlined /> },
                   },
                   {
                     name: "orders",
                     list: "/orders",
                     show: "/orders/show/:id",
-                    meta: {
-                      label: "Orders",
-                      icon: <ShoppingCartOutlined />,
-                    },
+                    meta: { icon: <ShoppingCartOutlined /> },
                   },
                   {
                     name: "profiles",
                     list: "/customers",
                     show: "/customers/show/:id",
-                    meta: {
-                      label: "Customers",
-                      icon: <UserOutlined />,
-                    },
+                    meta: { icon: <UserOutlined /> },
                   },
                   {
                     name: "stores",
-                    meta: {
-                      label: "Stores",
-                      icon: <ShopOutlined />,
-                    },
+                    meta: { icon: <ShopOutlined /> },
                   },
                   {
                     name: "products",
@@ -99,11 +107,7 @@ function App() {
                     create: "/products/create",
                     edit: "/products/edit/:id",
                     show: "/products/show/:id",
-                    meta: {
-                      label: "Products",
-                      parent: "stores",
-                      icon: <InboxOutlined />,
-                    },
+                    meta: { parent: "stores", icon: <InboxOutlined /> },
                   },
                   {
                     name: "categories",
@@ -111,11 +115,7 @@ function App() {
                     create: "/categories/create",
                     edit: "/categories/edit/:id",
                     show: "/categories/show/:id",
-                    meta: {
-                      label: "Categories",
-                      parent: "stores",
-                      icon: <AppstoreOutlined />,
-                    },
+                    meta: { parent: "stores", icon: <AppstoreOutlined /> },
                   },
                 ]}
                 options={{

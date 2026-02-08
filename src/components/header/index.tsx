@@ -1,11 +1,13 @@
 import type { RefineThemedLayoutHeaderProps } from "@refinedev/antd";
-import { useGetIdentity, useLogout } from "@refinedev/core";
+import { useGetIdentity, useLogout, useTranslation } from "@refinedev/core";
+import { useTranslation as useI18nTranslation } from "react-i18next";
 import { Link } from "react-router";
 import {
   Layout as AntdLayout,
   Avatar,
   Button,
   Dropdown,
+  Select,
   Space,
   Switch,
   theme,
@@ -30,6 +32,8 @@ export const Header: React.FC<RefineThemedLayoutHeaderProps> = ({
   const { data: user } = useGetIdentity<IUser>();
   const { mutate: logout } = useLogout();
   const { mode, setMode } = useContext(ColorModeContext);
+  const { translate, changeLocale } = useTranslation();
+  const { i18n } = useI18nTranslation();
 
   const headerStyles: React.CSSProperties = {
     backgroundColor: token.colorBgElevated,
@@ -50,13 +54,13 @@ export const Header: React.FC<RefineThemedLayoutHeaderProps> = ({
     {
       key: "profile",
       icon: <UserOutlined />,
-      label: <Link to="/profile">Profil saya</Link>,
+      label: <Link to="/profile">{translate("profile.myProfile")}</Link>,
     },
     { type: "divider" },
     {
       key: "logout",
       icon: <LogoutOutlined />,
-      label: "Keluar",
+      label: translate("buttons.logout"),
       danger: true,
       onClick: () => logout(),
     },
@@ -65,6 +69,15 @@ export const Header: React.FC<RefineThemedLayoutHeaderProps> = ({
   return (
     <AntdLayout.Header style={headerStyles}>
       <Space>
+        <Select
+          value={i18n.language?.startsWith("en") ? "en" : "id"}
+          onChange={(v) => changeLocale(v ?? "id")}
+          style={{ width: 80 }}
+          options={[
+            { value: "id", label: "ID" },
+            { value: "en", label: "EN" },
+          ]}
+        />
         <Switch
           checkedChildren="🌛"
           unCheckedChildren="🔆"

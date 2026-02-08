@@ -1,14 +1,15 @@
-import { useGetIdentity, useInvalidate, useUpdatePassword } from "@refinedev/core";
+import { useGetIdentity, useInvalidate, useUpdatePassword, useTranslation } from "@refinedev/core";
 import { Edit, useForm } from "@refinedev/antd";
 import { Divider, Form, Input, Button, message } from "antd";
 import { LockOutlined } from "@ant-design/icons";
 import { AvatarUpload } from "../../components/avatar-upload";
 
 export const Profile: React.FC = () => {
+  const { translate } = useTranslation();
   const { data: user } = useGetIdentity<{ id: string }>();
   const invalidate = useInvalidate();
   const [passwordForm] = Form.useForm();
-  const { mutate: updatePassword, isLoading: isPasswordLoading } = useUpdatePassword();
+  const { mutate: updatePassword, isPending: isPasswordLoading } = useUpdatePassword();
 
   const { formProps, saveButtonProps } = useForm({
     action: "edit",
@@ -24,7 +25,7 @@ export const Profile: React.FC = () => {
 
   const onPasswordFinish = (values: { password: string; confirmPassword: string }) => {
     if (values.password !== values.confirmPassword) {
-      message.error("Konfirmasi password tidak cocok.");
+      message.error(translate("profile.passwordMismatch"));
       return;
     }
     updatePassword(
@@ -32,14 +33,14 @@ export const Profile: React.FC = () => {
       {
         onSuccess: (data) => {
           if (data?.success === false && data?.error) {
-            message.error(data.error.message ?? "Gagal mengubah password.");
+            message.error(data.error.message ?? translate("profile.passwordError"));
             return;
           }
-          message.success("Password berhasil diubah.");
+          message.success(translate("profile.passwordSuccess"));
           passwordForm.resetFields();
         },
         onError: (error) => {
-          message.error(error?.message ?? "Gagal mengubah password.");
+          message.error(error?.message ?? translate("profile.passwordError"));
         },
       }
     );
@@ -52,21 +53,21 @@ export const Profile: React.FC = () => {
   return (
     <Edit
       saveButtonProps={saveButtonProps}
-      title="Profil Saya"
+      title={translate("profile.title")}
       breadcrumb={false}
       contentProps={{ style: { display: "flex", flexDirection: "column", gap: 24 } }}
     >
       <Form {...formProps} layout="vertical">
-        <Form.Item label="Nama Lengkap" name="full_name">
-          <Input placeholder="Masukkan nama lengkap" />
+        <Form.Item label={translate("profile.fields.fullName")} name="full_name">
+          <Input placeholder={translate("profile.fields.fullNamePlaceholder")} />
         </Form.Item>
-        <Form.Item label="Avatar" name="avatar_url">
+        <Form.Item label={translate("profile.fields.avatar")} name="avatar_url">
           <AvatarUpload userId={user.id} />
         </Form.Item>
       </Form>
 
       <Divider orientation="left" plain>
-        Ganti Password
+        {translate("profile.changePassword")}
       </Divider>
 
       <Form
@@ -77,44 +78,44 @@ export const Profile: React.FC = () => {
         style={{ maxWidth: 400 }}
       >
         <Form.Item
-          label="Password Baru"
+          label={translate("profile.newPassword")}
           name="password"
           rules={[
-            { required: true, message: "Masukkan password baru" },
-            { min: 6, message: "Password minimal 6 karakter" },
+            { required: true, message: translate("profile.passwordRequired") },
+            { min: 6, message: translate("profile.passwordMinLength") },
           ]}
         >
           <Input.Password
             prefix={<LockOutlined />}
-            placeholder="Masukkan password baru"
+            placeholder={translate("profile.newPasswordPlaceholder")}
             autoComplete="new-password"
           />
         </Form.Item>
         <Form.Item
-          label="Konfirmasi Password"
+          label={translate("profile.confirmPassword")}
           name="confirmPassword"
           dependencies={["password"]}
           rules={[
-            { required: true, message: "Konfirmasi password" },
+            { required: true, message: translate("profile.confirmRequired") },
             ({ getFieldValue }) => ({
               validator(_, value) {
                 if (!value || getFieldValue("password") === value) {
                   return Promise.resolve();
                 }
-                return Promise.reject(new Error("Password tidak cocok"));
+                return Promise.reject(new Error(translate("profile.passwordNotMatch")));
               },
             }),
           ]}
         >
           <Input.Password
             prefix={<LockOutlined />}
-            placeholder="Ulangi password baru"
+            placeholder={translate("profile.confirmPasswordPlaceholder")}
             autoComplete="new-password"
           />
         </Form.Item>
         <Form.Item>
           <Button type="primary" htmlType="submit" loading={isPasswordLoading}>
-            Ganti Password
+            {translate("profile.changePassword")}
           </Button>
         </Form.Item>
       </Form>

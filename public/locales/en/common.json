@@ -1,0 +1,181 @@
+{
+  "app": {
+    "title": "Admin Pharmacy",
+    "titleShort": "ADM"
+  },
+  "resources": {
+    "dashboard": "Dashboard",
+    "orders": "Orders",
+    "customers": "Customers",
+    "stores": "Stores",
+    "products": "Products",
+    "categories": "Categories"
+  },
+  "actions": {
+    "show": "View",
+    "edit": "Edit",
+    "delete": "Delete",
+    "create": "Create",
+    "list": "List"
+  },
+  "buttons": {
+    "save": "Save",
+    "create": "Create",
+    "cancel": "Cancel",
+    "logout": "Logout"
+  },
+  "table": {
+    "actions": "Actions"
+  },
+  "dashboard": {
+    "dashboard": "Dashboard",
+    "totalOrders": "Total Orders",
+    "totalCustomers": "Total Customers",
+    "totalProducts": "Total Products"
+  },
+  "profiles": {
+    "profiles": "Customers"
+  },
+  "stores": {
+    "stores": "Stores"
+  },
+  "products": {
+    "products": "Products",
+    "fields": {
+      "image": "Image",
+      "name": "Name",
+      "slug": "Slug",
+      "category": "Category",
+      "price": "Price",
+      "stock": "Stock",
+      "active": "Active",
+      "description": "Description",
+      "images": "Images",
+      "created": "Created"
+    },
+    "active": {
+      "yes": "Yes",
+      "no": "No"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    }
+  },
+  "categories": {
+    "categories": "Categories",
+    "fields": {
+      "logo": "Logo",
+      "name": "Name",
+      "slug": "Slug",
+      "created": "Created"
+    }
+  },
+  "orders": {
+    "orders": "Orders",
+    "fields": {
+      "id": "ID",
+      "total": "Total",
+      "status": "Status",
+      "payment": "Payment",
+      "created": "Created",
+      "product": "Product",
+      "quantity": "Qty",
+      "unitPrice": "Unit Price",
+      "subtotal": "Subtotal",
+      "paymentStatus": "Payment Status",
+      "paymentType": "Payment Type",
+      "date": "Date",
+      "productSubtotal": "Product Subtotal",
+      "shippingCost": "Shipping Cost",
+      "courier": "Courier",
+      "waybillNumber": "Waybill No."
+    },
+    "updateOrder": "Update Order",
+    "productList": "Product List",
+    "orderInfo": "Order Information",
+    "totalAndShipping": "Total & Shipping",
+    "waybillRequired": "Waybill number is required when status is {{status}}",
+    "waybillPlaceholder": "Enter waybill number after shipping",
+    "saveSuccess": "Order updated successfully",
+    "saveError": "Failed to update order",
+    "cancelConfirm": "Cancel order?",
+    "cancelContent": "Order status will be changed to Cancelled. This action cannot be undone.",
+    "cancelOk": "Yes, Cancel",
+    "cancelButton": "Cancel",
+    "filterStatus": "Select Status",
+    "filterPayment": "Select Payment",
+    "showDetail": "View Detail"
+  },
+  "orderStatus": {
+    "pending": "Pending",
+    "processing": "Processing",
+    "paid": "Paid",
+    "shipped": "Shipped",
+    "delivered": "Delivered",
+    "cancelled": "Cancelled"
+  },
+  "paymentStatus": {
+    "pending": "Pending",
+    "success": "Success",
+    "failed": "Failed"
+  },
+  "customers": {
+    "fields": {
+      "customer": "Customer",
+      "phone": "Phone",
+      "joined": "Joined",
+      "profile": "Profile",
+      "fullName": "Full Name",
+      "role": "Role",
+      "status": "Status"
+    },
+    "searchName": "Search name",
+    "searchPhone": "Search phone",
+    "showDetail": "View detail",
+    "statusBanned": "Banned",
+    "statusActive": "Active",
+    "ban": "Ban",
+    "unban": "Unban",
+    "banConfirm": "Ban customer?",
+    "banContent": "Customer \"{{name}}\" will be blocked and cannot login.",
+    "banOk": "Yes, Ban",
+    "banSuccess": "Customer banned successfully",
+    "banError": "Failed to ban customer",
+    "unbanSuccess": "Customer unbanned successfully",
+    "unbanError": "Failed to unban customer",
+    "banTooltip": "Ban customer",
+    "unbanTooltip": "Unban customer"
+  },
+  "profile": {
+    "title": "My Profile",
+    "fields": {
+      "fullName": "Full Name",
+      "avatar": "Avatar",
+      "fullNamePlaceholder": "Enter full name"
+    },
+    "changePassword": "Change Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "newPasswordPlaceholder": "Enter new password",
+    "confirmPasswordPlaceholder": "Repeat new password",
+    "passwordMismatch": "Password confirmation does not match.",
+    "passwordRequired": "Enter new password",
+    "passwordMinLength": "Password must be at least 6 characters",
+    "confirmRequired": "Confirm password",
+    "passwordNotMatch": "Passwords do not match",
+    "passwordSuccess": "Password changed successfully.",
+    "passwordError": "Failed to change password.",
+    "myProfile": "My Profile"
+  },
+  "auth": {
+    "accessDenied": "Access denied. Only admins can log in to this panel.",
+    "oauthNotAllowed": "Admin panel only supports email and password login.",
+    "registerDisabled": "Registration is not available. Contact administrator.",
+    "checkFailed": "Access denied. Only admins can access this panel."
+  },
+  "notifications": {
+    "success": "Success",
+    "error": "Error"
+  }
+}
