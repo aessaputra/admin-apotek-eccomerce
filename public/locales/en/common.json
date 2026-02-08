@@ -161,7 +161,7 @@
     "confirmPasswordPlaceholder": "Repeat new password",
     "passwordMismatch": "Password confirmation does not match.",
     "passwordRequired": "Enter new password",
-    "passwordMinLength": "Password must be at least 6 characters",
+    "passwordMinLength": "Password must be at least 8 characters",
     "confirmRequired": "Confirm password",
     "passwordNotMatch": "Passwords do not match",
     "passwordSuccess": "Password changed successfully.",
