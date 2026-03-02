@@ -13,6 +13,7 @@ import {
   ShopOutlined,
   InboxOutlined,
   AppstoreOutlined,
+  BarChartOutlined,
 } from "@ant-design/icons";
 
 import routerProvider, {
@@ -47,6 +48,7 @@ import { CategoryCreate } from "./pages/categories/create";
 import { CategoryEdit } from "./pages/categories/edit";
 import { CategoryShow } from "./pages/categories/show";
 import { Profile } from "./pages/profile";
+import { SalesReport } from "./pages/reports/sales";
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -118,6 +120,11 @@ function App() {
                     show: "/categories/show/:id",
                     meta: { parent: "stores", icon: <AppstoreOutlined /> },
                   },
+                  {
+                    name: "salesReports",
+                    list: "/reports/sales",
+                    meta: { icon: <BarChartOutlined /> },
+                  },
                 ]}
                 options={{
                   syncWithLocation: true,
@@ -167,6 +174,9 @@ function App() {
                       <Route path="create" element={<CategoryCreate />} />
                       <Route path="show/:id" element={<CategoryShow />} />
                       <Route path="edit/:id" element={<CategoryEdit />} />
+                    </Route>
+                    <Route path="/reports">
+                      <Route path="sales" element={<SalesReport />} />
                     </Route>
                     <Route path="*" element={<ErrorComponent />} />
                   </Route>

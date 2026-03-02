@@ -10,7 +10,8 @@
     "profiles": "Pelanggan",
     "stores": "Toko",
     "products": "Produk",
-    "categories": "Kategori"
+    "categories": "Kategori",
+    "salesReports": "Laporan Penjualan"
   },
   "actions": {
     "show": "Lihat",
@@ -33,6 +34,9 @@
     "totalOrders": "Total Pesanan",
     "totalCustomers": "Total Pelanggan",
     "totalProducts": "Total Produk"
+  },
+  "salesReports": {
+    "salesReports": "Laporan Penjualan"
   },
   "profiles": {
     "profiles": "Pelanggan"
@@ -179,5 +183,27 @@
   "notifications": {
     "success": "Berhasil",
     "error": "Error"
+  },
+  "reports": {
+    "sales": {
+      "title": "Laporan Penjualan",
+      "daily": "Ringkasan Penjualan Harian",
+      "date": "Tanggal",
+      "date_from": "Dari tanggal",
+      "date_to": "Sampai tanggal",
+      "orders_count": "Jumlah Order",
+      "total_revenue": "Total Omzet",
+      "aov": "Rata-rata Nilai Order",
+      "top_products": "Produk Terlaris",
+      "product_name": "Produk",
+      "category_name": "Kategori",
+      "total_qty_sold": "Qty Terjual",
+      "top_customers": "Customer Terbesar",
+      "customer_name": "Nama",
+      "phone_number": "No. HP",
+      "empty_daily": "Tidak ada data pada rentang tanggal ini",
+      "empty_products": "Belum ada data penjualan produk",
+      "empty_customers": "Belum ada data penjualan per customer"
+    }
   }
 }

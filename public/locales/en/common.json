@@ -10,7 +10,8 @@
     "profiles": "Customers",
     "stores": "Stores",
     "products": "Products",
-    "categories": "Categories"
+    "categories": "Categories",
+    "salesReports": "Sales Reports"
   },
   "actions": {
     "show": "View",
@@ -33,6 +34,9 @@
     "totalOrders": "Total Orders",
     "totalCustomers": "Total Customers",
     "totalProducts": "Total Products"
+  },
+  "salesReports": {
+    "salesReports": "Sales Reports"
   },
   "profiles": {
     "profiles": "Customers"
@@ -179,5 +183,27 @@
   "notifications": {
     "success": "Success",
     "error": "Error"
+  },
+  "reports": {
+    "sales": {
+      "title": "Sales Report",
+      "daily": "Daily Sales Summary",
+      "date": "Date",
+      "date_from": "From date",
+      "date_to": "To date",
+      "orders_count": "Orders Count",
+      "total_revenue": "Total Revenue",
+      "aov": "Average Order Value",
+      "top_products": "Top Products",
+      "product_name": "Product",
+      "category_name": "Category",
+      "total_qty_sold": "Qty Sold",
+      "top_customers": "Top Customers",
+      "customer_name": "Name",
+      "phone_number": "Phone Number",
+      "empty_daily": "No data for this date range",
+      "empty_products": "No product sales data yet",
+      "empty_customers": "No customer sales data yet"
+    }
   }
 }
