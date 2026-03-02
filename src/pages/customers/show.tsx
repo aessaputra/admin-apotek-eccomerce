@@ -1,10 +1,8 @@
 import { useParams } from "react-router";
-import { useShow, useTranslation, useInvalidate } from "@refinedev/core";
+import { useShow, useTranslation } from "@refinedev/core";
 import { Show, DateField } from "@refinedev/antd";
-import { useMutation } from "@tanstack/react-query";
-import { Typography, Avatar, Space, Tag, Button, App } from "antd";
-import { supabaseClient } from "../../providers/supabase-client";
-import { getFunctionsErrorMessage } from "../../utils/functions-error";
+import { Typography, Avatar, Space, Tag, Button } from "antd";
+import { useBanToggle } from "../../hooks/useBanToggle";
 
 const { Title, Text } = Typography;
 
@@ -16,8 +14,7 @@ const ROLE_COLORS: Record<string, string> = {
 export const CustomerShow: React.FC = () => {
   const { translate } = useTranslation();
   const { id } = useParams<{ id: string }>();
-  const invalidate = useInvalidate();
-  const { modal } = App.useApp();
+  const { handleBan, handleUnban, isPending } = useBanToggle();
   const {
     result: record,
     query: { isLoading },
@@ -25,72 +22,6 @@ export const CustomerShow: React.FC = () => {
     resource: "profiles",
     id: id ?? "",
   });
-
-  const { mutate, isPending } = useMutation({
-    mutationFn: async ({
-      userId,
-      action,
-    }: {
-      userId: string;
-      action: "ban" | "unban";
-    }) => {
-      const { data, error } = await supabaseClient.functions.invoke(
-        "ban-customer",
-        { body: { userId, action } }
-      );
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      invalidate({ resource: "profiles", invalidates: ["list", "detail"] });
-    },
-  });
-
-  const handleBan = () => {
-    if (!id) return;
-    modal.confirm({
-      title: translate("customers.banConfirm"),
-      content: translate("customers.banContent", {
-        name: record?.full_name || id,
-      }),
-      okText: translate("customers.banOk"),
-      cancelText: translate("buttons.cancel"),
-      okButtonProps: { danger: true },
-      onOk: () =>
-        mutate(
-          { userId: id, action: "ban" },
-          {
-            onSuccess: () =>
-              modal.success({ content: translate("customers.banSuccess") }),
-            onError: async (e: unknown) => {
-              const msg = await getFunctionsErrorMessage(
-                e,
-                translate("customers.banError")
-              );
-              modal.error({ content: msg });
-            },
-          }
-        ),
-    });
-  };
-
-  const handleUnban = () => {
-    if (!id) return;
-    mutate(
-      { userId: id, action: "unban" },
-      {
-        onSuccess: () =>
-          modal.success({ content: translate("customers.unbanSuccess") }),
-        onError: async (e: unknown) => {
-          const msg = await getFunctionsErrorMessage(
-            e,
-            translate("customers.unbanError")
-          );
-          modal.error({ content: msg });
-        },
-      }
-    );
-  };
 
   return (
     <Show isLoading={isLoading}>
@@ -118,13 +49,13 @@ export const CustomerShow: React.FC = () => {
         <Tag color={record?.is_banned ? "red" : "green"}>
           {record?.is_banned ? translate("customers.statusBanned") : translate("customers.statusActive")}
         </Tag>
-        {record?.role === "customer" &&
+        {record?.role === "customer" && id &&
           (record?.is_banned ? (
             <Button
               type="primary"
               size="small"
               loading={isPending}
-              onClick={handleUnban}
+              onClick={() => handleUnban({ id, full_name: record?.full_name })}
             >
               {translate("customers.unban")}
             </Button>
@@ -133,7 +64,7 @@ export const CustomerShow: React.FC = () => {
               danger
               size="small"
               loading={isPending}
-              onClick={handleBan}
+              onClick={() => handleBan({ id, full_name: record?.full_name })}
             >
               {translate("customers.ban")}
             </Button>

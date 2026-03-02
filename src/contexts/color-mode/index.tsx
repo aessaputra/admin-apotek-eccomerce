@@ -2,19 +2,12 @@ import { RefineThemes } from "@refinedev/antd";
 import { ConfigProvider, theme } from "antd";
 import {
   type PropsWithChildren,
-  createContext,
   useEffect,
   useState,
 } from "react";
+import { ColorModeContext } from "./context";
 
-type ColorModeContextType = {
-  mode: string;
-  setMode: () => void;
-};
-
-export const ColorModeContext = createContext<ColorModeContextType>(
-  {} as ColorModeContextType
-);
+export { ColorModeContext } from "./context";
 
 function getInitialColorMode(): string {
   if (typeof window === "undefined") return "light";

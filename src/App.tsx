@@ -60,7 +60,7 @@ function App() {
   const { t, i18n } = useTranslation();
 
   const i18nProvider: I18nProvider = {
-    translate: (key: string, options?: any, defaultMessage?: string): string => {
+    translate: (key: string, options?: Record<string, unknown>, defaultMessage?: string): string => {
       const result =
         defaultMessage !== undefined
           ? t(key, defaultMessage, options ?? {})
@@ -147,12 +147,7 @@ function App() {
                         <ThemedLayout
                           Header={Header}
                           Title={Title}
-                          Sider={({ Title }) => (
-                            <ThemedSider
-                              Title={Title}
-                              render={({ items }) => <>{items}</>}
-                            />
-                          )}
+                          Sider={({ Title }) => <ThemedSider Title={Title} render={({ items }) => <>{items}</>} />}
                         >
                           <Outlet />
                         </ThemedLayout>

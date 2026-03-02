@@ -4,9 +4,10 @@ import { Divider, Form, Input, Button, message } from "antd";
 import { LockOutlined } from "@ant-design/icons";
 import { AvatarUpload } from "../../components/avatar-upload";
 
-export const Profile: React.FC = () => {
+type IdentityUser = { id: string };
+
+const ProfileForms: React.FC<{ userId: string }> = ({ userId }) => {
   const { translate } = useTranslation();
-  const { data: user } = useGetIdentity<{ id: string }>();
   const invalidate = useInvalidate();
   const [passwordForm] = Form.useForm();
   const { mutate: updatePassword, isPending: isPasswordLoading } = useUpdatePassword();
@@ -14,10 +15,9 @@ export const Profile: React.FC = () => {
   const { formProps, saveButtonProps } = useForm({
     action: "edit",
     resource: "profiles",
-    id: user?.id ?? "",
+    id: userId,
     redirect: false,
     mutationMode: "pessimistic",
-    queryOptions: { enabled: !!user?.id },
     onMutationSuccess: () => {
       invalidate({ invalidates: ["all"] });
     },
@@ -46,10 +46,6 @@ export const Profile: React.FC = () => {
     );
   };
 
-  if (!user?.id) {
-    return null;
-  }
-
   return (
     <Edit
       saveButtonProps={saveButtonProps}
@@ -62,7 +58,7 @@ export const Profile: React.FC = () => {
           <Input placeholder={translate("profile.fields.fullNamePlaceholder")} />
         </Form.Item>
         <Form.Item label={translate("profile.fields.avatar")} name="avatar_url">
-          <AvatarUpload userId={user.id} />
+          <AvatarUpload userId={userId} />
         </Form.Item>
       </Form>
 
@@ -121,4 +117,14 @@ export const Profile: React.FC = () => {
       </Form>
     </Edit>
   );
+};
+
+export const Profile: React.FC = () => {
+  const { data: user } = useGetIdentity<IdentityUser>();
+
+  if (!user?.id) {
+    return null;
+  }
+
+  return <ProfileForms userId={user.id} />;
 };

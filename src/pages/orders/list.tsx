@@ -1,21 +1,7 @@
 import { List, useTable, ShowButton, FilterDropdown, getDefaultFilter } from "@refinedev/antd";
 import { useTranslation } from "@refinedev/core";
 import { Table, Space, Tooltip, Select, Tag } from "antd";
-
-const STATUS_COLORS: Record<string, string> = {
-  pending: "orange",
-  processing: "blue",
-  paid: "green",
-  shipped: "cyan",
-  delivered: "green",
-  cancelled: "red",
-};
-
-const PAYMENT_COLORS: Record<string, string> = {
-  pending: "orange",
-  success: "green",
-  failed: "red",
-};
+import { STATUS_COLORS, PAYMENT_COLORS, getStatusOptions, getPaymentOptions } from "../../constants/orders";
 
 export const OrderList: React.FC = () => {
   const { translate } = useTranslation();
@@ -23,20 +9,8 @@ export const OrderList: React.FC = () => {
     syncWithLocation: true,
   });
 
-  const STATUS_OPTIONS = [
-    { value: "pending", label: translate("orderStatus.pending") },
-    { value: "processing", label: translate("orderStatus.processing") },
-    { value: "paid", label: translate("orderStatus.paid") },
-    { value: "shipped", label: translate("orderStatus.shipped") },
-    { value: "delivered", label: translate("orderStatus.delivered") },
-    { value: "cancelled", label: translate("orderStatus.cancelled") },
-  ];
-
-  const PAYMENT_OPTIONS = [
-    { value: "pending", label: translate("paymentStatus.pending") },
-    { value: "success", label: translate("paymentStatus.success") },
-    { value: "failed", label: translate("paymentStatus.failed") },
-  ];
+  const STATUS_OPTIONS = getStatusOptions(translate);
+  const PAYMENT_OPTIONS = getPaymentOptions(translate);
 
   return (
     <List>

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useShow, useUpdate, useTranslation } from "@refinedev/core";
 import { Show, DateField, NumberField } from "@refinedev/antd";
 import { Typography, Table, Tag, Descriptions, Form, Select, Input, Button, Card, App } from "antd";
+import { STATUS_COLORS, PAYMENT_COLORS, getStatusOptions } from "../../constants/orders";
 
 const { Title, Text } = Typography;
 
@@ -27,21 +28,6 @@ interface OrderRecord {
   created_at: string;
   order_items?: OrderItem[];
 }
-
-const STATUS_COLORS: Record<string, string> = {
-  pending: "orange",
-  processing: "blue",
-  paid: "green",
-  shipped: "cyan",
-  delivered: "green",
-  cancelled: "red",
-};
-
-const PAYMENT_COLORS: Record<string, string> = {
-  pending: "orange",
-  success: "green",
-  failed: "red",
-};
 
 export const OrderShow: React.FC = () => {
   const { translate } = useTranslation();
@@ -95,14 +81,7 @@ export const OrderShow: React.FC = () => {
     doMutate(values);
   };
 
-  const STATUS_OPTIONS = [
-    { value: "pending", label: translate("orderStatus.pending") },
-    { value: "processing", label: translate("orderStatus.processing") },
-    { value: "paid", label: translate("orderStatus.paid") },
-    { value: "shipped", label: translate("orderStatus.shipped") },
-    { value: "delivered", label: translate("orderStatus.delivered") },
-    { value: "cancelled", label: translate("orderStatus.cancelled") },
-  ];
+  const STATUS_OPTIONS = getStatusOptions(translate);
 
   useEffect(() => {
     if (record) {

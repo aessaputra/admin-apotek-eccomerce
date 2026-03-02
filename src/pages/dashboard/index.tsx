@@ -4,9 +4,9 @@ import { ShoppingCartOutlined, UserOutlined, InboxOutlined } from "@ant-design/i
 
 export const Dashboard: React.FC = () => {
   const { translate } = useTranslation();
-  const { result: ordersResult } = useList({ resource: "orders" });
-  const { result: customersResult } = useList({ resource: "profiles" });
-  const { result: productsResult } = useList({ resource: "products" });
+  const { result: ordersResult } = useList({ resource: "orders", pagination: { mode: "off" }, meta: { count: "exact" } });
+  const { result: customersResult } = useList({ resource: "profiles", pagination: { mode: "off" }, meta: { count: "exact" }, filters: [{ field: "role", operator: "eq", value: "customer" }] });
+  const { result: productsResult } = useList({ resource: "products", pagination: { mode: "off" }, meta: { count: "exact" } });
 
   const totalOrders = ordersResult?.total ?? 0;
   const totalCustomers = customersResult?.total ?? 0;

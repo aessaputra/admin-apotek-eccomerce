@@ -1,7 +1,5 @@
-import { message, Upload } from "antd";
-import type { RcFile } from "antd/es/upload/interface";
-import { supabaseClient } from "../../providers/supabase-client";
-import { getStoragePathFromPublicUrl, sanitizeFilename, validateImageFile } from "../../utils/storage";
+import { Upload } from "antd";
+import { useSupabaseUpload } from "../../hooks/useSupabaseUpload";
 
 const BUCKET = "avatars";
 
@@ -20,14 +18,16 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
     ? [{ uid: "-1", name: "avatar", url: value, status: "done" as const }]
     : [];
 
-  const beforeUpload = (file: RcFile) => {
-    const { valid, error } = validateImageFile(file);
-    if (!valid) {
-      message.error(error);
-      return false;
-    }
-    return true;
-  };
+  const { beforeUpload, customRequest, handleRemove } = useSupabaseUpload(
+    {
+      bucket: BUCKET,
+      pathPrefix: `${userId}/`,
+      maxCount: 1,
+      replaceOnUpload: true,
+    },
+    value,
+    onChange
+  );
 
   return (
     <Upload
@@ -36,50 +36,8 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
       accept="image/jpeg,image/png,image/webp,image/gif"
       fileList={fileList}
       beforeUpload={beforeUpload}
-      onRemove={async () => {
-        if (value) {
-          const oldPath = getStoragePathFromPublicUrl(value, BUCKET);
-          if (oldPath) {
-            try {
-              await supabaseClient.storage.from(BUCKET).remove([oldPath]);
-            } catch {
-              // Continue even if delete fails
-            }
-          }
-        }
-        onChange?.(undefined);
-      }}
-      customRequest={async ({ file, onError, onSuccess }) => {
-        try {
-          if (value) {
-            const oldPath = getStoragePathFromPublicUrl(value, BUCKET);
-            if (oldPath) {
-              await supabaseClient.storage.from(BUCKET).remove([oldPath]);
-            }
-          }
-
-          const rcFile = file as RcFile;
-          const safeName = sanitizeFilename(rcFile.name);
-          const path = `${userId}/${Date.now()}-${safeName}`;
-          const { error } = await supabaseClient.storage
-            .from(BUCKET)
-            .upload(path, rcFile, {
-              upsert: true,
-              cacheControl: "3600",
-            });
-
-          if (error) throw error;
-
-          const { data } = supabaseClient.storage
-            .from(BUCKET)
-            .getPublicUrl(path);
-
-          onChange?.(data.publicUrl);
-          onSuccess?.({ url: data.publicUrl });
-        } catch (err) {
-          onError?.(err as Error);
-        }
-      }}
+      onRemove={() => handleRemove(value!)}
+      customRequest={customRequest}
     >
       {fileList.length === 0 ? "+ Upload" : null}
     </Upload>

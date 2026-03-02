@@ -68,7 +68,7 @@ export const SalesReport: React.FC = () => {
     pagination: { pageSize: 30 },
     errorNotification: (error) => ({
       message: translate("reports.sales.load_error_daily", "Gagal memuat ringkasan harian"),
-      description: (error as any)?.message ?? translate("notifications.error"),
+      description: (error instanceof Error ? error.message : undefined) ?? translate("notifications.error"),
       type: "error",
     }),
   });
@@ -78,7 +78,7 @@ export const SalesReport: React.FC = () => {
     pagination: { pageSize: 20 },
     errorNotification: (error) => ({
       message: translate("reports.sales.load_error_products", "Gagal memuat data produk terlaris"),
-      description: (error as any)?.message ?? translate("notifications.error"),
+      description: (error instanceof Error ? error.message : undefined) ?? translate("notifications.error"),
       type: "error",
     }),
   });
@@ -88,7 +88,7 @@ export const SalesReport: React.FC = () => {
     pagination: { pageSize: 20 },
     errorNotification: (error) => ({
       message: translate("reports.sales.load_error_customers", "Gagal memuat data penjualan customer"),
-      description: (error as any)?.message ?? translate("notifications.error"),
+      description: (error instanceof Error ? error.message : undefined) ?? translate("notifications.error"),
       type: "error",
     }),
   });

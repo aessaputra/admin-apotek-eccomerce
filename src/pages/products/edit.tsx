@@ -57,38 +57,47 @@ export const ProductEdit: React.FC = () => {
 
     try {
       const removed = original.filter((o) => !currentUrls.includes(o.url));
-      for (const img of removed) {
-        const path = getStoragePathFromPublicUrl(img.url, PRODUCT_IMAGES_BUCKET);
-        if (path) {
-          await supabaseClient.storage.from(PRODUCT_IMAGES_BUCKET).remove([path]);
-        }
-        const { error: deleteError } = await supabaseClient
-          .from("product_images")
-          .delete()
-          .eq("id", img.id);
-        if (deleteError) throw deleteError;
-      }
+      const removedResults = await Promise.allSettled(
+        removed.map(async (img) => {
+          const path = getStoragePathFromPublicUrl(img.url, PRODUCT_IMAGES_BUCKET);
+          if (path) {
+            await supabaseClient.storage.from(PRODUCT_IMAGES_BUCKET).remove([path]);
+          }
+          const { error: deleteError } = await supabaseClient
+            .from("product_images")
+            .delete()
+            .eq("id", img.id);
+          if (deleteError) throw deleteError;
+        })
+      );
 
-      for (let i = 0; i < currentUrls.length; i++) {
-        const url = currentUrls[i];
-        const existing = original.find((o) => o.url === url);
-        if (existing) {
-          const { error: updateError } = await supabaseClient
-            .from("product_images")
-            .update({ sort_order: i })
-            .eq("id", existing.id);
-          if (updateError) throw updateError;
-        } else {
-          const { error: insertError } = await supabaseClient
-            .from("product_images")
-            .insert({
-              product_id: productId,
-              url,
-              sort_order: i,
-            });
-          if (insertError) throw insertError;
-        }
-      }
+      const firstRemovedError = removedResults.find((r) => r.status === "rejected");
+      if (firstRemovedError) throw (firstRemovedError as PromiseRejectedResult).reason;
+
+      const updateResults = await Promise.allSettled(
+        currentUrls.map(async (url, i) => {
+          const existing = original.find((o) => o.url === url);
+          if (existing) {
+            const { error: updateError } = await supabaseClient
+              .from("product_images")
+              .update({ sort_order: i })
+              .eq("id", existing.id);
+            if (updateError) throw updateError;
+          } else {
+            const { error: insertError } = await supabaseClient
+              .from("product_images")
+              .insert({
+                product_id: productId,
+                url,
+                sort_order: i,
+              });
+            if (insertError) throw insertError;
+          }
+        })
+      );
+
+      const firstUpdateError = updateResults.find((r) => r.status === "rejected");
+      if (firstUpdateError) throw (firstUpdateError as PromiseRejectedResult).reason;
     } catch (err) {
       message.error(translate("products.imagesSaveError"));
       throw err;

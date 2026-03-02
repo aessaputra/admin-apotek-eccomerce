@@ -15,12 +15,13 @@ async function deleteCategoryLogo(logoUrl: string | null | undefined): Promise<v
 }
 
 async function deleteProductImages(productImages: { url: string }[]): Promise<void> {
-  for (const img of productImages || []) {
+  const deletions = (productImages || []).map(async (img) => {
     const path = getStoragePathFromPublicUrl(img.url, PRODUCT_IMAGES_BUCKET);
     if (path) {
       await supabaseClient.storage.from(PRODUCT_IMAGES_BUCKET).remove([path]);
     }
-  }
+  });
+  await Promise.allSettled(deletions);
 }
 
 export const dataProvider: DataProvider = {
@@ -63,10 +64,12 @@ export const dataProvider: DataProvider = {
           meta: params.meta,
         });
         const items = Array.isArray(data) ? data : [];
-        for (const item of items) {
-          const logoUrl = (item as { logo_url?: string })?.logo_url;
-          await deleteCategoryLogo(logoUrl);
-        }
+        await Promise.allSettled(
+          items.map((item) => {
+            const logoUrl = (item as { logo_url?: string })?.logo_url;
+            return deleteCategoryLogo(logoUrl);
+          })
+        );
       } catch {
         // Continue with delete even if logo fetch/remove fails
       }
@@ -79,10 +82,12 @@ export const dataProvider: DataProvider = {
           meta: { select: "*, product_images(*)" },
         });
         const items = Array.isArray(data) ? data : [];
-        for (const item of items) {
-          const images = (item as { product_images?: { url: string }[] })?.product_images ?? [];
-          await deleteProductImages(images);
-        }
+        await Promise.allSettled(
+          items.map((item) => {
+            const images = (item as { product_images?: { url: string }[] })?.product_images ?? [];
+            return deleteProductImages(images);
+          })
+        );
       } catch {
         // Continue with delete even if fetch/remove fails
       }

@@ -28,3 +28,6 @@ _.ntvs_
 _.njsproj
 _.sln
 \*.sw?
+
+# Agent files
+.agents/
