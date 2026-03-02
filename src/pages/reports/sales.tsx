@@ -62,25 +62,40 @@ export const SalesReport: React.FC = () => {
     });
   }
 
-  const { data: dailySalesData, isLoading: dailyLoading } = useList<DailySalesRecord>({
+  const { result: dailySalesResult, query: dailyQuery } = useList<DailySalesRecord>({
     resource: "report_daily_sales",
     filters: dailyFilters,
     pagination: { pageSize: 30 },
+    errorNotification: (error) => ({
+      message: translate("reports.sales.load_error_daily", "Gagal memuat ringkasan harian"),
+      description: (error as any)?.message ?? translate("notifications.error"),
+      type: "error",
+    }),
   });
 
-  const { data: productSalesData, isLoading: productLoading } = useList<ProductSalesRecord>({
+  const { result: productSalesResult, query: productQuery } = useList<ProductSalesRecord>({
     resource: "report_product_sales",
     pagination: { pageSize: 20 },
+    errorNotification: (error) => ({
+      message: translate("reports.sales.load_error_products", "Gagal memuat data produk terlaris"),
+      description: (error as any)?.message ?? translate("notifications.error"),
+      type: "error",
+    }),
   });
 
-  const { data: customerSalesData, isLoading: customerLoading } = useList<CustomerSalesRecord>({
+  const { result: customerSalesResult, query: customerQuery } = useList<CustomerSalesRecord>({
     resource: "report_customer_sales",
     pagination: { pageSize: 20 },
+    errorNotification: (error) => ({
+      message: translate("reports.sales.load_error_customers", "Gagal memuat data penjualan customer"),
+      description: (error as any)?.message ?? translate("notifications.error"),
+      type: "error",
+    }),
   });
 
-  const dailySales = dailySalesData?.data ?? [];
-  const productSales = productSalesData?.data ?? [];
-  const customerSales = customerSalesData?.data ?? [];
+  const dailySales = dailySalesResult?.data ?? [];
+  const productSales = productSalesResult?.data ?? [];
+  const customerSales = customerSalesResult?.data ?? [];
 
   return (
     <Row gutter={[16, 16]}>
@@ -111,7 +126,7 @@ export const SalesReport: React.FC = () => {
           <Table<DailySalesRecord>
             rowKey={(record) => record.sale_date}
             dataSource={dailySales}
-            loading={dailyLoading}
+            loading={dailyQuery.isLoading}
             pagination={{ pageSize: 30 }}
             columns={[
               {
@@ -155,7 +170,7 @@ export const SalesReport: React.FC = () => {
           <Table<ProductSalesRecord>
             rowKey={(record) => record.product_id}
             dataSource={productSales}
-            loading={productLoading}
+            loading={productQuery.isLoading}
             pagination={{ pageSize: 20 }}
             columns={[
               {
@@ -194,7 +209,7 @@ export const SalesReport: React.FC = () => {
           <Table<CustomerSalesRecord>
             rowKey={(record) => record.user_id}
             dataSource={customerSales}
-            loading={customerLoading}
+            loading={customerQuery.isLoading}
             pagination={{ pageSize: 20 }}
             columns={[
               {

@@ -203,7 +203,10 @@
       "phone_number": "Phone Number",
       "empty_daily": "No data for this date range",
       "empty_products": "No product sales data yet",
-      "empty_customers": "No customer sales data yet"
+      "empty_customers": "No customer sales data yet",
+      "load_error_daily": "Failed to load daily sales summary",
+      "load_error_products": "Failed to load top products data",
+      "load_error_customers": "Failed to load customer sales data"
     }
   }
 }

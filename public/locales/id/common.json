@@ -203,7 +203,10 @@
       "phone_number": "No. HP",
       "empty_daily": "Tidak ada data pada rentang tanggal ini",
       "empty_products": "Belum ada data penjualan produk",
-      "empty_customers": "Belum ada data penjualan per customer"
+      "empty_customers": "Belum ada data penjualan per customer",
+      "load_error_daily": "Gagal memuat ringkasan harian",
+      "load_error_products": "Gagal memuat data produk terlaris",
+      "load_error_customers": "Gagal memuat data penjualan customer"
     }
   }
 }
