@@ -3,7 +3,13 @@ import { Authenticated, GitHubBanner, Refine } from "@refinedev/core";
 import { DevtoolsPanel, DevtoolsProvider } from "@refinedev/devtools";
 import { RefineKbar, RefineKbarProvider } from "@refinedev/kbar";
 
-import { AuthPage, ErrorComponent, ThemedLayout, ThemedSider, useNotificationProvider } from "@refinedev/antd";
+import {
+  AuthPage,
+  ErrorComponent,
+  ThemedLayout,
+  ThemedSider,
+  useNotificationProvider,
+} from "@refinedev/antd";
 import "@refinedev/antd/dist/reset.css";
 
 import {

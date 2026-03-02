@@ -189,50 +189,54 @@ export const OrderShow: React.FC = () => {
         </Descriptions.Item>
       </Descriptions>
 
-      {record && !isLoading && (
-        <Card title={translate("orders.updateOrder")} style={{ marginTop: 24 }}>
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={handleUpdate}
-            initialValues={{
-              status: record.status ?? "pending",
-              waybill_number: record.waybill_number ?? "",
-            }}
+      <Card title={translate("orders.updateOrder")} style={{ marginTop: 24 }}>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleUpdate}
+          initialValues={{
+            status: record?.status ?? "pending",
+            waybill_number: record?.waybill_number ?? "",
+          }}
+        >
+          <Form.Item
+            name="status"
+            label={translate("orders.fields.status")}
+            rules={[{ required: true }]}
           >
-            <Form.Item
-              name="status"
-              label={translate("orders.fields.status")}
-              rules={[{ required: true }]}
-            >
-              <Select options={STATUS_OPTIONS} style={{ minWidth: 160 }} />
-            </Form.Item>
-            <Form.Item
-              name="waybill_number"
-              label={translate("orders.fields.waybillNumber")}
-              dependencies={["status"]}
-              rules={[
-                ({ getFieldValue }) => ({
-                  validator(_, value) {
-                    const status = getFieldValue("status");
-                    if (status === "shipped" && !value?.trim()) {
-                      return Promise.reject(new Error(translate("orders.waybillRequired", { status: translate("orderStatus.shipped") })));
-                    }
-                    return Promise.resolve();
-                  },
-                }),
-              ]}
-            >
-              <Input placeholder={translate("orders.waybillPlaceholder")} />
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" htmlType="submit" loading={isUpdating}>
-                {translate("buttons.save")}
-              </Button>
-            </Form.Item>
-          </Form>
-        </Card>
-      )}
+            <Select options={STATUS_OPTIONS} style={{ minWidth: 160 }} />
+          </Form.Item>
+          <Form.Item
+            name="waybill_number"
+            label={translate("orders.fields.waybillNumber")}
+            dependencies={["status"]}
+            rules={[
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  const status = getFieldValue("status");
+                  if (status === "shipped" && !value?.trim()) {
+                    return Promise.reject(
+                      new Error(
+                        translate("orders.waybillRequired", {
+                          status: translate("orderStatus.shipped"),
+                        }),
+                      ),
+                    );
+                  }
+                  return Promise.resolve();
+                },
+              }),
+            ]}
+          >
+            <Input placeholder={translate("orders.waybillPlaceholder")} />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit" loading={isUpdating}>
+              {translate("buttons.save")}
+            </Button>
+          </Form.Item>
+        </Form>
+      </Card>
 
       <Title level={5} style={{ marginTop: 24 }}>
         {translate("orders.productList")}
