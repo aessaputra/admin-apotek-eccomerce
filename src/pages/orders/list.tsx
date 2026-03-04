@@ -71,6 +71,9 @@ export const OrderList: React.FC = () => {
           )}
           defaultFilteredValue={getDefaultFilter("payment_status", filters, "eq")}
         />
+        <Table.Column dataIndex="payment_type" title={translate("orders.fields.paymentType")} render={(v) => v || "-"} />
+        <Table.Column dataIndex="courier_code" title={translate("orders.fields.courierCode")} render={(v) => v || "-"} />
+        <Table.Column dataIndex="waybill_number" title={translate("orders.fields.waybillNumber")} render={(v) => v || "-"} />
         <Table.Column dataIndex="created_at" title={translate("orders.fields.created")} render={(v) => v ? new Date(v).toLocaleDateString() : "-"} />
         <Table.Column
           title={translate("table.actions")}

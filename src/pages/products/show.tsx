@@ -17,6 +17,7 @@ interface ProductRecord {
   description?: string | null;
   price: string | number;
   stock?: number | null;
+  weight?: number | null;
   is_active?: boolean | null;
   category_id?: string | null;
   created_at?: string;
@@ -75,6 +76,9 @@ export const ProductShow: React.FC = () => {
 
       <Title level={5}>{translate("products.fields.stock")}</Title>
       <Text>{record?.stock ?? 0}</Text>
+
+      <Title level={5}>{translate("products.fields.weight")}</Title>
+      <Text>{record?.weight != null ? `${record.weight} gram` : "-"}</Text>
 
       <Title level={5}>{translate("products.fields.category")}</Title>
       <Text>{record?.categories?.name ?? "-"}</Text>

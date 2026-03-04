@@ -69,6 +69,9 @@ export const ProductCreate: React.FC = () => {
         <Form.Item label={translate("products.fields.stock")} name="stock" initialValue={0}>
           <InputNumber style={{ width: "100%" }} min={0} />
         </Form.Item>
+        <Form.Item label={translate("products.fields.weight")} name="weight" initialValue={200}>
+          <InputNumber style={{ width: "100%" }} min={0} addonAfter="gram" />
+        </Form.Item>
         <Form.Item label={translate("products.fields.category")} name="category_id">
           <Select {...selectProps} />
         </Form.Item>

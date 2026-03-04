@@ -180,88 +180,89 @@ sequenceDiagram
 
 | Midtrans `transaction_status` | `payment_status` | `status` (order) |
 |------------------------------|------------------|------------------|
-| `capture`, `settlement`      | success          | paid / processing |
+| _(initial, belum bayar)_     | unpaid           | pending          |
+| `capture`, `settlement`      | success          | paid → processing |
 | `pending`                    | pending          | pending          |
 | `deny`, `expire`, `cancel`   | failed           | cancelled        |
 
-### 2.5 Shipping Flow (Raja Ongkir)
+> **Catatan:** Status `paid` → `processing` terjadi otomatis setelah Biteship order berhasil dibuat.
+> Stock dikurangi secara **atomic** via RPC `reduce_product_stock(p_product_id, p_quantity)` — mencegah race condition pada concurrent webhooks.
+
+### 2.5 Shipping & Logistics Flow (Biteship)
 
 ```mermaid
 flowchart TB
     subgraph Mobile["Mobile App"]
-        M1[Checkout: Input Alamat]
-        M2[Dapat origin & destination ID]
-        M3[Panggil Edge Function\ncalculate-shipping-cost]
-        M4[Tampilkan pilihan kurir]
-        M5[User pilih layanan]
-        M6[Simpan ke order]
+        M1[Checkout: Set Koordinat / Area]
+        M2[Panggil Edge Function\nbiteship-shipping]
+        M3[Dapatkan Rate Semua Kurir]
+        M4[User pilih layanan (Mis. JNE REG)]
+        M5[Bayar via Midtrans]
     end
 
     subgraph Supabase["Supabase"]
-        EF1["Edge Function\nrajaongkir-cost"]
-        EF2["Edge Function\nrajaongkir-tracking"]
-        DB[(orders)]
+        EF1["Edge Function\nbiteship-shipping (Proxy)"]
+        WEBHOOK["Edge Function\nmidtrans-webhook"]
     end
 
-    subgraph RajaOngkir["Raja Ongkir API"]
-        RO1[Province / City / Destination]
-        RO2[Calculate Domestic Cost]
-        RO3[Waybill Tracking]
+    subgraph Biteship["Biteship API"]
+        B1[Rates (Cek Ongkir)]
+        B2[Orders/Shipment (Bikin Resi)]
+        B3[Pickup Request]
     end
 
     M1 --> M2
-    M2 --> M3
-    M3 --> EF1
-    EF1 -->|origin, destination, weight, courier| RO2
-    RO2 -->|list: cost, etd, service| EF1
+    M2 -->|lat/long & weight| EF1
+    EF1 --> B1
+    B1 -->|list: cost, etd, service| EF1
     EF1 --> M3
-    M3 --> M4 --> M5 --> M6 --> DB
-    EF2 -->|waybill, courier| RO3
-    RO3 --> EF2
+    M3 --> M4 --> M5
+
+    M5 -->|Success| WEBHOOK
+    WEBHOOK -->|Trigger create Order| B2
+    B2 -->|AWB / Resi terbit| B3
 ```
 
 ```mermaid
 sequenceDiagram
     participant M as Mobile App
-    participant EF as Edge Function
-    participant RO as Raja Ongkir
-    participant S as Supabase
+    participant S as Supabase Backend
+    participant BS as Biteship API
 
-    M->>M: User pilih alamat (province, city)
-    M->>EF: get-shipping-cost(origin_id, dest_id, weight, couriers)
-    EF->>RO: POST /calculate/domestic-cost
-    RO-->>EF: List layanan (JNE REG 15k, JNT 12k, ...)
-    EF-->>M: Shipping options
+    M->>M: User input alamat & pin peta
+    M->>S: Call get-rates()
+    S->>BS: POST /v1/rates/couriers
+    BS-->>S: Daftar tarif kurir
+    S-->>M: Tampilkan list pengiriman
 
-    M->>M: User pilih kurir + layanan
-    M->>S: Insert order (+ shipping_cost, courier, service, etd, address)
-
-    Note over M,S: Setelah order dikirim
-    M->>EF: track-shipment(waybill, courier)
-    EF->>RO: POST /waybill
-    RO-->>EF: Status pengiriman
-    EF-->>M: Tracking manifest
+    M->>M: User bayar (Midtrans Lunas)
+    M->>S: Midtrans Webhook (status: success)
+    
+    Note over S,BS: Alur Otomatis Logistik
+    S->>BS: POST /v1/orders (Create Waybill)
+    BS-->>S: waybill_id, courier tracking
+    S->>S: Update tabel `orders` (+waybill_number)
 ```
 
-**Dua Metode Pencarian Lokasi:**
+**Dua Metode Pencarian Lokasi (Pemetaan Area Biteship):**
 
 | Metode | Alur | Use Case |
 |--------|------|----------|
-| **Step-by-Step** | Province → City → District → Subdistrict | Form dropdown berjenjang |
-| **Direct Search** | Cari nama kota/kecamatan/kode pos | Autocomplete, pencarian langsung |
+| **Area Search** | Ketik nama kecamatan / kode pos `(maps/areas)` | Pencarian cepat teks |
+| **Coordinate (Lat/Long)** | Ambil dari map pin marker `(latitude, longitude)` | Paling akurat (sering tarif instan/Gojek butuh ini) |
 
 **Field Shipping pada Order:**
 
 | Field | Keterangan |
 |-------|------------|
-| `shipping_cost` | Ongkos kirim (dari Raja Ongkir) |
-| `courier_code` | Kode kurir (jne, jnt, pos, tiki, sicepat, dll) |
-| `courier_service` | Nama layanan (REG, OKE, YES, dll) |
-| `shipping_etd` | Perkiraan waktu sampai |
+| `shipping_cost` | Ongkos kirim |
+| `courier_code` | Kode kurir (jne, jnt, paxel, sicepat, dll) |
+| `courier_service` | Nama layanan (misal: "reg", "instant") |
+| `shipping_etd` | Perkiraan waktu sampai (Estimasi durasi) |
 | `shipping_address_id` | FK ke `addresses` (alamat pengiriman) |
-| `origin_city_id` | City ID asal (warehouse/store) |
-| `destination_city_id` | City ID tujuan |
-| `waybill_number` | Nomor resi (diisi admin setelah kirim) |
+| `origin_area_id` | Area ID asal (Biteship Mapping) / Lat-Long |
+| `destination_area_id` | Area ID tujuan (Biteship) / Lat-Long |
+| `waybill_number` | Nomor resi (Akan digenerate otomatis oleh Biteship & Webhook) |
 
 ---
 
@@ -320,7 +321,7 @@ sequenceDiagram
 | **Auth** | JWT, email/password, OAuth, magic link |
 | **Storage** | File upload (avatars, category logos, product images) |
 | **Realtime** | Subscribe perubahan tabel (mis. orders) dengan RLS |
-| **Edge Functions** | Logic server-side: cleanup orphan storage, create Midtrans Snap token, handle Midtrans webhook, **calculate Raja Ongkir cost**, **track waybill** |
+| **Edge Functions** | Logic server-side: cleanup orphan storage, create Midtrans Snap token, handle Midtrans webhook, **proxy Biteship shipping API**, **create Biteship order & AWB** |
 
 ### 3.4 Midtrans Payment Gateway
 
@@ -338,16 +339,16 @@ sequenceDiagram
 2. **Idempotensi** — Midtrans bisa kirim notifikasi berulang; cek `transaction_status` terakhir sebelum update; return 200 OK meski status sama
 3. **Validasi** — Pastikan `order_id` exist di DB sebelum update
 
-### 3.5 Raja Ongkir Shipping API
+### 3.5 Logistics & Shipping API (Biteship)
 
 | Aspek | Keterangan |
 |-------|------------|
-| **Integrasi** | Raja Ongkir API (Komerce / RajaOngkir) |
-| **Endpoint Utama** | Province, City, Destination search; Calculate domestic cost; Waybill tracking |
-| **Kurir** | JNE, J&T, POS, TIKI, Sicepat, dan lainnya |
-| **Alur** | Mobile request cost via Edge Function → Raja Ongkir → daftar harga; User pilih → simpan ke order; Tracking via waybill |
-| **Keamanan** | API key hanya di Edge Function; jangan expose ke client |
-| **Precision** | City-level atau District/Subdistrict untuk perhitungan lebih akurat |
+| **Integrasi** | Biteship API |
+| **Endpoint Utama** | `v1/rates/couriers` (Hitung ongkos kirim semua kurir); `v1/orders` (Terbitkan resi & panggil penjemputan) |
+| **Kurir** | Lengkap (JNE, SiCepat, Paxel, J&T, GoSend, dll) lewat 1 API Key yang sama |
+| **Alur** | Cek Tarif → Order Lunas → Otomatis create shipment (Resi Keluar) → Kurir ambil barang ke gudang |
+| **Keamanan** | API key (Live / Test) disimpan di Edge Function; Webhook endpoint untuk status pengiriman |
+| **Precision** | Bisa menggunakan latitude/longitude untuk kalkulasi ongkir presisi tingkat rumah. |
 
 ---
 
@@ -386,11 +387,10 @@ erDiagram
         text street_address
         text city
         text postal_code
-        text province_id
         text province
-        text city_id
-        text district_id
-        text subdistrict_id
+        text latitude
+        text longitude
+        text area_id
         boolean is_default
     }
 
@@ -410,6 +410,7 @@ erDiagram
         text description
         numeric price
         int stock
+        int weight "gram, default 200"
         boolean is_active
         timestamptz created_at
         timestamptz updated_at
@@ -442,7 +443,7 @@ erDiagram
         uuid shipping_address_id FK
         numeric total_amount
         text status
-        text payment_status
+        text payment_status "unpaid → pending → success/failed"
         text midtrans_order_id
         text midtrans_transaction_id
         text payment_type
@@ -450,10 +451,12 @@ erDiagram
         text courier_code
         text courier_service
         text shipping_etd
-        text origin_city_id
-        text destination_city_id
+        text origin_area_id
+        text destination_area_id
         text waybill_number
+        text biteship_order_id
         timestamptz created_at
+        timestamptz updated_at "auto-trigger on update"
     }
 
     order_items {
@@ -536,7 +539,7 @@ Supabase Realtime memakai RLS sehingga hanya perubahan yang diizinkan policy yan
 | Admin Panel | `VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY` | URL project & anon key |
 | Mobile App (Expo) | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` | URL project & anon key |
 | Supabase (Edge Function) | `MIDTRANS_SERVER_KEY`, `MIDTRANS_CLIENT_KEY` | Server Key untuk Snap API; Client Key untuk Snap UI |
-| Supabase (Edge Function) | `RAJAONGKIR_API_KEY` | API key Raja Ongkir untuk cost & tracking |
+| Supabase (Edge Function) | `BITESHIP_API_KEY` | API key Biteship (Test / Live) untuk cost, orders & tracking |
 | Midtrans Dashboard | Payment Notification URL | URL Edge Function webhook (contoh: `https://<project>.supabase.co/functions/v1/midtrans-webhook`) |
 
 > Gunakan **anon key** untuk client; jangan expose **service_role key**. **Server Key** Midtrans hanya di server (Edge Function).
@@ -555,11 +558,13 @@ Supabase Realtime memakai RLS sehingga hanya perubahan yang diizinkan policy yan
 - **Verify signature** — Webhook handler wajib verifikasi sebelum update DB
 - **Idempotent** — Handle notifikasi duplikat; return 200 OK
 - **Server Key** — Hanya di Edge Function, never expose ke client
+- **Atomic stock reduction** — Gunakan RPC `reduce_product_stock()` (bukan read-then-write) untuk mencegah race condition
+- **Initial payment_status** — Order baru dibuat dengan `payment_status = 'unpaid'` sebelum interaksi Midtrans
 
-### 9.3 Shipping (Raja Ongkir)
-- **API key** — Hanya di Edge Function
-- **Addresses** — Simpan `city_id`, `province_id` saat user pilih alamat
-- **Origin** — Simpan `origin_city_id` store di env atau tabel config
+### 9.3 Shipping & Logistics (Biteship)
+- **API key** — Hanya ditaruh di environment variable Edge Function.
+- **Addresses** — Simpan coordinat (`latitude`, `longitude`) atau `area_id` saat form alamat.
+- **Automasi** — Tembak `/v1/orders` Biteship persis sesaat setelah `midtrans-webhook` menyatakan "LUNAS". Ini mengamankan barang sebelum dicetak resi aslinya.
 
 ### 9.4 Umum
 - **Anon key** — Gunakan untuk client; jangan expose `service_role`
@@ -587,5 +592,5 @@ Supabase Realtime memakai RLS sehingga hanya perubahan yang diizinkan policy yan
 - [Supabase RLS Best Practices](https://supabase.com/docs/guides/database/postgres/row-level-security)
 - [Midtrans Snap Integration](https://docs.midtrans.com/docs/snap-snap-integration-guide)
 - [Midtrans HTTP(S) Notification / Webhooks](https://docs.midtrans.com/docs/https-notification-webhooks)
-- [Raja Ongkir Documentation](https://rajaongkir.com/docs)
-- [Raja Ongkir Calculate Domestic Cost](https://rajaongkir.com/docs/shipping-cost/endpoint-rajaongkir-for-search-base/calculate-domestic-cost)
+- [Biteship Documentation](https://biteship.com/docs/api/)
+- [Biteship Tracking Simulator](https://biteship.com/docs/simulator)

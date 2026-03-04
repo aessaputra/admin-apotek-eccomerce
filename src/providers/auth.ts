@@ -172,7 +172,7 @@ const authProvider: AuthProvider = {
   },
 
   onError: async (error) => {
-    console.error(error);
+    if (import.meta.env.DEV) console.error(error);
     return { error };
   },
 

@@ -33,7 +33,18 @@
     "dashboard": "Dashboard",
     "totalOrders": "Total Orders",
     "totalCustomers": "Total Customers",
-    "totalProducts": "Total Products"
+    "totalProducts": "Total Products",
+    "totalRevenue": "Total Revenue",
+    "recentOrders": "Recent Orders",
+    "lowStockAlerts": "Low Stock Alerts",
+    "noRecentOrders": "No orders yet",
+    "noLowStock": "All stock levels OK",
+    "viewAll": "View All",
+    "orderDate": "Date",
+    "orderTotal": "Total",
+    "orderStatus": "Status",
+    "productName": "Product",
+    "currentStock": "Stock"
   },
   "salesReports": {
     "salesReports": "Sales Reports"
@@ -56,7 +67,8 @@
       "active": "Active",
       "description": "Description",
       "images": "Images",
-      "created": "Created"
+      "created": "Created",
+      "weight": "Weight (gram)"
     },
     "active": {
       "yes": "Yes",
@@ -95,7 +107,12 @@
       "productSubtotal": "Product Subtotal",
       "shippingCost": "Shipping Cost",
       "courier": "Courier",
-      "waybillNumber": "Waybill No."
+      "waybillNumber": "Waybill No.",
+      "midtransOrderId": "Midtrans Order ID",
+      "midtransTransactionId": "Midtrans Transaction ID",
+      "biteshipOrderId": "Biteship Order ID",
+      "courierCode": "Courier Code",
+      "updatedAt": "Updated At"
     },
     "updateOrder": "Update Order",
     "productList": "Product List",
@@ -111,17 +128,32 @@
     "cancelButton": "Cancel",
     "filterStatus": "Select Status",
     "filterPayment": "Select Payment",
-    "showDetail": "View Detail"
+    "showDetail": "View Detail",
+    "waybillSourceSystem": "Auto (Biteship)",
+    "waybillSourceManual": "Manual",
+    "waybillSourceSystem": "Auto (Biteship)",
+    "waybillSourceManual": "Manual",
+    "waybillOverrideReason": "Override Reason",
+    "waybillOverridePlaceholder": "Why are you entering the waybill manually?",
+    "enableManualWaybill": "Enter waybill manually",
+    "manualWaybillWarning": "Manual entry — Biteship order exists but waybill will be overridden",
+    "syncTracking": "Sync Tracking",
+    "trackingSynced": "Tracking Synced",
+    "syncFailed": "Sync Failed",
+    "activityTitle": "Order Activities",
+    "noActivities": "No activities yet"
   },
   "orderStatus": {
     "pending": "Pending",
     "processing": "Processing",
     "paid": "Paid",
+    "awaiting_shipment": "Awaiting Shipment",
     "shipped": "Shipped",
     "delivered": "Delivered",
     "cancelled": "Cancelled"
   },
   "paymentStatus": {
+    "unpaid": "Unpaid",
     "pending": "Pending",
     "success": "Success",
     "failed": "Failed"

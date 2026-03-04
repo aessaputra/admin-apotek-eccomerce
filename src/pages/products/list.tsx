@@ -47,6 +47,7 @@ export const ProductList: React.FC = () => {
         />
         <Table.Column dataIndex="price" title={translate("products.fields.price")} render={(v) => `Rp ${Number(v || 0).toLocaleString("id-ID")}`} />
         <Table.Column dataIndex="stock" title={translate("products.fields.stock")} />
+        <Table.Column dataIndex="weight" title={translate("products.fields.weight")} render={(v) => v != null ? `${v} g` : "-"} />
         <Table.Column dataIndex="is_active" title={translate("products.fields.active")} render={(v) => (v ? translate("products.active.yes") : translate("products.active.no"))} />
         <Table.Column
           title={translate("table.actions")}

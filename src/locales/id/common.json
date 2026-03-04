@@ -33,7 +33,18 @@
     "dashboard": "Dashboard",
     "totalOrders": "Total Pesanan",
     "totalCustomers": "Total Pelanggan",
-    "totalProducts": "Total Produk"
+    "totalProducts": "Total Produk",
+    "totalRevenue": "Total Pendapatan",
+    "recentOrders": "Pesanan Terbaru",
+    "lowStockAlerts": "Stok Menipis",
+    "noRecentOrders": "Belum ada pesanan",
+    "noLowStock": "Semua stok aman",
+    "viewAll": "Lihat Semua",
+    "orderDate": "Tanggal",
+    "orderTotal": "Total",
+    "orderStatus": "Status",
+    "productName": "Produk",
+    "currentStock": "Stok"
   },
   "salesReports": {
     "salesReports": "Laporan Penjualan"
@@ -56,7 +67,8 @@
       "active": "Aktif",
       "description": "Deskripsi",
       "images": "Gambar",
-      "created": "Dibuat"
+      "created": "Dibuat",
+      "weight": "Berat (gram)"
     },
     "active": {
       "yes": "Ya",
@@ -95,7 +107,12 @@
       "productSubtotal": "Subtotal Produk",
       "shippingCost": "Ongkos Kirim",
       "courier": "Kurir",
-      "waybillNumber": "No. Resi"
+      "waybillNumber": "No. Resi",
+      "midtransOrderId": "Midtrans Order ID",
+      "midtransTransactionId": "Midtrans Transaction ID",
+      "biteshipOrderId": "Biteship Order ID",
+      "courierCode": "Kode Kurir",
+      "updatedAt": "Diperbarui"
     },
     "updateOrder": "Update Pesanan",
     "productList": "Daftar Produk",
@@ -111,20 +128,35 @@
     "cancelButton": "Batal",
     "filterStatus": "Pilih Status",
     "filterPayment": "Pilih Pembayaran",
-    "showDetail": "Lihat Detail"
+    "showDetail": "Lihat Detail",
+    "waybillSourceSystem": "Otomatis (Biteship)",
+    "waybillSourceManual": "Manual",
+    "waybillSourceSystem": "Otomatis (Biteship)",
+    "waybillSourceManual": "Manual",
+    "waybillOverrideReason": "Alasan Override",
+    "waybillOverridePlaceholder": "Mengapa Anda memasukkan resi secara manual?",
+    "enableManualWaybill": "Masukkan resi manual",
+    "manualWaybillWarning": "Input manual — Order Biteship ada tapi resi akan di-override",
+    "syncTracking": "Sync Tracking",
+    "trackingSynced": "Tracking Tersinkron",
+    "syncFailed": "Sinkronisasi Gagal",
+    "activityTitle": "Aktivitas Pesanan",
+    "noActivities": "Belum ada aktivitas"
   },
   "orderStatus": {
     "pending": "Pending",
     "processing": "Processing",
     "paid": "Paid",
+    "awaiting_shipment": "Menunggu Pengiriman",
     "shipped": "Shipped",
     "delivered": "Delivered",
     "cancelled": "Cancelled"
   },
   "paymentStatus": {
+    "unpaid": "Belum Bayar",
     "pending": "Pending",
-    "success": "Success",
-    "failed": "Failed"
+    "success": "Berhasil",
+    "failed": "Gagal"
   },
   "customers": {
     "fields": {
