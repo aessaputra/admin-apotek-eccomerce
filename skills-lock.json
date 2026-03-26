@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "git-pushing": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "computedHash": "06ece46912b5c4e8cf23400c7f73c0c355fcdf378336cd3d13f8da01466b7c72"
+    },
+    "refine-dev": {
+      "source": "itechmeat/llm-code",
+      "sourceType": "github",
+      "computedHash": "f7b5bdcc0bb65940a65b9e3822b75b1017d6061918991d0ef53ebd938660761f"
+    }
+  }
+}
