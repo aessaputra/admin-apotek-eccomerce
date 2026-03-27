@@ -241,6 +241,17 @@ Deno.serve(async req => {
       const waybill = String(trackingData.waybill || trackingData.waybill_id || '') || null;
       const nextStatus = mapBiteshipStatus(trackingStatus, order.status);
 
+      // Enforce waybill requirement for shipped status
+      if (nextStatus === 'shipped' && !waybill && !order.waybill_number) {
+        return new Response(
+          JSON.stringify({ error: 'Cannot set status to shipped without a waybill number' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        );
+      }
+
       const { data: updated, error: updateError } = await adminClient
         .from('orders')
         .update({

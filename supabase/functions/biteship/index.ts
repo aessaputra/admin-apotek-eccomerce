@@ -427,13 +427,18 @@ Deno.serve(async (req: Request) => {
 
       if (requestPayload?.order_id && biteshipOrderId) {
         const adminClient = getSupabaseAdminClient();
+        const updatePayload: Record<string, unknown> = {
+          biteship_order_id: biteshipOrderId,
+          updated_at: new Date().toISOString(),
+        };
+        if (waybillId) {
+          updatePayload.waybill_number = waybillId;
+          updatePayload.status = 'shipped';
+        }
+
         const { error: updateError } = await adminClient
           .from('orders')
-          .update({
-            biteship_order_id: biteshipOrderId,
-            waybill_number: waybillId,
-            status: 'shipped',
-          })
+          .update(updatePayload)
           .eq('id', requestPayload.order_id);
 
         if (updateError) {
@@ -443,7 +448,7 @@ Deno.serve(async (req: Request) => {
               status: 500,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             },
-          );
+            );
         }
       }
     }
