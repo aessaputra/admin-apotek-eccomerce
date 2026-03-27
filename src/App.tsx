@@ -131,6 +131,9 @@ function App() {
                     list: "/reports/sales",
                     meta: { icon: <BarChartOutlined /> },
                   },
+                  { name: "report_daily_sales" },
+                  { name: "report_product_sales" },
+                  { name: "report_customer_sales" },
                 ]}
                 options={{
                   syncWithLocation: true,

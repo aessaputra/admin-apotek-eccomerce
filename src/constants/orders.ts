@@ -1,7 +1,6 @@
 export const STATUS_COLORS: Record<string, string> = {
   pending: "orange",
   processing: "blue",
-  paid: "green",
   awaiting_shipment: "gold",
   shipped: "cyan",
   delivered: "green",
@@ -9,17 +8,22 @@ export const STATUS_COLORS: Record<string, string> = {
 };
 
 export const PAYMENT_COLORS: Record<string, string> = {
-  unpaid: "default",
   pending: "orange",
-  success: "green",
-  failed: "red",
+  settlement: "green",
+  authorize: "blue",
+  deny: "red",
+  cancel: "red",
+  expire: "gold",
+  refund: "purple",
+  partial_refund: "purple",
+  chargeback: "volcano",
+  partial_chargeback: "volcano",
 };
 
 export function getStatusOptions(translate: (key: string) => string) {
   return [
     { value: "pending", label: translate("orderStatus.pending") },
     { value: "processing", label: translate("orderStatus.processing") },
-    { value: "paid", label: translate("orderStatus.paid") },
     { value: "awaiting_shipment", label: translate("orderStatus.awaiting_shipment") },
     { value: "shipped", label: translate("orderStatus.shipped") },
     { value: "delivered", label: translate("orderStatus.delivered") },
@@ -29,9 +33,24 @@ export function getStatusOptions(translate: (key: string) => string) {
 
 export function getPaymentOptions(translate: (key: string) => string) {
   return [
-    { value: "unpaid", label: translate("paymentStatus.unpaid") },
     { value: "pending", label: translate("paymentStatus.pending") },
-    { value: "success", label: translate("paymentStatus.success") },
-    { value: "failed", label: translate("paymentStatus.failed") },
+    { value: "authorize", label: translate("paymentStatus.authorize") },
+    { value: "settlement", label: translate("paymentStatus.settlement") },
+    { value: "deny", label: translate("paymentStatus.deny") },
+    { value: "cancel", label: translate("paymentStatus.cancel") },
+    { value: "expire", label: translate("paymentStatus.expire") },
+    { value: "refund", label: translate("paymentStatus.refund") },
+    { value: "partial_refund", label: translate("paymentStatus.partial_refund") },
+    { value: "chargeback", label: translate("paymentStatus.chargeback") },
+    { value: "partial_chargeback", label: translate("paymentStatus.partial_chargeback") },
   ];
 }
+
+// Order status transition rules matching order-manager Edge Function
+// These define valid state transitions for admin UI
+export const TRANSITION_RULES: Record<string, string[]> = {
+  pending: ["processing", "cancelled"],
+  processing: ["shipped", "cancelled"],
+  awaiting_shipment: ["processing", "shipped", "cancelled"],
+  shipped: ["delivered"],
+};

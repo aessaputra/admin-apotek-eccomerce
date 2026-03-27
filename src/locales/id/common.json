@@ -131,8 +131,6 @@
     "showDetail": "Lihat Detail",
     "waybillSourceSystem": "Otomatis (Biteship)",
     "waybillSourceManual": "Manual",
-    "waybillSourceSystem": "Otomatis (Biteship)",
-    "waybillSourceManual": "Manual",
     "waybillOverrideReason": "Alasan Override",
     "waybillOverridePlaceholder": "Mengapa Anda memasukkan resi secara manual?",
     "enableManualWaybill": "Masukkan resi manual",
@@ -146,17 +144,22 @@
   "orderStatus": {
     "pending": "Pending",
     "processing": "Processing",
-    "paid": "Paid",
     "awaiting_shipment": "Menunggu Pengiriman",
     "shipped": "Shipped",
     "delivered": "Delivered",
     "cancelled": "Cancelled"
   },
   "paymentStatus": {
-    "unpaid": "Belum Bayar",
     "pending": "Pending",
-    "success": "Berhasil",
-    "failed": "Gagal"
+    "authorize": "Authorize",
+    "settlement": "Settlement",
+    "deny": "Deny",
+    "cancel": "Cancel",
+    "expire": "Expire",
+    "refund": "Refund",
+    "partial_refund": "Partial Refund",
+    "chargeback": "Chargeback",
+    "partial_chargeback": "Partial Chargeback"
   },
   "customers": {
     "fields": {

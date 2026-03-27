@@ -131,8 +131,6 @@
     "showDetail": "View Detail",
     "waybillSourceSystem": "Auto (Biteship)",
     "waybillSourceManual": "Manual",
-    "waybillSourceSystem": "Auto (Biteship)",
-    "waybillSourceManual": "Manual",
     "waybillOverrideReason": "Override Reason",
     "waybillOverridePlaceholder": "Why are you entering the waybill manually?",
     "enableManualWaybill": "Enter waybill manually",
@@ -146,17 +144,22 @@
   "orderStatus": {
     "pending": "Pending",
     "processing": "Processing",
-    "paid": "Paid",
     "awaiting_shipment": "Awaiting Shipment",
     "shipped": "Shipped",
     "delivered": "Delivered",
     "cancelled": "Cancelled"
   },
   "paymentStatus": {
-    "unpaid": "Unpaid",
     "pending": "Pending",
-    "success": "Success",
-    "failed": "Failed"
+    "authorize": "Authorize",
+    "settlement": "Settlement",
+    "deny": "Deny",
+    "cancel": "Cancel",
+    "expire": "Expire",
+    "refund": "Refund",
+    "partial_refund": "Partial Refund",
+    "chargeback": "Chargeback",
+    "partial_chargeback": "Partial Chargeback"
   },
   "customers": {
     "fields": {
