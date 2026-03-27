@@ -31,3 +31,9 @@ _.sln
 
 # Agent files
 .agents/
+
+# System files
+.sisyphus/
+
+# Supabase temp files
+supabase/.temp/
