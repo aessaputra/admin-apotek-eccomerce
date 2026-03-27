@@ -225,9 +225,13 @@ export const OrderShow: React.FC = () => {
   const STATUS_OPTIONS = getStatusOptions(translate);
   const current = record?.status ?? "";
   const allowed = TRANSITION_RULES[current] ?? [];
-  const availableStatusOptions = isStatusDropdownLocked
+  const baseOptions = isStatusDropdownLocked
     ? STATUS_OPTIONS.filter((opt) => opt.value === current)
     : STATUS_OPTIONS.filter((opt) => opt.value === current || allowed.includes(String(opt.value)));
+  const currentInOptions = STATUS_OPTIONS.some((opt) => opt.value === current);
+  const availableStatusOptions = currentInOptions
+    ? baseOptions
+    : [...baseOptions, { value: current, label: translate(`orderStatus.${current}`) }];
 
   useEffect(() => {
     if (record) {
