@@ -1,6 +1,7 @@
 export const STATUS_COLORS: Record<string, string> = {
   pending: "orange",
   processing: "blue",
+  paid: "green",
   awaiting_shipment: "gold",
   shipped: "cyan",
   delivered: "green",
@@ -48,8 +49,11 @@ export function getPaymentOptions(translate: (key: string) => string) {
 
 // Order status transition rules matching order-manager Edge Function
 // These define valid state transitions for admin UI
+// Note: 'paid' is included as a SOURCE state for legacy orders,
+// but is NOT a target state (modern flow uses awaiting_shipment)
 export const TRANSITION_RULES: Record<string, string[]> = {
   pending: ["processing", "cancelled"],
+  paid: ["awaiting_shipment", "processing", "cancelled"],
   processing: ["shipped", "cancelled"],
   awaiting_shipment: ["processing", "shipped", "cancelled"],
   shipped: ["delivered"],

@@ -144,6 +144,7 @@
   "orderStatus": {
     "pending": "Pending",
     "processing": "Processing",
+    "paid": "Paid",
     "awaiting_shipment": "Menunggu Pengiriman",
     "shipped": "Shipped",
     "delivered": "Delivered",
