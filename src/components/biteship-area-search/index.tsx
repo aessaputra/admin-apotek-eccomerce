@@ -1,11 +1,11 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { AutoComplete, Spin, Typography, Tag } from "antd";
 import { useTranslation } from "@refinedev/core";
 import { supabaseClient } from "../../providers/supabase-client";
 
 export interface BiteshipArea {
-  area_id: string;
-  area_name: string;
+  id: string;
+  name: string;
   postal_code: number;
   country_name: string;
   country_code: string;
@@ -18,7 +18,11 @@ export interface BiteshipArea {
 export interface BiteshipAreaSearchProps {
   value?: string;
   onChange?: (areaId: string) => void;
-  onAreaSelect?: (area: BiteshipArea) => void;
+  onAreaSelect?: (area: {
+    areaId: string;
+    areaName: string;
+    postalCode: number;
+  }) => void;
   placeholder?: string;
 }
 
@@ -34,9 +38,17 @@ export const BiteshipAreaSearch: React.FC<BiteshipAreaSearchProps> = ({
   >([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [selectedLabel, setSelectedLabel] = useState<string>("");
-  const [isSearching, setIsSearching] = useState(false);
+  const [selectedArea, setSelectedArea] = useState<BiteshipArea | null>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync with external value (form field)
+  useEffect(() => {
+    if (value && selectedArea && value !== selectedArea.id) {
+      // External value changed, reset selected area
+      setSelectedArea(null);
+    }
+  }, [value, selectedArea]);
 
   const searchAreas = useCallback(async (query: string) => {
     if (!query || query.length < 3) {
@@ -78,13 +90,13 @@ export const BiteshipAreaSearch: React.FC<BiteshipAreaSearchProps> = ({
       const areas: BiteshipArea[] = data.areas || [];
 
       const areaOptions = areas.map((area) => ({
-        value: area.area_id,
+        value: area.id,
         label: (
           <div
             style={{ display: "flex", flexDirection: "column", gap: "2px" }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <Typography.Text strong>{area.area_name}</Typography.Text>
+              <Typography.Text strong>{area.name}</Typography.Text>
               <Tag style={{ fontSize: "11px", padding: "0 4px" }}>
                 {area.postal_code}
               </Tag>
@@ -103,6 +115,7 @@ export const BiteshipAreaSearch: React.FC<BiteshipAreaSearchProps> = ({
       }));
 
       setOptions(areaOptions);
+      setIsDropdownOpen(true);
     } catch {
       setOptions([]);
     } finally {
@@ -111,8 +124,11 @@ export const BiteshipAreaSearch: React.FC<BiteshipAreaSearchProps> = ({
   }, []);
 
   const handleSearch = (text: string) => {
-    setIsSearching(true);
     setSearchText(text);
+    // Clear selected area when user starts typing new search
+    if (selectedArea) {
+      setSelectedArea(null);
+    }
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
@@ -121,40 +137,56 @@ export const BiteshipAreaSearch: React.FC<BiteshipAreaSearchProps> = ({
     }, 500);
   };
 
-  const handleSelect = (selectedValue: string) => {
-    const selected = options.find((opt) => opt.value === selectedValue);
-    if (selected) {
-      const label = `${selected.area.area_name} (${selected.area.postal_code})`;
-      setSelectedLabel(label);
-      setIsSearching(false);
+  const handleSelect = (_value: string, option: { area: BiteshipArea }) => {
+    const area = option.area;
+    if (area) {
+      setSelectedArea(area);
+      setSearchText("");
+      setOptions([]);
+      setIsDropdownOpen(false);
+      
+      // Call onChange with area_id for form field binding
       if (onChange) {
-        onChange(selectedValue);
+        onChange(area.id);
       }
+      
+      // Call onAreaSelect with full area data
       if (onAreaSelect) {
-        onAreaSelect(selected.area);
+        onAreaSelect({
+          areaId: area.id,
+          areaName: area.name,
+          postalCode: area.postal_code,
+        });
       }
     }
-    setSearchText("");
-    setOptions([]);
   };
 
   const handleBlur = () => {
-    setIsSearching(false);
-    setSearchText("");
-    setOptions([]);
+    // Delay clearing dropdown to allow selection to complete
+    setTimeout(() => {
+      setIsDropdownOpen(false);
+    }, 200);
   };
 
-  const displayValue = isSearching
-    ? searchText
-    : selectedLabel || value || searchText;
+  const handleFocus = () => {
+    if (options.length > 0) {
+      setIsDropdownOpen(true);
+    }
+  };
+
+  // Display selected area name, or search text, or empty
+  const displayValue = selectedArea 
+    ? `${selectedArea.name} (${selectedArea.postal_code})`
+    : searchText;
 
   return (
     <AutoComplete
       value={displayValue}
-      options={options}
+      options={isDropdownOpen ? options : []}
       onSearch={handleSearch}
       onSelect={handleSelect}
       onBlur={handleBlur}
+      onFocus={handleFocus}
       placeholder={placeholder}
       notFoundContent={
         loading ? (

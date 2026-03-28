@@ -4,7 +4,7 @@ import { Form, Input, Tabs, Card, Row, Col, Upload } from "antd";
 import type { TabsProps } from "antd";
 import { useSupabaseUpload } from "../../hooks/useSupabaseUpload";
 import { MEDIA_BUCKET } from "../../utils/storage";
-import { BiteshipAreaSearch, BiteshipArea } from "../../components/biteship-area-search";
+import { BiteshipAreaSearch } from "../../components/biteship-area-search";
 import { MapLocationPicker } from "../../components/map-location-picker";
 
 interface SettingsFormValues {
@@ -82,9 +82,9 @@ export const Settings: React.FC = () => {
     },
   });
 
-  const handleAreaSelect = (area: BiteshipArea) => {
-    form.setFieldValue("origin_area_id", area.area_id);
-    form.setFieldValue("origin_postal_code", String(area.postal_code));
+  const handleAreaSelect = (area: { areaId: string; areaName: string; postalCode: number }) => {
+    form.setFieldValue("origin_area_id", area.areaId);
+    form.setFieldValue("origin_postal_code", String(area.postalCode));
   };
 
   const handleLocationChange = (lat: string, lng: string) => {
