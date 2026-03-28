@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import { Icon, LatLng } from "leaflet";
+import { Input, Button, List, Typography, Space } from "antd";
+import { SearchOutlined } from "@ant-design/icons";
 import "leaflet/dist/leaflet.css";
 
 // Fix default Leaflet marker icon issue with Vite bundler
@@ -30,6 +32,19 @@ const MapClickHandler: React.FC<MapClickHandlerProps> = ({
       onLocationSelect(e.latlng.lat, e.latlng.lng);
     },
   });
+  return null;
+};
+
+interface MapControllerProps {
+  center: LatLng;
+  zoom: number;
+}
+
+const MapController: React.FC<MapControllerProps> = ({ center, zoom }) => {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, zoom);
+  }, [map, center, zoom]);
   return null;
 };
 
@@ -66,6 +81,13 @@ const DraggableMarker: React.FC<DraggableMarkerProps> = ({
   );
 };
 
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+}
+
 export interface MapLocationPickerProps {
   latitude?: string | number;
   longitude?: string | number;
@@ -94,6 +116,12 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
         : longitude ?? DEFAULT_LNG;
     return new LatLng(lat, lng);
   });
+
+  const [zoom, setZoom] = useState(13);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<NominatimResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const lat =
@@ -127,21 +155,95 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
     [onLocationChange]
   );
 
+  const searchAddress = useCallback(async () => {
+    if (!searchQuery.trim()) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          searchQuery
+        )}&countrycodes=ID&limit=5`
+      );
+      const data: NominatimResult[] = await response.json();
+      setSearchResults(data);
+    } catch (error) {
+      console.error("Geocoding error:", error);
+      setSearchResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [searchQuery]);
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      searchAddress();
+    }
+  };
+
+  const handleResultSelect = (result: NominatimResult) => {
+    const lat = parseFloat(result.lat);
+    const lng = parseFloat(result.lon);
+    setPosition(new LatLng(lat, lng));
+    setZoom(16);
+    setSearchResults([]);
+    if (onLocationChange) {
+      onLocationChange(lat.toFixed(6), lng.toFixed(6));
+    }
+  };
+
   return (
-    <div style={{ height, width: "100%", borderRadius: "8px", overflow: "hidden" }}>
-      <MapContainer
-        center={position}
-        zoom={13}
-        scrollWheelZoom={true}
-        style={{ height: "100%", width: "100%" }}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+    <div style={{ width: "100%" }}>
+      <Space direction="vertical" style={{ width: "100%", marginBottom: 12 }}>
+        <Input.Search
+          placeholder="Cari alamat..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={handleSearchKeyDown}
+          onSearch={searchAddress}
+          loading={loading}
+          enterButton={<Button icon={<SearchOutlined />} />}
         />
-        <DraggableMarker position={position} onDragEnd={handleMarkerDragEnd} />
-        <MapClickHandler onLocationSelect={handleLocationSelect} />
-      </MapContainer>
+        {searchResults.length > 0 && (
+          <List
+            size="small"
+            bordered
+            dataSource={searchResults}
+            renderItem={(item) => (
+              <List.Item
+                style={{ cursor: "pointer" }}
+                onClick={() => handleResultSelect(item)}
+              >
+                <Typography.Text style={{ fontSize: "12px" }}>
+                  {item.display_name}
+                </Typography.Text>
+              </List.Item>
+            )}
+            style={{ maxHeight: "200px", overflow: "auto" }}
+          />
+        )}
+        <Typography.Text type="secondary" style={{ fontSize: "12px" }}>
+          Atau klik langsung pada peta untuk memilih lokasi
+        </Typography.Text>
+      </Space>
+      <div
+        style={{ height, width: "100%", borderRadius: "8px", overflow: "hidden" }}
+      >
+        <MapContainer
+          center={position}
+          zoom={zoom}
+          scrollWheelZoom={true}
+          style={{ height: "100%", width: "100%" }}
+        >
+          <MapController center={position} zoom={zoom} />
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <DraggableMarker position={position} onDragEnd={handleMarkerDragEnd} />
+          <MapClickHandler onLocationSelect={handleLocationSelect} />
+        </MapContainer>
+      </div>
     </div>
   );
 };
