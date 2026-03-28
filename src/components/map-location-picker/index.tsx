@@ -119,6 +119,7 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
 
   const handleMarkerDragEnd = useCallback(
     (lat: number, lng: number) => {
+      setPosition(new LatLng(lat, lng));
       if (onLocationChange) {
         onLocationChange(lat.toFixed(6), lng.toFixed(6));
       }

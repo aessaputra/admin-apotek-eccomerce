@@ -83,16 +83,13 @@ export const Settings: React.FC = () => {
   });
 
   const handleAreaSelect = (area: BiteshipArea) => {
-    formProps.form?.setFieldsValue({
-      origin_postal_code: String(area.postal_code),
-    });
+    formProps.form?.setFieldValue("origin_area_id", area.area_id);
+    formProps.form?.setFieldValue("origin_postal_code", String(area.postal_code));
   };
 
   const handleLocationChange = (lat: string, lng: string) => {
-    formProps.form?.setFieldsValue({
-      origin_latitude: lat,
-      origin_longitude: lng,
-    });
+    formProps.form?.setFieldValue("origin_latitude", lat);
+    formProps.form?.setFieldValue("origin_longitude", lng);
   };
 
   const tabItems: TabsProps["items"] = [

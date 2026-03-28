@@ -4,8 +4,8 @@ import { useTranslation } from "@refinedev/core";
 import { supabaseClient } from "../../providers/supabase-client";
 
 export interface BiteshipArea {
-  id: string;
-  name: string;
+  area_id: string;
+  area_name: string;
   postal_code: number;
   country_name: string;
   country_code: string;
@@ -78,13 +78,13 @@ export const BiteshipAreaSearch: React.FC<BiteshipAreaSearchProps> = ({
       const areas: BiteshipArea[] = data.areas || [];
 
       const areaOptions = areas.map((area) => ({
-        value: area.id,
+        value: area.area_id,
         label: (
           <div
             style={{ display: "flex", flexDirection: "column", gap: "2px" }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <Typography.Text strong>{area.name}</Typography.Text>
+              <Typography.Text strong>{area.area_name}</Typography.Text>
               <Tag style={{ fontSize: "11px", padding: "0 4px" }}>
                 {area.postal_code}
               </Tag>
@@ -124,7 +124,7 @@ export const BiteshipAreaSearch: React.FC<BiteshipAreaSearchProps> = ({
   const handleSelect = (selectedValue: string) => {
     const selected = options.find((opt) => opt.value === selectedValue);
     if (selected) {
-      const label = `${selected.area.name} (${selected.area.postal_code})`;
+      const label = `${selected.area.area_name} (${selected.area.postal_code})`;
       setSelectedLabel(label);
       setIsSearching(false);
       if (onAreaSelect) {
