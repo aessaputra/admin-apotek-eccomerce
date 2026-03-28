@@ -7,6 +7,14 @@ export const OrderList: React.FC = () => {
   const { translate } = useTranslation();
   const { tableProps, filters } = useTable({
     syncWithLocation: true,
+    sorters: {
+      initial: [
+        {
+          field: "created_at",
+          order: "desc",
+        },
+      ],
+    },
   });
 
   const STATUS_OPTIONS = getStatusOptions(translate);

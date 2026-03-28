@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useShow, useTranslation } from "@refinedev/core";
 import { Show, DateField, NumberField } from "@refinedev/antd";
 import { Typography, Table, Tag, Descriptions, Form, Select, Input, Button, Card, App, Timeline, Spin, Tooltip, Switch, Alert, Space } from "antd";
 import { SyncOutlined, InfoCircleOutlined, LockOutlined, WarningOutlined } from "@ant-design/icons";
 import { STATUS_COLORS, PAYMENT_COLORS, getStatusOptions, TRANSITION_RULES } from "../../constants/orders";
 import { supabaseClient } from "../../providers/supabase-client";
+import { getFunctionsErrorMessage } from "../../utils/functions-error";
 
 const { Title, Text } = Typography;
 
@@ -89,13 +90,7 @@ export const OrderShow: React.FC = () => {
   // Show override reason field when: manual mode is on AND Biteship order exists (i.e. overriding system waybill)
   const showOverrideReason = manualWaybillMode && hasBiteship && !isWaybillFullyLocked;
 
-  useEffect(() => {
-    if (record?.id) {
-      loadActivities();
-    }
-  }, [record?.id]);
-
-  const loadActivities = async () => {
+  const loadActivities = useCallback(async () => {
     if (!record?.id) return;
     setLoadingActivities(true);
     try {
@@ -114,34 +109,27 @@ export const OrderShow: React.FC = () => {
     } finally {
       setLoadingActivities(false);
     }
-  };
+  }, [record?.id]);
+
+  useEffect(() => {
+    if (record?.id) {
+      loadActivities();
+    }
+  }, [record?.id, loadActivities]);
 
   const invokeOrderManager = async (values: {
     action: "transition_status" | "sync_tracking";
     orderId: string;
     payload?: Record<string, unknown>;
   }) => {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    const token = session?.access_token;
-    if (!token) {
-      throw new Error("Not authenticated");
-    }
-
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/order-manager`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(values),
+    const { data, error } = await supabaseClient.functions.invoke("order-manager", {
+      body: values,
     });
-
-    const result = await response.json();
-    if (!response.ok) {
-      throw new Error(result?.message || result?.error || "Order manager request failed");
+    if (error) {
+      const msg = await getFunctionsErrorMessage(error, "Order manager request failed");
+      throw new Error(msg);
     }
-
-    return result;
+    return data;
   };
 
   const handleSyncTracking = async () => {
