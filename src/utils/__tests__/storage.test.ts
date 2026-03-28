@@ -60,7 +60,7 @@ describe("storage utils", () => {
   });
 
   describe("getStoragePathFromPublicUrl", () => {
-    const bucket = "product-images";
+    const bucket = "media";
     const baseUrl = "https://example.supabase.co/storage/v1/object/public";
 
     it("should extract path correctly from a valid URL", () => {

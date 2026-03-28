@@ -20,6 +20,7 @@ import {
   InboxOutlined,
   AppstoreOutlined,
   BarChartOutlined,
+  SettingOutlined,
 } from "@ant-design/icons";
 
 import routerProvider, {
@@ -55,6 +56,7 @@ import { CategoryEdit } from "./pages/categories/edit";
 import { CategoryShow } from "./pages/categories/show";
 import { Profile } from "./pages/profile";
 import { SalesReport } from "./pages/reports/sales";
+import { Settings } from "./pages/settings";
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -131,6 +133,11 @@ function App() {
                     list: "/reports/sales",
                     meta: { icon: <BarChartOutlined /> },
                   },
+                  {
+                    name: "settings",
+                    list: "/settings",
+                    meta: { icon: <SettingOutlined /> },
+                  },
                   { name: "report_daily_sales" },
                   { name: "report_product_sales" },
                   { name: "report_customer_sales" },
@@ -182,6 +189,7 @@ function App() {
                     <Route path="/reports">
                       <Route path="sales" element={<SalesReport />} />
                     </Route>
+                    <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<ErrorComponent />} />
                   </Route>
                   <Route

@@ -7,7 +7,7 @@ import { slugify } from "../../utils/slugify";
 import { supabaseClient } from "../../providers/supabase-client";
 import {
   getStoragePathFromPublicUrl,
-  PRODUCT_IMAGES_BUCKET,
+  MEDIA_BUCKET,
 } from "../../utils/storage";
 
 interface ProductImage { id: string; url: string; sort_order: number }
@@ -59,9 +59,9 @@ export const ProductEdit: React.FC = () => {
       const removed = original.filter((o) => !currentUrls.includes(o.url));
       const removedResults = await Promise.allSettled(
         removed.map(async (img) => {
-          const path = getStoragePathFromPublicUrl(img.url, PRODUCT_IMAGES_BUCKET);
+          const path = getStoragePathFromPublicUrl(img.url, MEDIA_BUCKET);
           if (path) {
-            await supabaseClient.storage.from(PRODUCT_IMAGES_BUCKET).remove([path]);
+            await supabaseClient.storage.from(MEDIA_BUCKET).remove([path]);
           }
           const { error: deleteError } = await supabaseClient
             .from("product_images")

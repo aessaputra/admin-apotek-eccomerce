@@ -1,6 +1,6 @@
 import { Upload } from "antd";
 import { useSupabaseUpload } from "../../hooks/useSupabaseUpload";
-import { PRODUCT_IMAGES_BUCKET } from "../../utils/storage";
+import { MEDIA_BUCKET } from "../../utils/storage";
 
 interface ProductImageUploadProps {
   value?: string[];
@@ -20,8 +20,8 @@ export const ProductImageUpload: React.FC<ProductImageUploadProps> = ({
 
   const { beforeUpload, customRequest, handleRemove } = useSupabaseUpload(
     {
-      bucket: PRODUCT_IMAGES_BUCKET,
-      pathPrefix: "images/",
+      bucket: MEDIA_BUCKET,
+      pathPrefix: "products/",
       maxCount: 10,
       replaceOnUpload: false,
     },

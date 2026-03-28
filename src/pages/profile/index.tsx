@@ -58,7 +58,7 @@ const ProfileForms: React.FC<{ userId: string }> = ({ userId }) => {
           <Input placeholder={translate("profile.fields.fullNamePlaceholder")} />
         </Form.Item>
         <Form.Item label={translate("profile.fields.avatar")} name="avatar_url">
-          <AvatarUpload userId={userId} />
+          <AvatarUpload />
         </Form.Item>
       </Form>
 

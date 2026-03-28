@@ -8,30 +8,60 @@ interface BiteshipProxyRequest {
   payload?: Record<string, unknown>;
 }
 
+interface StoreSettings {
+  store_name: string;
+  phone_number: string;
+  email: string;
+  organization: string;
+  store_address: string;
+  origin_postal_code: number;
+  origin_latitude: number | null;
+  origin_longitude: number | null;
+  origin_area_id: string | null;
+}
+
 const BITESHIP_API_KEY = Deno.env.get('BITESHIP_API_KEY');
 if (!BITESHIP_API_KEY) throw new Error('Missing BITESHIP_API_KEY environment variable');
 const BITESHIP_API_URL = 'https://api.biteship.com';
 const DEFAULT_ORIGIN_POSTAL_CODE = 42183;
 const DEFAULT_COURIERS = 'jne,jnt,sicepat,anteraja,pos,gojek,grab,lalamove';
-const BITESHIP_ORIGIN_POSTAL_CODE = Number.parseInt(
-  Deno.env.get('BITESHIP_ORIGIN_POSTAL_CODE') || '',
-  10,
-);
 const BITESHIP_COURIERS = (Deno.env.get('BITESHIP_COURIERS') || '').trim() || DEFAULT_COURIERS;
-const BITESHIP_ORIGIN_LATITUDE = Deno.env.get('BITESHIP_ORIGIN_LATITUDE');
-const BITESHIP_ORIGIN_LONGITUDE = Deno.env.get('BITESHIP_ORIGIN_LONGITUDE');
-const SHOP_SHIPPER_NAME = (Deno.env.get('SHOP_SHIPPER_NAME') || '').trim();
-const SHOP_SHIPPER_PHONE = (Deno.env.get('SHOP_SHIPPER_PHONE') || '').trim();
-const SHOP_SHIPPER_EMAIL = (Deno.env.get('SHOP_SHIPPER_EMAIL') || '').trim();
-const SHOP_ORGANIZATION = (Deno.env.get('SHOP_ORGANIZATION') || '').trim();
-const SHOP_ADDRESS = (Deno.env.get('SHOP_ADDRESS') || '').trim();
-const ORIGIN_POSTAL_CODE = Number.isFinite(BITESHIP_ORIGIN_POSTAL_CODE)
-  ? BITESHIP_ORIGIN_POSTAL_CODE
-  : DEFAULT_ORIGIN_POSTAL_CODE;
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
 const JWT_ISSUER = `${supabaseUrl}/auth/v1`;
+
+async function getStoreSettings(): Promise<StoreSettings> {
+  const adminClient = getSupabaseAdminClient();
+  const { data, error } = await adminClient
+    .from('settings')
+    .select(
+      'store_name, phone_number, email, organization, store_address, origin_postal_code, origin_latitude, origin_longitude, origin_area_id',
+    )
+    .eq('id', 1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[getStoreSettings] Database error:', error);
+    throw new Error(`Failed to fetch store settings: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error('Store settings not found (expected row with id=1)');
+  }
+
+  return {
+    store_name: data.store_name || '',
+    phone_number: data.phone_number || '',
+    email: data.email || '',
+    organization: data.organization || '',
+    store_address: data.store_address || '',
+    origin_postal_code: data.origin_postal_code ?? DEFAULT_ORIGIN_POSTAL_CODE,
+    origin_latitude: data.origin_latitude,
+    origin_longitude: data.origin_longitude,
+    origin_area_id: data.origin_area_id,
+  };
+}
 
 // Validate tracking_id to prevent URL manipulation
 function isValidTrackingId(id: string): boolean {
@@ -111,6 +141,7 @@ function getLoggablePayload(payload: unknown): unknown {
 
 function withServerShipperAndOriginFields(
   payload: Record<string, unknown>,
+  settings: StoreSettings,
 ): Record<string, unknown> {
   const {
     shipper_contact_name: _shipperContactName,
@@ -127,14 +158,14 @@ function withServerShipperAndOriginFields(
 
   return {
     ...safePayload,
-    shipper_contact_name: SHOP_SHIPPER_NAME,
-    shipper_contact_phone: SHOP_SHIPPER_PHONE,
-    shipper_contact_email: SHOP_SHIPPER_EMAIL,
-    shipper_organization: SHOP_ORGANIZATION,
-    origin_contact_name: SHOP_SHIPPER_NAME,
-    origin_contact_phone: SHOP_SHIPPER_PHONE,
-    origin_address: SHOP_ADDRESS,
-    origin_postal_code: ORIGIN_POSTAL_CODE,
+    shipper_contact_name: settings.store_name,
+    shipper_contact_phone: settings.phone_number,
+    shipper_contact_email: settings.email,
+    shipper_organization: settings.organization,
+    origin_contact_name: settings.store_name,
+    origin_contact_phone: settings.phone_number,
+    origin_address: settings.store_address,
+    origin_postal_code: settings.origin_postal_code,
   };
 }
 
@@ -195,6 +226,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // 5. Validate action-specific requirements before fetching settings
     if (action === 'create_order') {
       if (!isRecord(payload) || !payload.order_id) {
         return new Response(JSON.stringify({ error: 'order_id is required for create_order' }), {
@@ -244,6 +276,25 @@ Deno.serve(async (req: Request) => {
     let method = 'POST';
     let requestPayload = isRecord(payload) ? payload : undefined;
 
+    // Fetch store settings only for actions that require them
+    let settings: StoreSettings | undefined;
+    const needsSettings = action === 'rates' || action === 'draft_order' || action === 'create_order';
+
+    if (needsSettings) {
+      try {
+        settings = await getStoreSettings();
+      } catch (error: unknown) {
+        console.error('[biteship] Failed to fetch store settings:', error);
+        return new Response(
+          JSON.stringify({ error: 'Service configuration unavailable' }),
+          {
+            status: 503,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        );
+      }
+    }
+
     if (action === 'rates') {
       const safePayload = isRecord(requestPayload) ? requestPayload : {};
       const { origin_area_id: _originAreaId, ...ratesPayload } = safePayload;
@@ -275,31 +326,35 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      // Priority: area_id > coordinates > postal_code
+      const originFields = settings!.origin_area_id
+        ? { origin_area_id: settings!.origin_area_id }
+        : (settings!.origin_latitude !== null && settings!.origin_longitude !== null)
+          ? {
+              origin_latitude: settings!.origin_latitude,
+              origin_longitude: settings!.origin_longitude,
+            }
+          : { origin_postal_code: settings!.origin_postal_code };
+
       requestPayload = {
         ...ratesPayload,
-        origin_postal_code: ratesPayload.origin_postal_code ?? ORIGIN_POSTAL_CODE,
+        ...originFields,
         couriers: ratesPayload.couriers ?? BITESHIP_COURIERS,
-        ...(BITESHIP_ORIGIN_LATITUDE && BITESHIP_ORIGIN_LONGITUDE
-          ? {
-              origin_latitude: Number(BITESHIP_ORIGIN_LATITUDE),
-              origin_longitude: Number(BITESHIP_ORIGIN_LONGITUDE),
-            }
-          : {}),
       };
     }
 
     if (action === 'create_order') {
       if (
-        !SHOP_SHIPPER_NAME ||
-        !SHOP_SHIPPER_PHONE ||
-        !SHOP_SHIPPER_EMAIL ||
-        !SHOP_ORGANIZATION ||
-        !SHOP_ADDRESS
+        !settings!.store_name ||
+        !settings!.phone_number ||
+        !settings!.email ||
+        !settings!.organization ||
+        !settings!.store_address
       ) {
         return new Response(
           JSON.stringify({
             error:
-              'Missing shop shipper configuration. Set SHOP_SHIPPER_NAME, SHOP_SHIPPER_PHONE, SHOP_SHIPPER_EMAIL, SHOP_ORGANIZATION, and SHOP_ADDRESS.',
+              'Missing shop shipper configuration. Ensure store_name, phone_number, email, organization, and store_address are set in settings table.',
           }),
           {
             status: 500,
@@ -309,13 +364,13 @@ Deno.serve(async (req: Request) => {
       }
 
       const safePayload = isRecord(requestPayload) ? requestPayload : {};
-      requestPayload = withServerShipperAndOriginFields(safePayload);
+      requestPayload = withServerShipperAndOriginFields(safePayload, settings!);
     }
 
     if (action === 'draft_order') {
-      if (!SHOP_SHIPPER_EMAIL || !SHOP_ORGANIZATION) {
+      if (!settings!.email || !settings!.organization) {
         return new Response(
-          JSON.stringify({ error: 'Missing SHOP_SHIPPER_EMAIL or SHOP_ORGANIZATION secret.' }),
+          JSON.stringify({ error: 'Missing email or organization in settings configuration.' }),
           {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -326,7 +381,7 @@ Deno.serve(async (req: Request) => {
       const safePayload = isRecord(requestPayload) ? requestPayload : {};
       requestPayload = {
         items: [],
-        ...withServerShipperAndOriginFields(safePayload),
+        ...withServerShipperAndOriginFields(safePayload, settings!),
       };
     }
 
@@ -450,7 +505,7 @@ Deno.serve(async (req: Request) => {
               status: 500,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             },
-            );
+          );
         }
       }
     }

@@ -1,4 +1,4 @@
-export const PRODUCT_IMAGES_BUCKET = "product-images";
+export const MEDIA_BUCKET = "media";
 
 /** Max file size untuk upload gambar (5MB) */
 export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;

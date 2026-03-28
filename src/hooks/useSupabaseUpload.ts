@@ -13,6 +13,7 @@ interface UseSupabaseUploadOptions {
   pathPrefix: string; // e.g. "logos/", "images/", or dynamic like `${userId}/`
   maxCount?: number; // default 1
   replaceOnUpload?: boolean; // true for avatar/category (remove old before uploading new), false for product (append)
+  includeUserId?: boolean; // true for avatar uploads to comply with RLS policy (e.g., 'avatars/{userId}-{timestamp}-{filename}')
 }
 
 interface UseSupabaseUploadReturn {
@@ -33,7 +34,7 @@ export function useSupabaseUpload(
     | ((v: string[]) => void)
     | undefined
 ): UseSupabaseUploadReturn {
-  const { bucket, pathPrefix, replaceOnUpload = false } = options;
+  const { bucket, pathPrefix, replaceOnUpload = false, includeUserId = false } = options;
 
   const beforeUpload = useCallback((file: RcFile) => {
     const { valid, error } = validateImageFile(file);
@@ -70,7 +71,10 @@ export function useSupabaseUpload(
         }
 
         const safeName = sanitizeFilename(rcFile.name);
-        const path = `${pathPrefix}${Date.now()}-${safeName}`;
+        // Get current user ID if includeUserId is enabled (required for avatar RLS policy)
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        const userIdPrefix = includeUserId && user ? `${user.id}-` : '';
+        const path = `${pathPrefix}${userIdPrefix}${Date.now()}-${safeName}`;
 
         const { error } = await supabaseClient.storage
           .from(bucket)
@@ -94,7 +98,7 @@ export function useSupabaseUpload(
         onError?.(err as Error);
       }
     },
-    [bucket, pathPrefix, replaceOnUpload, value, onChange]
+    [bucket, pathPrefix, replaceOnUpload, includeUserId, value, onChange]
   );
 
   const handleRemove = useCallback(

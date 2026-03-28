@@ -1,8 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const PRODUCT_IMAGES_BUCKET = "product-images";
-const CATEGORY_LOGO_BUCKET = "category-logos";
+const MEDIA_BUCKET = "media";
 
 function getStoragePathFromUrl(url: string, bucket: string): string | null {
   if (!url || typeof url !== "string") return null;
@@ -40,33 +39,52 @@ Deno.serve(async (req: Request) => {
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   const referenced: Record<string, Set<string>> = {
-    [PRODUCT_IMAGES_BUCKET]: new Set(),
-    [CATEGORY_LOGO_BUCKET]: new Set(),
+    [MEDIA_BUCKET]: new Set(),
   };
 
+  // Collect all referenced paths from the media bucket
   const { data: productImages } = await supabase.from("product_images").select("url");
   for (const row of productImages ?? []) {
-    const path = getStoragePathFromUrl(row.url, PRODUCT_IMAGES_BUCKET);
-    if (path) referenced[PRODUCT_IMAGES_BUCKET].add(path);
+    const path = getStoragePathFromUrl(row.url, MEDIA_BUCKET);
+    if (path) referenced[MEDIA_BUCKET].add(path);
   }
 
   const { data: categories } = await supabase.from("categories").select("logo_url");
   for (const row of categories ?? []) {
-    const path = getStoragePathFromUrl(row.logo_url, CATEGORY_LOGO_BUCKET);
-    if (path) referenced[CATEGORY_LOGO_BUCKET].add(path);
+    const path = getStoragePathFromUrl(row.logo_url, MEDIA_BUCKET);
+    if (path) referenced[MEDIA_BUCKET].add(path);
+  }
+
+  const { data: profiles } = await supabase.from("profiles").select("avatar_url");
+  for (const row of profiles ?? []) {
+    if (row.avatar_url) {
+      const path = getStoragePathFromUrl(row.avatar_url, MEDIA_BUCKET);
+      if (path) referenced[MEDIA_BUCKET].add(path);
+    }
+  }
+
+  const { data: settings } = await supabase.from("settings").select("primary_logo_url, app_icon_url");
+  for (const row of settings ?? []) {
+    if (row.primary_logo_url) {
+      const path = getStoragePathFromUrl(row.primary_logo_url, MEDIA_BUCKET);
+      if (path) referenced[MEDIA_BUCKET].add(path);
+    }
+    if (row.app_icon_url) {
+      const path = getStoragePathFromUrl(row.app_icon_url, MEDIA_BUCKET);
+      if (path) referenced[MEDIA_BUCKET].add(path);
+    }
   }
 
   let deletedCount = 0;
 
-  for (const bucket of [PRODUCT_IMAGES_BUCKET, CATEGORY_LOGO_BUCKET]) {
-    const allPaths = await listAllPaths(supabase, bucket, "");
-    const orphans = allPaths.filter((p) => !referenced[bucket].has(p));
+  // List all paths in the media bucket
+  const allPaths = await listAllPaths(supabase, MEDIA_BUCKET, "");
+  const orphans = allPaths.filter((p) => !referenced[MEDIA_BUCKET].has(p));
 
-    for (let i = 0; i < orphans.length; i += 100) {
-      const batch = orphans.slice(i, i + 100);
-      await supabase.storage.from(bucket).remove(batch);
-      deletedCount += batch.length;
-    }
+  for (let i = 0; i < orphans.length; i += 100) {
+    const batch = orphans.slice(i, i + 100);
+    await supabase.storage.from(MEDIA_BUCKET).remove(batch);
+    deletedCount += batch.length;
   }
 
   return new Response(

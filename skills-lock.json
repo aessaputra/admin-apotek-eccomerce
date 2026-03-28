@@ -10,6 +10,11 @@
       "source": "itechmeat/llm-code",
       "sourceType": "github",
       "computedHash": "f7b5bdcc0bb65940a65b9e3822b75b1017d6061918991d0ef53ebd938660761f"
+    },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "computedHash": "9c87c315aed143ee3b34bec8117100f5035e0df09e6b23e1ecc772cff434c9ad"
     }
   }
 }

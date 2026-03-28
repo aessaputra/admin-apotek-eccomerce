@@ -1,24 +1,22 @@
 import type { DataProvider } from "@refinedev/core";
 import { dataProvider as supabaseDataProvider } from "@refinedev/supabase";
 import { supabaseClient } from "./supabase-client";
-import { getStoragePathFromPublicUrl, PRODUCT_IMAGES_BUCKET } from "../utils/storage";
-
-const CATEGORY_LOGO_BUCKET = "category-logos";
+import { getStoragePathFromPublicUrl, MEDIA_BUCKET } from "../utils/storage";
 
 const baseDataProvider = supabaseDataProvider(supabaseClient);
 
 async function deleteCategoryLogo(logoUrl: string | null | undefined): Promise<void> {
   if (!logoUrl) return;
-  const path = getStoragePathFromPublicUrl(logoUrl, CATEGORY_LOGO_BUCKET);
+  const path = getStoragePathFromPublicUrl(logoUrl, MEDIA_BUCKET);
   if (!path) return;
-  await supabaseClient.storage.from(CATEGORY_LOGO_BUCKET).remove([path]);
+  await supabaseClient.storage.from(MEDIA_BUCKET).remove([path]);
 }
 
 async function deleteProductImages(productImages: { url: string }[]): Promise<void> {
   const deletions = (productImages || []).map(async (img) => {
-    const path = getStoragePathFromPublicUrl(img.url, PRODUCT_IMAGES_BUCKET);
+    const path = getStoragePathFromPublicUrl(img.url, MEDIA_BUCKET);
     if (path) {
-      await supabaseClient.storage.from(PRODUCT_IMAGES_BUCKET).remove([path]);
+      await supabaseClient.storage.from(MEDIA_BUCKET).remove([path]);
     }
   });
   await Promise.allSettled(deletions);

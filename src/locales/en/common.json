@@ -11,7 +11,8 @@
     "stores": "Stores",
     "products": "Products",
     "categories": "Categories",
-    "salesReports": "Sales Reports"
+    "salesReports": "Sales Reports",
+    "settings": "Settings"
   },
   "actions": {
     "show": "View",
@@ -244,5 +245,52 @@
       "load_error_products": "Failed to load top products data",
       "load_error_customers": "Failed to load customer sales data"
     }
+  },
+  "settings": {
+    "title": "Settings",
+    "tabs": {
+      "storeProfile": "Store Profile",
+      "shippingSettings": "Shipping Settings",
+      "branding": "Branding & Logos"
+    },
+    "fields": {
+      "storeName": "Store Name",
+      "storeNamePlaceholder": "Enter store name",
+      "phoneNumber": "Phone Number",
+      "phoneNumberPlaceholder": "Enter phone number",
+      "email": "Email",
+      "emailPlaceholder": "Enter email",
+      "organization": "Organization",
+      "organizationPlaceholder": "Enter organization name",
+      "originAreaId": "Origin Area (Biteship)",
+      "originAreaIdPlaceholder": "Search area by name or postal code",
+      "originPostalCode": "Origin Postal Code",
+      "originPostalCodePlaceholder": "Enter origin postal code",
+      "originLatitude": "Origin Latitude",
+      "originLatitudePlaceholder": "Optional: for instant couriers (Gojek/Grab)",
+      "originLongitude": "Origin Longitude",
+      "originLongitudePlaceholder": "Optional: for instant couriers (Gojek/Grab)",
+      "mapLocationPicker": "Pick Location on Map",
+      "storeAddress": "Full Store Address",
+      "storeAddressPlaceholder": "Enter full store address",
+      "primaryLogo": "Primary Logo",
+      "primaryLogoPlaceholder": "Upload Logo",
+      "appIcon": "App Icon",
+      "appIconPlaceholder": "Upload Icon"
+    },
+    "validation": {
+      "storeNameRequired": "Store name is required",
+      "phoneRequired": "Phone number is required",
+      "emailRequired": "Email is required",
+      "emailInvalid": "Invalid email format",
+      "areaIdRequired": "Origin area is required",
+      "postalCodeRequired": "Postal code is required",
+      "latitudeRequired": "Latitude is required",
+      "longitudeRequired": "Longitude is required",
+      "addressRequired": "Address is required"
+    },
+    "noAreasFound": "No areas found",
+    "saveSuccess": "Settings saved successfully",
+    "saveError": "Failed to save settings"
   }
 }

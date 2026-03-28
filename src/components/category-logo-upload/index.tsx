@@ -1,7 +1,6 @@
 import { Upload } from "antd";
 import { useSupabaseUpload } from "../../hooks/useSupabaseUpload";
-
-const BUCKET = "category-logos";
+import { MEDIA_BUCKET } from "../../utils/storage";
 
 interface CategoryLogoUploadProps {
   value?: string;
@@ -18,8 +17,8 @@ export const CategoryLogoUpload: React.FC<CategoryLogoUploadProps> = ({
 
   const { beforeUpload, customRequest, handleRemove } = useSupabaseUpload(
     {
-      bucket: BUCKET,
-      pathPrefix: "logos/",
+      bucket: MEDIA_BUCKET,
+      pathPrefix: "categories/",
       maxCount: 1,
       replaceOnUpload: true,
     },

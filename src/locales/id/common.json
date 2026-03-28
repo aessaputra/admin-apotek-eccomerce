@@ -11,7 +11,8 @@
     "stores": "Toko",
     "products": "Produk",
     "categories": "Kategori",
-    "salesReports": "Laporan Penjualan"
+    "salesReports": "Laporan Penjualan",
+    "settings": "Pengaturan"
   },
   "actions": {
     "show": "Lihat",
@@ -244,5 +245,52 @@
       "load_error_products": "Gagal memuat data produk terlaris",
       "load_error_customers": "Gagal memuat data penjualan customer"
     }
+  },
+  "settings": {
+    "title": "Pengaturan",
+    "tabs": {
+      "storeProfile": "Profil Toko",
+      "shippingSettings": "Pengaturan Pengiriman",
+      "branding": "Branding & Logo"
+    },
+    "fields": {
+      "storeName": "Nama Toko",
+      "storeNamePlaceholder": "Masukkan nama toko",
+      "phoneNumber": "Nomor Telepon",
+      "phoneNumberPlaceholder": "Masukkan nomor telepon",
+      "email": "Email",
+      "emailPlaceholder": "Masukkan email",
+      "organization": "Organisasi",
+      "organizationPlaceholder": "Masukkan nama organisasi",
+      "originAreaId": "Area Asal (Biteship)",
+      "originAreaIdPlaceholder": "Cari area berdasarkan nama atau kode pos",
+      "originPostalCode": "Kode Pos Asal",
+      "originPostalCodePlaceholder": "Masukkan kode pos asal",
+      "originLatitude": "Latitude Asal",
+      "originLatitudePlaceholder": "Opsional: untuk kurir instan (Gojek/Grab)",
+      "originLongitude": "Longitude Asal",
+      "originLongitudePlaceholder": "Opsional: untuk kurir instan (Gojek/Grab)",
+      "mapLocationPicker": "Pilih Lokasi di Peta",
+      "storeAddress": "Alamat Toko Lengkap",
+      "storeAddressPlaceholder": "Masukkan alamat lengkap toko",
+      "primaryLogo": "Logo Utama",
+      "primaryLogoPlaceholder": "Unggah Logo",
+      "appIcon": "Ikon Aplikasi",
+      "appIconPlaceholder": "Unggah Ikon"
+    },
+    "validation": {
+      "storeNameRequired": "Nama toko wajib diisi",
+      "phoneRequired": "Nomor telepon wajib diisi",
+      "emailRequired": "Email wajib diisi",
+      "emailInvalid": "Format email tidak valid",
+      "areaIdRequired": "Area asal wajib dipilih",
+      "postalCodeRequired": "Kode pos wajib diisi",
+      "latitudeRequired": "Latitude wajib diisi",
+      "longitudeRequired": "Longitude wajib diisi",
+      "addressRequired": "Alamat wajib diisi"
+    },
+    "noAreasFound": "Area tidak ditemukan",
+    "saveSuccess": "Pengaturan berhasil disimpan",
+    "saveError": "Gagal menyimpan pengaturan"
   }
 }
