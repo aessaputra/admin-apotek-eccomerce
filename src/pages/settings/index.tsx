@@ -65,7 +65,7 @@ const LogoUpload: React.FC<LogoUploadProps> = ({ value, onChange, placeholder })
 
 export const Settings: React.FC = () => {
   const { translate } = useTranslation();
-  const { formProps, saveButtonProps } = useForm<SettingsFormValues>({
+  const { formProps, saveButtonProps, form } = useForm<SettingsFormValues>({
     action: "edit",
     resource: "settings",
     id: 1,
@@ -83,13 +83,13 @@ export const Settings: React.FC = () => {
   });
 
   const handleAreaSelect = (area: BiteshipArea) => {
-    formProps.form?.setFieldValue("origin_area_id", area.area_id);
-    formProps.form?.setFieldValue("origin_postal_code", String(area.postal_code));
+    form.setFieldValue("origin_area_id", area.area_id);
+    form.setFieldValue("origin_postal_code", String(area.postal_code));
   };
 
   const handleLocationChange = (lat: string, lng: string) => {
-    formProps.form?.setFieldValue("origin_latitude", lat);
-    formProps.form?.setFieldValue("origin_longitude", lng);
+    form.setFieldValue("origin_latitude", lat);
+    form.setFieldValue("origin_longitude", lng);
   };
 
   const tabItems: TabsProps["items"] = [
@@ -137,26 +137,26 @@ export const Settings: React.FC = () => {
       children: (
         <Card>
           <Form.Item
-            label={translate("settings.fields.originAreaId", {}, "Origin Area (Biteship)")}
+            label={translate("settings.fields.originAreaId", {}, "Origin Area")}
             name="origin_area_id"
             rules={[{ required: true, message: translate("settings.validation.areaIdRequired", {}, "Origin area is required") }]}
           >
             <BiteshipAreaSearch
-              placeholder={translate("settings.fields.originAreaIdPlaceholder", {}, "Search area by name or postal code")}
+              placeholder={translate("settings.fields.originAreaIdPlaceholder", {}, "Search area, district, or city...")}
               onAreaSelect={handleAreaSelect}
             />
           </Form.Item>
           <Form.Item
-            label={translate("settings.fields.originPostalCode", {}, "Origin Postal Code")}
+            label={translate("settings.fields.originPostalCode", {}, "Postal Code")}
             name="origin_postal_code"
             rules={[{ required: true, message: translate("settings.validation.postalCodeRequired", {}, "Postal code is required") }]}
           >
-            <Input placeholder={translate("settings.fields.originPostalCodePlaceholder", {}, "Enter origin postal code")} readOnly />
+            <Input placeholder={translate("settings.fields.originPostalCodePlaceholder", {}, "Enter postal code")} />
           </Form.Item>
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
-                label={translate("settings.fields.originLatitude", {}, "Origin Latitude")}
+                label={translate("settings.fields.originLatitude", {}, "Latitude")}
                 name="origin_latitude"
               >
                 <Input placeholder={translate("settings.fields.originLatitudePlaceholder", {}, "Optional: for instant couriers (Gojek/Grab)")} />
@@ -164,7 +164,7 @@ export const Settings: React.FC = () => {
             </Col>
             <Col span={12}>
               <Form.Item
-                label={translate("settings.fields.originLongitude", {}, "Origin Longitude")}
+                label={translate("settings.fields.originLongitude", {}, "Longitude")}
                 name="origin_longitude"
               >
                 <Input placeholder={translate("settings.fields.originLongitudePlaceholder", {}, "Optional: for instant couriers (Gojek/Grab)")} />
@@ -172,11 +172,11 @@ export const Settings: React.FC = () => {
             </Col>
           </Row>
           <Form.Item
-            label={translate("settings.fields.mapLocationPicker", {}, "Pick Location on Map")}
+            label={translate("settings.fields.mapLocationPicker", {}, "Store Location")}
           >
             <MapLocationPicker
-              latitude={formProps.form?.getFieldValue("origin_latitude")}
-              longitude={formProps.form?.getFieldValue("origin_longitude")}
+              latitude={form.getFieldValue("origin_latitude")}
+              longitude={form.getFieldValue("origin_longitude")}
               onLocationChange={handleLocationChange}
               height="300px"
             />

@@ -127,12 +127,12 @@ export const BiteshipAreaSearch: React.FC<BiteshipAreaSearchProps> = ({
       const label = `${selected.area.area_name} (${selected.area.postal_code})`;
       setSelectedLabel(label);
       setIsSearching(false);
+      if (onChange) {
+        onChange(selectedValue);
+      }
       if (onAreaSelect) {
         onAreaSelect(selected.area);
       }
-    }
-    if (onChange) {
-      onChange(selectedValue);
     }
     setSearchText("");
     setOptions([]);
