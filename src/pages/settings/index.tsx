@@ -1,6 +1,6 @@
 import { Edit, useForm } from "@refinedev/antd";
 import { useTranslation } from "@refinedev/core";
-import { Form, Input, Tabs, Card, Row, Col, Upload } from "antd";
+import { Form, Input, Tabs, Card, Row, Col, Upload, Typography } from "antd";
 import type { TabsProps } from "antd";
 import { useSupabaseUpload } from "../../hooks/useSupabaseUpload";
 import { MEDIA_BUCKET } from "../../utils/storage";
@@ -153,24 +153,16 @@ export const Settings: React.FC = () => {
           >
             <Input placeholder={translate("settings.fields.originPostalCodePlaceholder", {}, "Enter postal code")} />
           </Form.Item>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                label={translate("settings.fields.originLatitude", {}, "Latitude")}
-                name="origin_latitude"
-              >
-                <Input placeholder={translate("settings.fields.originLatitudePlaceholder", {}, "Optional: for instant couriers (Gojek/Grab)")} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label={translate("settings.fields.originLongitude", {}, "Longitude")}
-                name="origin_longitude"
-              >
-                <Input placeholder={translate("settings.fields.originLongitudePlaceholder", {}, "Optional: for instant couriers (Gojek/Grab)")} />
-              </Form.Item>
-            </Col>
-          </Row>
+          <Form.Item
+            label={translate("settings.fields.storeAddress", {}, "Store Address")}
+            name="store_address"
+            rules={[{ required: true, message: translate("settings.validation.addressRequired", {}, "Address is required") }]}
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder={translate("settings.fields.storeAddressPlaceholder", {}, "Enter full store address")}
+            />
+          </Form.Item>
           <Form.Item
             label={translate("settings.fields.mapLocationPicker", {}, "Store Location")}
           >
@@ -180,17 +172,28 @@ export const Settings: React.FC = () => {
               onLocationChange={handleLocationChange}
               height="300px"
             />
+            <Typography.Text type="secondary" style={{ fontSize: "12px", marginTop: "8px", display: "block" }}>
+              {translate("settings.fields.mapHelperText", "Or click directly on the map to select location")}
+            </Typography.Text>
           </Form.Item>
-          <Form.Item
-            label={translate("settings.fields.storeAddress", {}, "Full Store Address")}
-            name="store_address"
-            rules={[{ required: true, message: translate("settings.validation.addressRequired", {}, "Address is required") }]}
-          >
-            <Input.TextArea
-              rows={4}
-              placeholder={translate("settings.fields.storeAddressPlaceholder", {}, "Enter full store address")}
-            />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label={translate("settings.fields.originLatitude", {}, "Latitude")}
+                name="origin_latitude"
+              >
+                <Input readOnly placeholder={translate("settings.fields.originLatitudePlaceholder", {}, "Auto-filled from map")} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label={translate("settings.fields.originLongitude", {}, "Longitude")}
+                name="origin_longitude"
+              >
+                <Input readOnly placeholder={translate("settings.fields.originLongitudePlaceholder", {}, "Auto-filled from map")} />
+              </Form.Item>
+            </Col>
+          </Row>
         </Card>
       ),
     },
