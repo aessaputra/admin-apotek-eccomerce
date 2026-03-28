@@ -30,7 +30,6 @@ const ORIGIN_POSTAL_CODE = Number.isFinite(BITESHIP_ORIGIN_POSTAL_CODE)
   : DEFAULT_ORIGIN_POSTAL_CODE;
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-
 const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
 const JWT_ISSUER = `${supabaseUrl}/auth/v1`;
 
@@ -176,7 +175,10 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-    } catch {
+    } catch (error: unknown) {
+      console.error('[biteship] JWT verification failed', {
+        message: error instanceof Error ? error.message : String(error),
+      });
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

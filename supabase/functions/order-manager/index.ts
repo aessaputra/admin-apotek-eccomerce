@@ -1,5 +1,5 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createRemoteJWKSet, jwtVerify } from 'npm:jose@5';
 import { corsHeaders } from '../_shared/cors.ts';
 import { getSupabaseAdminClient } from '../_shared/supabase.ts';
 
@@ -18,6 +18,9 @@ type OrderManagerRequest = {
 };
 
 const BITESHIP_BASE_URL = 'https://api.biteship.com/v1';
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
+const JWT_ISSUER = `${supabaseUrl}/auth/v1`;
 
 const TRANSITION_RULES: Record<string, string[]> = {
   pending: ['processing', 'cancelled'],
@@ -43,27 +46,29 @@ function mapBiteshipStatus(status: string, fallback: string): string {
 
 async function requireAdmin(req: Request): Promise<{ userId: string }> {
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader) {
-    throw new Error('Missing Authorization header');
+  if (!authHeader?.startsWith('Bearer ')) {
+    throw new Error('Unauthorized: Missing Authorization header');
+  }
+  const token = authHeader.slice(7).trim();
+  if (!token) {
+    throw new Error('Unauthorized: Invalid JWT');
   }
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+  let userId = '';
+  try {
+    const { payload } = await jwtVerify(token, JWKS, {
+      issuer: JWT_ISSUER,
+      audience: 'authenticated',
+    });
+    userId = payload.sub ?? '';
+  } catch (error: unknown) {
+    console.error('[order-manager] JWT verification failed', {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw new Error('Unauthorized: Invalid JWT');
+  }
 
-  // Use global.headers pattern for auth - pass Authorization header to client
-  const verifier = createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: { Authorization: authHeader },
-    },
-  });
-
-  // getUser() without token arg uses the Authorization header from global config
-  const {
-    data: { user },
-    error: authError,
-  } = await verifier.auth.getUser();
-
-  if (authError || !user) {
+  if (!userId) {
     throw new Error('Unauthorized: Invalid JWT');
   }
 
@@ -71,14 +76,14 @@ async function requireAdmin(req: Request): Promise<{ userId: string }> {
   const { data: profile, error: profileError } = await adminClient
     .from('profiles')
     .select('role')
-    .eq('id', user.id)
+    .eq('id', userId)
     .single();
 
   if (profileError || !profile || profile.role !== 'admin') {
     throw new Error('Forbidden: Admin role required');
   }
 
-  return { userId: user.id };
+  return { userId };
 }
 
 Deno.serve(async req => {
