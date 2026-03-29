@@ -6,6 +6,7 @@ import {
   AdvancedMarker,
   useMap,
   useMapsLibrary,
+  type MapMouseEvent,
 } from "@vis.gl/react-google-maps";
 
 interface PlaceSuggestion {
@@ -19,28 +20,39 @@ interface GooglePlacesAutocompleteProps {
 const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
   onPlaceSelect,
 }) => {
-  const [inputValue, setInputValue] = useState("");
+  const [searchValue, setSearchValue] = useState("");
+  const [debouncedSearchValue, setDebouncedSearchValue] = useState("");
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const placesLib = useMapsLibrary("places");
   const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
-    if (!placesLib) return;
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearchValue(searchValue.trim());
+    }, 300);
 
-    if (inputValue.trim() === "") {
-      setSuggestions([]);
+    return () => window.clearTimeout(timeoutId);
+  }, [searchValue]);
+
+  useEffect(() => {
+    if (!placesLib) {
       return;
     }
 
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
+    if (debouncedSearchValue === "") {
+      requestIdRef.current += 1;
+      setSuggestions([]);
+      setIsLoading(false);
+      return;
     }
 
-    searchTimeoutRef.current = setTimeout(async () => {
-      setIsLoading(true);
+    const currentRequestId = requestIdRef.current + 1;
+    requestIdRef.current = currentRequestId;
+    setIsLoading(true);
 
+    const fetchSuggestions = async () => {
       const { AutocompleteSessionToken, AutocompleteSuggestion } = placesLib;
 
       if (!sessionTokenRef.current) {
@@ -49,32 +61,42 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
 
       try {
         const request: google.maps.places.AutocompleteRequest = {
-          input: inputValue,
+          input: debouncedSearchValue,
           sessionToken: sessionTokenRef.current,
           includedRegionCodes: ["ID"],
         };
 
         const response = await AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+
+        if (requestIdRef.current !== currentRequestId) {
+          return;
+        }
+
         setSuggestions(response.suggestions as PlaceSuggestion[]);
       } catch (error) {
-        console.error("Places API error:", error);
-        setSuggestions([]);
+        if (requestIdRef.current === currentRequestId) {
+          console.error("Places API error:", error);
+          setSuggestions([]);
+        }
       } finally {
-        setIsLoading(false);
-      }
-    }, 300);
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
+        if (requestIdRef.current === currentRequestId) {
+          setIsLoading(false);
+        }
       }
     };
-  }, [inputValue, placesLib]);
+
+    void fetchSuggestions();
+  }, [debouncedSearchValue, placesLib]);
+
+  const handleInputChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchValue(event.target.value);
+    },
+    []
+  );
 
   const handleSuggestionClick = useCallback(
     async (suggestion: PlaceSuggestion) => {
-      if (!suggestion.placePrediction) return;
-
       const place = suggestion.placePrediction.toPlace();
 
       await place.fetchFields({
@@ -83,15 +105,19 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
 
       const lat = place.location?.lat();
       const lng = place.location?.lng();
-      const address = place.formattedAddress ?? "";
+      const address = place.formattedAddress ?? suggestion.placePrediction.text.text;
 
-      if (lat !== undefined && lng !== undefined) {
-        onPlaceSelect(lat, lng, address);
+      if (lat === undefined || lng === undefined) {
+        return;
       }
 
+      onPlaceSelect(lat, lng, address);
       sessionTokenRef.current = null;
-      setInputValue("");
+      requestIdRef.current += 1;
+      setSearchValue(address);
+      setDebouncedSearchValue("");
       setSuggestions([]);
+      setIsLoading(false);
     },
     [onPlaceSelect]
   );
@@ -100,8 +126,8 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
     <div style={{ width: "100%" }}>
       <Input
         placeholder="Cari apotek, klinik, atau lokasi..."
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
+        value={searchValue}
+        onChange={handleInputChange}
         suffix={isLoading ? <Spin size="small" /> : null}
       />
       {suggestions.length > 0 && (
@@ -114,9 +140,7 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
               style={{ cursor: "pointer", padding: "8px 12px" }}
               onClick={() => handleSuggestionClick(item)}
             >
-              <Typography.Text
-                style={{ fontSize: "12px", lineHeight: "1.4" }}
-              >
+              <Typography.Text style={{ fontSize: "12px", lineHeight: "1.4" }}>
                 {item.placePrediction.text.text}
               </Typography.Text>
             </List.Item>
@@ -136,7 +160,7 @@ export interface MapLocationPickerProps {
 }
 
 const DEFAULT_LAT = -6.2088;
-  const DEFAULT_LNG = 106.8456;
+const DEFAULT_LNG = 106.8456;
 
 interface MapControllerProps {
   lat: number;
@@ -148,11 +172,14 @@ const MapController: React.FC<MapControllerProps> = ({ lat, lng, zoom }) => {
   const map = useMap();
 
   useEffect(() => {
-    if (map) {
-      map.panTo({ lat, lng });
-      if (zoom) {
-        map.setZoom(zoom);
-      }
+    if (!map) {
+      return;
+    }
+
+    map.panTo({ lat, lng });
+
+    if (zoom !== undefined) {
+      map.setZoom(zoom);
     }
   }, [map, lat, lng, zoom]);
 
@@ -174,9 +201,9 @@ const MapLocationPickerInner: React.FC<MapLocationPickerProps> = ({
       typeof longitude === "string"
         ? parseFloat(longitude) || DEFAULT_LNG
         : longitude ?? DEFAULT_LNG;
+
     return { lat, lng };
   });
-
   const [zoom, setZoom] = useState(13);
 
   useEffect(() => {
@@ -188,39 +215,45 @@ const MapLocationPickerInner: React.FC<MapLocationPickerProps> = ({
       typeof longitude === "string"
         ? parseFloat(longitude) || DEFAULT_LNG
         : longitude ?? DEFAULT_LNG;
+
     setPosition({ lat, lng });
   }, [latitude, longitude]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleMapClick = useCallback(
-    (e: any) => {
-      const latLng = e.latLng as google.maps.LatLng | null;
-      if (latLng) {
-        const lat = latLng.lat();
-        const lng = latLng.lng();
-        setPosition({ lat, lng });
-        onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
+    (event: MapMouseEvent) => {
+      const { latLng } = event.detail;
+
+      if (!latLng) {
+        return;
       }
+
+      setPosition(latLng);
+      onLocationChange?.(latLng.lat.toFixed(6), latLng.lng.toFixed(6));
     },
     [onLocationChange]
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleMarkerDragEnd = useCallback(
-    (e: any) => {
-      const latLng = e.latLng as google.maps.LatLng | null;
-      if (latLng) {
-        const lat = latLng.lat();
-        const lng = latLng.lng();
-        setPosition({ lat, lng });
-        onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
+    (event: google.maps.MapMouseEvent) => {
+      const latLng = event.latLng;
+
+      if (!latLng) {
+        return;
       }
+
+      const nextPosition = {
+        lat: latLng.lat(),
+        lng: latLng.lng(),
+      };
+
+      setPosition(nextPosition);
+      onLocationChange?.(nextPosition.lat.toFixed(6), nextPosition.lng.toFixed(6));
     },
     [onLocationChange]
   );
 
   const handlePlaceSelect = useCallback(
-    (lat: number, lng: number, _address: string) => {
+    (lat: number, lng: number) => {
       setPosition({ lat, lng });
       setZoom(16);
       onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
@@ -236,9 +269,7 @@ const MapLocationPickerInner: React.FC<MapLocationPickerProps> = ({
           Atau klik langsung pada peta untuk memilih lokasi
         </Typography.Text>
       </Space>
-      <div
-        style={{ height, width: "100%", borderRadius: "8px", overflow: "hidden" }}
-      >
+      <div style={{ height, width: "100%", borderRadius: "8px", overflow: "hidden" }}>
         <GoogleMap
           defaultCenter={position}
           defaultZoom={zoom}
@@ -250,11 +281,7 @@ const MapLocationPickerInner: React.FC<MapLocationPickerProps> = ({
           onClick={handleMapClick}
         >
           <MapController lat={position.lat} lng={position.lng} zoom={zoom} />
-          <AdvancedMarker
-            position={position}
-            draggable={true}
-            onDragEnd={handleMarkerDragEnd}
-          />
+          <AdvancedMarker position={position} draggable={true} onDragEnd={handleMarkerDragEnd} />
         </GoogleMap>
       </div>
     </div>
@@ -266,6 +293,7 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = (props) => {
 
   if (!apiKey) {
     console.error("VITE_GOOGLE_MAPS_API_KEY is not defined in environment variables");
+
     return (
       <div style={{ padding: "20px", color: "red" }}>
         Google Maps API Key tidak dikonfigurasi. Silakan hubungi administrator.
