@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef, memo } from "react";
-import { Input, List, Typography, Space, Spin, type InputRef } from "antd";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
+import { Input, Typography, Space, type InputRef } from "antd";
 import {
   APIProvider,
   Map as GoogleMap,
@@ -9,40 +9,6 @@ import {
   type MapMouseEvent,
 } from "@vis.gl/react-google-maps";
 
-interface SuggestionListProps {
-  suggestions: google.maps.places.AutocompletePrediction[];
-  onSelect: (suggestion: google.maps.places.AutocompletePrediction) => void;
-}
-
-const SuggestionList = memo<SuggestionListProps>(function SuggestionList({
-  suggestions,
-  onSelect,
-}) {
-  if (suggestions.length === 0) {
-    return null;
-  }
-
-  return (
-    <List
-      size="small"
-      bordered
-      dataSource={suggestions}
-      renderItem={(item) => (
-        <List.Item
-          key={item.place_id}
-          style={{ cursor: "pointer", padding: "8px 12px" }}
-          onClick={() => onSelect(item)}
-        >
-          <Typography.Text style={{ fontSize: "12px", lineHeight: "1.4" }}>
-            {item.description}
-          </Typography.Text>
-        </List.Item>
-      )}
-      style={{ maxHeight: "250px", overflow: "auto", marginTop: "8px" }}
-    />
-  );
-});
-
 interface GooglePlacesAutocompleteProps {
   onPlaceSelect: (lat: number, lng: number, address: string) => void;
 }
@@ -50,162 +16,64 @@ interface GooglePlacesAutocompleteProps {
 const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
   onPlaceSelect,
 }) => {
-  const [searchValue, setSearchValue] = useState("");
-  const [debouncedSearchValue, setDebouncedSearchValue] = useState("");
-  const [suggestions, setSuggestions] = useState<google.maps.places.AutocompletePrediction[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const placesLib = useMapsLibrary("places");
-  const geocodingLib = useMapsLibrary("geocoding");
-  const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
-  const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
-  const requestIdRef = useRef(0);
   const inputRef = useRef<InputRef>(null);
-
-  // Initialize AutocompleteService when places library loads
-  useEffect(() => {
-    if (placesLib && !autocompleteServiceRef.current) {
-      autocompleteServiceRef.current = new placesLib.AutocompleteService();
-    }
-  }, [placesLib]);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const listenerRef = useRef<google.maps.MapsEventListener | null>(null);
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setDebouncedSearchValue(searchValue.trim());
-    }, 300);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [searchValue]);
-
-  useEffect(() => {
-    if (!placesLib || !autocompleteServiceRef.current) {
+    if (!placesLib || !inputRef.current?.input) {
       return;
     }
 
-    if (debouncedSearchValue === "") {
-      requestIdRef.current += 1;
-      setSuggestions([]);
-      setIsLoading(false);
-      return;
-    }
+    // Get the actual HTML input element from Ant Design's Input component
+    const inputElement = inputRef.current.input;
 
-    const currentRequestId = requestIdRef.current + 1;
-    requestIdRef.current = currentRequestId;
-    setIsLoading(true);
+    // Create native Google Places Autocomplete widget
+    const autocomplete = new placesLib.Autocomplete(inputElement, {
+      componentRestrictions: { country: "id" },
+      // No 'types' restriction - allow all place types (pharmacies, clinics, etc.)
+    });
 
-    const fetchSuggestions = async () => {
-      const { AutocompleteSessionToken } = placesLib;
+    autocompleteRef.current = autocomplete;
 
-      if (!sessionTokenRef.current) {
-        sessionTokenRef.current = new AutocompleteSessionToken();
-      }
+    // Add place_changed listener
+    listenerRef.current = autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
 
-      try {
-        const request: google.maps.places.AutocompletionRequest = {
-          input: debouncedSearchValue,
-          sessionToken: sessionTokenRef.current,
-          componentRestrictions: { country: "id" },
-        };
-
-        const service = autocompleteServiceRef.current;
-        if (!service) return;
-
-        const predictions = await new Promise<google.maps.places.AutocompletePrediction[]>((resolve, reject) => {
-          service.getPlacePredictions(request, (results, status) => {
-            if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-              resolve(results);
-            } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-              resolve([]);
-            } else {
-              reject(new Error(`Places service error: ${status}`));
-            }
-          });
-        });
-
-        if (requestIdRef.current !== currentRequestId) {
-          return;
-        }
-
-        setSuggestions(predictions);
-      } catch (error) {
-        if (requestIdRef.current === currentRequestId) {
-          console.error("Places API error:", error);
-          setSuggestions([]);
-        }
-      } finally {
-        if (requestIdRef.current === currentRequestId) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void fetchSuggestions();
-  }, [debouncedSearchValue, placesLib]);
-
-  const handleInputChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      setSearchValue(event.target.value);
-    },
-    []
-  );
-
-  const handleSuggestionSelect = useCallback(
-    async (suggestion: google.maps.places.AutocompletePrediction) => {
-      if (!geocodingLib) {
-        console.error("Geocoding library not loaded");
+      if (!place.geometry?.location) {
+        console.warn("Place has no geometry");
         return;
       }
 
-      try {
-        const geocoder = new geocodingLib.Geocoder();
+      const lat = place.geometry.location.lat();
+      const lng = place.geometry.location.lng();
+      const address = place.formatted_address ?? place.name ?? "";
 
-        const response = await new Promise<google.maps.GeocoderResponse>((resolve, reject) => {
-          geocoder.geocode({ placeId: suggestion.place_id }, (results, status) => {
-            if (status === google.maps.GeocoderStatus.OK && results && results.length > 0) {
-              resolve({ results } as google.maps.GeocoderResponse);
-            } else {
-              reject(new Error(`Geocoding error: ${status}`));
-            }
-          });
-        });
+      onPlaceSelect(lat, lng, address);
+    });
 
-        const result = response.results[0];
-        const location = result.geometry.location;
-        const lat = location.lat();
-        const lng = location.lng();
-        const address = result.formatted_address ?? suggestion.description;
-
-        onPlaceSelect(lat, lng, address);
-        sessionTokenRef.current = null;
-        requestIdRef.current += 1;
-        setSearchValue(address);
-        setDebouncedSearchValue("");
-        setSuggestions([]);
-        setIsLoading(false);
-
-        // Restore focus to input after selection
-        inputRef.current?.focus();
-      } catch (error) {
-        console.error("Error fetching place details:", error);
+    // Cleanup on unmount
+    return () => {
+      if (listenerRef.current) {
+        listenerRef.current.remove();
+        listenerRef.current = null;
       }
-    },
-    [geocodingLib, onPlaceSelect]
-  );
-
-  const suffix = <span>{isLoading ? <Spin size="small" /> : null}</span>;
+      if (autocompleteRef.current) {
+        // Clear all listeners on the autocomplete instance
+        google.maps.event.clearInstanceListeners(autocompleteRef.current);
+        autocompleteRef.current = null;
+      }
+    };
+  }, [placesLib, onPlaceSelect]);
 
   return (
-    <div style={{ width: "100%" }}>
-      <Input
-        ref={inputRef}
-        placeholder="Cari apotek, klinik, atau lokasi..."
-        value={searchValue}
-        onChange={handleInputChange}
-        suffix={suffix}
-        autoComplete="off"
-        spellCheck={false}
-      />
-      <SuggestionList suggestions={suggestions} onSelect={handleSuggestionSelect} />
-    </div>
+    <Input
+      ref={inputRef}
+      placeholder="Cari apotek, klinik, atau lokasi..."
+      autoComplete="off"
+      spellCheck={false}
+    />
   );
 };
 
@@ -262,6 +130,8 @@ const MapLocationPickerInner: React.FC<MapLocationPickerProps> = ({
     return { lat, lng };
   });
   const [zoom, setZoom] = useState(13);
+
+
 
   useEffect(() => {
     const lat =
