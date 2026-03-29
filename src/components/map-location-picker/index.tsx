@@ -86,7 +86,14 @@ interface NominatimResult {
   display_name: string;
   lat: string;
   lon: string;
+  type?: string;
+  class?: string;
 }
+
+const truncateText = (text: string, maxLength: number): string => {
+  if (text.length <= maxLength) return text;
+  return text.slice(0, maxLength - 3) + "...";
+};
 
 export interface MapLocationPickerProps {
   latitude?: string | number;
@@ -163,7 +170,12 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
           searchQuery
-        )}&countrycodes=ID&limit=5`
+        )}&countrycodes=ID&limit=10&addressdetails=1&extratags=1`,
+        {
+          headers: {
+            "User-Agent": "PharmaAdmin-MapPicker/1.0 (pharmacy-admin@example.com)",
+          },
+        }
       );
       const data: NominatimResult[] = await response.json();
       setSearchResults(data);
@@ -211,15 +223,18 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
             dataSource={searchResults}
             renderItem={(item) => (
               <List.Item
-                style={{ cursor: "pointer" }}
+                style={{ cursor: "pointer", padding: "8px 12px" }}
                 onClick={() => handleResultSelect(item)}
               >
-                <Typography.Text style={{ fontSize: "12px" }}>
-                  {item.display_name}
+                <Typography.Text
+                  style={{ fontSize: "12px", lineHeight: "1.4" }}
+                  title={item.display_name}
+                >
+                  {truncateText(item.display_name, 80)}
                 </Typography.Text>
               </List.Item>
             )}
-            style={{ maxHeight: "200px", overflow: "auto" }}
+            style={{ maxHeight: "250px", overflow: "auto" }}
           />
         )}
         <Typography.Text type="secondary" style={{ fontSize: "12px" }}>
