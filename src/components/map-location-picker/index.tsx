@@ -1,84 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
-import { Icon, LatLng } from "leaflet";
 import { Input, List, Typography, Space, Spin } from "antd";
-import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
-import "leaflet/dist/leaflet.css";
-
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
-
-const defaultIcon = new Icon({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-
-interface MapClickHandlerProps {
-  onLocationSelect: (lat: number, lng: number) => void;
-}
-
-const MapClickHandler: React.FC<MapClickHandlerProps> = ({
-  onLocationSelect,
-}) => {
-  useMapEvents({
-    click: (e) => {
-      onLocationSelect(e.latlng.lat, e.latlng.lng);
-    },
-  });
-  return null;
-};
-
-interface MapControllerProps {
-  center: LatLng;
-  zoom: number;
-}
-
-const MapController: React.FC<MapControllerProps> = ({ center, zoom }) => {
-  const map = useMap();
-  useEffect(() => {
-    map.setView(center, zoom);
-  }, [map, center, zoom]);
-  return null;
-};
-
-interface DraggableMarkerProps {
-  position: LatLng;
-  onDragEnd: (lat: number, lng: number) => void;
-}
-
-const DraggableMarker: React.FC<DraggableMarkerProps> = ({
-  position,
-  onDragEnd,
-}) => {
-  const [markerPosition, setMarkerPosition] = useState<LatLng>(position);
-
-  useEffect(() => {
-    setMarkerPosition(position);
-  }, [position]);
-
-  const eventHandlers = {
-    dragend: (e: { target: { getLatLng: () => LatLng } }) => {
-      const newPos = e.target.getLatLng();
-      setMarkerPosition(newPos);
-      onDragEnd(newPos.lat, newPos.lng);
-    },
-  };
-
-  return (
-    <Marker
-      position={markerPosition}
-      icon={defaultIcon}
-      draggable={true}
-      eventHandlers={eventHandlers}
-    />
-  );
-};
+import {
+  APIProvider,
+  Map as GoogleMap,
+  AdvancedMarker,
+  useMap,
+  useMapsLibrary,
+} from "@vis.gl/react-google-maps";
 
 interface PlaceSuggestion {
   placePrediction: google.maps.places.PlacePrediction;
@@ -208,7 +136,28 @@ export interface MapLocationPickerProps {
 }
 
 const DEFAULT_LAT = -6.2088;
-const DEFAULT_LNG = 106.8456;
+  const DEFAULT_LNG = 106.8456;
+
+interface MapControllerProps {
+  lat: number;
+  lng: number;
+  zoom?: number;
+}
+
+const MapController: React.FC<MapControllerProps> = ({ lat, lng, zoom }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (map) {
+      map.panTo({ lat, lng });
+      if (zoom) {
+        map.setZoom(zoom);
+      }
+    }
+  }, [map, lat, lng, zoom]);
+
+  return null;
+};
 
 const MapLocationPickerInner: React.FC<MapLocationPickerProps> = ({
   latitude,
@@ -216,7 +165,7 @@ const MapLocationPickerInner: React.FC<MapLocationPickerProps> = ({
   onLocationChange,
   height = "300px",
 }) => {
-  const [position, setPosition] = useState<LatLng>(() => {
+  const [position, setPosition] = useState<{ lat: number; lng: number }>(() => {
     const lat =
       typeof latitude === "string"
         ? parseFloat(latitude) || DEFAULT_LAT
@@ -225,7 +174,7 @@ const MapLocationPickerInner: React.FC<MapLocationPickerProps> = ({
       typeof longitude === "string"
         ? parseFloat(longitude) || DEFAULT_LNG
         : longitude ?? DEFAULT_LNG;
-    return new LatLng(lat, lng);
+    return { lat, lng };
   });
 
   const [zoom, setZoom] = useState(13);
@@ -239,28 +188,40 @@ const MapLocationPickerInner: React.FC<MapLocationPickerProps> = ({
       typeof longitude === "string"
         ? parseFloat(longitude) || DEFAULT_LNG
         : longitude ?? DEFAULT_LNG;
-    setPosition(new LatLng(lat, lng));
+    setPosition({ lat, lng });
   }, [latitude, longitude]);
 
-  const handleLocationSelect = useCallback(
-    (lat: number, lng: number) => {
-      setPosition(new LatLng(lat, lng));
-      onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleMapClick = useCallback(
+    (e: any) => {
+      const latLng = e.latLng as google.maps.LatLng | null;
+      if (latLng) {
+        const lat = latLng.lat();
+        const lng = latLng.lng();
+        setPosition({ lat, lng });
+        onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
+      }
     },
     [onLocationChange]
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleMarkerDragEnd = useCallback(
-    (lat: number, lng: number) => {
-      setPosition(new LatLng(lat, lng));
-      onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
+    (e: any) => {
+      const latLng = e.latLng as google.maps.LatLng | null;
+      if (latLng) {
+        const lat = latLng.lat();
+        const lng = latLng.lng();
+        setPosition({ lat, lng });
+        onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
+      }
     },
     [onLocationChange]
   );
 
   const handlePlaceSelect = useCallback(
     (lat: number, lng: number, _address: string) => {
-      setPosition(new LatLng(lat, lng));
+      setPosition({ lat, lng });
       setZoom(16);
       onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
     },
@@ -278,20 +239,23 @@ const MapLocationPickerInner: React.FC<MapLocationPickerProps> = ({
       <div
         style={{ height, width: "100%", borderRadius: "8px", overflow: "hidden" }}
       >
-        <MapContainer
+        <GoogleMap
+          defaultCenter={position}
+          defaultZoom={zoom}
           center={position}
           zoom={zoom}
-          scrollWheelZoom={true}
-          style={{ height: "100%", width: "100%" }}
+          gestureHandling="greedy"
+          disableDefaultUI={false}
+          mapId="map-location-picker"
+          onClick={handleMapClick}
         >
-          <MapController center={position} zoom={zoom} />
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          <MapController lat={position.lat} lng={position.lng} zoom={zoom} />
+          <AdvancedMarker
+            position={position}
+            draggable={true}
+            onDragEnd={handleMarkerDragEnd}
           />
-          <DraggableMarker position={position} onDragEnd={handleMarkerDragEnd} />
-          <MapClickHandler onLocationSelect={handleLocationSelect} />
-        </MapContainer>
+        </GoogleMap>
       </div>
     </div>
   );
