@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Input, List, Typography, Space, Spin } from "antd";
+import { useState, useEffect, useCallback, useRef, memo } from "react";
+import { Input, List, Typography, Space, Spin, type InputRef } from "antd";
 import {
   APIProvider,
   Map as GoogleMap,
@@ -12,6 +12,44 @@ import {
 interface PlaceSuggestion {
   placePrediction: google.maps.places.PlacePrediction;
 }
+
+interface AutocompleteSuggestionResult {
+  placePrediction?: google.maps.places.PlacePrediction;
+}
+
+interface SuggestionListProps {
+  suggestions: PlaceSuggestion[];
+  onSelect: (suggestion: PlaceSuggestion) => void;
+}
+
+const SuggestionList = memo<SuggestionListProps>(function SuggestionList({
+  suggestions,
+  onSelect,
+}) {
+  if (suggestions.length === 0) {
+    return null;
+  }
+
+  return (
+    <List
+      size="small"
+      bordered
+      dataSource={suggestions}
+      renderItem={(item) => (
+        <List.Item
+          key={item.placePrediction.placeId}
+          style={{ cursor: "pointer", padding: "8px 12px" }}
+          onClick={() => onSelect(item)}
+        >
+          <Typography.Text style={{ fontSize: "12px", lineHeight: "1.4" }}>
+            {item.placePrediction.text.text}
+          </Typography.Text>
+        </List.Item>
+      )}
+      style={{ maxHeight: "250px", overflow: "auto", marginTop: "8px" }}
+    />
+  );
+});
 
 interface GooglePlacesAutocompleteProps {
   onPlaceSelect: (lat: number, lng: number, address: string) => void;
@@ -27,6 +65,7 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
   const placesLib = useMapsLibrary("places");
   const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
   const requestIdRef = useRef(0);
+  const inputRef = useRef<InputRef>(null);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -62,8 +101,11 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
       try {
         const request: google.maps.places.AutocompleteRequest = {
           input: debouncedSearchValue,
+          inputOffset: debouncedSearchValue.length,
           sessionToken: sessionTokenRef.current,
           includedRegionCodes: ["ID"],
+          language: "id",
+          region: "id",
         };
 
         const response = await AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
@@ -72,7 +114,15 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
           return;
         }
 
-        setSuggestions(response.suggestions as PlaceSuggestion[]);
+        const placeSuggestions = response.suggestions
+          .map((suggestion) => (suggestion as AutocompleteSuggestionResult).placePrediction)
+          .filter(
+            (placePrediction): placePrediction is google.maps.places.PlacePrediction =>
+              Boolean(placePrediction)
+          )
+          .map((placePrediction) => ({ placePrediction }));
+
+        setSuggestions(placeSuggestions);
       } catch (error) {
         if (requestIdRef.current === currentRequestId) {
           console.error("Places API error:", error);
@@ -95,7 +145,7 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
     []
   );
 
-  const handleSuggestionClick = useCallback(
+  const handleSuggestionSelect = useCallback(
     async (suggestion: PlaceSuggestion) => {
       const place = suggestion.placePrediction.toPlace();
 
@@ -118,36 +168,27 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
       setDebouncedSearchValue("");
       setSuggestions([]);
       setIsLoading(false);
+
+      // Restore focus to input after selection
+      inputRef.current?.focus();
     },
     [onPlaceSelect]
   );
 
+  const suffix = <span>{isLoading ? <Spin size="small" /> : null}</span>;
+
   return (
     <div style={{ width: "100%" }}>
       <Input
+        ref={inputRef}
         placeholder="Cari apotek, klinik, atau lokasi..."
         value={searchValue}
         onChange={handleInputChange}
-        suffix={isLoading ? <Spin size="small" /> : null}
+        suffix={suffix}
+        autoComplete="off"
+        spellCheck={false}
       />
-      {suggestions.length > 0 && (
-        <List
-          size="small"
-          bordered
-          dataSource={suggestions}
-          renderItem={(item) => (
-            <List.Item
-              style={{ cursor: "pointer", padding: "8px 12px" }}
-              onClick={() => handleSuggestionClick(item)}
-            >
-              <Typography.Text style={{ fontSize: "12px", lineHeight: "1.4" }}>
-                {item.placePrediction.text.text}
-              </Typography.Text>
-            </List.Item>
-          )}
-          style={{ maxHeight: "250px", overflow: "auto", marginTop: "8px" }}
-        />
-      )}
+      <SuggestionList suggestions={suggestions} onSelect={handleSuggestionSelect} />
     </div>
   );
 };
