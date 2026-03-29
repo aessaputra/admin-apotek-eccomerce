@@ -9,17 +9,9 @@ import {
   type MapMouseEvent,
 } from "@vis.gl/react-google-maps";
 
-interface PlaceSuggestion {
-  placePrediction: google.maps.places.PlacePrediction;
-}
-
-interface AutocompleteSuggestionResult {
-  placePrediction?: google.maps.places.PlacePrediction;
-}
-
 interface SuggestionListProps {
-  suggestions: PlaceSuggestion[];
-  onSelect: (suggestion: PlaceSuggestion) => void;
+  suggestions: google.maps.places.AutocompletePrediction[];
+  onSelect: (suggestion: google.maps.places.AutocompletePrediction) => void;
 }
 
 const SuggestionList = memo<SuggestionListProps>(function SuggestionList({
@@ -37,12 +29,12 @@ const SuggestionList = memo<SuggestionListProps>(function SuggestionList({
       dataSource={suggestions}
       renderItem={(item) => (
         <List.Item
-          key={item.placePrediction.placeId}
+          key={item.place_id}
           style={{ cursor: "pointer", padding: "8px 12px" }}
           onClick={() => onSelect(item)}
         >
           <Typography.Text style={{ fontSize: "12px", lineHeight: "1.4" }}>
-            {item.placePrediction.text.text}
+            {item.description}
           </Typography.Text>
         </List.Item>
       )}
@@ -60,12 +52,21 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
 }) => {
   const [searchValue, setSearchValue] = useState("");
   const [debouncedSearchValue, setDebouncedSearchValue] = useState("");
-  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [suggestions, setSuggestions] = useState<google.maps.places.AutocompletePrediction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const placesLib = useMapsLibrary("places");
+  const geocodingLib = useMapsLibrary("geocoding");
+  const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
   const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
   const requestIdRef = useRef(0);
   const inputRef = useRef<InputRef>(null);
+
+  // Initialize AutocompleteService when places library loads
+  useEffect(() => {
+    if (placesLib && !autocompleteServiceRef.current) {
+      autocompleteServiceRef.current = new placesLib.AutocompleteService();
+    }
+  }, [placesLib]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -76,7 +77,7 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
   }, [searchValue]);
 
   useEffect(() => {
-    if (!placesLib) {
+    if (!placesLib || !autocompleteServiceRef.current) {
       return;
     }
 
@@ -92,37 +93,39 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
     setIsLoading(true);
 
     const fetchSuggestions = async () => {
-      const { AutocompleteSessionToken, AutocompleteSuggestion } = placesLib;
+      const { AutocompleteSessionToken } = placesLib;
 
       if (!sessionTokenRef.current) {
         sessionTokenRef.current = new AutocompleteSessionToken();
       }
 
       try {
-        const request: google.maps.places.AutocompleteRequest = {
+        const request: google.maps.places.AutocompletionRequest = {
           input: debouncedSearchValue,
-          inputOffset: debouncedSearchValue.length,
           sessionToken: sessionTokenRef.current,
-          includedRegionCodes: ["ID"],
-          language: "id",
-          region: "id",
+          componentRestrictions: { country: "id" },
         };
 
-        const response = await AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+        const service = autocompleteServiceRef.current;
+        if (!service) return;
+
+        const predictions = await new Promise<google.maps.places.AutocompletePrediction[]>((resolve, reject) => {
+          service.getPlacePredictions(request, (results, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+              resolve(results);
+            } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+              resolve([]);
+            } else {
+              reject(new Error(`Places service error: ${status}`));
+            }
+          });
+        });
 
         if (requestIdRef.current !== currentRequestId) {
           return;
         }
 
-        const placeSuggestions = response.suggestions
-          .map((suggestion) => (suggestion as AutocompleteSuggestionResult).placePrediction)
-          .filter(
-            (placePrediction): placePrediction is google.maps.places.PlacePrediction =>
-              Boolean(placePrediction)
-          )
-          .map((placePrediction) => ({ placePrediction }));
-
-        setSuggestions(placeSuggestions);
+        setSuggestions(predictions);
       } catch (error) {
         if (requestIdRef.current === currentRequestId) {
           console.error("Places API error:", error);
@@ -146,33 +149,46 @@ const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
   );
 
   const handleSuggestionSelect = useCallback(
-    async (suggestion: PlaceSuggestion) => {
-      const place = suggestion.placePrediction.toPlace();
-
-      await place.fetchFields({
-        fields: ["location", "formattedAddress"],
-      });
-
-      const lat = place.location?.lat();
-      const lng = place.location?.lng();
-      const address = place.formattedAddress ?? suggestion.placePrediction.text.text;
-
-      if (lat === undefined || lng === undefined) {
+    async (suggestion: google.maps.places.AutocompletePrediction) => {
+      if (!geocodingLib) {
+        console.error("Geocoding library not loaded");
         return;
       }
 
-      onPlaceSelect(lat, lng, address);
-      sessionTokenRef.current = null;
-      requestIdRef.current += 1;
-      setSearchValue(address);
-      setDebouncedSearchValue("");
-      setSuggestions([]);
-      setIsLoading(false);
+      try {
+        const geocoder = new geocodingLib.Geocoder();
 
-      // Restore focus to input after selection
-      inputRef.current?.focus();
+        const response = await new Promise<google.maps.GeocoderResponse>((resolve, reject) => {
+          geocoder.geocode({ placeId: suggestion.place_id }, (results, status) => {
+            if (status === google.maps.GeocoderStatus.OK && results && results.length > 0) {
+              resolve({ results } as google.maps.GeocoderResponse);
+            } else {
+              reject(new Error(`Geocoding error: ${status}`));
+            }
+          });
+        });
+
+        const result = response.results[0];
+        const location = result.geometry.location;
+        const lat = location.lat();
+        const lng = location.lng();
+        const address = result.formatted_address ?? suggestion.description;
+
+        onPlaceSelect(lat, lng, address);
+        sessionTokenRef.current = null;
+        requestIdRef.current += 1;
+        setSearchValue(address);
+        setDebouncedSearchValue("");
+        setSuggestions([]);
+        setIsLoading(false);
+
+        // Restore focus to input after selection
+        inputRef.current?.focus();
+      } catch (error) {
+        console.error("Error fetching place details:", error);
+      }
     },
-    [onPlaceSelect]
+    [geocodingLib, onPlaceSelect]
   );
 
   const suffix = <span>{isLoading ? <Spin size="small" /> : null}</span>;
@@ -343,7 +359,7 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = (props) => {
   }
 
   return (
-    <APIProvider apiKey={apiKey} version="beta">
+    <APIProvider apiKey={apiKey}>
       <MapLocationPickerInner {...props} />
     </APIProvider>
   );
