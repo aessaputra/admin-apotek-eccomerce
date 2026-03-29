@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import { Icon, LatLng } from "leaflet";
-import { Input, Button, List, Typography, Space } from "antd";
-import { SearchOutlined } from "@ant-design/icons";
+import { Input, List, Typography, Space, Spin } from "antd";
+import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import "leaflet/dist/leaflet.css";
 
-// Fix default Leaflet marker icon issue with Vite bundler
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -81,18 +80,124 @@ const DraggableMarker: React.FC<DraggableMarkerProps> = ({
   );
 };
 
-interface NominatimResult {
-  place_id: number;
-  display_name: string;
-  lat: string;
-  lon: string;
-  type?: string;
-  class?: string;
+interface PlaceSuggestion {
+  placePrediction: google.maps.places.PlacePrediction;
 }
 
-const truncateText = (text: string, maxLength: number): string => {
-  if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength - 3) + "...";
+interface GooglePlacesAutocompleteProps {
+  onPlaceSelect: (lat: number, lng: number, address: string) => void;
+}
+
+const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
+  onPlaceSelect,
+}) => {
+  const [inputValue, setInputValue] = useState("");
+  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const placesLib = useMapsLibrary("places");
+  const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!placesLib) return;
+
+    if (inputValue.trim() === "") {
+      setSuggestions([]);
+      return;
+    }
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      setIsLoading(true);
+
+      const { AutocompleteSessionToken, AutocompleteSuggestion } = placesLib;
+
+      if (!sessionTokenRef.current) {
+        sessionTokenRef.current = new AutocompleteSessionToken();
+      }
+
+      try {
+        const request: google.maps.places.AutocompleteRequest = {
+          input: inputValue,
+          sessionToken: sessionTokenRef.current,
+          includedRegionCodes: ["ID"],
+        };
+
+        const response = await AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+        setSuggestions(response.suggestions as PlaceSuggestion[]);
+      } catch (error) {
+        console.error("Places API error:", error);
+        setSuggestions([]);
+      } finally {
+        setIsLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [inputValue, placesLib]);
+
+  const handleSuggestionClick = useCallback(
+    async (suggestion: PlaceSuggestion) => {
+      if (!suggestion.placePrediction) return;
+
+      const place = suggestion.placePrediction.toPlace();
+
+      await place.fetchFields({
+        fields: ["location", "formattedAddress"],
+      });
+
+      const lat = place.location?.lat();
+      const lng = place.location?.lng();
+      const address = place.formattedAddress ?? "";
+
+      if (lat !== undefined && lng !== undefined) {
+        onPlaceSelect(lat, lng, address);
+      }
+
+      sessionTokenRef.current = null;
+      setInputValue("");
+      setSuggestions([]);
+    },
+    [onPlaceSelect]
+  );
+
+  return (
+    <div style={{ width: "100%" }}>
+      <Input
+        placeholder="Cari apotek, klinik, atau lokasi..."
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        suffix={isLoading ? <Spin size="small" /> : null}
+      />
+      {suggestions.length > 0 && (
+        <List
+          size="small"
+          bordered
+          dataSource={suggestions}
+          renderItem={(item) => (
+            <List.Item
+              style={{ cursor: "pointer", padding: "8px 12px" }}
+              onClick={() => handleSuggestionClick(item)}
+            >
+              <Typography.Text
+                style={{ fontSize: "12px", lineHeight: "1.4" }}
+              >
+                {item.placePrediction.text.text}
+              </Typography.Text>
+            </List.Item>
+          )}
+          style={{ maxHeight: "250px", overflow: "auto", marginTop: "8px" }}
+        />
+      )}
+    </div>
+  );
 };
 
 export interface MapLocationPickerProps {
@@ -102,11 +207,10 @@ export interface MapLocationPickerProps {
   height?: string;
 }
 
-// Default to Jakarta, Indonesia
 const DEFAULT_LAT = -6.2088;
 const DEFAULT_LNG = 106.8456;
 
-export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
+const MapLocationPickerInner: React.FC<MapLocationPickerProps> = ({
   latitude,
   longitude,
   onLocationChange,
@@ -125,10 +229,6 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
   });
 
   const [zoom, setZoom] = useState(13);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<NominatimResult[]>([]);
-  const [loading, setLoading] = useState(false);
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const lat =
@@ -145,9 +245,7 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
   const handleLocationSelect = useCallback(
     (lat: number, lng: number) => {
       setPosition(new LatLng(lat, lng));
-      if (onLocationChange) {
-        onLocationChange(lat.toFixed(6), lng.toFixed(6));
-      }
+      onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
     },
     [onLocationChange]
   );
@@ -155,88 +253,24 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
   const handleMarkerDragEnd = useCallback(
     (lat: number, lng: number) => {
       setPosition(new LatLng(lat, lng));
-      if (onLocationChange) {
-        onLocationChange(lat.toFixed(6), lng.toFixed(6));
-      }
+      onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
     },
     [onLocationChange]
   );
 
-  const searchAddress = useCallback(async () => {
-    if (!searchQuery.trim()) return;
-
-    setLoading(true);
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          searchQuery
-        )}&countrycodes=ID&limit=10&addressdetails=1&extratags=1`,
-        {
-          headers: {
-            "User-Agent": "PharmaAdmin-MapPicker/1.0 (pharmacy-admin@example.com)",
-          },
-        }
-      );
-      const data: NominatimResult[] = await response.json();
-      setSearchResults(data);
-    } catch (error) {
-      console.error("Geocoding error:", error);
-      setSearchResults([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [searchQuery]);
-
-  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      searchAddress();
-    }
-  };
-
-  const handleResultSelect = (result: NominatimResult) => {
-    const lat = parseFloat(result.lat);
-    const lng = parseFloat(result.lon);
-    setPosition(new LatLng(lat, lng));
-    setZoom(16);
-    setSearchResults([]);
-    if (onLocationChange) {
-      onLocationChange(lat.toFixed(6), lng.toFixed(6));
-    }
-  };
+  const handlePlaceSelect = useCallback(
+    (lat: number, lng: number, _address: string) => {
+      setPosition(new LatLng(lat, lng));
+      setZoom(16);
+      onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
+    },
+    [onLocationChange]
+  );
 
   return (
     <div style={{ width: "100%" }}>
       <Space direction="vertical" style={{ width: "100%", marginBottom: 12 }}>
-        <Input.Search
-          placeholder="Cari alamat..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={handleSearchKeyDown}
-          onSearch={searchAddress}
-          loading={loading}
-          enterButton={<Button icon={<SearchOutlined />} />}
-        />
-        {searchResults.length > 0 && (
-          <List
-            size="small"
-            bordered
-            dataSource={searchResults}
-            renderItem={(item) => (
-              <List.Item
-                style={{ cursor: "pointer", padding: "8px 12px" }}
-                onClick={() => handleResultSelect(item)}
-              >
-                <Typography.Text
-                  style={{ fontSize: "12px", lineHeight: "1.4" }}
-                  title={item.display_name}
-                >
-                  {truncateText(item.display_name, 80)}
-                </Typography.Text>
-              </List.Item>
-            )}
-            style={{ maxHeight: "250px", overflow: "auto" }}
-          />
-        )}
+        <GooglePlacesAutocomplete onPlaceSelect={handlePlaceSelect} />
         <Typography.Text type="secondary" style={{ fontSize: "12px" }}>
           Atau klik langsung pada peta untuk memilih lokasi
         </Typography.Text>
@@ -260,6 +294,25 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
         </MapContainer>
       </div>
     </div>
+  );
+};
+
+export const MapLocationPicker: React.FC<MapLocationPickerProps> = (props) => {
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+  if (!apiKey) {
+    console.error("VITE_GOOGLE_MAPS_API_KEY is not defined in environment variables");
+    return (
+      <div style={{ padding: "20px", color: "red" }}>
+        Google Maps API Key tidak dikonfigurasi. Silakan hubungi administrator.
+      </div>
+    );
+  }
+
+  return (
+    <APIProvider apiKey={apiKey} version="beta">
+      <MapLocationPickerInner {...props} />
+    </APIProvider>
   );
 };
 
