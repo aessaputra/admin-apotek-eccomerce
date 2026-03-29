@@ -1,81 +1,30 @@
-import { useState, useEffect, useRef, useCallback, memo } from "react";
-import { Input, Typography, Space, type InputRef } from "antd";
-import {
-  APIProvider,
-  Map as GoogleMap,
-  AdvancedMarker,
-  useMap,
-  useMapsLibrary,
-  type MapMouseEvent,
-} from "@vis.gl/react-google-maps";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Input, List, Typography, Space, message } from "antd";
+import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
+import { Icon, type LatLngExpression } from "leaflet";
+import "leaflet/dist/leaflet.css";
 
-interface GooglePlacesAutocompleteProps {
-  onPlaceSelect: (lat: number, lng: number, address: string) => void;
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+const DefaultIcon = new Icon({
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+  type: string;
+  class: string;
+  importance: number;
 }
-
-const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> = ({
-  onPlaceSelect,
-}) => {
-  const placesLib = useMapsLibrary("places");
-  const inputRef = useRef<InputRef>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const listenerRef = useRef<google.maps.MapsEventListener | null>(null);
-
-  useEffect(() => {
-    if (!placesLib || !inputRef.current?.input) {
-      return;
-    }
-
-    // Get the actual HTML input element from Ant Design's Input component
-    const inputElement = inputRef.current.input;
-
-    // Create native Google Places Autocomplete widget
-    const autocomplete = new placesLib.Autocomplete(inputElement, {
-      componentRestrictions: { country: "id" },
-      // No 'types' restriction - allow all place types (pharmacies, clinics, etc.)
-    });
-
-    autocompleteRef.current = autocomplete;
-
-    // Add place_changed listener
-    listenerRef.current = autocomplete.addListener("place_changed", () => {
-      const place = autocomplete.getPlace();
-
-      if (!place.geometry?.location) {
-        console.warn("Place has no geometry");
-        return;
-      }
-
-      const lat = place.geometry.location.lat();
-      const lng = place.geometry.location.lng();
-      const address = place.formatted_address ?? place.name ?? "";
-
-      onPlaceSelect(lat, lng, address);
-    });
-
-    // Cleanup on unmount
-    return () => {
-      if (listenerRef.current) {
-        listenerRef.current.remove();
-        listenerRef.current = null;
-      }
-      if (autocompleteRef.current) {
-        // Clear all listeners on the autocomplete instance
-        google.maps.event.clearInstanceListeners(autocompleteRef.current);
-        autocompleteRef.current = null;
-      }
-    };
-  }, [placesLib, onPlaceSelect]);
-
-  return (
-    <Input
-      ref={inputRef}
-      placeholder="Cari apotek, klinik, atau lokasi..."
-      autoComplete="off"
-      spellCheck={false}
-    />
-  );
-};
 
 export interface MapLocationPickerProps {
   latitude?: string | number;
@@ -86,38 +35,257 @@ export interface MapLocationPickerProps {
 
 const DEFAULT_LAT = -6.2088;
 const DEFAULT_LNG = 106.8456;
+const DEFAULT_ZOOM = 13;
+const SEARCH_ZOOM = 16;
 
 interface MapControllerProps {
-  lat: number;
-  lng: number;
-  zoom?: number;
+  targetPosition: { lat: number; lng: number } | null;
+  shouldFlyTo: boolean;
+  onFlyComplete: () => void;
 }
 
-const MapController: React.FC<MapControllerProps> = ({ lat, lng, zoom }) => {
+const MapController: React.FC<MapControllerProps> = ({
+  targetPosition,
+  shouldFlyTo,
+  onFlyComplete,
+}) => {
   const map = useMap();
 
   useEffect(() => {
-    if (!map) {
-      return;
+    if (shouldFlyTo && targetPosition) {
+      map.flyTo([targetPosition.lat, targetPosition.lng], SEARCH_ZOOM, {
+        duration: 1.5,
+      });
+      onFlyComplete();
     }
-
-    map.panTo({ lat, lng });
-
-    if (zoom !== undefined) {
-      map.setZoom(zoom);
-    }
-  }, [map, lat, lng, zoom]);
+  }, [map, targetPosition, shouldFlyTo, onFlyComplete]);
 
   return null;
 };
 
-const MapLocationPickerInner: React.FC<MapLocationPickerProps> = ({
+interface SearchSectionProps {
+  onLocationSelect: (lat: number, lng: number, displayName: string) => void;
+}
+
+const SearchSection: React.FC<SearchSectionProps> = ({ onLocationSelect }) => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<NominatimResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const performSearch = useCallback(async (query: string) => {
+    if (!query.trim() || query.length < 3) {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=ID&limit=5`,
+        {
+          headers: {
+            "User-Agent": "PharmacyAdminPanel/1.0",
+            "Accept-Language": "id",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data: NominatimResult[] = await response.json();
+      setSearchResults(data);
+      setShowResults(data.length > 0);
+    } catch (error) {
+      console.error("Nominatim search error:", error);
+      message.error("Gagal mencari lokasi. Silakan coba lagi.");
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      performSearch(value);
+    }, 500);
+  };
+
+  const handleSelectResult = (result: NominatimResult) => {
+    const lat = parseFloat(result.lat);
+    const lng = parseFloat(result.lon);
+    onLocationSelect(lat, lng, result.display_name);
+    setSearchQuery(result.display_name);
+    setShowResults(false);
+    setSearchResults([]);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  return (
+    <div style={{ position: "relative", zIndex: 1000 }}>
+      <Input.Search
+        placeholder="Cari apotek, klinik, kecamatan, atau lokasi..."
+        value={searchQuery}
+        onChange={(e) => handleSearchChange(e.target.value)}
+        loading={isSearching}
+        allowClear
+        onFocus={() => {
+          if (searchResults.length > 0) setShowResults(true);
+        }}
+      />
+
+      {showResults && searchResults.length > 0 && (
+        <List
+          style={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            right: 0,
+            maxHeight: "250px",
+            overflow: "auto",
+            backgroundColor: "white",
+            border: "1px solid #d9d9d9",
+            borderRadius: "6px",
+            marginTop: "4px",
+            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
+          }}
+          dataSource={searchResults}
+          renderItem={(item) => (
+            <List.Item
+              style={{
+                padding: "8px 12px",
+                cursor: "pointer",
+                borderBottom: "1px solid #f0f0f0",
+              }}
+              onClick={() => handleSelectResult(item)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleSelectResult(item);
+                }
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = "#f5f5f5";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor = "white";
+              }}
+              tabIndex={0}
+              role="button"
+              aria-label={`Select ${item.display_name}`}
+            >
+              <Typography.Text style={{ fontSize: "13px" }}>
+                {item.display_name}
+              </Typography.Text>
+            </List.Item>
+          )}
+        />
+      )}
+
+      {showResults && (
+        <button
+          type="button"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: -1,
+            opacity: 0,
+            cursor: "default",
+            border: "none",
+            padding: 0,
+            margin: 0,
+            background: "transparent",
+          }}
+          onClick={() => setShowResults(false)}
+          aria-label="Close search results"
+        />
+      )}
+    </div>
+  );
+};
+
+interface DraggableMarkerProps {
+  position: { lat: number; lng: number };
+  onDragEnd: (lat: number, lng: number) => void;
+}
+
+const DraggableMarker: React.FC<DraggableMarkerProps> = ({
+  position,
+  onDragEnd,
+}) => {
+  const [dragPosition, setDragPosition] = useState(position);
+
+  useEffect(() => {
+    setDragPosition(position);
+  }, [position]);
+
+  const eventHandlers = {
+    dragend: (e: { target: { getLatLng: () => { lat: number; lng: number } } }) => {
+      const newPos = e.target.getLatLng();
+      setDragPosition({ lat: newPos.lat, lng: newPos.lng });
+      onDragEnd(newPos.lat, newPos.lng);
+    },
+  };
+
+  return (
+    <Marker
+      position={[dragPosition.lat, dragPosition.lng] as LatLngExpression}
+      icon={DefaultIcon}
+      draggable={true}
+      eventHandlers={eventHandlers}
+    />
+  );
+};
+
+interface MapClickHandlerProps {
+  onMapClick: (lat: number, lng: number) => void;
+}
+
+const MapClickHandler: React.FC<MapClickHandlerProps> = ({ onMapClick }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    const handleClick = (e: { latlng: { lat: number; lng: number } }) => {
+      onMapClick(e.latlng.lat, e.latlng.lng);
+    };
+
+    map.on("click", handleClick);
+
+    return () => {
+      map.off("click", handleClick);
+    };
+  }, [map, onMapClick]);
+
+  return null;
+};
+
+export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
   latitude,
   longitude,
   onLocationChange,
   height = "300px",
 }) => {
-  const [position, setPosition] = useState<{ lat: number; lng: number }>(() => {
+  const getInitialPosition = useCallback(() => {
     const lat =
       typeof latitude === "string"
         ? parseFloat(latitude) || DEFAULT_LAT
@@ -126,112 +294,89 @@ const MapLocationPickerInner: React.FC<MapLocationPickerProps> = ({
       typeof longitude === "string"
         ? parseFloat(longitude) || DEFAULT_LNG
         : longitude ?? DEFAULT_LNG;
-
     return { lat, lng };
-  });
-  const [zoom, setZoom] = useState(13);
-
-
-
-  useEffect(() => {
-    const lat =
-      typeof latitude === "string"
-        ? parseFloat(latitude) || DEFAULT_LAT
-        : latitude ?? DEFAULT_LAT;
-    const lng =
-      typeof longitude === "string"
-        ? parseFloat(longitude) || DEFAULT_LNG
-        : longitude ?? DEFAULT_LNG;
-
-    setPosition({ lat, lng });
   }, [latitude, longitude]);
 
+  const [position, setPosition] = useState(getInitialPosition);
+  const [flyToPosition, setFlyToPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [shouldFly, setShouldFly] = useState(false);
+
+  useEffect(() => {
+    const newPos = getInitialPosition();
+    setPosition(newPos);
+  }, [getInitialPosition]);
+
   const handleMapClick = useCallback(
-    (event: MapMouseEvent) => {
-      const { latLng } = event.detail;
-
-      if (!latLng) {
-        return;
-      }
-
-      setPosition(latLng);
-      onLocationChange?.(latLng.lat.toFixed(6), latLng.lng.toFixed(6));
-    },
-    [onLocationChange]
-  );
-
-  const handleMarkerDragEnd = useCallback(
-    (event: google.maps.MapMouseEvent) => {
-      const latLng = event.latLng;
-
-      if (!latLng) {
-        return;
-      }
-
-      const nextPosition = {
-        lat: latLng.lat(),
-        lng: latLng.lng(),
-      };
-
-      setPosition(nextPosition);
-      onLocationChange?.(nextPosition.lat.toFixed(6), nextPosition.lng.toFixed(6));
-    },
-    [onLocationChange]
-  );
-
-  const handlePlaceSelect = useCallback(
     (lat: number, lng: number) => {
       setPosition({ lat, lng });
-      setZoom(16);
       onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
     },
     [onLocationChange]
   );
 
+  const handleMarkerDragEnd = useCallback(
+    (lat: number, lng: number) => {
+      setPosition({ lat, lng });
+      onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
+    },
+    [onLocationChange]
+  );
+
+  const handleLocationSelect = useCallback(
+    (lat: number, lng: number, _displayName: string) => {
+      setPosition({ lat, lng });
+      setFlyToPosition({ lat, lng });
+      setShouldFly(true);
+      onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
+    },
+    [onLocationChange]
+  );
+
+  const handleFlyComplete = useCallback(() => {
+    setShouldFly(false);
+  }, []);
+
   return (
     <div style={{ width: "100%" }}>
       <Space direction="vertical" style={{ width: "100%", marginBottom: 12 }}>
-        <GooglePlacesAutocomplete onPlaceSelect={handlePlaceSelect} />
+        <SearchSection onLocationSelect={handleLocationSelect} />
         <Typography.Text type="secondary" style={{ fontSize: "12px" }}>
-          Atau klik langsung pada peta untuk memilih lokasi
+          Atau klik langsung pada peta / seret pin untuk memilih lokasi tepat
         </Typography.Text>
       </Space>
-      <div style={{ height, width: "100%", borderRadius: "8px", overflow: "hidden" }}>
-        <GoogleMap
-          defaultCenter={position}
-          defaultZoom={zoom}
-          center={position}
-          zoom={zoom}
-          gestureHandling="greedy"
-          disableDefaultUI={false}
-          mapId="map-location-picker"
-          onClick={handleMapClick}
+
+      <div
+        style={{
+          height,
+          width: "100%",
+          borderRadius: "8px",
+          overflow: "hidden",
+          border: "1px solid #d9d9d9",
+        }}
+      >
+        <MapContainer
+          center={[position.lat, position.lng] as LatLngExpression}
+          zoom={DEFAULT_ZOOM}
+          style={{ height: "100%", width: "100%" }}
+          scrollWheelZoom={true}
         >
-          <MapController lat={position.lat} lng={position.lng} zoom={zoom} />
-          <AdvancedMarker position={position} draggable={true} onDragEnd={handleMarkerDragEnd} />
-        </GoogleMap>
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+
+          <MapController
+            targetPosition={flyToPosition}
+            shouldFlyTo={shouldFly}
+            onFlyComplete={handleFlyComplete}
+          />
+
+          <MapClickHandler onMapClick={handleMapClick} />
+
+          <DraggableMarker position={position} onDragEnd={handleMarkerDragEnd} />
+        </MapContainer>
       </div>
     </div>
-  );
-};
-
-export const MapLocationPicker: React.FC<MapLocationPickerProps> = (props) => {
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-
-  if (!apiKey) {
-    console.error("VITE_GOOGLE_MAPS_API_KEY is not defined in environment variables");
-
-    return (
-      <div style={{ padding: "20px", color: "red" }}>
-        Google Maps API Key tidak dikonfigurasi. Silakan hubungi administrator.
-      </div>
-    );
-  }
-
-  return (
-    <APIProvider apiKey={apiKey}>
-      <MapLocationPickerInner {...props} />
-    </APIProvider>
   );
 };
 
