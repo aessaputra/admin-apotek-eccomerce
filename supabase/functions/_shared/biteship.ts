@@ -1,5 +1,9 @@
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
+import { getSupabaseAdminClient } from './supabase.ts';
+
+const DEFAULT_ORIGIN_POSTAL_CODE = 42183;
+
 interface BiteshipOrderItem {
   name: string;
   description?: string;
@@ -60,6 +64,190 @@ interface BiteshipOrderResponse {
   courier: BiteshipCourierInfo;
 }
 
+export interface StoreSettings {
+  store_name: string;
+  phone_number: string;
+  email: string;
+  organization: string;
+  store_address: string;
+  enabled_couriers: string | null;
+  origin_postal_code: number;
+  origin_latitude: number | null;
+  origin_longitude: number | null;
+  origin_area_id: string | null;
+}
+
+interface EnabledCourierServiceSelection {
+  companyCode: string;
+  serviceCode: string | '*';
+}
+
+interface BiteshipRatePricing {
+  courier_code?: string;
+  courier_service_code?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function normalizeEnabledCourierSelection(value: string): EnabledCourierServiceSelection | null {
+  const trimmedValue = value.trim().toLowerCase();
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const [companyCode, ...serviceParts] = trimmedValue.split(':');
+  const normalizedCompanyCode = companyCode.trim();
+  if (!normalizedCompanyCode) {
+    return null;
+  }
+
+  if (serviceParts.length === 0) {
+    return { companyCode: normalizedCompanyCode, serviceCode: '*' };
+  }
+
+  const normalizedServiceCode = serviceParts.join(':').trim();
+  if (!normalizedServiceCode) {
+    return null;
+  }
+
+  return { companyCode: normalizedCompanyCode, serviceCode: normalizedServiceCode };
+}
+
+function parseEnabledCourierServices(
+  value: string | null | undefined,
+): EnabledCourierServiceSelection[] {
+  if (!value) {
+    return [];
+  }
+
+  const selections = new Map<string, EnabledCourierServiceSelection>();
+  for (const rawSelection of value.split(',')) {
+    const normalizedSelection = normalizeEnabledCourierSelection(rawSelection);
+    if (!normalizedSelection) {
+      continue;
+    }
+
+    const selectionKey = `${normalizedSelection.companyCode}:${normalizedSelection.serviceCode}`;
+    selections.set(selectionKey, normalizedSelection);
+  }
+
+  return Array.from(selections.values());
+}
+
+function serializeEnabledCourierServices(
+  selections: EnabledCourierServiceSelection[],
+): string | null {
+  if (selections.length === 0) {
+    return null;
+  }
+
+  return selections
+    .map((selection) =>
+      selection.serviceCode === '*'
+        ? selection.companyCode
+        : `${selection.companyCode}:${selection.serviceCode}`,
+    )
+    .join(',');
+}
+
+export function getEnabledCouriers(settings: StoreSettings): string {
+  const selections = parseEnabledCourierServices(settings.enabled_couriers);
+  if (selections.length === 0) {
+    return '';
+  }
+
+  return Array.from(new Set(selections.map((selection) => selection.companyCode))).join(',');
+}
+
+export function filterRatesByEnabledServices(
+  responseData: unknown,
+  settings: StoreSettings,
+): unknown {
+  const enabledSelections = parseEnabledCourierServices(settings.enabled_couriers);
+  if (!isRecord(responseData) || !Array.isArray(responseData.pricing)) {
+    return responseData;
+  }
+
+  if (enabledSelections.length === 0) {
+    return {
+      ...responseData,
+      pricing: [],
+    };
+  }
+
+  const allowedServicesByCompany = new Map<string, Set<string>>();
+  for (const selection of enabledSelections) {
+    const companyServices = allowedServicesByCompany.get(selection.companyCode) ?? new Set<string>();
+    companyServices.add(selection.serviceCode);
+    allowedServicesByCompany.set(selection.companyCode, companyServices);
+  }
+
+  const filteredPricing = responseData.pricing.filter((item: unknown) => {
+    if (!isRecord(item)) {
+      return false;
+    }
+
+    const pricing = item as BiteshipRatePricing;
+    const companyCode = pricing.courier_code?.trim().toLowerCase();
+    const serviceCode = pricing.courier_service_code?.trim().toLowerCase();
+    if (!companyCode || !serviceCode) {
+      return false;
+    }
+
+    const allowedServices = allowedServicesByCompany.get(companyCode);
+    if (!allowedServices) {
+      return false;
+    }
+
+    return allowedServices.has('*') || allowedServices.has(serviceCode);
+  });
+
+  return {
+    ...responseData,
+    pricing: filteredPricing,
+  };
+}
+
+export function isCourierServiceEnabled(
+  settings: StoreSettings,
+  companyCode: string | null | undefined,
+  serviceCode: string | null | undefined,
+): boolean {
+  const normalizedCompanyCode = companyCode?.trim().toLowerCase();
+  const normalizedServiceCode = serviceCode?.trim().toLowerCase();
+  if (!normalizedCompanyCode || !normalizedServiceCode) {
+    return false;
+  }
+
+  const enabledSelections = parseEnabledCourierServices(settings.enabled_couriers);
+  if (enabledSelections.length === 0) {
+    return false;
+  }
+
+  return enabledSelections.some((selection) => {
+    return (
+      selection.companyCode === normalizedCompanyCode &&
+      (selection.serviceCode === '*' || selection.serviceCode === normalizedServiceCode)
+    );
+  });
+}
+
+export function assertCompleteStoreSettings(settings: StoreSettings): void {
+  if (
+    !settings.store_name ||
+    !settings.phone_number ||
+    !settings.email ||
+    !settings.organization ||
+    !settings.store_address
+  ) {
+    throw new Error(
+      'Missing shop shipper configuration. Ensure store_name, phone_number, email, organization, and store_address are set in settings table.',
+    );
+  }
+}
+
 interface OrderProduct {
   name: string;
   description?: string;
@@ -92,6 +280,39 @@ interface Order {
   };
 }
 
+export async function getStoreSettings(): Promise<StoreSettings> {
+  const adminClient = getSupabaseAdminClient();
+  const { data, error } = await adminClient
+    .from('settings')
+    .select(
+      'store_name, phone_number, email, organization, store_address, enabled_couriers, origin_postal_code, origin_latitude, origin_longitude, origin_area_id',
+    )
+    .eq('id', 1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[getStoreSettings] Database error:', error);
+    throw new Error(`Failed to fetch store settings: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error('Store settings not found (expected row with id=1)');
+  }
+
+  return {
+    store_name: data.store_name || '',
+    phone_number: data.phone_number || '',
+    email: data.email || '',
+    organization: data.organization || '',
+    store_address: data.store_address || '',
+    enabled_couriers: serializeEnabledCourierServices(parseEnabledCourierServices(data.enabled_couriers)),
+    origin_postal_code: data.origin_postal_code ?? DEFAULT_ORIGIN_POSTAL_CODE,
+    origin_latitude: data.origin_latitude,
+    origin_longitude: data.origin_longitude,
+    origin_area_id: data.origin_area_id,
+  };
+}
+
 export const createBiteshipOrder = async (
   order: Order,
   apiKey: string,
@@ -104,14 +325,19 @@ export const createBiteshipOrder = async (
   if (!order.courier_code) throw new Error('Missing courier_code on order');
   if (!order.courier_service) throw new Error('Missing courier_service on order');
 
-  const shipperName = Deno.env.get('SHOP_SHIPPER_NAME') || 'Apotek Sehat';
-  const shipperPhone = Deno.env.get('SHOP_SHIPPER_PHONE') || '08123456789';
-  const shipperEmail = Deno.env.get('SHOP_SHIPPER_EMAIL') || '';
-  const shipperOrganization = Deno.env.get('SHOP_ORGANIZATION') || '';
-  const shopAddress = Deno.env.get('SHOP_ADDRESS') || 'Alamat Toko Apotek';
-  const originPostalCode = Number(Deno.env.get('BITESHIP_ORIGIN_POSTAL_CODE') || '42183');
-  const originLatitude = Deno.env.get('BITESHIP_ORIGIN_LATITUDE');
-  const originLongitude = Deno.env.get('BITESHIP_ORIGIN_LONGITUDE');
+  const settings = await getStoreSettings();
+  assertCompleteStoreSettings(settings);
+  if (!isCourierServiceEnabled(settings, order.courier_code, order.courier_service)) {
+    throw new Error(`Disabled courier service: ${order.courier_code}:${order.courier_service}`);
+  }
+  const shipperName = settings.store_name;
+  const shipperPhone = settings.phone_number;
+  const shipperEmail = settings.email;
+  const shipperOrganization = settings.organization;
+  const shopAddress = settings.store_address;
+  const originPostalCode = settings.origin_postal_code ?? DEFAULT_ORIGIN_POSTAL_CODE;
+  const originLatitude = settings.origin_latitude;
+  const originLongitude = settings.origin_longitude;
 
   const items: BiteshipOrderItem[] = (order.order_items || []).map(
     (item: OrderItem): BiteshipOrderItem => ({
@@ -132,14 +358,14 @@ export const createBiteshipOrder = async (
     origin_contact_phone: shipperPhone,
     origin_address: shopAddress,
     origin_postal_code: originPostalCode,
-    ...(originLatitude && originLongitude
-      ? {
-          origin_coordinate: {
-            latitude: Number(originLatitude),
-            longitude: Number(originLongitude),
-          },
-        }
-      : {}),
+    ...(originLatitude !== null && originLongitude !== null
+       ? {
+           origin_coordinate: {
+             latitude: originLatitude,
+             longitude: originLongitude,
+           },
+         }
+       : {}),
 
     destination_contact_name: order.profiles?.full_name || 'Customer',
     destination_contact_phone: order.addresses?.phone_number || shipperPhone,

@@ -1,11 +1,21 @@
 import { Edit, useForm } from "@refinedev/antd";
 import { useTranslation } from "@refinedev/core";
-import { Form, Input, Tabs, Card, Row, Col, Upload, Typography } from "antd";
+import { Form, Input, Tabs, Card, Row, Col, Upload, Typography, Button, Space, Tag } from "antd";
+import { useState } from "react";
 import type { TabsProps } from "antd";
+import { SettingOutlined } from "@ant-design/icons";
 import { useSupabaseUpload } from "../../hooks/useSupabaseUpload";
+import { useBiteshipCouriers } from "../../hooks/useBiteshipCouriers";
 import { MEDIA_BUCKET } from "../../utils/storage";
 import { BiteshipAreaSearch } from "../../components/biteship-area-search";
 import { MapLocationPicker } from "../../components/map-location-picker";
+import { CourierPickerModal } from "../../components/courier-picker-modal";
+import {
+  getFallbackCourierOption,
+  getCourierSelectionCompany,
+  parseCouriers,
+  serializeCouriers,
+} from "../../constants/couriers.ts";
 
 interface SettingsFormValues {
   store_name: string;
@@ -19,9 +29,86 @@ interface SettingsFormValues {
   store_address: string;
   primary_logo_url: string;
   app_icon_url: string;
+  enabled_couriers: string | null;
 }
 
 const LOGO_PATH_PREFIX = "settings/";
+
+interface CourierPickerTriggerProps {
+  value?: string[];
+  loading?: boolean;
+  disabled?: boolean;
+  onOpenModal: () => void;
+}
+
+const CourierPickerTrigger: React.FC<CourierPickerTriggerProps> = ({
+  value = [],
+  loading,
+  disabled = false,
+  onOpenModal,
+}) => {
+  const { translate } = useTranslation();
+
+  const selectedServices = value
+    .map((selection) => {
+      const companyCode = getCourierSelectionCompany(selection);
+      if (!companyCode) {
+        return null;
+      }
+
+      const [_, ...serviceParts] = selection.split(":");
+      const fallbackCourier = getFallbackCourierOption(companyCode);
+      const serviceCode = serviceParts.join(":") || "*";
+
+      return {
+        key: selection,
+        companyCode,
+        companyLabel: fallbackCourier.label,
+        serviceLabel:
+          serviceCode === "*"
+            ? translate("settings.courierPicker.allServices", {}, "All services")
+            : serviceCode.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()),
+      };
+    })
+    .filter((selection): selection is NonNullable<typeof selection> => selection !== null);
+  const displayText = selectedServices.length > 0
+    ? selectedServices.length === 1
+      ? `${selectedServices[0].companyLabel} • ${selectedServices[0].serviceLabel}`
+      : translate(
+        "settings.courierPicker.selectedCount",
+          { count: selectedServices.length },
+          `${selectedServices.length} services selected`
+        )
+    : translate("settings.fields.couriersPlaceholder", {}, "Select couriers");
+
+  return (
+    <div>
+      <Button
+        onClick={onOpenModal}
+        disabled={loading || disabled}
+        style={{ width: "100%", textAlign: "left", height: "auto", padding: "8px 12px" }}
+      >
+        <Space direction="vertical" size={0} style={{ width: "100%" }}>
+          <Space style={{ width: "100%", justifyContent: "space-between" }}>
+            <Typography.Text>{displayText}</Typography.Text>
+            <SettingOutlined style={{ color: "#999" }} />
+          </Space>
+          {selectedServices.length > 0 && selectedServices.length <= 5 && (
+            <div style={{ marginTop: 4 }}>
+              <Space size={[4, 4]} wrap>
+                {selectedServices.map((selection) => (
+                  <Tag key={selection.key} style={{ margin: 0 }}>
+                    {selection.companyLabel} • {selection.serviceLabel}
+                  </Tag>
+                ))}
+              </Space>
+            </div>
+          )}
+        </Space>
+      </Button>
+    </div>
+  );
+};
 
 interface LogoUploadProps {
   value?: string;
@@ -65,6 +152,8 @@ const LogoUpload: React.FC<LogoUploadProps> = ({ value, onChange, placeholder })
 
 export const Settings: React.FC = () => {
   const { translate } = useTranslation();
+  const { couriers, loading: couriersLoading, error: couriersError, isFallback: couriersFallback } = useBiteshipCouriers();
+  const [courierModalOpen, setCourierModalOpen] = useState(false);
   const { formProps, saveButtonProps, form } = useForm<SettingsFormValues>({
     action: "edit",
     resource: "settings",
@@ -90,6 +179,11 @@ export const Settings: React.FC = () => {
   const handleLocationChange = (lat: string, lng: string) => {
     form.setFieldValue("origin_latitude", lat);
     form.setFieldValue("origin_longitude", lng);
+  };
+
+  const handleCourierConfirm = (selectedCouriers: string[]) => {
+    form.setFieldValue("enabled_couriers", serializeCouriers(selectedCouriers));
+    setCourierModalOpen(false);
   };
 
   const tabItems: TabsProps["items"] = [
@@ -122,12 +216,6 @@ export const Settings: React.FC = () => {
           >
             <Input placeholder={translate("settings.fields.emailPlaceholder", {}, "Enter email")} />
           </Form.Item>
-          <Form.Item
-            label={translate("settings.fields.organization", {}, "Organization")}
-            name="organization"
-          >
-            <Input placeholder={translate("settings.fields.organizationPlaceholder", {}, "Enter organization name")} />
-          </Form.Item>
         </Card>
       ),
     },
@@ -136,6 +224,42 @@ export const Settings: React.FC = () => {
       label: translate("settings.tabs.shippingSettings", {}, "Shipping Settings"),
       children: (
         <Card>
+          <Form.Item
+            label={translate("settings.fields.organization", {}, "Organization")}
+            name="organization"
+            rules={[{ required: true, message: translate("settings.validation.organizationRequired", {}, "Organization is required for shipping") }]}
+            help={translate("settings.fields.organizationHelp", {}, "Organization name used as shipper name for deliveries")}
+          >
+            <Input placeholder={translate("settings.fields.organizationPlaceholder", {}, "Enter organization name")} />
+          </Form.Item>
+          <Form.Item
+            label={translate("settings.fields.couriers", {}, "Active Couriers")}
+            name="enabled_couriers"
+            help={
+              <>
+                {translate("settings.fields.couriersHelp", {}, "Pilih layanan kurir yang ingin ditampilkan saat perhitungan ongkir. Anda dapat mengatur jenis layanan untuk setiap kurir.")}
+                {couriersError && (
+                  <Typography.Text type="danger" style={{ display: "block", marginTop: 4 }}>
+                    {couriersFallback
+                      ? translate(
+                          "settings.fields.couriersLoadError",
+                          {},
+                          "Failed to load live courier services. Editing is temporarily disabled to avoid saving incomplete data."
+                        )
+                      : translate("settings.fields.couriersLoadError", {}, "Failed to load courier list.")}
+                  </Typography.Text>
+                )}
+              </>
+            }
+            getValueProps={(value: string | null | undefined) => ({ value: parseCouriers(value) })}
+            getValueFromEvent={(value: string[] | undefined) => serializeCouriers(value ?? [])}
+          >
+            <CourierPickerTrigger
+              loading={couriersLoading}
+              disabled={couriersFallback}
+              onOpenModal={() => setCourierModalOpen(true)}
+            />
+          </Form.Item>
           <Form.Item
             label={translate("settings.fields.originAreaId", {}, "Origin Area")}
             name="origin_area_id"
@@ -224,19 +348,31 @@ export const Settings: React.FC = () => {
   ];
 
   return (
-    <Edit
-      saveButtonProps={saveButtonProps}
-      title={translate("settings.title", {}, "Settings")}
-      breadcrumb={false}
-    >
-      <Form {...formProps} layout="vertical">
-        <Tabs
-          defaultActiveKey="storeProfile"
-          items={tabItems}
-          type="card"
-        />
-      </Form>
-    </Edit>
+    <>
+      <Edit
+        saveButtonProps={saveButtonProps}
+        title={translate("settings.title", {}, "Settings")}
+        breadcrumb={false}
+      >
+        <Form {...formProps} layout="vertical">
+          <Tabs
+            defaultActiveKey="storeProfile"
+            items={tabItems}
+            type="card"
+          />
+        </Form>
+      </Edit>
+      <CourierPickerModal
+        open={courierModalOpen}
+        value={parseCouriers(form.getFieldValue("enabled_couriers"))}
+        couriers={couriers}
+        loading={couriersLoading}
+        error={couriersFallback ? couriersError : null}
+        readOnly={couriersFallback}
+        onConfirm={handleCourierConfirm}
+        onCancel={() => setCourierModalOpen(false)}
+      />
+    </>
   );
 };
 

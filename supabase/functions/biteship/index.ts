@@ -1,5 +1,13 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createRemoteJWKSet, jwtVerify } from 'npm:jose@5';
+import {
+  assertCompleteStoreSettings,
+  filterRatesByEnabledServices,
+  getEnabledCouriers,
+  getStoreSettings,
+  isCourierServiceEnabled,
+  type StoreSettings,
+} from '../_shared/biteship.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { getSupabaseAdminClient } from '../_shared/supabase.ts';
 
@@ -8,60 +16,13 @@ interface BiteshipProxyRequest {
   payload?: Record<string, unknown>;
 }
 
-interface StoreSettings {
-  store_name: string;
-  phone_number: string;
-  email: string;
-  organization: string;
-  store_address: string;
-  origin_postal_code: number;
-  origin_latitude: number | null;
-  origin_longitude: number | null;
-  origin_area_id: string | null;
-}
-
 const BITESHIP_API_KEY = Deno.env.get('BITESHIP_API_KEY');
 if (!BITESHIP_API_KEY) throw new Error('Missing BITESHIP_API_KEY environment variable');
 const BITESHIP_API_URL = 'https://api.biteship.com';
-const DEFAULT_ORIGIN_POSTAL_CODE = 42183;
-const DEFAULT_COURIERS = 'jne,jnt,sicepat,anteraja,pos,gojek,grab,lalamove';
-const BITESHIP_COURIERS = (Deno.env.get('BITESHIP_COURIERS') || '').trim() || DEFAULT_COURIERS;
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
 const JWT_ISSUER = `${supabaseUrl}/auth/v1`;
-
-async function getStoreSettings(): Promise<StoreSettings> {
-  const adminClient = getSupabaseAdminClient();
-  const { data, error } = await adminClient
-    .from('settings')
-    .select(
-      'store_name, phone_number, email, organization, store_address, origin_postal_code, origin_latitude, origin_longitude, origin_area_id',
-    )
-    .eq('id', 1)
-    .maybeSingle();
-
-  if (error) {
-    console.error('[getStoreSettings] Database error:', error);
-    throw new Error(`Failed to fetch store settings: ${error.message}`);
-  }
-
-  if (!data) {
-    throw new Error('Store settings not found (expected row with id=1)');
-  }
-
-  return {
-    store_name: data.store_name || '',
-    phone_number: data.phone_number || '',
-    email: data.email || '',
-    organization: data.organization || '',
-    store_address: data.store_address || '',
-    origin_postal_code: data.origin_postal_code ?? DEFAULT_ORIGIN_POSTAL_CODE,
-    origin_latitude: data.origin_latitude,
-    origin_longitude: data.origin_longitude,
-    origin_area_id: data.origin_area_id,
-  };
-}
 
 // Validate tracking_id to prevent URL manipulation
 function isValidTrackingId(id: string): boolean {
@@ -298,6 +259,7 @@ Deno.serve(async (req: Request) => {
     if (action === 'rates') {
       const safePayload = isRecord(requestPayload) ? requestPayload : {};
       const { origin_area_id: _originAreaId, ...ratesPayload } = safePayload;
+      const enabledCouriers = getEnabledCouriers(settings!);
 
       const destinationAreaId =
         typeof ratesPayload.destination_area_id === 'string'
@@ -336,25 +298,30 @@ Deno.serve(async (req: Request) => {
             }
           : { origin_postal_code: settings!.origin_postal_code };
 
+      if (!enabledCouriers) {
+        return new Response(
+          JSON.stringify({ success: true, pricing: [] }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        );
+      }
+
       requestPayload = {
         ...ratesPayload,
         ...originFields,
-        couriers: ratesPayload.couriers ?? BITESHIP_COURIERS,
+        couriers: enabledCouriers,
       };
     }
 
     if (action === 'create_order') {
-      if (
-        !settings!.store_name ||
-        !settings!.phone_number ||
-        !settings!.email ||
-        !settings!.organization ||
-        !settings!.store_address
-      ) {
+      try {
+        assertCompleteStoreSettings(settings!);
+      } catch (error: unknown) {
         return new Response(
           JSON.stringify({
-            error:
-              'Missing shop shipper configuration. Ensure store_name, phone_number, email, organization, and store_address are set in settings table.',
+            error: error instanceof Error ? error.message : 'Missing shop shipper configuration.',
           }),
           {
             status: 500,
@@ -364,13 +331,28 @@ Deno.serve(async (req: Request) => {
       }
 
       const safePayload = isRecord(requestPayload) ? requestPayload : {};
+      const courierCompany = getNestedString(safePayload, ['courier_company']);
+      const courierType = getNestedString(safePayload, ['courier_type']);
+      if (courierCompany && courierType && !isCourierServiceEnabled(settings!, courierCompany, courierType)) {
+        return new Response(
+          JSON.stringify({ error: 'Selected courier service is disabled in settings.' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        );
+      }
       requestPayload = withServerShipperAndOriginFields(safePayload, settings!);
     }
 
     if (action === 'draft_order') {
-      if (!settings!.email || !settings!.organization) {
+      try {
+        assertCompleteStoreSettings(settings!);
+      } catch (error: unknown) {
         return new Response(
-          JSON.stringify({ error: 'Missing email or organization in settings configuration.' }),
+          JSON.stringify({
+            error: error instanceof Error ? error.message : 'Missing shipping configuration.',
+          }),
           {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -516,6 +498,10 @@ Deno.serve(async (req: Request) => {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    if (action === 'rates') {
+      responseData = filterRatesByEnabledServices(responseData, settings!);
     }
 
     return new Response(JSON.stringify(responseData), {
