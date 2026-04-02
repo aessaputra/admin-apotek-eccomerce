@@ -2,7 +2,7 @@ import { useShow, useTranslation } from "@refinedev/core";
 import { Show, NumberField } from "@refinedev/antd";
 import { Typography, Image, Tag, Space } from "antd";
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 
 interface ProductImage {
   id: string;
@@ -66,7 +66,9 @@ export const ProductShow: React.FC = () => {
       <Text>{record?.slug ?? "-"}</Text>
 
       <Title level={5}>{translate("products.fields.description")}</Title>
-      <Text>{record?.description || "-"}</Text>
+      <Paragraph style={{ whiteSpace: "pre-wrap", marginBottom: 0 }}>
+        {record?.description || "-"}
+      </Paragraph>
 
       <Title level={5}>{translate("products.fields.price")}</Title>
       <NumberField

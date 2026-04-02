@@ -9,7 +9,12 @@ import { ProductCreate } from "../products/create";
 import { ProductEdit } from "../products/edit";
 
 const mocks = vi.hoisted(() => {
-  const translate = vi.fn((key: string, _params?: Record<string, unknown>, fallback?: string) => fallback ?? key);
+  const translate = vi.fn((key: string, paramsOrFallback?: Record<string, unknown> | string, fallback?: string) => {
+    if (typeof paramsOrFallback === "string") {
+      return paramsOrFallback;
+    }
+    return fallback ?? key;
+  });
   const useForm = vi.fn();
   const useSelect = vi.fn(() => ({ selectProps: { options: [{ label: "Category", value: "cat-1" }] } }));
   const useGetIdentity = vi.fn();
@@ -118,10 +123,62 @@ vi.mock("antd", () => {
   const Input = Object.assign(
     ({ placeholder, readOnly }: { placeholder?: string; readOnly?: boolean }) => <input aria-label={placeholder ?? "input"} readOnly={readOnly} />,
     {
-      TextArea: ({ placeholder }: { placeholder?: string }) => <textarea aria-label={placeholder ?? "textarea"} />,
+      TextArea: ({
+        placeholder,
+        rows,
+        maxLength,
+        showCount,
+        disabled,
+        value,
+        onChange,
+        autoFocus,
+        style,
+      }: {
+        placeholder?: string;
+        rows?: number;
+        maxLength?: number;
+        showCount?: boolean;
+        disabled?: boolean;
+        value?: string;
+        onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+        autoFocus?: boolean;
+        style?: React.CSSProperties;
+      }) => (
+        <textarea
+          aria-label={placeholder ?? "textarea"}
+          data-maxlength={maxLength}
+          data-rows={rows}
+          data-showcount={showCount ? "true" : "false"}
+          data-disabled={disabled ? "true" : "false"}
+          value={value}
+          onChange={onChange}
+          autoFocus={autoFocus}
+          style={style}
+        />
+      ),
       Password: ({ placeholder }: { placeholder?: string }) => <input aria-label={placeholder ?? "password"} type="password" />,
     }
   );
+
+  const Typography = {
+    Text: ({ children, type }: { children: React.ReactNode; type?: string }) => <span data-type={type}>{children}</span>,
+    Paragraph: ({ children, ellipsis, style }: { children: React.ReactNode; ellipsis?: { rows: number; expandable: boolean }; style?: React.CSSProperties }) => <p data-ellipsis={ellipsis ? "true" : "false"} style={style}>{children}</p>,
+  };
+
+  const theme = {
+    useToken: () => ({
+      token: {
+        colorBgContainer: "#ffffff",
+        colorBorderSecondary: "#d9d9d9",
+        borderRadius: 6,
+        colorTextTertiary: "#8c8c8c",
+        colorTextSecondary: "#595959",
+        colorText: "#000000",
+        colorPrimary: "#1890ff",
+        colorPrimaryBg: "#e6f7ff",
+      },
+    }),
+  };
 
   return {
     Form,
@@ -133,13 +190,13 @@ vi.mock("antd", () => {
     Row: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Col: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Upload: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Typography: {
-      Text: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
-    },
-    Button: ({ children, onClick, htmlType }: { children: React.ReactNode; onClick?: () => void; htmlType?: "submit" | "button" }) => <button type={htmlType ?? "button"} onClick={onClick}>{children}</button>,
+    Typography,
+    theme,
+    Button: ({ children, onClick, htmlType, type, size, icon }: { children?: React.ReactNode; onClick?: () => void; htmlType?: "submit" | "button"; type?: string; size?: string; icon?: React.ReactNode }) => <button type={htmlType ?? "button"} data-type={type} data-size={size} onClick={onClick}>{icon}{children}</button>,
     Space: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
     Divider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Modal: ({ children, open, title, footer }: { children: React.ReactNode; open?: boolean; title?: React.ReactNode; footer?: React.ReactNode }) => open ? <div role="dialog"><div>{title}</div>{children}{footer}</div> : null,
     message: {
       error: mocks.messageError,
       success: mocks.messageSuccess,
@@ -150,6 +207,9 @@ vi.mock("antd", () => {
 vi.mock("@ant-design/icons", () => ({
   LockOutlined: () => <span>lock</span>,
   SettingOutlined: () => <span>setting</span>,
+  ExpandOutlined: () => <span>expand</span>,
+  EditOutlined: () => <span>edit</span>,
+  FileTextOutlined: () => <span>file-text</span>,
 }));
 
 describe("form pages", () => {
@@ -185,6 +245,45 @@ describe("form pages", () => {
 
     rerender(<ProductEdit />);
     expect(mocks.setFieldsValue).toHaveBeenCalledWith({ images: ["https://example.com/one.png"] });
+  });
+
+  it("renders product description with edit modal flow", () => {
+    mocks.useForm
+      .mockReturnValueOnce({ formProps: {}, saveButtonProps: {}, form: { setFieldValue: mocks.setFieldValue } })
+      .mockReturnValueOnce({
+        formProps: {},
+        saveButtonProps: {},
+        form: { setFieldValue: mocks.setFieldValue, setFieldsValue: mocks.setFieldsValue },
+        query: { data: { data: { product_images: [] } } },
+      });
+
+    const { rerender } = render(<ProductCreate />);
+    
+    const previewCard = screen.getByRole("button", { name: "file-textEnter product description. Line breaks are preserved. editAdd description" });
+    expect(previewCard).not.toBeNull();
+    
+    fireEvent.click(previewCard);
+    
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).not.toBeNull();
+    
+    const cancelButton = screen.getByRole("button", { name: "Cancel" });
+    fireEvent.click(cancelButton);
+    
+    expect(screen.queryByRole("dialog")).toBeNull();
+    
+    fireEvent.click(previewCard);
+    
+    expect(screen.getByRole("dialog")).not.toBeNull();
+    
+    const saveButton = screen.getByRole("button", { name: "Save" });
+    fireEvent.click(saveButton);
+    
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    rerender(<ProductEdit />);
+    const previewCardInEdit = screen.getByRole("button", { name: "file-textEnter product description. Line breaks are preserved. editAdd description" });
+    expect(previewCardInEdit).not.toBeNull();
   });
 
   it("renders category create and edit forms with logo upload", () => {

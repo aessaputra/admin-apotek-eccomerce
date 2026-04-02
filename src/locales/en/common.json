@@ -79,7 +79,15 @@
       "active": "Active",
       "inactive": "Inactive"
     },
-    "imagesSaveError": "Failed to save product images"
+    "imagesSaveError": "Failed to save product images",
+    "description": {
+      "editModal": {
+        "title": "Edit Description",
+        "save": "Save",
+        "cancel": "Cancel",
+        "placeholder": "Enter product description. Line breaks are preserved."
+      }
+    }
   },
   "categories": {
     "categories": "Categories",

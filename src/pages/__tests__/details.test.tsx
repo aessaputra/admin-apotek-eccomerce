@@ -118,6 +118,9 @@ vi.mock("antd", async () => {
     Typography: {
       Title: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
       Text: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+      Paragraph: ({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) => (
+        <p style={style}>{children}</p>
+      ),
     },
     Avatar: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Space: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -205,6 +208,32 @@ describe("detail and dashboard pages", () => {
     expect(screen.getByText("Supplements")).not.toBeNull();
     expect(screen.getByText("products.status.active")).not.toBeNull();
     expect(screen.getByText("https://example.com/two.png")).not.toBeNull();
+  });
+
+  it("preserves line breaks for long plain-text product descriptions", () => {
+    mocks.useShow.mockReturnValue({
+      result: {
+        name: "Vitamin C",
+        slug: "vitamin-c",
+        description: "Line 1\n\nLine 2",
+        price: 15000,
+        stock: 5,
+        weight: 200,
+        is_active: true,
+        categories: { name: "Supplements" },
+        product_images: [],
+      },
+      query: { isLoading: false },
+    });
+
+    render(<ProductShow />);
+
+    const descriptionParagraph = screen.getByText((_, element) => {
+      return element?.tagName === "P" && element.textContent === "Line 1\n\nLine 2";
+    });
+    expect(descriptionParagraph.tagName).toBe("P");
+    expect((descriptionParagraph as HTMLElement).style.whiteSpace).toBe("pre-wrap");
+    expect((descriptionParagraph as HTMLElement).style.marginBottom).toBe("0px");
   });
 
   it("renders category details with logo and created date", () => {

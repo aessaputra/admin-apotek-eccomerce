@@ -2,6 +2,7 @@ import { Create, useForm, useSelect } from "@refinedev/antd";
 import { useTranslation } from "@refinedev/core";
 import { Form, Input, InputNumber, Select, message } from "antd";
 import { ProductImageUpload } from "../../components/product-image-upload";
+import { DescriptionEditorModal } from "../../components/description-editor-modal";
 import { slugify } from "../../utils/slugify";
 import { supabaseClient } from "../../providers/supabase-client";
 
@@ -69,8 +70,8 @@ export const ProductCreate: React.FC = () => {
         <Form.Item label={translate("products.fields.slug")} name="slug" rules={[{ required: true }]}>
           <Input />
         </Form.Item>
-        <Form.Item label={translate("products.fields.description")} name="description">
-          <Input.TextArea />
+        <Form.Item label={translate("products.fields.description")} name="description" getValueFromEvent={(val: string) => val}>
+          <DescriptionEditorModal maxLength={5000} />
         </Form.Item>
         <Form.Item label={translate("products.fields.price")} name="price" rules={[{ required: true }]}>
           <InputNumber style={{ width: "100%" }} min={0} />
