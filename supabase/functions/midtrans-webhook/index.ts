@@ -11,6 +11,7 @@ import type {
   MidtransStatusResponse,
   MidtransWebhookPayload,
   Order,
+  OrderItem,
   PaymentStatus,
 } from '../_shared/types.ts';
 
@@ -83,10 +84,47 @@ function pickNotificationDate(value?: string): string | null {
   return value;
 }
 
+function getRequiredPaymentCurrency(
+  primaryValue: string | null | undefined,
+  secondaryValue: string | null | undefined,
+  contextLabel: string,
+  orderId: string,
+): string {
+  const rawCurrency = primaryValue ?? secondaryValue;
+  const normalizedCurrency = rawCurrency?.trim().toUpperCase();
+
+  if (!normalizedCurrency) {
+    throw new Error(
+      `Missing currency in ${contextLabel} for order ${orderId}. Midtrans webhook payload must include a valid currency before payment data can be persisted.`,
+    );
+  }
+
+  return normalizedCurrency;
+}
+
+function getRequiredOrderItemQuantity(item: OrderItem, orderId: string): number {
+  const parsedQuantity = Number(item.quantity);
+
+  if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
+    throw new Error(
+      `Missing quantity for product ${item.product_id ?? 'unknown'} in order ${orderId}. Stock deduction requires a quantity greater than 0.`,
+    );
+  }
+
+  return parsedQuantity;
+}
+
 async function persistRawNotificationEarly(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
   payload: MidtransWebhookPayload,
 ): Promise<void> {
+  const currency = getRequiredPaymentCurrency(
+    payload.currency,
+    null,
+    'raw Midtrans notification',
+    payload.order_id,
+  );
+
   const rawRecord = {
     midtrans_order_id: payload.order_id,
     midtrans_transaction_id: payload.transaction_id || null,
@@ -94,7 +132,7 @@ async function persistRawNotificationEarly(
     fraud_status: payload.fraud_status || null,
     status_code: payload.status_code || null,
     gross_amount: toNumericAmount(payload.gross_amount),
-    currency: payload.currency || 'IDR',
+    currency,
     raw_notification: payload,
   };
 
@@ -209,6 +247,13 @@ async function upsertPaymentRecord(
     .eq('midtrans_order_id', payload.order_id)
     .maybeSingle();
 
+  const currency = getRequiredPaymentCurrency(
+    verifiedStatus.currency,
+    payload.currency,
+    'verified Midtrans status',
+    payload.order_id,
+  );
+
   const paymentPayload = {
     order_id: order.id,
     user_id: order.user_id ?? null,
@@ -221,7 +266,7 @@ async function upsertPaymentRecord(
     fraud_status: verifiedStatus.fraud_status || payload.fraud_status || null,
     status_code: verifiedStatus.status_code || payload.status_code || null,
     status_message: verifiedStatus.status_message || payload.status_message || null,
-    currency: verifiedStatus.currency || payload.currency || 'IDR',
+    currency,
     gross_amount: toNumericAmount(verifiedStatus.gross_amount || payload.gross_amount),
     signature_key: payload.signature_key,
     merchant_id: verifiedStatus.merchant_id || payload.merchant_id || null,
@@ -655,7 +700,7 @@ Deno.serve(async req => {
           const { error: rpcError } = await adminClient.rpc('apply_order_item_stock_deduction', {
             p_order_id: order.id,
             p_product_id: item.product_id,
-            p_quantity: item.quantity || 0,
+            p_quantity: getRequiredOrderItemQuantity(item, order.id),
           });
 
           if (!rpcError) {
