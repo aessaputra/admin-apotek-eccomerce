@@ -321,6 +321,28 @@ interface OrderItem {
   quantity?: number;
 }
 
+function getRequiredTrimmedValue(value: string | null | undefined, fieldLabel: string, orderId: string): string {
+  const normalizedValue = value?.trim();
+
+  if (!normalizedValue) {
+    throw new Error(`${fieldLabel} is required for Biteship order ${orderId}.`);
+  }
+
+  return normalizedValue;
+}
+
+function getRequiredOrderItemName(item: OrderItem, orderId: string, itemIndex: number): string {
+  const productName = item.products?.name?.trim();
+
+  if (!productName) {
+    throw new Error(
+      `Missing product name for item ${itemIndex + 1} in order ${orderId}. Product name is required before creating a Biteship order.`,
+    );
+  }
+
+  return productName;
+}
+
 function getRequiredOrderItemWeight(item: OrderItem, orderId: string, itemIndex: number): number {
   const rawWeight = item.products?.weight;
   const parsedWeight = Number(rawWeight);
@@ -413,10 +435,25 @@ export const createBiteshipOrder = async (
   const originPostalCode = getRequiredStoreOriginPostalCode(settings);
   const originLatitude = settings.origin_latitude;
   const originLongitude = settings.origin_longitude;
+  const destinationContactName = getRequiredTrimmedValue(
+    order.profiles?.full_name,
+    'Destination contact name',
+    order.id,
+  );
+  const destinationContactPhone = getRequiredTrimmedValue(
+    order.addresses?.phone_number,
+    'Destination contact phone',
+    order.id,
+  );
+  const destinationAddress = getRequiredTrimmedValue(
+    order.addresses?.street_address,
+    'Destination address',
+    order.id,
+  );
 
   const items: BiteshipOrderItem[] = (order.order_items || []).map(
     (item: OrderItem, index: number): BiteshipOrderItem => ({
-      name: item.products?.name || 'Product',
+      name: getRequiredOrderItemName(item, order.id, index),
       description: item.products?.description || '',
       value: Math.round(Number(item.price_at_purchase)),
       quantity: Number(item.quantity),
@@ -442,9 +479,9 @@ export const createBiteshipOrder = async (
          }
        : {}),
 
-    destination_contact_name: order.profiles?.full_name || 'Customer',
-    destination_contact_phone: order.addresses?.phone_number || shipperPhone,
-    destination_address: order.addresses?.street_address || 'Alamat Tujuan',
+    destination_contact_name: destinationContactName,
+    destination_contact_phone: destinationContactPhone,
+    destination_address: destinationAddress,
     ...(order.destination_area_id
       ? { destination_area_id: order.destination_area_id }
       : { destination_postal_code: Number(order.destination_postal_code) }),

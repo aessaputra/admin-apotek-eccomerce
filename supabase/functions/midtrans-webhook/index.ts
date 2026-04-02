@@ -114,6 +114,27 @@ function getRequiredOrderItemQuantity(item: OrderItem, orderId: string): number 
   return parsedQuantity;
 }
 
+function getExpectedOrderAmount(order: Order): number {
+  const baseAmount = order.gross_amount ?? order.total_amount;
+  const normalizedBaseAmount = Number(baseAmount);
+
+  if (!Number.isFinite(normalizedBaseAmount)) {
+    throw new Error(
+      `Missing valid gross_amount or total_amount for order ${order.id}. Payment validation requires a numeric order amount.`,
+    );
+  }
+
+  const normalizedShippingAmount = Number(order.shipping_cost ?? 0);
+
+  if (!Number.isFinite(normalizedShippingAmount)) {
+    throw new Error(
+      `Invalid shipping_cost for order ${order.id}. Payment validation requires a numeric shipping amount.`,
+    );
+  }
+
+  return Math.round(normalizedBaseAmount + normalizedShippingAmount);
+}
+
 async function persistRawNotificationEarly(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
   payload: MidtransWebhookPayload,
@@ -555,9 +576,7 @@ Deno.serve(async req => {
 
     const order = rawOrder as unknown as Order;
 
-    const expectedAmount = Math.round(
-      Number(order.gross_amount ?? order.total_amount + Number(order.shipping_cost ?? 0)),
-    );
+    const expectedAmount = getExpectedOrderAmount(order);
     const webhookAmount = Math.round(
       toNumericAmount(verifiedStatus.gross_amount || payload.gross_amount),
     );
