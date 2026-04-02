@@ -85,7 +85,10 @@
         "title": "Edit Deskripsi",
         "save": "Simpan",
         "cancel": "Batal",
-        "placeholder": "Masukkan deskripsi produk. Baris baru akan dipertahankan."
+        "placeholder": "Masukkan deskripsi...",
+        "emptyState": "Belum ada deskripsi",
+        "addDescription": "Tambah deskripsi",
+        "edit": "Edit"
       }
     }
   },

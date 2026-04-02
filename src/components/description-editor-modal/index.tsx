@@ -134,7 +134,7 @@ export const DescriptionEditorModal: React.FC<DescriptionEditorModalProps> = ({
           <div style={emptyStateStyle}>
             <FileTextOutlined style={{ fontSize: 24, opacity: 0.5 }} />
             <Text type="secondary" style={{ fontSize: 13 }}>
-              {label ?? translate("products.description.editModal.placeholder", "Enter product description. Line breaks are preserved.")}
+              {label ?? translate("products.description.editModal.emptyState", "No description added yet")}
             </Text>
             <Button
               type="link"
@@ -165,11 +165,6 @@ export const DescriptionEditorModal: React.FC<DescriptionEditorModalProps> = ({
         width={720}
         destroyOnClose
       >
-        <div style={{ marginBottom: 12 }}>
-          <Text type="secondary" style={{ fontSize: 13 }}>
-            {translate("products.description.editModal.hint", "Line breaks and paragraphs will be preserved in the product display.")}
-          </Text>
-        </div>
         <div style={{ marginBottom: 24 }}>
           <TextArea
             value={localValue}
@@ -180,7 +175,7 @@ export const DescriptionEditorModal: React.FC<DescriptionEditorModalProps> = ({
             autoFocus
             placeholder={translate(
               "products.description.editModal.placeholder",
-              "Enter product description. Line breaks are preserved."
+              "Product description..."
             )}
             style={{ fontSize: 14, lineHeight: 1.6 }}
           />

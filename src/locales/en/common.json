@@ -85,7 +85,10 @@
         "title": "Edit Description",
         "save": "Save",
         "cancel": "Cancel",
-        "placeholder": "Enter product description. Line breaks are preserved."
+        "placeholder": "Enter description...",
+        "emptyState": "No description added",
+        "addDescription": "Add description",
+        "edit": "Edit"
       }
     }
   },

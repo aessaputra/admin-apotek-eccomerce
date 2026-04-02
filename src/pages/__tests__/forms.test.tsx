@@ -210,6 +210,7 @@ vi.mock("@ant-design/icons", () => ({
   ExpandOutlined: () => <span>expand</span>,
   EditOutlined: () => <span>edit</span>,
   FileTextOutlined: () => <span>file-text</span>,
+  InfoCircleOutlined: () => <span>info</span>,
 }));
 
 describe("form pages", () => {
@@ -259,7 +260,7 @@ describe("form pages", () => {
 
     const { rerender } = render(<ProductCreate />);
     
-    const previewCard = screen.getByRole("button", { name: "file-textEnter product description. Line breaks are preserved. editAdd description" });
+    const previewCard = screen.getByRole("button", { name: /file-text.*No description added.*edit.*Add description/i });
     expect(previewCard).not.toBeNull();
     
     fireEvent.click(previewCard);
@@ -282,7 +283,7 @@ describe("form pages", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
 
     rerender(<ProductEdit />);
-    const previewCardInEdit = screen.getByRole("button", { name: "file-textEnter product description. Line breaks are preserved. editAdd description" });
+    const previewCardInEdit = screen.getByRole("button", { name: /file-text.*No description added.*edit.*Add description/i });
     expect(previewCardInEdit).not.toBeNull();
   });
 
