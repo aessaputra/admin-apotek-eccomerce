@@ -321,6 +321,20 @@ interface OrderItem {
   quantity?: number;
 }
 
+function getRequiredOrderItemWeight(item: OrderItem, orderId: string, itemIndex: number): number {
+  const rawWeight = item.products?.weight;
+  const parsedWeight = Number(rawWeight);
+
+  if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
+    const productName = item.products?.name?.trim() || `Item ${itemIndex + 1}`;
+    throw new Error(
+      `Missing product weight for "${productName}" in order ${orderId}. Set a product weight greater than 0 gram before creating a Biteship order.`,
+    );
+  }
+
+  return parsedWeight;
+}
+
 interface Order {
   id: string;
   tracking_id?: string | null;
@@ -401,12 +415,12 @@ export const createBiteshipOrder = async (
   const originLongitude = settings.origin_longitude;
 
   const items: BiteshipOrderItem[] = (order.order_items || []).map(
-    (item: OrderItem): BiteshipOrderItem => ({
+    (item: OrderItem, index: number): BiteshipOrderItem => ({
       name: item.products?.name || 'Product',
       description: item.products?.description || '',
       value: Math.round(Number(item.price_at_purchase)),
       quantity: Number(item.quantity),
-      weight: Number(item.products?.weight || 200),
+      weight: getRequiredOrderItemWeight(item, order.id, index),
     }),
   );
 

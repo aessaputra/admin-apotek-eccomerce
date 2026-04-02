@@ -10,6 +10,15 @@ import {
   MEDIA_BUCKET,
 } from "../../utils/storage";
 
+const PRODUCT_WEIGHT_RULES = [
+  { required: true, message: "Product weight is required for shipping" },
+  {
+    type: "number" as const,
+    min: 1,
+    message: "Product weight must be greater than 0 gram",
+  },
+];
+
 interface ProductImage { id: string; url: string; sort_order: number }
 
 export const ProductEdit: React.FC = () => {
@@ -129,8 +138,13 @@ export const ProductEdit: React.FC = () => {
         <Form.Item label={translate("products.fields.stock")} name="stock">
           <InputNumber style={{ width: "100%" }} min={0} />
         </Form.Item>
-        <Form.Item label={translate("products.fields.weight")} name="weight">
-          <InputNumber style={{ width: "100%" }} min={0} addonAfter="gram" />
+        <Form.Item
+          label={translate("products.fields.weight")}
+          name="weight"
+          rules={PRODUCT_WEIGHT_RULES}
+          extra="Required for shipping rates and Biteship order creation."
+        >
+          <InputNumber style={{ width: "100%" }} min={1} addonAfter="gram" />
         </Form.Item>
         <Form.Item label={translate("products.fields.category")} name="category_id">
           <Select {...selectProps} />
