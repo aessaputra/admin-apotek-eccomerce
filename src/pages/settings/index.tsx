@@ -33,6 +33,7 @@ interface SettingsFormValues {
 }
 
 const LOGO_PATH_PREFIX = "settings/";
+const INDONESIAN_POSTAL_CODE_REGEX = /^[1-9][0-9]{4}$/;
 
 interface CourierPickerTriggerProps {
   value?: string[];
@@ -263,7 +264,11 @@ export const Settings: React.FC = () => {
           <Form.Item
             label={translate("settings.fields.originAreaId", {}, "Origin Area")}
             name="origin_area_id"
-            rules={[{ required: true, message: translate("settings.validation.areaIdRequired", {}, "Origin area is required") }]}
+            help={translate(
+              "settings.fields.originAreaIdHelp",
+              {},
+              "Optional for rates when postal code or map coordinates are already configured, but recommended for the most accurate Biteship area matching."
+            )}
           >
             <BiteshipAreaSearch
               placeholder={translate("settings.fields.originAreaIdPlaceholder", {}, "Search area, district, or city...")}
@@ -273,9 +278,23 @@ export const Settings: React.FC = () => {
           <Form.Item
             label={translate("settings.fields.originPostalCode", {}, "Postal Code")}
             name="origin_postal_code"
-            rules={[{ required: true, message: translate("settings.validation.postalCodeRequired", {}, "Postal code is required") }]}
+            rules={[
+              { required: true, message: translate("settings.validation.postalCodeRequired", {}, "Postal code is required") },
+              {
+                pattern: INDONESIAN_POSTAL_CODE_REGEX,
+                message: translate(
+                  "settings.validation.postalCodeInvalid",
+                  {},
+                  "Postal code must be a valid 5-digit Indonesian postal code starting with digits 1-9"
+                ),
+              },
+            ]}
           >
-            <Input placeholder={translate("settings.fields.originPostalCodePlaceholder", {}, "Enter postal code")} />
+            <Input
+              maxLength={5}
+              inputMode="numeric"
+              placeholder={translate("settings.fields.originPostalCodePlaceholder", {}, "Enter postal code")}
+            />
           </Form.Item>
           <Form.Item
             label={translate("settings.fields.storeAddress", {}, "Store Address")}

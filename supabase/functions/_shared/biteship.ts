@@ -2,8 +2,6 @@
 
 import { getSupabaseAdminClient } from './supabase.ts';
 
-const DEFAULT_ORIGIN_POSTAL_CODE = 42183;
-
 interface BiteshipOrderItem {
   name: string;
   description?: string;
@@ -71,10 +69,71 @@ export interface StoreSettings {
   organization: string;
   store_address: string;
   enabled_couriers: string | null;
-  origin_postal_code: number;
+  origin_postal_code: string | null;
   origin_latitude: number | null;
   origin_longitude: number | null;
   origin_area_id: string | null;
+}
+
+function normalizeStorePostalCode(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const normalizedValue = value.trim();
+    return /^[1-9][0-9]{4}$/.test(normalizedValue) ? normalizedValue : null;
+  }
+
+  if (typeof value === 'number' && Number.isInteger(value)) {
+    const normalizedValue = String(value);
+    return /^[1-9][0-9]{4}$/.test(normalizedValue) ? normalizedValue : null;
+  }
+
+  return null;
+}
+
+function normalizeStoreCoordinate(value: unknown): number | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === 'string') {
+    const normalizedValue = value.trim();
+    if (!normalizedValue) {
+      return null;
+    }
+
+    const parsedValue = Number(normalizedValue);
+    return Number.isFinite(parsedValue) ? parsedValue : null;
+  }
+
+  return null;
+}
+
+function hasStoreOriginPostalCode(settings: StoreSettings): boolean {
+  return normalizeStorePostalCode(settings.origin_postal_code) !== null;
+}
+
+export function getRequiredStoreOriginPostalCode(settings: StoreSettings): string {
+  const originPostalCode = normalizeStorePostalCode(settings.origin_postal_code);
+  if (!originPostalCode) {
+    throw new Error(
+      'Missing origin_postal_code in settings table. Configure a valid 5-digit Indonesian shipping origin postal code starting with digits 1-9 before creating Biteship orders.',
+    );
+  }
+
+  return originPostalCode;
+}
+
+function hasStoreOriginCoordinates(settings: StoreSettings): boolean {
+  return settings.origin_latitude !== null && settings.origin_longitude !== null;
+}
+
+export function assertStoreSettingsHaveRateOrigin(settings: StoreSettings): void {
+  if (settings.origin_area_id || hasStoreOriginCoordinates(settings) || hasStoreOriginPostalCode(settings)) {
+    return;
+  }
+
+  throw new Error(
+    'Missing shipping origin configuration. Set origin_area_id, origin coordinates, or origin_postal_code in settings table.',
+  );
 }
 
 interface EnabledCourierServiceSelection {
@@ -246,6 +305,8 @@ export function assertCompleteStoreSettings(settings: StoreSettings): void {
       'Missing shop shipper configuration. Ensure store_name, phone_number, email, organization, and store_address are set in settings table.',
     );
   }
+
+  getRequiredStoreOriginPostalCode(settings);
 }
 
 interface OrderProduct {
@@ -306,9 +367,9 @@ export async function getStoreSettings(): Promise<StoreSettings> {
     organization: data.organization || '',
     store_address: data.store_address || '',
     enabled_couriers: serializeEnabledCourierServices(parseEnabledCourierServices(data.enabled_couriers)),
-    origin_postal_code: data.origin_postal_code ?? DEFAULT_ORIGIN_POSTAL_CODE,
-    origin_latitude: data.origin_latitude,
-    origin_longitude: data.origin_longitude,
+    origin_postal_code: normalizeStorePostalCode(data.origin_postal_code),
+    origin_latitude: normalizeStoreCoordinate(data.origin_latitude),
+    origin_longitude: normalizeStoreCoordinate(data.origin_longitude),
     origin_area_id: data.origin_area_id,
   };
 }
@@ -335,7 +396,7 @@ export const createBiteshipOrder = async (
   const shipperEmail = settings.email;
   const shipperOrganization = settings.organization;
   const shopAddress = settings.store_address;
-  const originPostalCode = settings.origin_postal_code ?? DEFAULT_ORIGIN_POSTAL_CODE;
+  const originPostalCode = getRequiredStoreOriginPostalCode(settings);
   const originLatitude = settings.origin_latitude;
   const originLongitude = settings.origin_longitude;
 
@@ -357,7 +418,7 @@ export const createBiteshipOrder = async (
     origin_contact_name: shipperName,
     origin_contact_phone: shipperPhone,
     origin_address: shopAddress,
-    origin_postal_code: originPostalCode,
+    origin_postal_code: Number(originPostalCode),
     ...(originLatitude !== null && originLongitude !== null
        ? {
            origin_coordinate: {

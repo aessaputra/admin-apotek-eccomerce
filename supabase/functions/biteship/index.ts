@@ -2,7 +2,9 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createRemoteJWKSet, jwtVerify } from 'npm:jose@5';
 import {
   assertCompleteStoreSettings,
+  assertStoreSettingsHaveRateOrigin,
   filterRatesByEnabledServices,
+  getRequiredStoreOriginPostalCode,
   getEnabledCouriers,
   getStoreSettings,
   isCourierServiceEnabled,
@@ -114,6 +116,9 @@ function withServerShipperAndOriginFields(
     origin_address: _originAddress,
     origin_area_id: _originAreaId,
     origin_postal_code: _originPostalCode,
+    origin_latitude: _originLatitude,
+    origin_longitude: _originLongitude,
+    origin_coordinate: _originCoordinate,
     ...safePayload
   } = payload;
 
@@ -126,8 +131,21 @@ function withServerShipperAndOriginFields(
     origin_contact_name: settings.store_name,
     origin_contact_phone: settings.phone_number,
     origin_address: settings.store_address,
-    origin_postal_code: settings.origin_postal_code,
+    origin_postal_code: Number(getRequiredStoreOriginPostalCode(settings)),
   };
+}
+
+function withoutClientOriginFields(payload: Record<string, unknown>): Record<string, unknown> {
+  const {
+    origin_area_id: _originAreaId,
+    origin_postal_code: _originPostalCode,
+    origin_latitude: _originLatitude,
+    origin_longitude: _originLongitude,
+    origin_coordinate: _originCoordinate,
+    ...safePayload
+  } = payload;
+
+  return safePayload;
 }
 
 Deno.serve(async (req: Request) => {
@@ -257,8 +275,25 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === 'rates') {
+      try {
+        assertStoreSettingsHaveRateOrigin(settings!);
+      } catch (error: unknown) {
+        return new Response(
+          JSON.stringify({
+            error:
+              error instanceof Error
+                ? error.message
+                : 'Missing shipping origin configuration.',
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        );
+      }
+
       const safePayload = isRecord(requestPayload) ? requestPayload : {};
-      const { origin_area_id: _originAreaId, ...ratesPayload } = safePayload;
+      const ratesPayload = withoutClientOriginFields(safePayload);
       const enabledCouriers = getEnabledCouriers(settings!);
 
       const destinationAreaId =
@@ -296,7 +331,7 @@ Deno.serve(async (req: Request) => {
               origin_latitude: settings!.origin_latitude,
               origin_longitude: settings!.origin_longitude,
             }
-          : { origin_postal_code: settings!.origin_postal_code };
+          : { origin_postal_code: Number(getRequiredStoreOriginPostalCode(settings!)) };
 
       if (!enabledCouriers) {
         return new Response(
