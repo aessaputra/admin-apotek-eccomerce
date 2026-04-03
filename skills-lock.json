@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "concise-planning": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "computedHash": "a49c0165c120028e55ab10444a0c4053e5fae27e39e65870d1fcf5c7cb94cca2"
+    },
     "frontend-design": {
       "source": "anthropics/skills",
       "sourceType": "github",
@@ -11,6 +16,11 @@
       "sourceType": "github",
       "computedHash": "06ece46912b5c4e8cf23400c7f73c0c355fcdf378336cd3d13f8da01466b7c72"
     },
+    "lint-and-validate": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "computedHash": "f9ff791ed1675649f24bb62a5981c494108d98d5f14e97b8f4a2512acb4be732"
+    },
     "refine-dev": {
       "source": "itechmeat/llm-code",
       "sourceType": "github",
@@ -20,6 +30,11 @@
       "source": "supabase/agent-skills",
       "sourceType": "github",
       "computedHash": "9c87c315aed143ee3b34bec8117100f5035e0df09e6b23e1ecc772cff434c9ad"
+    },
+    "systematic-debugging": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "computedHash": "72e9ab72627e4fd8ed26a582e82309a98ecdc4f6e1c99418430ac05682c9e91d"
     },
     "testing-strategy": {
       "source": "anthropics/knowledge-work-plugins",

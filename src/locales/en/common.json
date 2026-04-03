@@ -12,7 +12,8 @@
     "products": "Products",
     "categories": "Categories",
     "salesReports": "Sales Reports",
-    "settings": "Settings"
+    "settings": "Settings",
+    "home_banners": "Home Banners"
   },
   "actions": {
     "show": "View",
@@ -99,6 +100,139 @@
       "name": "Name",
       "slug": "Slug",
       "created": "Created"
+    }
+  },
+  "homeBanners": {
+    "homeBanners": "Home Banners",
+    "fields": {
+      "placementKey": "Banner Position",
+      "intent": "Banner Type",
+      "title": "Title",
+      "body": "Banner Description",
+      "mediaPath": "Banner Image",
+      "ctaKind": "Button Action",
+      "ctaStatus": "Has Button",
+      "ctaLabel": "Button Text",
+      "ctaRoute": "Button Destination",
+      "imageStatus": "Has Image",
+      "isActive": "Show on Homepage",
+      "createdAt": "Created",
+      "updatedAt": "Last Updated"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "withCta": "Has Button",
+      "noCta": "No Button",
+      "withImage": "With Image",
+      "noImage": "No Image"
+    },
+    "options": {
+      "placements": {
+        "home_banner_top": "Homepage Top",
+        "home_banner_bottom": "Homepage Bottom"
+      },
+      "intents": {
+        "promotional": "Promo",
+        "informational": "Information",
+        "branding": "Branding"
+      },
+      "ctaKinds": {
+        "none": "No Button",
+        "route": "Link to Page"
+      },
+      "ctaRoutes": {
+        "orders": "Orders",
+        "cart": "Cart",
+        "home/details": "Home Details"
+      }
+    },
+    "helpers": {
+      "placement": "Choose banner display position.",
+      "intent": "Choose banner purpose.",
+      "title": "Optional. Text appears at the bottom of the banner.",
+      "body": "Optional. Short description.",
+      "cta": "Select 'Link to Page' if banner has a button.",
+      "ctaLabel": "Example: View Details, Shop Now.",
+      "ctaRoute": "Destination page when button is clicked.",
+      "media": "Upload new or select saved image.",
+      "isActive": "Active banner will display on homepage."
+    },
+    "warnings": {
+      "title": "Recommendations",
+      "jpegFallback": "Use WebP for better results.",
+      "pngConditional": "PNG only for transparent images.",
+      "fileTooLarge": "File exceeds {{maxSizeKb}}KB.",
+      "ratioMismatch": "Ratio mismatch. Use {{width}}×{{height}}px ({{ratio}}).",
+      "titleTooLong": "Title too long.",
+      "bodyTooLong": "Description too long.",
+      "brandingWithoutImage": "Branding banner needs an image.",
+      "activation": "Deactivate other active banner in same position first."
+    },
+    "media": {
+      "guidanceTitle": "Image Requirements",
+      "invalidFormat": "Home banners only support WebP, JPEG, or PNG files.",
+      "uploadSuccess": "Media uploaded successfully.",
+      "selectPlacementFirst": "Choose a banner position before uploading.",
+      "selectPlacementHint": "Choose a banner position first so uploaded images stay organized.",
+      "selectExistingPlaceholder": "Choose a saved image",
+      "selectPlacementPlaceholder": "Choose a banner position first",
+      "noExistingAssets": "No saved images for this position yet.",
+      "storedPath": "File: {{path}}",
+      "previewAlt": "Home banner preview",
+      "previewTitle": "Image Preview",
+      "actions": {
+        "upload": "Upload",
+        "pickExisting": "Choose Saved",
+        "uploadMedia": "Upload Image",
+        "refresh": "Reload",
+        "clearSelection": "Clear Selection",
+        "preview": "Preview Image"
+      },
+      "specs": {
+        "home_banner_top": "Tip: Recommended size {{width}}×{{height}}px ({{ratio}}). Max file upload 2MB.",
+        "home_banner_bottom": "Tip: Recommended size {{width}}×{{height}}px ({{ratio}}). Max file upload 2MB."
+      }
+    },
+    "mediaLibrary": {
+      "title": "Saved Banner Images",
+      "openAction": "Browse Images",
+      "refresh": "Reload",
+      "preview": "View",
+      "delete": "Delete",
+      "uploadedOn": "Uploaded {{date}}",
+      "noAssets": "No saved images for this banner position yet.",
+      "selectPlacementHint": "Select banner position first.",
+      "deleteConfirmTitle": "Delete Image",
+      "deleteConfirmContent": "Delete \"{{filename}}\"?",
+      "deleteConfirmOk": "Delete",
+      "deleteBlockedTitle": "Cannot Delete",
+      "deleteBlockedContent": "Image still used by other banners.",
+      "deleteSuccess": "Image deleted."
+    },
+    "preview": {
+      "title": "Preview",
+      "openAction": "Preview",
+      "description": "Estimated banner appearance.",
+      "contentBanner": "Banner + Text",
+      "imageOnly": "Image Only",
+      "noImageSelected": "Please select an image first.",
+      "safeArea": {
+        "home_banner_top": "Place text/logo in the lower-left area.",
+        "home_banner_bottom": "Place text/logo in the lower-left area."
+      }
+    },
+    "confirm": {
+      "activateTitle": "Activate banner?",
+      "activateContent": "Deactivate other active banner in same position first.",
+      "activateOk": "Activate"
+    },
+    "validation": {
+      "placementRequired": "Banner position is required",
+      "intentRequired": "Banner type is required",
+      "ctaKindRequired": "Button action is required",
+      "ctaLabelRequired": "Button text is required",
+      "ctaRouteRequired": "Button destination is required"
     }
   },
   "orders": {

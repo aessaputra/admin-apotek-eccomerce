@@ -7,6 +7,12 @@ const mocks = vi.hoisted(() => {
   const deleteMany = vi.fn();
   const remove = vi.fn();
   const storageFrom = vi.fn(() => ({ remove }));
+  const bannerSelectEq = vi.fn();
+  const from = vi.fn(() => ({
+    select: vi.fn(() => ({
+      eq: bannerSelectEq,
+    })),
+  }));
 
   return {
     getOne,
@@ -15,6 +21,8 @@ const mocks = vi.hoisted(() => {
     deleteMany,
     remove,
     storageFrom,
+    bannerSelectEq,
+    from,
   };
 });
 
@@ -28,10 +36,11 @@ vi.mock("@refinedev/supabase", () => ({
 }));
 
 vi.mock("../supabase-client", () => ({
-  supabaseClient: {
-    storage: {
-      from: mocks.storageFrom,
-    },
+    supabaseClient: {
+      from: mocks.from,
+      storage: {
+        from: mocks.storageFrom,
+      },
   },
 }));
 
@@ -45,10 +54,13 @@ describe("dataProvider custom deletes", () => {
     mocks.deleteMany.mockReset();
     mocks.remove.mockReset();
     mocks.storageFrom.mockClear();
+    mocks.from.mockClear();
+    mocks.bannerSelectEq.mockReset();
 
     mocks.deleteOne.mockResolvedValue({ data: { id: "1" } });
     mocks.deleteMany.mockResolvedValue({ data: [{ id: "1" }] });
     mocks.remove.mockResolvedValue({ data: [] });
+    mocks.bannerSelectEq.mockResolvedValue({ data: [], error: null });
   });
 
   it("removes a category logo from storage before deleting the record", async () => {
@@ -217,5 +229,107 @@ describe("dataProvider custom deletes", () => {
       resource: "categories",
       id: "1",
     });
+  });
+
+  it("removes a home banner media file when no other banner references it", async () => {
+    mocks.getOne.mockResolvedValue({
+      data: {
+        id: "banner-1",
+        media_path: "banners/home_banner_top/banner-a.webp",
+      },
+    });
+    mocks.bannerSelectEq.mockResolvedValue({
+      data: [{ id: "banner-1" }],
+      error: null,
+    });
+
+    const params = {
+      resource: "home_banners",
+      id: "banner-1",
+      meta: { select: "*" },
+    };
+
+    const result = await dataProvider.deleteOne(params);
+
+    expect(mocks.getOne).toHaveBeenCalledWith({
+      resource: "home_banners",
+      id: "banner-1",
+      meta: { select: "*" },
+    });
+    expect(mocks.from).toHaveBeenCalledWith("home_banners");
+    expect(mocks.bannerSelectEq).toHaveBeenCalledWith("media_path", "banners/home_banner_top/banner-a.webp");
+    expect(mocks.remove).toHaveBeenCalledWith(["banners/home_banner_top/banner-a.webp"]);
+    expect(mocks.deleteOne).toHaveBeenCalledWith(params);
+    expect(result).toEqual({ data: { id: "1" } });
+  });
+
+  it("keeps a home banner media file when another banner still references it", async () => {
+    mocks.getOne.mockResolvedValue({
+      data: {
+        id: "banner-1",
+        media_path: "banners/home_banner_top/shared.webp",
+      },
+    });
+    mocks.bannerSelectEq.mockResolvedValue({
+      data: [{ id: "banner-1" }, { id: "banner-2" }],
+      error: null,
+    });
+
+    await expect(
+      dataProvider.deleteOne({
+        resource: "home_banners",
+        id: "banner-1",
+      })
+    ).resolves.toEqual({ data: { id: "1" } });
+
+    expect(mocks.remove).not.toHaveBeenCalled();
+    expect(mocks.deleteOne).toHaveBeenCalledWith({
+      resource: "home_banners",
+      id: "banner-1",
+    });
+  });
+
+  it("removes a shared home banner media file once all referencing banners are deleted together", async () => {
+    mocks.getMany.mockResolvedValue({
+      data: [
+        {
+          id: "banner-1",
+          media_path: "banners/home_banner_bottom/shared.webp",
+        },
+        {
+          id: "banner-2",
+          media_path: "banners/home_banner_bottom/shared.webp",
+        },
+      ],
+    });
+    mocks.bannerSelectEq.mockResolvedValue({
+      data: [{ id: "banner-1" }, { id: "banner-2" }],
+      error: null,
+    });
+
+    const deleteManyMethod = dataProvider.deleteMany;
+
+    if (!deleteManyMethod) {
+      throw new Error("deleteMany is not implemented");
+    }
+
+    const result = await deleteManyMethod({
+      resource: "home_banners",
+      ids: ["banner-1", "banner-2"],
+      meta: { select: "*" },
+    });
+
+    expect(mocks.getMany).toHaveBeenCalledWith({
+      resource: "home_banners",
+      ids: ["banner-1", "banner-2"],
+      meta: { select: "*" },
+    });
+    expect(mocks.remove).toHaveBeenCalledWith(["banners/home_banner_bottom/shared.webp"]);
+    expect(mocks.deleteMany).toHaveBeenCalledWith({
+      resource: "home_banners",
+      ids: ["banner-1", "banner-2"],
+      meta: { select: "*" },
+    });
+    expect(result).toEqual({ data: [{ id: "1" }] });
   });
 });

@@ -21,6 +21,7 @@ import {
   AppstoreOutlined,
   BarChartOutlined,
   SettingOutlined,
+  PictureOutlined,
 } from "@ant-design/icons";
 
 import routerProvider, {
@@ -57,6 +58,10 @@ import { CategoryShow } from "./pages/categories/show";
 import { Profile } from "./pages/profile";
 import { SalesReport } from "./pages/reports/sales";
 import { Settings } from "./pages/settings";
+import { HomeBannerList } from "./pages/home-banners/list";
+import { HomeBannerCreate } from "./pages/home-banners/create";
+import { HomeBannerEdit } from "./pages/home-banners/edit";
+import { HomeBannerShow } from "./pages/home-banners/show";
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -138,6 +143,14 @@ function App() {
                     list: "/settings",
                     meta: { icon: <SettingOutlined /> },
                   },
+                  {
+                    name: "home_banners",
+                    list: "/home-banners",
+                    create: "/home-banners/create",
+                    edit: "/home-banners/edit/:id",
+                    show: "/home-banners/show/:id",
+                    meta: { parent: "stores", icon: <PictureOutlined /> },
+                  },
                   { name: "report_daily_sales" },
                   { name: "report_product_sales" },
                   { name: "report_customer_sales" },
@@ -190,6 +203,12 @@ function App() {
                       <Route path="sales" element={<SalesReport />} />
                     </Route>
                     <Route path="/settings" element={<Settings />} />
+                    <Route path="/home-banners">
+                      <Route index element={<HomeBannerList />} />
+                      <Route path="create" element={<HomeBannerCreate />} />
+                      <Route path="show/:id" element={<HomeBannerShow />} />
+                      <Route path="edit/:id" element={<HomeBannerEdit />} />
+                    </Route>
                     <Route path="*" element={<ErrorComponent />} />
                   </Route>
                   <Route

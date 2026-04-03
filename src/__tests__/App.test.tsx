@@ -34,6 +34,9 @@ vi.mock("@refinedev/core", () => ({
     captured.refineProps = props;
     return <div>{children}</div>;
   },
+  useTranslation: () => ({
+    translate: (key: string) => key,
+  }),
 }));
 
 vi.mock("@refinedev/devtools", () => ({
@@ -99,6 +102,10 @@ vi.mock("../pages/categories/show", () => ({ CategoryShow: () => <div>CategorySh
 vi.mock("../pages/profile", () => ({ Profile: () => <div>Profile</div> }));
 vi.mock("../pages/reports/sales", () => ({ SalesReport: () => <div>SalesReport</div> }));
 vi.mock("../pages/settings", () => ({ Settings: () => <div>Settings</div> }));
+vi.mock("../pages/home-banners/list", () => ({ HomeBannerList: () => <div>HomeBannerList</div> }));
+vi.mock("../pages/home-banners/create", () => ({ HomeBannerCreate: () => <div>HomeBannerCreate</div> }));
+vi.mock("../pages/home-banners/edit", () => ({ HomeBannerEdit: () => <div>HomeBannerEdit</div> }));
+vi.mock("../pages/home-banners/show", () => ({ HomeBannerShow: () => <div>HomeBannerShow</div> }));
 
 describe("App", () => {
   it("registers core Refine resources and document title behavior", () => {
@@ -114,6 +121,7 @@ describe("App", () => {
       "categories",
       "salesReports",
       "settings",
+      "home_banners",
       "report_daily_sales",
       "report_product_sales",
       "report_customer_sales",

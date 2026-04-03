@@ -12,7 +12,8 @@
     "products": "Produk",
     "categories": "Kategori",
     "salesReports": "Laporan Penjualan",
-    "settings": "Pengaturan"
+    "settings": "Pengaturan",
+    "home_banners": "Banner Home"
   },
   "actions": {
     "show": "Lihat",
@@ -99,6 +100,139 @@
       "name": "Nama",
       "slug": "Slug",
       "created": "Dibuat"
+    }
+  },
+  "homeBanners": {
+    "homeBanners": "Banner Home",
+    "fields": {
+      "placementKey": "Posisi Banner",
+      "intent": "Tipe Banner",
+      "title": "Judul",
+      "body": "Deskripsi Banner",
+      "mediaPath": "Gambar Banner",
+      "ctaKind": "Aksi Tombol",
+      "ctaStatus": "Ada Tombol",
+      "ctaLabel": "Teks Tombol",
+      "ctaRoute": "Tujuan Tombol",
+      "imageStatus": "Ada Gambar",
+      "isActive": "Tampilkan di Homepage",
+      "createdAt": "Dibuat",
+      "updatedAt": "Terakhir Diperbarui"
+    },
+    "status": {
+      "active": "Aktif",
+      "inactive": "Nonaktif",
+      "withCta": "Dengan Tombol",
+      "noCta": "Tanpa Tombol",
+      "withImage": "Dengan Gambar",
+      "noImage": "Tanpa Gambar"
+    },
+    "options": {
+      "placements": {
+        "home_banner_top": "Atas Homepage",
+        "home_banner_bottom": "Bawah Homepage"
+      },
+      "intents": {
+        "promotional": "Promo",
+        "informational": "Informasi",
+        "branding": "Branding"
+      },
+      "ctaKinds": {
+        "none": "Tanpa Tombol",
+        "route": "Tautan ke Halaman"
+      },
+      "ctaRoutes": {
+        "orders": "Orders",
+        "cart": "Cart",
+        "home/details": "Home Details"
+      }
+    },
+    "helpers": {
+      "placement": "Pilih posisi tampilan banner.",
+      "intent": "Pilih tujuan banner.",
+      "title": "Opsional. Teks muncul di bagian bawah banner.",
+      "body": "Opsional. Deskripsi singkat.",
+      "cta": "Pilih 'Tautan ke Halaman' jika banner punya tombol.",
+      "ctaLabel": "Contoh: Lihat Detail, Beli Sekarang.",
+      "ctaRoute": "Halaman tujuan saat tombol diklik.",
+      "media": "Upload baru atau pilih gambar tersimpan.",
+      "isActive": "Banner aktif akan tampil di homepage."
+    },
+    "warnings": {
+      "title": "Rekomendasi",
+      "jpegFallback": "Gunakan WebP untuk hasil lebih baik.",
+      "pngConditional": "PNG hanya untuk gambar dengan transparansi.",
+      "fileTooLarge": "File melebihi {{maxSizeKb}}KB.",
+      "ratioMismatch": "Rasio tidak sesuai. Gunakan {{width}}×{{height}}px ({{ratio}}).",
+      "titleTooLong": "Judul terlalu panjang.",
+      "bodyTooLong": "Deskripsi terlalu panjang.",
+      "brandingWithoutImage": "Banner branding perlu gambar.",
+      "activation": "Nonaktifkan banner aktif lain di posisi yang sama."
+    },
+    "media": {
+      "guidanceTitle": "Panduan Gambar",
+      "invalidFormat": "Home banner hanya mendukung file WebP, JPEG, atau PNG.",
+      "uploadSuccess": "Media berhasil di-upload.",
+      "selectPlacementFirst": "Pilih posisi banner sebelum upload.",
+      "selectPlacementHint": "Pilih posisi banner terlebih dahulu agar gambar tetap tersusun rapi.",
+      "selectExistingPlaceholder": "Pilih gambar yang sudah tersimpan",
+      "selectPlacementPlaceholder": "Pilih posisi banner terlebih dahulu",
+      "noExistingAssets": "Belum ada gambar tersimpan untuk posisi ini.",
+      "storedPath": "File: {{path}}",
+      "previewAlt": "Preview home banner",
+      "previewTitle": "Preview Gambar",
+      "actions": {
+        "upload": "Upload",
+        "pickExisting": "Pilih Tersimpan",
+        "uploadMedia": "Upload Gambar",
+        "refresh": "Muat Ulang",
+        "clearSelection": "Hapus Pilihan",
+        "preview": "Preview Gambar"
+      },
+      "specs": {
+        "home_banner_top": "Tips: Ukuran yang direkomendasikan {{width}}×{{height}}px ({{ratio}}). Max file upload 2MB.",
+        "home_banner_bottom": "Tips: Ukuran yang direkomendasikan {{width}}×{{height}}px ({{ratio}}). Max file upload 2MB."
+      }
+    },
+    "mediaLibrary": {
+      "title": "Gambar Banner Tersimpan",
+      "openAction": "Buka Galeri Gambar",
+      "refresh": "Muat Ulang",
+      "preview": "Lihat",
+      "delete": "Hapus",
+      "uploadedOn": "Diupload {{date}}",
+      "noAssets": "Belum ada gambar tersimpan untuk posisi ini.",
+      "selectPlacementHint": "Pilih posisi banner dulu.",
+      "deleteConfirmTitle": "Hapus Gambar",
+      "deleteConfirmContent": "Hapus \"{{filename}}\"?",
+      "deleteConfirmOk": "Hapus",
+      "deleteBlockedTitle": "Tidak Dapat Dihapus",
+      "deleteBlockedContent": "Gambar masih digunakan banner lain.",
+      "deleteSuccess": "Gambar dihapus."
+    },
+    "preview": {
+      "title": "Preview",
+      "openAction": "Preview",
+      "description": "Perkiraan tampilan banner.",
+      "contentBanner": "Banner + Teks",
+      "imageOnly": "Gambar Saja",
+      "noImageSelected": "Pilih gambar terlebih dahulu.",
+      "safeArea": {
+        "home_banner_top": "Letakkan teks/logo di bagian kiri bawah.",
+        "home_banner_bottom": "Letakkan teks/logo di bagian kiri bawah."
+      }
+    },
+    "confirm": {
+      "activateTitle": "Aktifkan banner?",
+      "activateContent": "Nonaktifkan banner aktif lain di posisi yang sama terlebih dahulu.",
+      "activateOk": "Aktifkan"
+    },
+    "validation": {
+      "placementRequired": "Posisi banner wajib dipilih",
+      "intentRequired": "Tipe banner wajib dipilih",
+      "ctaKindRequired": "Aksi tombol wajib dipilih",
+      "ctaLabelRequired": "Teks tombol wajib diisi",
+      "ctaRouteRequired": "Tujuan tombol wajib dipilih"
     }
   },
   "orders": {

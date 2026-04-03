@@ -78,3 +78,15 @@ export function getStoragePathFromPublicUrl(
   const path = match ? match[1] : null;
   return path && isPathSafe(path) ? path : null;
 }
+
+export function getPublicUrlFromStoragePath(
+  path: string,
+  bucket: string
+): string | null {
+  if (!path || typeof path !== "string" || !isPathSafe(path)) return null;
+
+  const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+  if (!baseUrl) return null;
+
+  return `${baseUrl}/storage/v1/object/public/${bucket}/${path}`;
+}

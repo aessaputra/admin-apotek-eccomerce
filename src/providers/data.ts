@@ -22,6 +22,35 @@ async function deleteProductImages(productImages: { url: string }[]): Promise<vo
   await Promise.allSettled(deletions);
 }
 
+async function deleteBannerMediaIfUnreferenced(
+  mediaPath: string | null | undefined,
+  deletingIds: string[]
+): Promise<void> {
+  if (!mediaPath) return;
+
+  const deletingIdSet = new Set(deletingIds);
+  const { data, error } = await supabaseClient
+    .from("home_banners")
+    .select("id")
+    .eq("media_path", mediaPath);
+
+  if (error) {
+    throw error;
+  }
+
+  const rows = Array.isArray(data) ? (data as Array<{ id?: string | number }>) : [];
+  const hasRemainingReference = rows.some((row) => {
+    const id = typeof row.id === "string" || typeof row.id === "number" ? String(row.id) : "";
+    return id.length > 0 && !deletingIdSet.has(id);
+  });
+
+  if (hasRemainingReference) {
+    return;
+  }
+
+  await supabaseClient.storage.from(MEDIA_BUCKET).remove([mediaPath]);
+}
+
 export const dataProvider: DataProvider = {
   ...baseDataProvider,
   deleteOne: async (params) => {
@@ -49,6 +78,19 @@ export const dataProvider: DataProvider = {
         await deleteProductImages(images);
       } catch {
         // Continue with delete even if fetch/remove fails
+      }
+    }
+    if (params.resource === "home_banners") {
+      try {
+        const { data } = await baseDataProvider.getOne({
+          resource: "home_banners",
+          id: params.id,
+          meta: params.meta,
+        });
+        const mediaPath = (data as { media_path?: string | null })?.media_path;
+        await deleteBannerMediaIfUnreferenced(mediaPath, [String(params.id)]);
+      } catch (error) {
+        void error;
       }
     }
     return baseDataProvider.deleteOne(params);
@@ -88,6 +130,30 @@ export const dataProvider: DataProvider = {
         );
       } catch {
         // Continue with delete even if fetch/remove fails
+      }
+    }
+    if (params.resource === "home_banners") {
+      try {
+        const { data } = await baseDataProvider.getMany({
+          resource: "home_banners",
+          ids: params.ids,
+          meta: params.meta,
+        });
+        const items = Array.isArray(data) ? data : [];
+        const deletingIds = params.ids.map((id) => String(id));
+        const uniqueMediaPaths = Array.from(
+          new Set(
+            items
+              .map((item) => (item as { media_path?: string | null })?.media_path)
+              .filter((value): value is string => typeof value === "string" && value.length > 0)
+          )
+        );
+
+        await Promise.allSettled(
+          uniqueMediaPaths.map((mediaPath) => deleteBannerMediaIfUnreferenced(mediaPath, deletingIds))
+        );
+      } catch (error) {
+        void error;
       }
     }
     return baseDataProvider.deleteMany(params);
