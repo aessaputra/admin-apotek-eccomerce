@@ -142,9 +142,7 @@
         "route": "Link to Page"
       },
       "ctaRoutes": {
-        "orders": "Orders",
-        "cart": "Cart",
-        "home/details": "Home Details"
+        "home/all-products": "All Products"
       }
     },
     "helpers": {

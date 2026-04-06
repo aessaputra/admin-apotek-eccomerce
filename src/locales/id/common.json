@@ -142,9 +142,7 @@
         "route": "Tautan ke Halaman"
       },
       "ctaRoutes": {
-        "orders": "Orders",
-        "cart": "Cart",
-        "home/details": "Home Details"
+        "home/all-products": "Semua Produk"
       }
     },
     "helpers": {

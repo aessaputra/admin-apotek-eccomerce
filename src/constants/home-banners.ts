@@ -12,9 +12,7 @@ export const HOME_BANNER_INTENTS = [
 export const HOME_BANNER_CTA_KINDS = ["none", "route"] as const;
 
 export const HOME_BANNER_CTA_ROUTES = [
-  "orders",
-  "cart",
-  "home/details",
+  "home/all-products",
 ] as const;
 
 export type HomeBannerPlacementKey = (typeof HOME_BANNER_PLACEMENTS)[number];
