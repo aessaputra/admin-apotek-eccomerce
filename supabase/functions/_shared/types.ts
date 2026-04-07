@@ -1,14 +1,14 @@
 export type PaymentStatus =
-  | 'pending'
-  | 'authorize'
-  | 'settlement'
-  | 'deny'
-  | 'cancel'
-  | 'expire'
-  | 'refund'
-  | 'partial_refund'
-  | 'chargeback'
-  | 'partial_chargeback';
+  | "pending"
+  | "authorize"
+  | "settlement"
+  | "deny"
+  | "cancel"
+  | "expire"
+  | "refund"
+  | "partial_refund"
+  | "chargeback"
+  | "partial_chargeback";
 
 export interface AuthUser {
   id: string;
@@ -55,6 +55,7 @@ export interface Order {
   total_amount: number | string;
   shipping_cost?: number | string | null;
   gross_amount?: number | string | null;
+  expired_at?: string | null;
   checkout_idempotency_key?: string | null;
   midtrans_order_id?: string | null;
   snap_token?: string | null;
