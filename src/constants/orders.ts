@@ -24,6 +24,7 @@ export const PAYMENT_COLORS: Record<string, string> = {
 export function getStatusOptions(translate: (key: string) => string) {
   return [
     { value: "pending", label: translate("orderStatus.pending") },
+    { value: "paid", label: translate("orderStatus.paid") },
     { value: "processing", label: translate("orderStatus.processing") },
     { value: "awaiting_shipment", label: translate("orderStatus.awaiting_shipment") },
     { value: "shipped", label: translate("orderStatus.shipped") },

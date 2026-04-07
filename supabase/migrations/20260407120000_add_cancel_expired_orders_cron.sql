@@ -18,7 +18,7 @@ begin
     update orders
     set 
         status = 'cancelled',
-        payment_status = 'cancelled',
+        payment_status = 'expire',
         updated_at = now()
     where id in (select id from expired_orders);
     
