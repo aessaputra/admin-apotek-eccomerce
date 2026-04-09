@@ -34,10 +34,21 @@ const JWT_ISSUER = `${supabaseUrl}/auth/v1`;
 
 const TRANSITION_RULES: Record<string, string[]> = {
   pending: ["processing", "cancelled"],
-  paid: ["awaiting_shipment", "processing", "cancelled"],
-  awaiting_shipment: ["processing", "shipped", "cancelled"],
-  processing: ["shipped", "cancelled"],
-  shipped: ["delivered"],
+  processing: ["awaiting_shipment", "cancelled"],
+  awaiting_shipment: ["shipped", "cancelled"],
+  shipped: ["in_transit", "delivered"],
+  in_transit: ["delivered"],
+};
+
+const TERMINAL_STATUSES = new Set(["delivered", "cancelled"]);
+const STATUS_PROGRESS_ORDER: Record<string, number> = {
+  pending: 0,
+  processing: 1,
+  awaiting_shipment: 2,
+  shipped: 3,
+  in_transit: 4,
+  delivered: 5,
+  cancelled: 5,
 };
 
 const MANUAL_WAYBILL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9-]{4,63}$/;
@@ -48,12 +59,31 @@ function canTransition(from: string, to: string): boolean {
 
 function mapBiteshipStatus(status: string, fallback: string): string {
   const statusMap: Record<string, string> = {
-    allocated: "processing",
+    allocated: "awaiting_shipment",
     picked_up: "shipped",
-    in_transit: "shipped",
+    in_transit: "in_transit",
     delivered: "delivered",
   };
   return statusMap[status] || fallback;
+}
+
+function canApplySyncedStatus(currentStatus: string, nextStatus: string): boolean {
+  if (TERMINAL_STATUSES.has(currentStatus)) {
+    return false;
+  }
+
+  if (currentStatus === nextStatus) {
+    return true;
+  }
+
+  const currentRank = STATUS_PROGRESS_ORDER[currentStatus];
+  const nextRank = STATUS_PROGRESS_ORDER[nextStatus];
+
+  if (currentRank === undefined || nextRank === undefined) {
+    return false;
+  }
+
+  return nextRank >= currentRank;
 }
 
 function getBiteshipAuthorizationHeader(apiKey: string): string {
@@ -436,6 +466,33 @@ Deno.serve(async (req: Request) => {
         String(trackingData.waybill || trackingData.waybill_id || "") || null;
       const nextStatus = mapBiteshipStatus(trackingStatus, order.status);
 
+      if (TERMINAL_STATUSES.has(order.status)) {
+        return new Response(
+          JSON.stringify({
+            error: "INVALID_SYNC_STATE",
+            message:
+              "Tracking sync is not allowed for delivered or cancelled orders",
+          }),
+          {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      if (!canApplySyncedStatus(order.status, nextStatus)) {
+        return new Response(
+          JSON.stringify({
+            error: "INVALID_SYNC_TRANSITION",
+            message: `Ignoring Biteship status ${trackingStatus} because it would move the order backward from ${order.status} to ${nextStatus}`,
+          }),
+          {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
       // Enforce waybill requirement for shipped status
       if (nextStatus === "shipped" && !waybill && !order.waybill_number) {
         return new Response(
@@ -464,6 +521,7 @@ Deno.serve(async (req: Request) => {
           updated_at: new Date().toISOString(),
         })
         .eq("id", body.orderId)
+        .eq("status", order.status)
         .select(
           "id, status, biteship_tracking_id, waybill_number, waybill_source, updated_at",
         )

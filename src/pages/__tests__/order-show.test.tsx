@@ -213,6 +213,10 @@ describe("OrderShow", () => {
     expect(screen.getByText("order-1")).not.toBeNull();
     expect(screen.getByText("settlement")).not.toBeNull();
     expect(screen.getByText("Vitamin C")).not.toBeNull();
+    expect(
+      screen.getByText((content) => content.includes("orderStatus.awaiting_shipment")),
+    ).not.toBeNull();
+    expect(screen.queryByText("orderStatus.paid")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Sync" }));
 
@@ -225,5 +229,28 @@ describe("OrderShow", () => {
       });
       expect(mocks.success).toHaveBeenCalled();
     });
+  });
+
+  it("hides sync action for terminal biteship orders", async () => {
+    mocks.useShow.mockReturnValue({
+      result: {
+        id: "order-2",
+        total_amount: 25000,
+        status: "delivered",
+        payment_status: "settlement",
+        biteship_order_id: "BT-2",
+        created_at: "2026-04-01T00:00:00.000Z",
+        order_items: [],
+      },
+      query: { isLoading: false },
+    });
+
+    render(<OrderShow />);
+
+    await waitFor(() => {
+      expect(mocks.setFieldsValue).toHaveBeenCalledWith({ status: "delivered", waybill_number: "" });
+    });
+
+    expect(screen.queryByRole("button", { name: "Sync" })).toBeNull();
   });
 });

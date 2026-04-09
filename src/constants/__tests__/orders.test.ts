@@ -11,7 +11,9 @@ describe("order constants", () => {
   it("maps known order statuses to UI colors", () => {
     expect(STATUS_COLORS).toMatchObject({
       pending: "orange",
+      processing: "blue",
       awaiting_shipment: "gold",
+      in_transit: "geekblue",
       delivered: "green",
       cancelled: "red",
     });
@@ -32,10 +34,10 @@ describe("order constants", () => {
 
     expect(result).toEqual([
       { value: "pending", label: "translated:orderStatus.pending" },
-      { value: "paid", label: "translated:orderStatus.paid" },
       { value: "processing", label: "translated:orderStatus.processing" },
       { value: "awaiting_shipment", label: "translated:orderStatus.awaiting_shipment" },
       { value: "shipped", label: "translated:orderStatus.shipped" },
+      { value: "in_transit", label: "translated:orderStatus.in_transit" },
       { value: "delivered", label: "translated:orderStatus.delivered" },
       { value: "cancelled", label: "translated:orderStatus.cancelled" },
     ]);
@@ -65,12 +67,21 @@ describe("order constants", () => {
   it("keeps only the allowed admin status transitions", () => {
     expect(TRANSITION_RULES).toEqual({
       pending: ["processing", "cancelled"],
-      paid: ["awaiting_shipment", "processing", "cancelled"],
-      processing: ["shipped", "cancelled"],
-      awaiting_shipment: ["processing", "shipped", "cancelled"],
-      shipped: ["delivered"],
+      processing: ["awaiting_shipment", "cancelled"],
+      awaiting_shipment: ["shipped", "cancelled"],
+      shipped: ["in_transit", "delivered"],
+      in_transit: ["delivered"],
     });
+    expect(TRANSITION_RULES.paid).toBeUndefined();
     expect(TRANSITION_RULES.delivered).toBeUndefined();
     expect(TRANSITION_RULES.cancelled).toBeUndefined();
+  });
+
+  it("does not expose the legacy paid status as a target option", () => {
+    const translate = vi.fn((key: string) => `translated:${key}`);
+
+    const values = getStatusOptions(translate).map((option) => option.value);
+
+    expect(values).not.toContain("paid");
   });
 });

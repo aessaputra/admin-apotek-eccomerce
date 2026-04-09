@@ -291,6 +291,7 @@
     "paid": "Paid",
     "awaiting_shipment": "Awaiting Shipment",
     "shipped": "Shipped",
+    "in_transit": "In Transit",
     "delivered": "Delivered",
     "cancelled": "Cancelled"
   },

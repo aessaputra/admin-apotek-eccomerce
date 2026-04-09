@@ -291,6 +291,7 @@
     "paid": "Paid",
     "awaiting_shipment": "Menunggu Pengiriman",
     "shipped": "Shipped",
+    "in_transit": "Sedang Dikirim",
     "delivered": "Delivered",
     "cancelled": "Cancelled"
   },

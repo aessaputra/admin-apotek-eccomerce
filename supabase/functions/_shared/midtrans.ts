@@ -158,12 +158,12 @@ export const mapMidtransStatus = (
       newPaymentStatus = "pending";
     } else if (fraudStatus === "accept") {
       newPaymentStatus = "settlement";
-      newOrderStatus = "awaiting_shipment";
+      newOrderStatus = "processing";
       shouldReduceStock = currentPaymentStatus !== "settlement";
     }
   } else if (transactionStatus === "settlement") {
     newPaymentStatus = "settlement";
-    newOrderStatus = "awaiting_shipment";
+    newOrderStatus = "processing";
     shouldReduceStock = currentPaymentStatus !== "settlement";
   } else if (["cancel", "deny", "expire"].includes(transactionStatus)) {
     newPaymentStatus =

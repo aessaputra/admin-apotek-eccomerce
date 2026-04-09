@@ -74,6 +74,7 @@ export const OrderShow: React.FC = () => {
   const items = record?.order_items ?? [];
   const hasBiteship = !!record?.biteship_order_id;
   const currentStatus = record?.status ?? "";
+  const canSyncTracking = hasBiteship && !TERMINAL_STATUSES.includes(currentStatus);
 
   // Status dropdown lock: only lock for terminal statuses (delivered, cancelled)
   // shipped CAN still transition to delivered, so don't lock it
@@ -135,7 +136,7 @@ export const OrderShow: React.FC = () => {
   };
 
   const handleSyncTracking = async () => {
-    if (!record?.biteship_order_id) return;
+    if (!record?.biteship_order_id || !canSyncTracking) return;
     setSyncing(true);
     try {
       const result = await invokeOrderManager({
@@ -306,7 +307,7 @@ export const OrderShow: React.FC = () => {
         </Descriptions.Item>
         <Descriptions.Item label={translate("orders.fields.biteshipOrderId")}>
           <Text copyable>{record?.biteship_order_id ?? "-"}</Text>
-          {hasBiteship && <Tooltip title={translate("orders.syncTracking")}><Button type="text" icon={<SyncOutlined spin={syncing} />} onClick={handleSyncTracking} loading={syncing} style={{ marginLeft: 8 }} size="small">Sync</Button></Tooltip>}
+          {canSyncTracking && <Tooltip title={translate("orders.syncTracking")}><Button type="text" icon={<SyncOutlined spin={syncing} />} onClick={handleSyncTracking} loading={syncing} style={{ marginLeft: 8 }} size="small">Sync</Button></Tooltip>}
         </Descriptions.Item>
         <Descriptions.Item label="Biteship Tracking ID">
           <Text copyable={!!record?.biteship_tracking_id}>{record?.biteship_tracking_id ?? "-"}</Text>

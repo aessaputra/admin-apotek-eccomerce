@@ -1,9 +1,9 @@
 export const STATUS_COLORS: Record<string, string> = {
   pending: "orange",
   processing: "blue",
-  paid: "green",
   awaiting_shipment: "gold",
   shipped: "cyan",
+  in_transit: "geekblue",
   delivered: "green",
   cancelled: "red",
 };
@@ -24,10 +24,10 @@ export const PAYMENT_COLORS: Record<string, string> = {
 export function getStatusOptions(translate: (key: string) => string) {
   return [
     { value: "pending", label: translate("orderStatus.pending") },
-    { value: "paid", label: translate("orderStatus.paid") },
     { value: "processing", label: translate("orderStatus.processing") },
     { value: "awaiting_shipment", label: translate("orderStatus.awaiting_shipment") },
     { value: "shipped", label: translate("orderStatus.shipped") },
+    { value: "in_transit", label: translate("orderStatus.in_transit") },
     { value: "delivered", label: translate("orderStatus.delivered") },
     { value: "cancelled", label: translate("orderStatus.cancelled") },
   ];
@@ -50,12 +50,11 @@ export function getPaymentOptions(translate: (key: string) => string) {
 
 // Order status transition rules matching order-manager Edge Function
 // These define valid state transitions for admin UI
-// Note: 'paid' is included as a SOURCE state for legacy orders,
-// but is NOT a target state (modern flow uses awaiting_shipment)
+// The active fulfillment lifecycle is: processing -> awaiting_shipment -> shipped -> in_transit -> delivered.
 export const TRANSITION_RULES: Record<string, string[]> = {
   pending: ["processing", "cancelled"],
-  paid: ["awaiting_shipment", "processing", "cancelled"],
-  processing: ["shipped", "cancelled"],
-  awaiting_shipment: ["processing", "shipped", "cancelled"],
-  shipped: ["delivered"],
+  processing: ["awaiting_shipment", "cancelled"],
+  awaiting_shipment: ["shipped", "cancelled"],
+  shipped: ["in_transit", "delivered"],
+  in_transit: ["delivered"],
 };
