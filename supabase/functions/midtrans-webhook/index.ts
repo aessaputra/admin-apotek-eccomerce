@@ -1,9 +1,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
+  assertMidtransCurrencyConsistency,
+  buildMidtransPaymentRecord,
   calculateMidtransGrossAmount,
   isConfirmedMidtransSuccess,
   isIgnorableMidtransNoop,
   mapMidtransStatus,
+  normalizeMidtransPaymentType,
   verifyMidtransSignature,
   verifyMidtransTransaction,
 } from "../_shared/midtrans.ts";
@@ -29,26 +32,6 @@ declare const Deno: {
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
-const PAYMENT_TYPE_ALLOWLIST = new Set([
-  "credit_card",
-  "bank_transfer",
-  "echannel",
-  "gopay",
-  "shopeepay",
-  "qris",
-  "akulaku",
-  "kredivo",
-  "indomaret",
-  "alfamart",
-  "bca_klikbca",
-  "bca_klikpay",
-  "bri_epay",
-  "cimb_clicks",
-  "danamon_online",
-  "uob_ezpay",
-  "other",
-]);
-
 function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -65,11 +48,6 @@ function toNumericAmount(value: string | number | null | undefined): number {
   return Number.parseFloat(String(value));
 }
 
-function normalizePaymentType(value: string | null | undefined): string | null {
-  if (!value) return null;
-  return PAYMENT_TYPE_ALLOWLIST.has(value) ? value : "other";
-}
-
 function buildWebhookEventKey(payload: MidtransWebhookPayload): string {
   // Include fraud_status to differentiate capture+challenge from capture+accept
   const fraudStatus = payload.fraud_status || "";
@@ -80,33 +58,6 @@ function buildWebhookEventKey(payload: MidtransWebhookPayload): string {
     payload.gross_amount,
     fraudStatus,
   ].join(":");
-}
-
-function getPaidAt(nextPaymentStatus: PaymentStatus): string | null {
-  return nextPaymentStatus === "settlement" ? new Date().toISOString() : null;
-}
-
-function pickNotificationDate(value?: string): string | null {
-  if (!value) return null;
-  return value;
-}
-
-function getRequiredPaymentCurrency(
-  primaryValue: string | null | undefined,
-  secondaryValue: string | null | undefined,
-  contextLabel: string,
-  orderId: string,
-): string {
-  const rawCurrency = primaryValue ?? secondaryValue;
-  const normalizedCurrency = rawCurrency?.trim().toUpperCase();
-
-  if (!normalizedCurrency) {
-    throw new Error(
-      `Missing currency in ${contextLabel} for order ${orderId}. Midtrans webhook payload must include a valid currency before payment data can be persisted.`,
-    );
-  }
-
-  return normalizedCurrency;
 }
 
 function getExpectedOrderAmount(order: Order): number {
@@ -137,10 +88,9 @@ async function persistRawNotificationEarly(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
   payload: MidtransWebhookPayload,
 ): Promise<void> {
-  const currency = getRequiredPaymentCurrency(
+  const currency = assertMidtransCurrencyConsistency(
     payload.currency,
-    null,
-    "raw Midtrans notification",
+    payload.currency,
     payload.order_id,
   );
 
@@ -242,78 +192,19 @@ async function upsertPaymentRecord(
 ): Promise<void> {
   const adminClient = getSupabaseAdminClient();
 
-  const effectivePaymentType = normalizePaymentType(
-    verifiedStatus.payment_type || payload.payment_type || order.payment_type,
-  );
-
   const { data: existingPayment } = await adminClient
     .from("payments")
     .select("paid_at")
     .eq("midtrans_order_id", payload.order_id)
     .maybeSingle();
 
-  const currency = getRequiredPaymentCurrency(
-    verifiedStatus.currency,
-    payload.currency,
-    "verified Midtrans status",
-    payload.order_id,
-  );
-
-  const paymentPayload = {
-    order_id: order.id,
-    user_id: order.user_id ?? null,
-    checkout_idempotency_key: order.checkout_idempotency_key ?? null,
-    midtrans_order_id: payload.order_id,
-    midtrans_transaction_id:
-      verifiedStatus.transaction_id || payload.transaction_id || null,
-    status,
-    payment_type: effectivePaymentType,
-    transaction_status:
-      verifiedStatus.transaction_status || payload.transaction_status || null,
-    fraud_status: verifiedStatus.fraud_status || payload.fraud_status || null,
-    status_code: verifiedStatus.status_code || payload.status_code || null,
-    status_message:
-      verifiedStatus.status_message || payload.status_message || null,
-    currency,
-    gross_amount: toNumericAmount(
-      verifiedStatus.gross_amount || payload.gross_amount,
-    ),
-    signature_key: payload.signature_key,
-    merchant_id: verifiedStatus.merchant_id || payload.merchant_id || null,
-    transaction_time: pickNotificationDate(
-      verifiedStatus.transaction_time || payload.transaction_time,
-    ),
-    settlement_time: pickNotificationDate(
-      verifiedStatus.settlement_time || payload.settlement_time,
-    ),
-    expiry_time: pickNotificationDate(
-      verifiedStatus.expiry_time || payload.expiry_time,
-    ),
-    paid_at: existingPayment?.paid_at || getPaidAt(status),
-    payment_code: verifiedStatus.payment_code || payload.payment_code || null,
-    store: verifiedStatus.store || payload.store || null,
-    va_numbers: verifiedStatus.va_numbers || payload.va_numbers || [],
-    biller_code: verifiedStatus.biller_code || payload.biller_code || null,
-    bill_key: verifiedStatus.bill_key || payload.bill_key || null,
-    bank: verifiedStatus.bank || payload.bank || null,
-    acquirer: verifiedStatus.acquirer || payload.acquirer || null,
-    issuer: verifiedStatus.issuer || payload.issuer || null,
-    card_type: verifiedStatus.card_type || payload.card_type || null,
-    masked_card: verifiedStatus.masked_card || payload.masked_card || null,
-    approval_code:
-      verifiedStatus.approval_code || payload.approval_code || null,
-    eci: verifiedStatus.eci || payload.eci || null,
-    channel_response_code:
-      verifiedStatus.channel_response_code ||
-      payload.channel_response_code ||
-      null,
-    channel_response_message:
-      verifiedStatus.channel_response_message ||
-      payload.channel_response_message ||
-      null,
-    redirect_url: verifiedStatus.redirect_url || payload.redirect_url || null,
-    raw_notification: payload,
-  };
+  const paymentPayload = buildMidtransPaymentRecord({
+    order,
+    payload,
+    verifiedStatus,
+    nextPaymentStatus: status,
+    existingPaidAt: existingPayment?.paid_at,
+  });
 
   const { error } = await adminClient
     .from("payments")
@@ -378,17 +269,6 @@ Deno.serve(async (req) => {
     }
 
     adminClient = getSupabaseAdminClient();
-
-    const { error: reconcileError } = await adminClient.rpc(
-      "reconcile_midtrans_orphan_notifications",
-      { p_limit: 5 },
-    );
-    if (reconcileError) {
-      console.error(
-        "[midtrans-webhook] Orphan reconciliation RPC error:",
-        reconcileError.message,
-      );
-    }
 
     // Persist raw notification immediately after signature validation for audit trail
     // This ensures we have the payload even if order not found or amount mismatch
@@ -485,8 +365,13 @@ Deno.serve(async (req) => {
         order.status,
       );
 
-    const paymentType = normalizePaymentType(
+    const paymentType = normalizeMidtransPaymentType(
       verifiedStatus.payment_type || payload.payment_type || order.payment_type,
+    );
+    const paymentCurrency = assertMidtransCurrencyConsistency(
+      verifiedStatus.currency,
+      payload.currency,
+      payload.order_id,
     );
 
     const { data: transitionResult, error: transitionError } =
@@ -499,6 +384,10 @@ Deno.serve(async (req) => {
         p_midtrans_transaction_id:
           verifiedStatus.transaction_id || payload.transaction_id || null,
         p_payment_type: paymentType,
+        p_paid_at:
+          newPaymentStatus === "settlement"
+            ? verifiedStatus.settlement_time || payload.settlement_time || null
+            : null,
       });
 
     if (transitionError) {
@@ -553,34 +442,11 @@ Deno.serve(async (req) => {
         metadata: {
           payment_status: persistedPaymentStatus,
           payment_type: paymentType,
+          currency: paymentCurrency,
           transaction_id:
             verifiedStatus.transaction_id || payload.transaction_id || null,
         },
       });
-    }
-
-    // Clear cart on settlement regardless of 'applied' to ensure retry on failure
-    // This prevents cart items persisting if first webhook succeeds but cart deletion fails
-    if (persistedPaymentStatus === "settlement" && order.user_id) {
-      const { data: userCart } = await adminClient
-        .from("carts")
-        .select("id")
-        .eq("user_id", order.user_id)
-        .maybeSingle();
-
-      if (userCart?.id) {
-        const { error: cartClearError } = await adminClient
-          .from("cart_items")
-          .delete()
-          .eq("cart_id", userCart.id);
-
-        if (cartClearError) {
-          console.error(
-            "[midtrans-webhook] Failed to clear cart:",
-            cartClearError.message,
-          );
-        }
-      }
     }
 
     let existingSideEffectTask = await getSideEffectTask(adminClient, order.id);
@@ -589,6 +455,7 @@ Deno.serve(async (req) => {
       await saveSideEffectTask(
         adminClient,
         order.id,
+        true,
         true,
         !order.biteship_order_id,
         null,

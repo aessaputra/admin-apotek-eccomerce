@@ -1,9 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
+  buildMidtransPaymentRecord,
   calculateMidtransGrossAmount,
   isConfirmedMidtransSuccess,
   isIgnorableMidtransNoop,
   mapMidtransStatus,
+  normalizeMidtransPaymentType,
   verifyMidtransTransaction,
 } from "../_shared/midtrans.ts";
 import { getSupabaseAdminClient } from "../_shared/supabase.ts";
@@ -12,11 +14,7 @@ import {
   saveSideEffectTask,
   triggerWebhookSideEffectProcessor,
 } from "../_shared/webhook-side-effects.ts";
-import type {
-  MidtransStatusResponse,
-  Order,
-  PaymentStatus,
-} from "../_shared/types.ts";
+import type { MidtransStatusResponse, Order, PaymentStatus } from "../_shared/types.ts";
 
 declare const Deno: {
   serve: (handler: (req: Request) => Response | Promise<Response>) => void;
@@ -46,53 +44,6 @@ function toNumericAmount(value: string | number | null | undefined): number {
   return Number.parseFloat(String(value));
 }
 
-function normalizePaymentType(value: string | null | undefined): string | null {
-  if (!value) return null;
-
-  const allowlist = new Set([
-    "credit_card",
-    "bank_transfer",
-    "echannel",
-    "gopay",
-    "shopeepay",
-    "qris",
-    "akulaku",
-    "kredivo",
-    "indomaret",
-    "alfamart",
-    "bca_klikbca",
-    "bca_klikpay",
-    "bri_epay",
-    "cimb_clicks",
-    "danamon_online",
-    "uob_ezpay",
-    "other",
-  ]);
-
-  return allowlist.has(value) ? value : "other";
-}
-
-function getRequiredPaymentCurrency(
-  primaryValue: string | null | undefined,
-  secondaryValue: string | null | undefined,
-  orderId: string,
-): string {
-  const rawCurrency = primaryValue ?? secondaryValue;
-  const normalizedCurrency = rawCurrency?.trim().toUpperCase();
-
-  if (!normalizedCurrency) {
-    throw new Error(
-      `Missing currency while reconciling Midtrans status for order ${orderId}.`,
-    );
-  }
-
-  return normalizedCurrency;
-}
-
-function getPaidAt(nextPaymentStatus: PaymentStatus): string | null {
-  return nextPaymentStatus === "settlement" ? new Date().toISOString() : null;
-}
-
 function getExpectedOrderAmount(order: Order): number {
   if (order.gross_amount != null) {
     const normalizedGrossAmount = Number(order.gross_amount);
@@ -120,64 +71,41 @@ async function upsertPaymentRecord(
   verifiedStatus: MidtransStatusResponse,
   status: PaymentStatus,
 ): Promise<void> {
-  const effectivePaymentType = normalizePaymentType(
-    verifiedStatus.payment_type || order.payment_type,
-  );
-
   const { data: existingPayment } = await adminClient
     .from("payments")
     .select("paid_at")
     .eq("midtrans_order_id", order.midtrans_order_id)
     .maybeSingle();
 
-  const currency = getRequiredPaymentCurrency(
-    verifiedStatus.currency,
-    null,
-    order.midtrans_order_id || order.id,
-  );
-
   const { error } = await adminClient.from("payments").upsert(
-    {
-      order_id: order.id,
-      user_id: order.user_id ?? null,
-      checkout_idempotency_key: order.checkout_idempotency_key ?? null,
-      midtrans_order_id: order.midtrans_order_id,
-      midtrans_transaction_id: verifiedStatus.transaction_id || null,
-      status,
-      payment_type: effectivePaymentType,
-      transaction_status: verifiedStatus.transaction_status || null,
-      fraud_status: verifiedStatus.fraud_status || null,
-      status_code: verifiedStatus.status_code || null,
-      status_message: verifiedStatus.status_message || null,
-      currency,
-      gross_amount: toNumericAmount(verifiedStatus.gross_amount),
-      merchant_id: verifiedStatus.merchant_id || null,
-      transaction_time: verifiedStatus.transaction_time || null,
-      settlement_time: verifiedStatus.settlement_time || null,
-      expiry_time: verifiedStatus.expiry_time || null,
-      paid_at: existingPayment?.paid_at || getPaidAt(status),
-      payment_code: verifiedStatus.payment_code || null,
-      store: verifiedStatus.store || null,
-      va_numbers: verifiedStatus.va_numbers || [],
-      biller_code: verifiedStatus.biller_code || null,
-      bill_key: verifiedStatus.bill_key || null,
-      bank: verifiedStatus.bank || null,
-      acquirer: verifiedStatus.acquirer || null,
-      issuer: verifiedStatus.issuer || null,
-      card_type: verifiedStatus.card_type || null,
-      masked_card: verifiedStatus.masked_card || null,
-      approval_code: verifiedStatus.approval_code || null,
-      eci: verifiedStatus.eci || null,
-      channel_response_code: verifiedStatus.channel_response_code || null,
-      channel_response_message: verifiedStatus.channel_response_message || null,
-      redirect_url: verifiedStatus.redirect_url || null,
-      raw_notification: verifiedStatus,
-    },
+    buildMidtransPaymentRecord({
+      order,
+      payload: null,
+      verifiedStatus,
+      nextPaymentStatus: status,
+      existingPaidAt: existingPayment?.paid_at,
+    }),
     { onConflict: "midtrans_order_id" },
   );
 
   if (error) {
     throw new Error(`Failed to upsert payment record: ${error.message}`);
+  }
+}
+
+async function reconcileMidtransOrphans(
+  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+): Promise<void> {
+  const { error } = await adminClient.rpc(
+    "reconcile_midtrans_orphan_notifications",
+    { p_limit: 20 },
+  );
+
+  if (error) {
+    console.error(
+      "[reconcile-pending-midtrans-payments] Orphan reconciliation RPC error:",
+      error.message,
+    );
   }
 }
 
@@ -236,6 +164,8 @@ Deno.serve(async (req) => {
         500,
       );
     }
+
+    await reconcileMidtransOrphans(adminClient);
 
     const orders = await listPendingOrders(adminClient, requestedLimit);
     const results: Array<Record<string, unknown>> = [];
@@ -298,7 +228,7 @@ Deno.serve(async (req) => {
             order.status,
           );
 
-        const paymentType = normalizePaymentType(
+        const paymentType = normalizeMidtransPaymentType(
           verifiedStatus.payment_type || order.payment_type,
         );
 
@@ -317,6 +247,10 @@ Deno.serve(async (req) => {
             p_next_order_status: newOrderStatus,
             p_midtrans_transaction_id: verifiedStatus.transaction_id || null,
             p_payment_type: paymentType,
+            p_paid_at:
+              newPaymentStatus === "settlement"
+                ? verifiedStatus.settlement_time || null
+                : null,
           });
 
         if (transitionError) {
@@ -364,6 +298,7 @@ Deno.serve(async (req) => {
               adminClient,
               order.id,
               true,
+              true,
               !order.biteship_order_id,
               null,
             );
@@ -373,7 +308,7 @@ Deno.serve(async (req) => {
             );
           }
 
-          if (existingSideEffectTask && shouldReduceStock) {
+          if (existingSideEffectTask) {
             triggerWebhookSideEffectProcessor(order.id);
           }
         }

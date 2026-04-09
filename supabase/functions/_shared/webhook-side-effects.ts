@@ -14,6 +14,7 @@ const DEFAULT_PROCESSOR_BATCH_SIZE = 3;
 const MAX_RETRY_DELAY_MS = 60 * 60 * 1000;
 
 export interface SideEffectTask {
+  needs_cart_cleanup: boolean;
   needs_stock: boolean;
   needs_biteship: boolean;
   retry_count: number;
@@ -122,7 +123,7 @@ export async function getSideEffectTask(
   const { data, error } = await adminClient
     .from("webhook_side_effect_tasks")
     .select(
-      "needs_stock, needs_biteship, retry_count, updated_at, lease_owner, lease_until, next_retry_at, last_attempted_at, last_error_code, failed_permanently_at, pending_biteship_order_id, pending_tracking_id, pending_waybill_number",
+      "needs_cart_cleanup, needs_stock, needs_biteship, retry_count, updated_at, lease_owner, lease_until, next_retry_at, last_attempted_at, last_error_code, failed_permanently_at, pending_biteship_order_id, pending_tracking_id, pending_waybill_number",
     )
     .eq("order_id", orderId)
     .maybeSingle();
@@ -137,6 +138,7 @@ export async function getSideEffectTask(
 export async function saveSideEffectTask(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
   orderId: string,
+  needsCartCleanup: boolean,
   needsStock: boolean,
   needsBiteship: boolean,
   lastError: string | null,
@@ -147,7 +149,7 @@ export async function saveSideEffectTask(
   lastErrorCode: string | null = null,
   permanentFailure = false,
 ): Promise<void> {
-  if (!needsStock && !needsBiteship) {
+  if (!needsCartCleanup && !needsStock && !needsBiteship) {
     let deleteQuery = adminClient
       .from("webhook_side_effect_tasks")
       .delete()
@@ -172,6 +174,7 @@ export async function saveSideEffectTask(
 
   const taskPayload = {
     order_id: orderId,
+    needs_cart_cleanup: needsCartCleanup,
     needs_stock: needsStock,
     needs_biteship: needsBiteship,
     last_error: lastError,
@@ -337,6 +340,42 @@ async function getOrderForSideEffects(
   return data as unknown as Order;
 }
 
+async function clearOrderCart(
+  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  order: Order,
+): Promise<void> {
+  if (!order.user_id) {
+    return;
+  }
+
+  const { data: userCart, error: cartLookupError } = await adminClient
+    .from("carts")
+    .select("id")
+    .eq("user_id", order.user_id)
+    .maybeSingle();
+
+  if (cartLookupError) {
+    throw new Error(
+      `Failed to look up cart for order ${order.id}: ${cartLookupError.message}`,
+    );
+  }
+
+  if (!userCart?.id) {
+    return;
+  }
+
+  const { error: cartClearError } = await adminClient
+    .from("cart_items")
+    .delete()
+    .eq("cart_id", userCart.id);
+
+  if (cartClearError) {
+    throw new Error(
+      `Failed to clear cart for order ${order.id}: ${cartClearError.message}`,
+    );
+  }
+}
+
 export async function listDueSideEffectTaskOrderIds(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
   limit = DEFAULT_PROCESSOR_BATCH_SIZE,
@@ -393,6 +432,7 @@ export async function processWebhookSideEffectTask(
     };
   }
 
+  let needsCartCleanup = existingSideEffectTask.needs_cart_cleanup;
   let needsStock = existingSideEffectTask.needs_stock;
   let needsBiteship = existingSideEffectTask.needs_biteship;
   let lastError: string | null = null;
@@ -411,6 +451,7 @@ export async function processWebhookSideEffectTask(
       await saveSideEffectTask(
         adminClient,
         orderId,
+        false,
         false,
         false,
         null,
@@ -433,6 +474,7 @@ export async function processWebhookSideEffectTask(
         orderId,
         false,
         false,
+        false,
         null,
         null,
         null,
@@ -444,6 +486,20 @@ export async function processWebhookSideEffectTask(
         needsRetry: false,
         message: "Order no longer requires fulfillment side effects",
       };
+    }
+
+    if (needsCartCleanup) {
+      try {
+        await renewSideEffectTaskLease(adminClient, orderId, leaseOwner);
+        await clearOrderCart(adminClient, order);
+        needsCartCleanup = false;
+      } catch (cartCleanupError: unknown) {
+        lastError =
+          cartCleanupError instanceof Error
+            ? cartCleanupError.message
+            : "Failed to clear cart after settlement";
+        lastErrorCode = "cart_cleanup_failed";
+      }
     }
 
     needsBiteship = needsBiteship && !order.biteship_order_id;
@@ -611,6 +667,7 @@ export async function processWebhookSideEffectTask(
     await saveSideEffectTask(
       adminClient,
       orderId,
+      needsCartCleanup,
       needsStock,
       needsBiteship,
       lastError,
@@ -640,6 +697,7 @@ export async function processWebhookSideEffectTask(
     await saveSideEffectTask(
       adminClient,
       orderId,
+      needsCartCleanup,
       needsStock,
       needsBiteship,
       message,
