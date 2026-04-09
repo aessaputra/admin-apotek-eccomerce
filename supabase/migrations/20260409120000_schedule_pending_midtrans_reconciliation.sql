@@ -64,7 +64,17 @@ $$;
 comment on function public.trigger_reconcile_pending_midtrans_payments(integer) is
   'Asynchronously invokes the reconcile-pending-midtrans-payments Edge Function for orders still stuck in pending or authorize payment states. Requires Vault secrets named project_url and service_role_key.';
 
-select cron.unschedule('reconcile-pending-midtrans-payments-every-5min');
+do $$
+begin
+  if exists (
+    select 1
+    from cron.job
+    where jobname = 'reconcile-pending-midtrans-payments-every-5min'
+  ) then
+    perform cron.unschedule('reconcile-pending-midtrans-payments-every-5min');
+  end if;
+end;
+$$;
 
 select cron.schedule(
   'reconcile-pending-midtrans-payments-every-5min',
