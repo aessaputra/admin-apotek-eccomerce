@@ -32,13 +32,14 @@ describe("order constants", () => {
 
     expect(result).toEqual([
       { value: "pending", label: "translated:orderStatus.pending" },
+      { value: "paid", label: "translated:orderStatus.paid" },
       { value: "processing", label: "translated:orderStatus.processing" },
       { value: "awaiting_shipment", label: "translated:orderStatus.awaiting_shipment" },
       { value: "shipped", label: "translated:orderStatus.shipped" },
       { value: "delivered", label: "translated:orderStatus.delivered" },
       { value: "cancelled", label: "translated:orderStatus.cancelled" },
     ]);
-    expect(translate).toHaveBeenCalledTimes(6);
+    expect(translate).toHaveBeenCalledTimes(7);
   });
 
   it("builds translated payment filter options in admin order", () => {
