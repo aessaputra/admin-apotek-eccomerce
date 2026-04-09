@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   calculateMidtransGrossAmount,
+  isConfirmedMidtransSuccess,
+  isIgnorableMidtransNoop,
   mapMidtransStatus,
   verifyMidtransSignature,
   verifyMidtransTransaction,
@@ -52,6 +54,10 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
     status,
     headers: JSON_HEADERS,
   });
+}
+
+function errorResponse(message: string, status = 500): Response {
+  return jsonResponse({ error: message }, status);
 }
 
 function toNumericAmount(value: string | number | null | undefined): number {
@@ -320,9 +326,8 @@ async function upsertPaymentRecord(
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
-    // Return 200 even for method mismatch - Midtrans expects 200 always
     console.error("[midtrans-webhook] Invalid method:", req.method);
-    return jsonResponse({ status: "ok", message: "Invalid method" }, 200);
+    return errorResponse("Method Not Allowed", 405);
   }
 
   let payload: MidtransWebhookPayload | null = null;
@@ -334,12 +339,8 @@ Deno.serve(async (req) => {
     try {
       payload = JSON.parse(bodyText) as MidtransWebhookPayload;
     } catch (parseError) {
-      // Return 200 even for invalid JSON - Midtrans expects 200 always
       console.error("[midtrans-webhook] Invalid JSON:", parseError);
-      return jsonResponse(
-        { status: "ok", message: "Invalid JSON payload" },
-        200,
-      );
+      return errorResponse("Invalid JSON payload", 400);
     }
 
     if (
@@ -348,21 +349,16 @@ Deno.serve(async (req) => {
       !payload.gross_amount ||
       !payload.signature_key
     ) {
-      // Return 200 even for invalid payload - Midtrans expects 200 always
       console.error(
         "[midtrans-webhook] Invalid payload: missing required fields",
       );
-      return jsonResponse({ status: "ok", message: "Invalid payload" }, 200);
+      return errorResponse("Invalid payload", 400);
     }
 
     const serverKey = Deno.env.get("MIDTRANS_SERVER_KEY");
     if (!serverKey) {
-      // Return 200 even for config error - Midtrans expects 200 always
       console.error("[midtrans-webhook] Missing MIDTRANS_SERVER_KEY");
-      return jsonResponse(
-        { status: "ok", message: "Server key not configured" },
-        200,
-      );
+      return errorResponse("Server key not configured", 500);
     }
 
     const isValidSignature = await verifyMidtransSignature(
@@ -374,13 +370,11 @@ Deno.serve(async (req) => {
     );
 
     if (!isValidSignature) {
-      // Return 200 even for invalid signature - Midtrans expects 200 always
-      // Log internally for security review but don't reveal to caller
       console.error(
         "[midtrans-webhook] Invalid signature for order:",
         payload.order_id,
       );
-      return jsonResponse({ status: "ok", message: "Invalid signature" }, 200);
+      return errorResponse("Invalid signature", 401);
     }
 
     adminClient = getSupabaseAdminClient();
@@ -415,13 +409,7 @@ Deno.serve(async (req) => {
           ? verificationError.message
           : "Unknown verification error";
       console.error("[midtrans-webhook] Status verification failed:", message);
-      return jsonResponse(
-        {
-          status: "ok",
-          message: "Status verification failed, will reconcile later",
-        },
-        200,
-      );
+      return errorResponse("Status verification failed, retry later", 503);
     }
 
     const { data: rawOrder, error: orderError } = await getOrderWithRetry(
@@ -431,13 +419,46 @@ Deno.serve(async (req) => {
 
     if (orderError || !rawOrder) {
       console.warn("[midtrans-webhook] Order not found for:", payload.order_id);
-      return jsonResponse(
-        { status: "ok", message: "Order not found, notification stored" },
-        200,
-      );
+      return errorResponse("Order not found, retry later", 503);
     }
 
     const order = rawOrder as unknown as Order;
+    const verifiedFraudStatus =
+      verifiedStatus.fraud_status || payload.fraud_status || "";
+    const payloadSuccessSignal =
+      payload.transaction_status === "settlement" ||
+      (payload.transaction_status === "capture" &&
+        (payload.fraud_status || "").toLowerCase() === "accept");
+    const verifiedSuccessSignal = isConfirmedMidtransSuccess({
+      transaction_status: verifiedStatus.transaction_status,
+      fraud_status: verifiedFraudStatus,
+      status_code: verifiedStatus.status_code || payload.status_code,
+    });
+
+    if (payloadSuccessSignal && !verifiedSuccessSignal) {
+      console.warn(
+        "[midtrans-webhook] Success webhook received before Midtrans status API confirmed success for order:",
+        payload.order_id,
+        "payload_status:",
+        payload.transaction_status,
+        "verified_status:",
+        verifiedStatus.transaction_status,
+      );
+      return errorResponse("Midtrans status not confirmed yet", 503);
+    }
+
+    if (
+      (verifiedStatus.transaction_status === "settlement" ||
+        (verifiedStatus.transaction_status === "capture" &&
+          verifiedFraudStatus.toLowerCase() === "accept")) &&
+      !verifiedSuccessSignal
+    ) {
+      console.error(
+        "[midtrans-webhook] Success state validation failed for order:",
+        payload.order_id,
+      );
+      return errorResponse("Success state validation failed", 409);
+    }
 
     const expectedAmount = getExpectedOrderAmount(order);
     const webhookAmount = Math.round(
@@ -445,7 +466,6 @@ Deno.serve(async (req) => {
     );
 
     if (webhookAmount !== expectedAmount) {
-      // Return 200 for amount mismatch - log internally for fraud review
       console.error(
         "[midtrans-webhook] Amount mismatch for order:",
         payload.order_id,
@@ -454,16 +474,13 @@ Deno.serve(async (req) => {
         "got:",
         webhookAmount,
       );
-      return jsonResponse(
-        { status: "ok", message: "Amount mismatch recorded" },
-        200,
-      );
+      return errorResponse("Amount mismatch recorded", 409);
     }
 
     const { newPaymentStatus, newOrderStatus, shouldReduceStock } =
       mapMidtransStatus(
         verifiedStatus.transaction_status,
-        verifiedStatus.fraud_status || payload.fraud_status || "",
+        verifiedFraudStatus,
         order.payment_status,
         order.status,
       );
@@ -489,19 +506,42 @@ Deno.serve(async (req) => {
         "[midtrans-webhook] Transition error:",
         transitionError.message,
       );
-      return jsonResponse(
-        { status: "ok", message: "Transition error logged" },
-        200,
-      );
+      return errorResponse("Transition error logged", 503);
     }
 
     const transition = Array.isArray(transitionResult)
       ? transitionResult[0]
       : transitionResult;
     const applied = transition?.applied ?? false;
+    const persistedPaymentStatus =
+      (transition?.payment_status as PaymentStatus | undefined) ||
+      newPaymentStatus;
+    const persistedOrderStatus = transition?.order_status || order.status;
+    const ignorableNoop =
+      !applied &&
+      isIgnorableMidtransNoop(
+        transition?.payment_status as PaymentStatus | undefined,
+        newPaymentStatus,
+      );
 
-    // Always persist raw_notification for audit trail, regardless of transition result
-    await upsertPaymentRecord(order, payload, verifiedStatus, newPaymentStatus);
+    await upsertPaymentRecord(
+      order,
+      payload,
+      verifiedStatus,
+      persistedPaymentStatus,
+    );
+
+    if (!applied && !ignorableNoop) {
+      console.error(
+        "[midtrans-webhook] Transition was not persisted for order:",
+        order.id,
+        "current:",
+        transition?.payment_status,
+        "requested:",
+        newPaymentStatus,
+      );
+      return errorResponse("Transition was not persisted", 503);
+    }
 
     if (applied) {
       await adminClient.from("order_activities").insert({
@@ -511,7 +551,7 @@ Deno.serve(async (req) => {
         new_status: newOrderStatus,
         actor_type: "system",
         metadata: {
-          payment_status: newPaymentStatus,
+          payment_status: persistedPaymentStatus,
           payment_type: paymentType,
           transaction_id:
             verifiedStatus.transaction_id || payload.transaction_id || null,
@@ -521,7 +561,7 @@ Deno.serve(async (req) => {
 
     // Clear cart on settlement regardless of 'applied' to ensure retry on failure
     // This prevents cart items persisting if first webhook succeeds but cart deletion fails
-    if (newPaymentStatus === "settlement" && order.user_id) {
+    if (persistedPaymentStatus === "settlement" && order.user_id) {
       const { data: userCart } = await adminClient
         .from("carts")
         .select("id")
@@ -545,7 +585,7 @@ Deno.serve(async (req) => {
 
     let existingSideEffectTask = await getSideEffectTask(adminClient, order.id);
 
-    if (applied && shouldReduceStock && !existingSideEffectTask) {
+    if (persistedPaymentStatus === "settlement" && !existingSideEffectTask) {
       await saveSideEffectTask(
         adminClient,
         order.id,
@@ -556,12 +596,16 @@ Deno.serve(async (req) => {
       existingSideEffectTask = await getSideEffectTask(adminClient, order.id);
     }
 
-    const shouldRunFulfillment = applied || !!existingSideEffectTask;
+    const shouldRunFulfillment =
+      persistedPaymentStatus === "settlement" && !!existingSideEffectTask;
 
     if (!shouldRunFulfillment) {
-      if (!applied) {
+      if (!applied && ignorableNoop) {
         return jsonResponse(
-          { status: "ok", message: "Transition already applied or invalid" },
+          {
+            status: "ok",
+            message: "Transition already satisfied or safely ignored",
+          },
           200,
         );
       }
@@ -573,9 +617,8 @@ Deno.serve(async (req) => {
 
     return jsonResponse({ status: "ok" }, 200);
   } catch (error: unknown) {
-    // Return 200 for all errors - Midtrans expects 200 always
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("[midtrans-webhook] Internal error:", message);
-    return jsonResponse({ status: "ok", message: "Error logged" }, 200);
+    return errorResponse("Internal error", 500);
   }
 });

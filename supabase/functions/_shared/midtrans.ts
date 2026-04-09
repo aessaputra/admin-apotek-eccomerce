@@ -1,11 +1,63 @@
 import type {
   MidtransStatusMapping,
+  MidtransStatusLike,
   MidtransStatusResponse,
   Order,
   AuthUser,
   SnapPayload,
   SnapItemDetail,
+  PaymentStatus,
 } from "./types.ts";
+
+const STALE_PAYMENT_STATUS_MAP: Record<PaymentStatus, PaymentStatus[]> = {
+  pending: [
+    "authorize",
+    "settlement",
+    "deny",
+    "cancel",
+    "expire",
+    "refund",
+    "partial_refund",
+    "chargeback",
+    "partial_chargeback",
+  ],
+  authorize: [
+    "settlement",
+    "deny",
+    "cancel",
+    "expire",
+    "refund",
+    "partial_refund",
+    "chargeback",
+    "partial_chargeback",
+  ],
+  settlement: ["refund", "partial_refund", "chargeback", "partial_chargeback"],
+  deny: [
+    "settlement",
+    "refund",
+    "partial_refund",
+    "chargeback",
+    "partial_chargeback",
+  ],
+  cancel: [
+    "settlement",
+    "refund",
+    "partial_refund",
+    "chargeback",
+    "partial_chargeback",
+  ],
+  expire: [
+    "settlement",
+    "refund",
+    "partial_refund",
+    "chargeback",
+    "partial_chargeback",
+  ],
+  refund: ["partial_refund", "chargeback", "partial_chargeback"],
+  partial_refund: [],
+  chargeback: ["partial_chargeback"],
+  partial_chargeback: [],
+};
 
 declare const Deno: {
   env: {
@@ -108,6 +160,41 @@ export const mapMidtransStatus = (
   }
 
   return { newPaymentStatus, newOrderStatus, shouldReduceStock };
+};
+
+export const isConfirmedMidtransSuccess = (
+  status: MidtransStatusLike,
+): boolean => {
+  const transactionStatus = status.transaction_status;
+  const fraudStatus = status.fraud_status?.toLowerCase() ?? "";
+  const statusCode = status.status_code ?? "";
+
+  if (statusCode !== "200") {
+    return false;
+  }
+
+  if (transactionStatus === "settlement") {
+    return true;
+  }
+
+  return transactionStatus === "capture" && fraudStatus === "accept";
+};
+
+export const isIgnorableMidtransNoop = (
+  currentPaymentStatus: PaymentStatus | null | undefined,
+  nextPaymentStatus: PaymentStatus,
+): boolean => {
+  if (!currentPaymentStatus) {
+    return false;
+  }
+
+  if (currentPaymentStatus === nextPaymentStatus) {
+    return true;
+  }
+
+  return STALE_PAYMENT_STATUS_MAP[nextPaymentStatus].includes(
+    currentPaymentStatus,
+  );
 };
 
 export const calculateMidtransGrossAmount = (order: Order): number => {
