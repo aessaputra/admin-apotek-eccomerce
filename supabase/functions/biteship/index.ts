@@ -239,41 +239,29 @@ Deno.serve(async (req: Request) => {
 
     // 5. Validate action-specific requirements before fetching settings
     if (action === "create_order") {
-      if (!isRecord(payload) || !payload.order_id) {
-        return new Response(
-          JSON.stringify({ error: "order_id is required for create_order" }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
-      }
-
-      const adminClient = getSupabaseAdminClient();
-      const { data: order, error: orderError } = await adminClient
-        .from("orders")
-        .select("user_id")
-        .eq("id", payload.order_id)
-        .single();
-
-      if (orderError || !order) {
-        return new Response(JSON.stringify({ error: "Order not found" }), {
-          status: 404,
+      return new Response(
+        JSON.stringify({
+          error:
+            "Direct create_order is disabled. Biteship orders are created automatically after payment settlement.",
+        }),
+        {
+          status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+        },
+      );
+    }
 
-      if (order.user_id !== userId) {
-        return new Response(
-          JSON.stringify({
-            error: "Forbidden: You can only access your own orders",
-          }),
-          {
-            status: 403,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
-      }
+    if (action === "track") {
+      return new Response(
+        JSON.stringify({
+          error:
+            "Direct track is disabled. Use the protected order-manager sync flow instead.",
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     // 6. Validate tracking_id format to prevent URL manipulation
@@ -571,6 +559,7 @@ Deno.serve(async (req: Request) => {
           await persistBiteshipShipment(adminClient, {
             orderId: String(requestPayload.order_id),
             biteshipOrderId,
+            trackingId,
             waybillNumber: waybillId,
             actorType: "system",
             metadata: {
