@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "Webhook Automation": {
+      "source": "claude-office-skills/skills",
+      "sourceType": "github",
+      "computedHash": "1df4d6308b87de01df422a895a6e5a1fece4bd777ba14955e267579b1cfa72dc"
+    },
     "concise-planning": {
       "source": "sickn33/antigravity-awesome-skills",
       "sourceType": "github",
@@ -30,6 +35,11 @@
       "source": "itechmeat/llm-code",
       "sourceType": "github",
       "computedHash": "f7b5bdcc0bb65940a65b9e3822b75b1017d6061918991d0ef53ebd938660761f"
+    },
+    "skill-creator": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "computedHash": "b122f4d1e91aa1d83027e050b5b37c3156203ee85458d7b1360bc48167c9e02a"
     },
     "supabase-postgres-best-practices": {
       "source": "supabase/agent-skills",
