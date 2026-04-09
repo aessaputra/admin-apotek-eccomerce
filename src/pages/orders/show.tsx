@@ -33,6 +33,7 @@ interface OrderRecord {
   midtrans_order_id?: string | null;
   midtrans_transaction_id?: string | null;
   biteship_order_id?: string | null;
+  biteship_tracking_id?: string | null;
   created_at: string;
   updated_at?: string | null;
   order_items?: OrderItem[];
@@ -306,6 +307,9 @@ export const OrderShow: React.FC = () => {
         <Descriptions.Item label={translate("orders.fields.biteshipOrderId")}>
           <Text copyable>{record?.biteship_order_id ?? "-"}</Text>
           {hasBiteship && <Tooltip title={translate("orders.syncTracking")}><Button type="text" icon={<SyncOutlined spin={syncing} />} onClick={handleSyncTracking} loading={syncing} style={{ marginLeft: 8 }} size="small">Sync</Button></Tooltip>}
+        </Descriptions.Item>
+        <Descriptions.Item label="Biteship Tracking ID">
+          <Text copyable={!!record?.biteship_tracking_id}>{record?.biteship_tracking_id ?? "-"}</Text>
         </Descriptions.Item>
         <Descriptions.Item label={translate("orders.fields.updatedAt")}>{record?.updated_at ? <DateField value={record.updated_at} format="LLL" /> : "-"}</Descriptions.Item>
       </Descriptions>

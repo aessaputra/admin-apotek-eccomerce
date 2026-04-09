@@ -60,6 +60,15 @@ interface BiteshipOrderResponse {
   courier: BiteshipCourierInfo;
 }
 
+interface BiteshipApiErrorResponse {
+  message?: string;
+  error?: string;
+  code?: number;
+  details?: {
+    order_id?: string;
+  };
+}
+
 export interface StoreSettings {
   store_name: string;
   phone_number: string;
@@ -78,6 +87,7 @@ export type ShippingActivityActorType = "admin" | "system";
 interface PersistBiteshipShipmentParams {
   orderId: string;
   biteshipOrderId: string;
+  trackingId?: string | null;
   waybillNumber?: string | null;
   actorType: ShippingActivityActorType;
   actorId?: string | null;
@@ -87,12 +97,12 @@ interface PersistBiteshipShipmentParams {
 function normalizeStorePostalCode(value: unknown): string | null {
   if (typeof value === "string") {
     const normalizedValue = value.trim();
-    return /^[1-9][0-9]{4}$/.test(normalizedValue) ? normalizedValue : null;
+    return /^\d{5}$/.test(normalizedValue) ? normalizedValue : null;
   }
 
   if (typeof value === "number" && Number.isInteger(value)) {
-    const normalizedValue = String(value);
-    return /^[1-9][0-9]{4}$/.test(normalizedValue) ? normalizedValue : null;
+    const normalizedValue = String(value).padStart(5, "0");
+    return /^\d{5}$/.test(normalizedValue) ? normalizedValue : null;
   }
 
   return null;
@@ -128,7 +138,7 @@ export function getRequiredStoreOriginPostalCode(
   );
   if (!originPostalCode) {
     throw new Error(
-      "Missing origin_postal_code in settings table. Configure a valid 5-digit Indonesian shipping origin postal code starting with digits 1-9 before creating Biteship orders.",
+      "Missing origin_postal_code in settings table. Configure a valid 5-digit Indonesian shipping origin postal code before creating Biteship orders.",
     );
   }
 
@@ -463,9 +473,11 @@ export async function persistBiteshipShipment(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
   params: PersistBiteshipShipmentParams,
 ): Promise<void> {
+  const normalizedTrackingId = params.trackingId?.trim() || null;
   const normalizedWaybillNumber = params.waybillNumber?.trim() || null;
   const updatePayload: Record<string, unknown> = {
     biteship_order_id: params.biteshipOrderId,
+    biteship_tracking_id: normalizedTrackingId,
     updated_at: new Date().toISOString(),
   };
 
@@ -489,6 +501,7 @@ export async function persistBiteshipShipment(
     actor_type: params.actorType,
     metadata: {
       biteship_order_id: params.biteshipOrderId,
+      tracking_id: normalizedTrackingId,
       waybill_number: normalizedWaybillNumber,
       waybill_source: normalizedWaybillNumber ? "system" : null,
       ...(params.metadata ?? {}),
@@ -506,6 +519,62 @@ export async function persistBiteshipShipment(
   if (activityError) {
     console.error("[biteship] Failed to log shipping activity:", activityError);
   }
+}
+
+function assertBiteshipOrderMatchesRequest(
+  order: Order,
+  biteshipOrder: BiteshipOrderResponse,
+): void {
+  const responseCompany = biteshipOrder.courier?.company?.trim().toLowerCase();
+  const responseService = biteshipOrder.courier?.type?.trim().toLowerCase();
+  const requestedCompany = order.courier_code?.trim().toLowerCase();
+  const requestedService = order.courier_service?.trim().toLowerCase();
+
+  if (
+    requestedCompany &&
+    responseCompany &&
+    requestedCompany !== responseCompany
+  ) {
+    throw new Error(
+      `Biteship duplicate reference returned courier company ${responseCompany}, expected ${requestedCompany}`,
+    );
+  }
+
+  if (
+    requestedService &&
+    responseService &&
+    requestedService !== responseService
+  ) {
+    throw new Error(
+      `Biteship duplicate reference returned courier service ${responseService}, expected ${requestedService}`,
+    );
+  }
+}
+
+async function retrieveBiteshipOrder(
+  orderId: string,
+  authKey: string,
+): Promise<BiteshipOrderResponse> {
+  const response = await fetch(
+    `https://api.biteship.com/v1/orders/${orderId}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: authKey,
+      },
+    },
+  );
+
+  const result = (await response.json()) as BiteshipOrderResponse &
+    BiteshipApiErrorResponse;
+
+  if (!response.ok) {
+    throw new Error(
+      result.message || result.error || "Failed to retrieve Biteship order",
+    );
+  }
+
+  return result;
 }
 
 export const createBiteshipOrder = async (
@@ -633,12 +702,30 @@ export const createBiteshipOrder = async (
     body: JSON.stringify(payload),
   });
 
-  const result = await response.json();
+  const result = (await response.json()) as BiteshipOrderResponse &
+    BiteshipApiErrorResponse;
 
   if (!response.ok) {
     console.error(`[biteship] API Error:`, JSON.stringify(result));
-    throw new Error(result.message || "Failed to create Biteship order");
+
+    if (result.code === 40002060 && result.details?.order_id) {
+      console.warn(
+        `[biteship] Reusing existing order for duplicate reference_id on order ${order.id}`,
+      );
+      const existingOrder = await retrieveBiteshipOrder(
+        result.details.order_id,
+        authKey,
+      );
+      assertBiteshipOrderMatchesRequest(order, existingOrder);
+      return existingOrder;
+    }
+
+    throw new Error(
+      result.message || result.error || "Failed to create Biteship order",
+    );
   }
 
-  return result as BiteshipOrderResponse;
+  const biteshipOrder = result as BiteshipOrderResponse;
+  assertBiteshipOrderMatchesRequest(order, biteshipOrder);
+  return biteshipOrder;
 };

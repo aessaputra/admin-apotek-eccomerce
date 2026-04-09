@@ -62,6 +62,7 @@ export interface Order {
   snap_redirect_url?: string | null;
   snap_token_created_at?: string | null;
   biteship_order_id?: string | null;
+  biteship_tracking_id?: string | null;
   waybill_number?: string | null;
   waybill_source?: "system" | "manual" | null;
   destination_area_id?: string | null;
@@ -129,6 +130,12 @@ export interface MidtransStatusResponse {
   channel_response_code?: string;
   channel_response_message?: string;
   redirect_url?: string;
+}
+
+export interface MidtransStatusLike {
+  transaction_status?: string;
+  fraud_status?: string | null;
+  status_code?: string | null;
 }
 
 export interface MidtransWebhookPayload {

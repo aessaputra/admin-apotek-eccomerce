@@ -40,6 +40,8 @@ const TRANSITION_RULES: Record<string, string[]> = {
   shipped: ["delivered"],
 };
 
+const MANUAL_WAYBILL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9-]{4,63}$/;
+
 function canTransition(from: string, to: string): boolean {
   return (TRANSITION_RULES[from] || []).includes(to);
 }
@@ -52,6 +54,27 @@ function mapBiteshipStatus(status: string, fallback: string): string {
     delivered: "delivered",
   };
   return statusMap[status] || fallback;
+}
+
+function getBiteshipAuthorizationHeader(apiKey: string): string {
+  return apiKey.startsWith("biteship_live.") || apiKey.startsWith("biteship_test.")
+    ? apiKey
+    : `biteship_test.${apiKey}`;
+}
+
+function normalizeWaybillNumber(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalizedValue = value.trim();
+  if (!normalizedValue) {
+    return null;
+  }
+
+  return MANUAL_WAYBILL_PATTERN.test(normalizedValue)
+    ? normalizedValue
+    : null;
 }
 
 async function requireAdmin(req: Request): Promise<{ userId: string }> {
@@ -126,7 +149,7 @@ Deno.serve(async (req: Request) => {
     const { data: order, error: orderError } = await adminClient
       .from("orders")
       .select(
-        "id, status, payment_status, waybill_number, waybill_source, biteship_order_id",
+        "id, status, payment_status, waybill_number, waybill_source, biteship_order_id, biteship_tracking_id",
       )
       .eq("id", body.orderId)
       .single();
@@ -165,6 +188,24 @@ Deno.serve(async (req: Request) => {
 
       const nextWaybill =
         body.payload?.waybill_number?.trim() || order.waybill_number || null;
+
+      if (
+        body.payload?.waybill_source === "manual" &&
+        body.payload?.waybill_number?.trim() &&
+        !normalizeWaybillNumber(body.payload.waybill_number)
+      ) {
+        return new Response(
+          JSON.stringify({
+            error:
+              "Manual waybill_number must contain 5-64 characters using only letters, numbers, or hyphens",
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
       if (to === "shipped" && !nextWaybill) {
         return new Response(
           JSON.stringify({
@@ -207,6 +248,18 @@ Deno.serve(async (req: Request) => {
         body.payload?.waybill_source === "manual" &&
         body.payload?.waybill_number?.trim()
       ) {
+        if (!body.payload?.waybill_override_reason?.trim() && order.biteship_order_id) {
+          return new Response(
+            JSON.stringify({
+              error:
+                "waybill_override_reason is required when overriding a Biteship-generated shipment",
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
         updatePayload.waybill_source = "manual";
         updatePayload.waybill_overridden_by = userId;
         updatePayload.waybill_override_reason =
@@ -277,13 +330,85 @@ Deno.serve(async (req: Request) => {
         throw new Error("Missing BITESHIP_API_KEY");
       }
 
+      const authHeader = getBiteshipAuthorizationHeader(biteshipKey);
+      let trackingId = order.biteship_tracking_id ?? null;
+
+      if (!trackingId) {
+        const orderResp = await fetch(
+          `${BITESHIP_BASE_URL}/orders/${order.biteship_order_id}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: authHeader,
+            },
+          },
+        );
+
+        if (!orderResp.ok) {
+          const errorBody = await orderResp.text();
+          return new Response(
+            JSON.stringify({
+              error: "Failed to recover Biteship tracking identifier",
+              details: errorBody,
+            }),
+            {
+              status: orderResp.status,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
+
+        const biteshipOrderData = (await orderResp.json()) as Record<
+          string,
+          unknown
+        >;
+        const recoveredTrackingId = String(
+          ((biteshipOrderData.courier as Record<string, unknown> | undefined)
+            ?.tracking_id as string | undefined) || "",
+        ).trim();
+
+        if (!recoveredTrackingId) {
+          return new Response(
+            JSON.stringify({
+              error: "Biteship order does not expose a tracking_id yet",
+            }),
+            {
+              status: 409,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
+
+        trackingId = recoveredTrackingId;
+
+        const recoveredWaybill = normalizeWaybillNumber(
+          ((biteshipOrderData.courier as Record<string, unknown> | undefined)
+            ?.waybill_id as string | undefined) || "",
+        );
+
+        const { error: recoverUpdateError } = await adminClient
+          .from("orders")
+          .update({
+            biteship_tracking_id: trackingId,
+            waybill_number: recoveredWaybill || order.waybill_number || null,
+            waybill_source: recoveredWaybill ? "system" : order.waybill_source,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", body.orderId);
+
+        if (recoverUpdateError) {
+          throw recoverUpdateError;
+        }
+      }
+
       const trackingResp = await fetch(
-        `${BITESHIP_BASE_URL}/trackings/${order.biteship_order_id}`,
+        `${BITESHIP_BASE_URL}/trackings/${trackingId}`,
         {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${biteshipKey}`,
+            Authorization: authHeader,
           },
         },
       );
@@ -333,12 +458,15 @@ Deno.serve(async (req: Request) => {
         .from("orders")
         .update({
           status: nextStatus,
+          biteship_tracking_id: trackingId,
           waybill_number: syncWaybill,
           waybill_source: syncWaybillSource,
           updated_at: new Date().toISOString(),
         })
         .eq("id", body.orderId)
-        .select("id, status, waybill_number, waybill_source, updated_at")
+        .select(
+          "id, status, biteship_tracking_id, waybill_number, waybill_source, updated_at",
+        )
         .single();
 
       if (updateError) {
@@ -356,6 +484,7 @@ Deno.serve(async (req: Request) => {
           actor_type: "admin",
           metadata: {
             biteship_order_id: order.biteship_order_id,
+            tracking_id: trackingId,
             biteship_status: trackingStatus,
             waybill: syncWaybill,
             waybill_source: syncWaybillSource,
