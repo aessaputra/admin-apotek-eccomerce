@@ -10,15 +10,22 @@ declare const Deno: {
 
 const SIDE_EFFECT_LEASE_MS = 10 * 60 * 1000;
 const BITESHIP_CALL_TIMEOUT_MS = 45_000;
-const DEFAULT_PROCESSOR_BATCH_SIZE = 10;
+const DEFAULT_PROCESSOR_BATCH_SIZE = 3;
+const MAX_RETRY_DELAY_MS = 60 * 60 * 1000;
 
 export interface SideEffectTask {
   needs_stock: boolean;
   needs_biteship: boolean;
   retry_count: number;
   updated_at: string;
+  lease_owner: string | null;
   lease_until: string | null;
+  next_retry_at: string | null;
+  last_attempted_at: string | null;
+  last_error_code: string | null;
+  failed_permanently_at: string | null;
   pending_biteship_order_id: string | null;
+  pending_tracking_id: string | null;
   pending_waybill_number: string | null;
 }
 
@@ -26,8 +33,49 @@ interface SideEffectTaskOrderRow {
   order_id: string | null;
 }
 
+interface SideEffectErrorClassification {
+  code: string;
+  permanent: boolean;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function classifySideEffectError(
+  error: unknown,
+): SideEffectErrorClassification {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalizedMessage = message.toLowerCase();
+
+  const permanentPatterns = [
+    "missing",
+    "required",
+    "disabled courier service",
+    "not configured",
+    "invalid",
+    "not found while processing fulfillment side effects",
+    "does not expose a tracking_id",
+  ];
+
+  const permanent = permanentPatterns.some((pattern) =>
+    normalizedMessage.includes(pattern),
+  );
+
+  return {
+    code: permanent ? "permanent_validation_failure" : "transient_failure",
+    permanent,
+  };
+}
+
+function getNextRetryAtIso(retryCount: number): string {
+  const safeRetryCount = Math.max(1, retryCount);
+  const delayMs = Math.min(
+    60_000 * 2 ** Math.max(0, safeRetryCount - 1),
+    MAX_RETRY_DELAY_MS,
+  );
+
+  return new Date(Date.now() + delayMs).toISOString();
 }
 
 async function withTimeout<T>(
@@ -74,7 +122,7 @@ export async function getSideEffectTask(
   const { data, error } = await adminClient
     .from("webhook_side_effect_tasks")
     .select(
-      "needs_stock, needs_biteship, retry_count, updated_at, lease_until, pending_biteship_order_id, pending_waybill_number",
+      "needs_stock, needs_biteship, retry_count, updated_at, lease_owner, lease_until, next_retry_at, last_attempted_at, last_error_code, failed_permanently_at, pending_biteship_order_id, pending_tracking_id, pending_waybill_number",
     )
     .eq("order_id", orderId)
     .maybeSingle();
@@ -93,13 +141,23 @@ export async function saveSideEffectTask(
   needsBiteship: boolean,
   lastError: string | null,
   pendingBiteshipOrderId: string | null = null,
+  pendingTrackingId: string | null = null,
   pendingWaybillNumber: string | null = null,
+  leaseOwner: string | null = null,
+  lastErrorCode: string | null = null,
+  permanentFailure = false,
 ): Promise<void> {
   if (!needsStock && !needsBiteship) {
-    const { error } = await adminClient
+    let deleteQuery = adminClient
       .from("webhook_side_effect_tasks")
       .delete()
       .eq("order_id", orderId);
+
+    if (leaseOwner) {
+      deleteQuery = deleteQuery.eq("lease_owner", leaseOwner);
+    }
+
+    const { error } = await deleteQuery;
     if (error) {
       throw new Error(`Failed to delete side effect task: ${error.message}`);
     }
@@ -108,25 +166,48 @@ export async function saveSideEffectTask(
 
   const existingTask = await getSideEffectTask(adminClient, orderId);
   const nextRetryCount = existingTask?.retry_count ?? 0;
+  const nowIso = new Date().toISOString();
+  const nextRetryAt =
+    permanentFailure || !lastError ? null : getNextRetryAtIso(nextRetryCount);
 
-  const { error } = await adminClient.from("webhook_side_effect_tasks").upsert(
-    {
-      order_id: orderId,
-      needs_stock: needsStock,
-      needs_biteship: needsBiteship,
-      last_error: lastError,
-      updated_at: new Date().toISOString(),
-      retry_count: nextRetryCount,
-      claimed_at: null,
-      lease_until: null,
-      pending_biteship_order_id: pendingBiteshipOrderId,
-      pending_waybill_number: pendingWaybillNumber,
-    },
-    { onConflict: "order_id" },
-  );
+  const taskPayload = {
+    order_id: orderId,
+    needs_stock: needsStock,
+    needs_biteship: needsBiteship,
+    last_error: lastError,
+    last_error_code: lastErrorCode,
+    updated_at: nowIso,
+    retry_count: nextRetryCount,
+    claimed_at: null,
+    lease_owner: null,
+    lease_until: null,
+    last_attempted_at: existingTask?.last_attempted_at ?? nowIso,
+    next_retry_at: nextRetryAt,
+    failed_permanently_at: permanentFailure ? nowIso : null,
+    pending_biteship_order_id: pendingBiteshipOrderId,
+    pending_tracking_id: pendingTrackingId,
+    pending_waybill_number: pendingWaybillNumber,
+  };
+
+  if (!existingTask || !leaseOwner) {
+    const { error } = await adminClient
+      .from("webhook_side_effect_tasks")
+      .upsert(taskPayload, { onConflict: "order_id" });
+
+    if (error) {
+      throw new Error(`Failed to upsert side effect task: ${error.message}`);
+    }
+    return;
+  }
+
+  const { error } = await adminClient
+    .from("webhook_side_effect_tasks")
+    .update(taskPayload)
+    .eq("order_id", orderId)
+    .eq("lease_owner", leaseOwner);
 
   if (error) {
-    throw new Error(`Failed to upsert side effect task: ${error.message}`);
+    throw new Error(`Failed to save side effect task: ${error.message}`);
   }
 }
 
@@ -134,18 +215,21 @@ export async function claimSideEffectTask(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
   orderId: string,
   currentTask: SideEffectTask,
-): Promise<boolean> {
+): Promise<string | null> {
   if (
+    currentTask.failed_permanently_at ||
+    (currentTask.next_retry_at && Date.parse(currentTask.next_retry_at) > Date.now()) ||
     currentTask.lease_until &&
     Date.parse(currentTask.lease_until) > Date.now()
   ) {
-    return false;
+    return null;
   }
 
   const nowIso = new Date().toISOString();
   const leaseUntilIso = new Date(
     Date.now() + SIDE_EFFECT_LEASE_MS,
   ).toISOString();
+  const leaseOwner = crypto.randomUUID();
 
   const { data, error } = await adminClient
     .from("webhook_side_effect_tasks")
@@ -153,23 +237,26 @@ export async function claimSideEffectTask(
       retry_count: currentTask.retry_count + 1,
       updated_at: nowIso,
       claimed_at: nowIso,
+      lease_owner: leaseOwner,
       lease_until: leaseUntilIso,
+      last_attempted_at: nowIso,
     })
     .eq("order_id", orderId)
     .eq("updated_at", currentTask.updated_at)
-    .select("order_id")
+    .select("order_id, lease_owner")
     .maybeSingle();
 
   if (error) {
     throw new Error(`Failed to claim side effect task: ${error.message}`);
   }
 
-  return !!data;
+  return data?.lease_owner ?? null;
 }
 
 export async function renewSideEffectTaskLease(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
   orderId: string,
+  leaseOwner: string,
 ): Promise<void> {
   const nowIso = new Date().toISOString();
   const leaseUntilIso = new Date(
@@ -183,7 +270,8 @@ export async function renewSideEffectTaskLease(
       lease_until: leaseUntilIso,
       updated_at: nowIso,
     })
-    .eq("order_id", orderId);
+    .eq("order_id", orderId)
+    .eq("lease_owner", leaseOwner);
 
   if (error) {
     throw new Error(`Failed to renew side effect lease: ${error.message}`);
@@ -194,7 +282,9 @@ async function persistPendingBiteshipResult(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
   orderId: string,
   biteshipOrderId: string,
+  trackingId: string | null,
   waybillNumber: string | null,
+  leaseOwner: string,
 ): Promise<void> {
   const nowIso = new Date().toISOString();
   const leaseUntilIso = new Date(
@@ -205,11 +295,13 @@ async function persistPendingBiteshipResult(
     .from("webhook_side_effect_tasks")
     .update({
       pending_biteship_order_id: biteshipOrderId,
+      pending_tracking_id: trackingId,
       pending_waybill_number: waybillNumber,
       updated_at: nowIso,
       lease_until: leaseUntilIso,
     })
-    .eq("order_id", orderId);
+    .eq("order_id", orderId)
+    .eq("lease_owner", leaseOwner);
 
   if (error) {
     throw new Error(
@@ -255,6 +347,8 @@ export async function listDueSideEffectTaskOrderIds(
   const { data, error } = await adminClient
     .from("webhook_side_effect_tasks")
     .select("order_id")
+    .is("failed_permanently_at", null)
+    .or(`next_retry_at.is.null,next_retry_at.lte.${nowIso}`)
     .or(`lease_until.is.null,lease_until.lt.${nowIso}`)
     .order("updated_at", { ascending: true })
     .limit(safeLimit);
@@ -285,13 +379,13 @@ export async function processWebhookSideEffectTask(
     };
   }
 
-  const claimed = await claimSideEffectTask(
+  const leaseOwner = await claimSideEffectTask(
     adminClient,
     orderId,
     existingSideEffectTask,
   );
 
-  if (!claimed) {
+  if (!leaseOwner) {
     return {
       processed: false,
       needsRetry: true,
@@ -302,8 +396,11 @@ export async function processWebhookSideEffectTask(
   let needsStock = existingSideEffectTask.needs_stock;
   let needsBiteship = existingSideEffectTask.needs_biteship;
   let lastError: string | null = null;
+  let lastErrorCode: string | null = null;
+  let permanentFailure = false;
   let pendingBiteshipOrderId =
     existingSideEffectTask.pending_biteship_order_id ?? null;
+  let pendingTrackingId = existingSideEffectTask.pending_tracking_id ?? null;
   let pendingWaybillNumber =
     existingSideEffectTask.pending_waybill_number ?? null;
 
@@ -314,22 +411,34 @@ export async function processWebhookSideEffectTask(
       await saveSideEffectTask(
         adminClient,
         orderId,
-        needsStock,
-        needsBiteship,
-        "Order not found while processing fulfillment side effects",
-        pendingBiteshipOrderId,
-        pendingWaybillNumber,
+        false,
+        false,
+        null,
+        null,
+        null,
+        null,
+        leaseOwner,
       );
 
       return {
-        processed: false,
-        needsRetry: true,
+        processed: true,
+        needsRetry: false,
         message: "Order not found while processing side effect task",
       };
     }
 
     if (order.payment_status !== "settlement") {
-      await saveSideEffectTask(adminClient, orderId, false, false, null);
+      await saveSideEffectTask(
+        adminClient,
+        orderId,
+        false,
+        false,
+        null,
+        null,
+        null,
+        null,
+        leaseOwner,
+      );
       return {
         processed: true,
         needsRetry: false,
@@ -344,7 +453,7 @@ export async function processWebhookSideEffectTask(
 
       for (const item of order.order_items) {
         if (!item.product_id) continue;
-        await renewSideEffectTaskLease(adminClient, orderId);
+        await renewSideEffectTaskLease(adminClient, orderId, leaseOwner);
 
         let stockReduced = false;
         for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -377,6 +486,7 @@ export async function processWebhookSideEffectTask(
         if (!stockReduced) {
           stockFailed = true;
           lastError = "Failed to reduce stock after retries";
+          lastErrorCode = "stock_deduction_failed";
         }
       }
 
@@ -392,6 +502,7 @@ export async function processWebhookSideEffectTask(
         await persistBiteshipShipment(adminClient, {
           orderId,
           biteshipOrderId: pendingBiteshipOrderId,
+          trackingId: pendingTrackingId,
           waybillNumber: pendingWaybillNumber,
           actorType: "system",
           metadata: {
@@ -400,19 +511,21 @@ export async function processWebhookSideEffectTask(
         });
         needsBiteship = false;
         pendingBiteshipOrderId = null;
+        pendingTrackingId = null;
         pendingWaybillNumber = null;
       } catch (persistPendingError: unknown) {
         lastError = `Failed to persist pending Biteship result: ${persistPendingError instanceof Error ? persistPendingError.message : String(persistPendingError)}`;
+        lastErrorCode = "persist_pending_biteship_failed";
       }
     }
 
     if (needsBiteship && !order.biteship_order_id && biteshipKey) {
-      await renewSideEffectTaskLease(adminClient, orderId);
+      await renewSideEffectTaskLease(adminClient, orderId, leaseOwner);
       let biteshipResponse: BiteshipOrderResponse | null = null;
 
       for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
-          await renewSideEffectTaskLease(adminClient, orderId);
+          await renewSideEffectTaskLease(adminClient, orderId, leaseOwner);
           type BiteshipOrderInput = Parameters<typeof createBiteshipOrder>[0];
           biteshipResponse = (await withTimeout(
             createBiteshipOrder(
@@ -428,14 +541,22 @@ export async function processWebhookSideEffectTask(
             biteshipError instanceof Error
               ? biteshipError.message
               : "Unknown Biteship error";
+          const classification = classifySideEffectError(biteshipError);
+          lastError = message;
+          lastErrorCode = classification.code;
+          permanentFailure = classification.permanent;
 
-          if (attempt === 2) {
+          if (attempt === 2 || classification.permanent) {
             console.error(
               "[process-webhook-side-effects] Biteship automation failed:",
               message,
             );
           } else {
             await sleep(350 * (attempt + 1));
+          }
+
+          if (classification.permanent) {
+            break;
           }
         }
       }
@@ -445,13 +566,16 @@ export async function processWebhookSideEffectTask(
           adminClient,
           orderId,
           biteshipResponse.id,
+          biteshipResponse.courier?.tracking_id || null,
           biteshipResponse.courier?.waybill_id || null,
+          leaseOwner,
         );
 
         try {
           await persistBiteshipShipment(adminClient, {
             orderId,
             biteshipOrderId: biteshipResponse.id,
+            trackingId: biteshipResponse.courier?.tracking_id || null,
             waybillNumber: biteshipResponse.courier?.waybill_id || null,
             actorType: "system",
             metadata: {
@@ -461,21 +585,27 @@ export async function processWebhookSideEffectTask(
           });
           needsBiteship = false;
           pendingBiteshipOrderId = null;
+          pendingTrackingId = null;
           pendingWaybillNumber = null;
         } catch (updateOrderError: unknown) {
           needsBiteship = true;
           lastError = `Failed to persist Biteship result: ${updateOrderError instanceof Error ? updateOrderError.message : String(updateOrderError)}`;
+          lastErrorCode = "persist_biteship_result_failed";
           pendingBiteshipOrderId = biteshipResponse.id;
+          pendingTrackingId = biteshipResponse.courier?.tracking_id || null;
           pendingWaybillNumber = biteshipResponse.courier?.waybill_id || null;
         }
       } else {
         needsBiteship = true;
         if (!lastError) {
           lastError = "Failed to create biteship order after retries";
+          lastErrorCode = "biteship_create_failed";
         }
       }
     } else if (needsBiteship && !biteshipKey && !lastError) {
       lastError = "BITESHIP_API_KEY is not configured";
+      lastErrorCode = "biteship_key_missing";
+      permanentFailure = true;
     }
 
     await saveSideEffectTask(
@@ -485,7 +615,11 @@ export async function processWebhookSideEffectTask(
       needsBiteship,
       lastError,
       pendingBiteshipOrderId,
+      pendingTrackingId,
       pendingWaybillNumber,
+      leaseOwner,
+      lastErrorCode,
+      permanentFailure,
     );
 
     return {
@@ -501,6 +635,7 @@ export async function processWebhookSideEffectTask(
       error instanceof Error
         ? error.message
         : "Unknown side effect processor error";
+    const classification = classifySideEffectError(error);
 
     await saveSideEffectTask(
       adminClient,
@@ -509,7 +644,11 @@ export async function processWebhookSideEffectTask(
       needsBiteship,
       message,
       pendingBiteshipOrderId,
+      pendingTrackingId,
       pendingWaybillNumber,
+      leaseOwner,
+      classification.code,
+      classification.permanent,
     );
 
     return {
@@ -537,11 +676,22 @@ export function triggerWebhookSideEffectProcessor(orderId: string): void {
       Authorization: `Bearer ${serviceRoleKey}`,
     },
     body: JSON.stringify({ orderId, limit: 1 }),
-  }).catch((error) => {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(
-      "[webhook-side-effects] Failed to trigger side effect processor:",
-      message,
-    );
-  });
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => "");
+        console.error(
+          "[webhook-side-effects] Processor trigger returned non-OK response:",
+          response.status,
+          errorBody,
+        );
+      }
+    })
+    .catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(
+        "[webhook-side-effects] Failed to trigger side effect processor:",
+        message,
+      );
+    });
 }
