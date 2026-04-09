@@ -63,6 +63,7 @@ export interface Order {
   snap_token_created_at?: string | null;
   biteship_order_id?: string | null;
   waybill_number?: string | null;
+  waybill_source?: "system" | "manual" | null;
   destination_area_id?: string | null;
   destination_postal_code?: number | null;
   courier_code?: string | null;

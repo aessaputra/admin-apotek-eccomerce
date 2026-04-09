@@ -1,29 +1,46 @@
-import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
-import { createRemoteJWKSet, jwtVerify } from 'npm:jose@5';
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
 import {
   assertCompleteStoreSettings,
   assertStoreSettingsHaveRateOrigin,
   filterRatesByEnabledServices,
   getRequiredStoreOriginPostalCode,
   getEnabledCouriers,
+  persistBiteshipShipment,
   getStoreSettings,
   isCourierServiceEnabled,
   type StoreSettings,
-} from '../_shared/biteship.ts';
-import { corsHeaders } from '../_shared/cors.ts';
-import { getSupabaseAdminClient } from '../_shared/supabase.ts';
+} from "../_shared/biteship.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { getSupabaseAdminClient } from "../_shared/supabase.ts";
 
 interface BiteshipProxyRequest {
-  action: 'rates' | 'track' | 'maps' | 'draft_order' | 'create_order' | 'couriers';
+  action:
+    | "rates"
+    | "track"
+    | "maps"
+    | "draft_order"
+    | "create_order"
+    | "couriers";
   payload?: Record<string, unknown>;
 }
 
-const BITESHIP_API_KEY = Deno.env.get('BITESHIP_API_KEY');
-if (!BITESHIP_API_KEY) throw new Error('Missing BITESHIP_API_KEY environment variable');
-const BITESHIP_API_URL = 'https://api.biteship.com';
+declare const Deno: {
+  serve: (handler: (req: Request) => Response | Promise<Response>) => void;
+  env: {
+    get: (key: string) => string | undefined;
+  };
+};
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const JWKS = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
+const BITESHIP_API_KEY = Deno.env.get("BITESHIP_API_KEY");
+if (!BITESHIP_API_KEY)
+  throw new Error("Missing BITESHIP_API_KEY environment variable");
+const BITESHIP_API_URL = "https://api.biteship.com";
+
+const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+const JWKS = createRemoteJWKSet(
+  new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`),
+);
 const JWT_ISSUER = `${supabaseUrl}/auth/v1`;
 
 // Validate tracking_id to prevent URL manipulation
@@ -32,22 +49,29 @@ function isValidTrackingId(id: string): boolean {
 }
 
 // Validate maps input to prevent injection attacks
-function validateMapsInput(input: unknown): { valid: boolean; error?: string; sanitized?: string } {
+function validateMapsInput(input: unknown): {
+  valid: boolean;
+  error?: string;
+  sanitized?: string;
+} {
   // Must be a string
-  if (typeof input !== 'string') {
-    return { valid: false, error: 'Input must be a string' };
+  if (typeof input !== "string") {
+    return { valid: false, error: "Input must be a string" };
   }
 
   const trimmed = input.trim();
 
   // Must not be empty
   if (trimmed.length === 0) {
-    return { valid: false, error: 'Input cannot be empty' };
+    return { valid: false, error: "Input cannot be empty" };
   }
 
   // Maximum length: 100 characters
   if (trimmed.length > 100) {
-    return { valid: false, error: 'Input exceeds maximum length of 100 characters' };
+    return {
+      valid: false,
+      error: "Input exceeds maximum length of 100 characters",
+    };
   }
 
   // Reject suspicious patterns that could indicate injection attempts
@@ -62,7 +86,7 @@ function validateMapsInput(input: unknown): { valid: boolean; error?: string; sa
 
   for (const pattern of suspiciousPatterns) {
     if (pattern.test(trimmed)) {
-      return { valid: false, error: 'Input contains invalid characters' };
+      return { valid: false, error: "Input contains invalid characters" };
     }
   }
 
@@ -70,7 +94,7 @@ function validateMapsInput(input: unknown): { valid: boolean; error?: string; sa
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === "object" && value !== null;
 }
 
 function getNestedString(data: unknown, path: string[]): string | undefined {
@@ -83,7 +107,7 @@ function getNestedString(data: unknown, path: string[]): string | undefined {
     current = current[key];
   }
 
-  return typeof current === 'string' ? current : undefined;
+  return typeof current === "string" ? current : undefined;
 }
 
 function getLoggablePayload(payload: unknown): unknown {
@@ -135,7 +159,9 @@ function withServerShipperAndOriginFields(
   };
 }
 
-function withoutClientOriginFields(payload: Record<string, unknown>): Record<string, unknown> {
+function withoutClientOriginFields(
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
   const {
     origin_area_id: _originAreaId,
     origin_postal_code: _originPostalCode,
@@ -150,48 +176,54 @@ function withoutClientOriginFields(payload: Record<string, unknown>): Record<str
 
 Deno.serve(async (req: Request) => {
   // 1. Handle CORS Preflight
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
     // 2. Validate JWT using jose jwtVerify with JWKS
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Missing or invalid Authorization header' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Missing or invalid Authorization header" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const token = authHeader.slice(7).trim();
     if (!token) {
-      return new Response(JSON.stringify({ error: 'Missing or invalid Authorization header' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({ error: "Missing or invalid Authorization header" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     let userId: string;
     try {
       const { payload } = await jwtVerify(token, JWKS, {
         issuer: JWT_ISSUER,
-        audience: 'authenticated',
+        audience: "authenticated",
       });
-      userId = payload.sub ?? '';
+      userId = payload.sub ?? "";
       if (!userId) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     } catch (error: unknown) {
-      console.error('[biteship] JWT verification failed', {
+      console.error("[biteship] JWT verification failed", {
         message: error instanceof Error ? error.message : String(error),
       });
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -199,82 +231,93 @@ Deno.serve(async (req: Request) => {
     const { action, payload }: BiteshipProxyRequest = await req.json();
 
     if (!action) {
-      return new Response(JSON.stringify({ error: 'Action is required' }), {
+      return new Response(JSON.stringify({ error: "Action is required" }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // 5. Validate action-specific requirements before fetching settings
-    if (action === 'create_order') {
+    if (action === "create_order") {
       if (!isRecord(payload) || !payload.order_id) {
-        return new Response(JSON.stringify({ error: 'order_id is required for create_order' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return new Response(
+          JSON.stringify({ error: "order_id is required for create_order" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
 
       const adminClient = getSupabaseAdminClient();
       const { data: order, error: orderError } = await adminClient
-        .from('orders')
-        .select('user_id')
-        .eq('id', payload.order_id)
+        .from("orders")
+        .select("user_id")
+        .eq("id", payload.order_id)
         .single();
 
       if (orderError || !order) {
-        return new Response(JSON.stringify({ error: 'Order not found' }), {
+        return new Response(JSON.stringify({ error: "Order not found" }), {
           status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       if (order.user_id !== userId) {
         return new Response(
-          JSON.stringify({ error: 'Forbidden: You can only access your own orders' }),
+          JSON.stringify({
+            error: "Forbidden: You can only access your own orders",
+          }),
           {
             status: 403,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
       }
     }
 
     // 6. Validate tracking_id format to prevent URL manipulation
-    if (action === 'track' && payload?.tracking_id) {
+    if (action === "track" && payload?.tracking_id) {
       const trackingId = String(payload.tracking_id);
       if (!isValidTrackingId(trackingId)) {
-        return new Response(JSON.stringify({ error: 'Invalid tracking_id format' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-    }
-
-    // 7. Build Biteship request
-    let endpoint = '';
-    let method = 'POST';
-    let requestPayload = isRecord(payload) ? payload : undefined;
-
-    // Fetch store settings only for actions that require them
-    let settings: StoreSettings | undefined;
-    const needsSettings = action === 'rates' || action === 'draft_order' || action === 'create_order';
-
-    if (needsSettings) {
-      try {
-        settings = await getStoreSettings();
-      } catch (error: unknown) {
-        console.error('[biteship] Failed to fetch store settings:', error);
         return new Response(
-          JSON.stringify({ error: 'Service configuration unavailable' }),
+          JSON.stringify({ error: "Invalid tracking_id format" }),
           {
-            status: 503,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
       }
     }
 
-    if (action === 'rates') {
+    // 7. Build Biteship request
+    let endpoint = "";
+    let method = "POST";
+    let requestPayload = isRecord(payload) ? payload : undefined;
+
+    // Fetch store settings only for actions that require them
+    let settings: StoreSettings | undefined;
+    const needsSettings =
+      action === "rates" ||
+      action === "draft_order" ||
+      action === "create_order";
+
+    if (needsSettings) {
+      try {
+        settings = await getStoreSettings();
+      } catch (error: unknown) {
+        console.error("[biteship] Failed to fetch store settings:", error);
+        return new Response(
+          JSON.stringify({ error: "Service configuration unavailable" }),
+          {
+            status: 503,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
+
+    if (action === "rates") {
       try {
         assertStoreSettingsHaveRateOrigin(settings!);
       } catch (error: unknown) {
@@ -283,11 +326,11 @@ Deno.serve(async (req: Request) => {
             error:
               error instanceof Error
                 ? error.message
-                : 'Missing shipping origin configuration.',
+                : "Missing shipping origin configuration.",
           }),
           {
             status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
       }
@@ -297,11 +340,13 @@ Deno.serve(async (req: Request) => {
       const enabledCouriers = getEnabledCouriers(settings!);
 
       const destinationAreaId =
-        typeof ratesPayload.destination_area_id === 'string'
+        typeof ratesPayload.destination_area_id === "string"
           ? ratesPayload.destination_area_id.trim()
-          : '';
+          : "";
       const destinationPostalCode = Number(
-        ratesPayload.destination_postal_code ?? ratesPayload.destination_postalcode ?? NaN,
+        ratesPayload.destination_postal_code ??
+          ratesPayload.destination_postalcode ??
+          NaN,
       );
       const hasDestinationAreaId = destinationAreaId.length > 0;
       const hasDestinationPostalCode =
@@ -314,11 +359,11 @@ Deno.serve(async (req: Request) => {
         return new Response(
           JSON.stringify({
             error:
-              'Missing destination location for rates. Provide destination_area_id or destination_postal_code. Check addresses.postal_code/subdistrict mapping.',
+              "Missing destination location for rates. Provide destination_area_id or destination_postal_code. Check addresses.postal_code/subdistrict mapping.",
           }),
           {
             status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
       }
@@ -326,21 +371,23 @@ Deno.serve(async (req: Request) => {
       // Priority: area_id > coordinates > postal_code
       const originFields = settings!.origin_area_id
         ? { origin_area_id: settings!.origin_area_id }
-        : (settings!.origin_latitude !== null && settings!.origin_longitude !== null)
+        : settings!.origin_latitude !== null &&
+            settings!.origin_longitude !== null
           ? {
               origin_latitude: settings!.origin_latitude,
               origin_longitude: settings!.origin_longitude,
             }
-          : { origin_postal_code: Number(getRequiredStoreOriginPostalCode(settings!)) };
+          : {
+              origin_postal_code: Number(
+                getRequiredStoreOriginPostalCode(settings!),
+              ),
+            };
 
       if (!enabledCouriers) {
-        return new Response(
-          JSON.stringify({ success: true, pricing: [] }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          },
-        );
+        return new Response(JSON.stringify({ success: true, pricing: [] }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       requestPayload = {
@@ -350,47 +397,59 @@ Deno.serve(async (req: Request) => {
       };
     }
 
-    if (action === 'create_order') {
+    if (action === "create_order") {
       try {
         assertCompleteStoreSettings(settings!);
       } catch (error: unknown) {
         return new Response(
           JSON.stringify({
-            error: error instanceof Error ? error.message : 'Missing shop shipper configuration.',
+            error:
+              error instanceof Error
+                ? error.message
+                : "Missing shop shipper configuration.",
           }),
           {
             status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
       }
 
       const safePayload = isRecord(requestPayload) ? requestPayload : {};
-      const courierCompany = getNestedString(safePayload, ['courier_company']);
-      const courierType = getNestedString(safePayload, ['courier_type']);
-      if (courierCompany && courierType && !isCourierServiceEnabled(settings!, courierCompany, courierType)) {
+      const courierCompany = getNestedString(safePayload, ["courier_company"]);
+      const courierType = getNestedString(safePayload, ["courier_type"]);
+      if (
+        courierCompany &&
+        courierType &&
+        !isCourierServiceEnabled(settings!, courierCompany, courierType)
+      ) {
         return new Response(
-          JSON.stringify({ error: 'Selected courier service is disabled in settings.' }),
+          JSON.stringify({
+            error: "Selected courier service is disabled in settings.",
+          }),
           {
             status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
       }
       requestPayload = withServerShipperAndOriginFields(safePayload, settings!);
     }
 
-    if (action === 'draft_order') {
+    if (action === "draft_order") {
       try {
         assertCompleteStoreSettings(settings!);
       } catch (error: unknown) {
         return new Response(
           JSON.stringify({
-            error: error instanceof Error ? error.message : 'Missing shipping configuration.',
+            error:
+              error instanceof Error
+                ? error.message
+                : "Missing shipping configuration.",
           }),
           {
             status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
       }
@@ -403,64 +462,71 @@ Deno.serve(async (req: Request) => {
     }
 
     switch (action) {
-      case 'rates':
-        endpoint = '/v1/rates/couriers';
+      case "rates":
+        endpoint = "/v1/rates/couriers";
         break;
-      case 'draft_order':
-        endpoint = '/v1/draft_orders';
+      case "draft_order":
+        endpoint = "/v1/draft_orders";
         break;
-      case 'create_order':
-        endpoint = '/v1/orders';
+      case "create_order":
+        endpoint = "/v1/orders";
         break;
-      case 'track':
+      case "track":
         endpoint = `/v1/trackings/${payload?.tracking_id}`;
-        method = 'GET';
+        method = "GET";
         break;
-      case 'maps': {
+      case "maps": {
         // Validate input before building URL
         const validation = validateMapsInput(payload?.input);
         if (!validation.valid) {
           return new Response(JSON.stringify({ error: validation.error }), {
             status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
         endpoint = `/v1/maps/areas?input=${encodeURIComponent(validation.sanitized!)}&type=single`;
-        method = 'GET';
+        method = "GET";
         break;
       }
-      case 'couriers':
-        endpoint = '/v1/couriers';
-        method = 'GET';
+      case "couriers":
+        endpoint = "/v1/couriers";
+        method = "GET";
         break;
       default:
-        return new Response(JSON.stringify({ error: 'Invalid action specified' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return new Response(
+          JSON.stringify({ error: "Invalid action specified" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
     }
 
     const biteshipUrl = `${BITESHIP_API_URL}${endpoint}`;
     const authPrefix =
-      BITESHIP_API_KEY.startsWith('biteship_live.') || BITESHIP_API_KEY.startsWith('biteship_test.')
-        ? ''
-        : 'biteship_test.';
+      BITESHIP_API_KEY.startsWith("biteship_live.") ||
+      BITESHIP_API_KEY.startsWith("biteship_test.")
+        ? ""
+        : "biteship_test.";
     const authKey = `${authPrefix}${BITESHIP_API_KEY}`;
 
     const fetchOptions: RequestInit = {
       method: method,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         authorization: authKey,
       },
     };
 
-    if (method !== 'GET' && requestPayload) {
+    if (method !== "GET" && requestPayload) {
       fetchOptions.body = JSON.stringify(requestPayload);
     }
 
-    if (action === 'rates') {
-      console.log('[biteship] rates payload:', JSON.stringify(getLoggablePayload(requestPayload)));
+    if (action === "rates") {
+      console.log(
+        "[biteship] rates payload:",
+        JSON.stringify(getLoggablePayload(requestPayload)),
+      );
     }
 
     console.log(`[biteship] Calling: ${method} ${biteshipUrl}`);
@@ -481,15 +547,15 @@ Deno.serve(async (req: Request) => {
       );
       return new Response(JSON.stringify({ error: data }), {
         status: biteshipResponse.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     let responseData = data;
-    if (action === 'create_order') {
-      const biteshipOrderId = getNestedString(data, ['id']);
-      const waybillId = getNestedString(data, ['courier', 'waybill_id']);
-      const trackingId = getNestedString(data, ['courier', 'tracking_id']);
+    if (action === "create_order") {
+      const biteshipOrderId = getNestedString(data, ["id"]);
+      const waybillId = getNestedString(data, ["courier", "waybill_id"]);
+      const trackingId = getNestedString(data, ["courier", "tracking_id"]);
 
       responseData = {
         ...(isRecord(data) ? data : {}),
@@ -501,57 +567,60 @@ Deno.serve(async (req: Request) => {
 
       if (requestPayload?.order_id && biteshipOrderId) {
         const adminClient = getSupabaseAdminClient();
-        const updatePayload: Record<string, unknown> = {
-          biteship_order_id: biteshipOrderId,
-          updated_at: new Date().toISOString(),
-        };
-        if (waybillId) {
-          updatePayload.waybill_number = waybillId;
-          updatePayload.status = 'shipped';
-        }
-
-        const { error: updateError } = await adminClient
-          .from('orders')
-          .update(updatePayload)
-          .eq('id', requestPayload.order_id);
-
-        if (updateError) {
+        try {
+          await persistBiteshipShipment(adminClient, {
+            orderId: String(requestPayload.order_id),
+            biteshipOrderId,
+            waybillNumber: waybillId,
+            actorType: "system",
+            metadata: {
+              source: "biteship_proxy",
+              tracking_id: trackingId,
+            },
+          });
+        } catch {
           return new Response(
-            JSON.stringify({ error: 'Failed to update order shipping details' }),
+            JSON.stringify({
+              error: "Failed to update order shipping details",
+            }),
             {
               status: 500,
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
             },
           );
         }
       }
     }
 
-    if (action === 'couriers') {
-      const couriers = isRecord(data) && Array.isArray(data.couriers) ? data.couriers : [];
+    if (action === "couriers") {
+      const couriers =
+        isRecord(data) && Array.isArray(data.couriers) ? data.couriers : [];
       return new Response(JSON.stringify(couriers), {
         status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (action === 'rates') {
+    if (action === "rates") {
       responseData = filterRatesByEnabledServices(responseData, settings!);
     }
 
     return new Response(JSON.stringify(responseData), {
       status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
+    const message = error instanceof Error ? error.message : "Unknown error";
 
     // Log full error internally for debugging
-    console.error('[biteship] Internal error:', { message, error: String(error) });
+    console.error("[biteship] Internal error:", {
+      message,
+      error: String(error),
+    });
 
     // Return generic error message to client - never leak internal error details
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });
   }

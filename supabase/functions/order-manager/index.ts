@@ -18,6 +18,14 @@ type OrderManagerRequest = {
 };
 
 const BITESHIP_BASE_URL = "https://api.biteship.com/v1";
+
+declare const Deno: {
+  serve: (handler: (req: Request) => Response | Promise<Response>) => void;
+  env: {
+    get: (key: string) => string | undefined;
+  };
+};
+
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const JWKS = createRemoteJWKSet(
   new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`),
@@ -88,7 +96,7 @@ async function requireAdmin(req: Request): Promise<{ userId: string }> {
   return { userId };
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -117,7 +125,9 @@ Deno.serve(async (req) => {
     const adminClient = getSupabaseAdminClient();
     const { data: order, error: orderError } = await adminClient
       .from("orders")
-      .select("id, status, payment_status, waybill_number, biteship_order_id")
+      .select(
+        "id, status, payment_status, waybill_number, waybill_source, biteship_order_id",
+      )
       .eq("id", body.orderId)
       .single();
 
@@ -222,20 +232,23 @@ Deno.serve(async (req) => {
         throw updateError;
       }
 
-      const { error: activityError } = await adminClient.from("order_activities").insert({
-        order_id: body.orderId,
-        action: "status_update",
-        old_status: order.status,
-        new_status: to,
-        actor_id: userId,
-        actor_type: "admin",
-        metadata: {
-          notes: body.payload?.notes ?? null,
-          waybill: nextWaybill,
-          waybill_source: body.payload?.waybill_source ?? null,
-          override_reason: body.payload?.waybill_override_reason ?? null,
-        },
-      });
+      const { error: activityError } = await adminClient
+        .from("order_activities")
+        .insert({
+          order_id: body.orderId,
+          action: "status_update",
+          old_status: order.status,
+          new_status: to,
+          actor_id: userId,
+          actor_type: "admin",
+          metadata: {
+            notes: body.payload?.notes ?? null,
+            waybill: nextWaybill,
+            waybill_source:
+              updatePayload.waybill_source ?? order.waybill_source ?? null,
+            override_reason: body.payload?.waybill_override_reason ?? null,
+          },
+        });
 
       if (activityError) {
         console.error("[order-manager] Failed to log activity:", activityError);
@@ -311,37 +324,49 @@ Deno.serve(async (req) => {
         );
       }
 
+      const syncWaybill = waybill || order.waybill_number || null;
+      const syncWaybillSource = waybill
+        ? "system"
+        : (order.waybill_source ?? null);
+
       const { data: updated, error: updateError } = await adminClient
         .from("orders")
         .update({
           status: nextStatus,
-          waybill_number: waybill || order.waybill_number || null,
+          waybill_number: syncWaybill,
+          waybill_source: syncWaybillSource,
           updated_at: new Date().toISOString(),
         })
         .eq("id", body.orderId)
-        .select("id, status, waybill_number, updated_at")
+        .select("id, status, waybill_number, waybill_source, updated_at")
         .single();
 
       if (updateError) {
         throw updateError;
       }
 
-      const { error: syncActivityError } = await adminClient.from("order_activities").insert({
-        order_id: body.orderId,
-        action: "sync_tracking",
-        old_status: order.status,
-        new_status: nextStatus,
-        actor_id: userId,
-        actor_type: "admin",
-        metadata: {
-          biteship_order_id: order.biteship_order_id,
-          biteship_status: trackingStatus,
-          waybill,
-        },
-      });
+      const { error: syncActivityError } = await adminClient
+        .from("order_activities")
+        .insert({
+          order_id: body.orderId,
+          action: "sync_tracking",
+          old_status: order.status,
+          new_status: nextStatus,
+          actor_id: userId,
+          actor_type: "admin",
+          metadata: {
+            biteship_order_id: order.biteship_order_id,
+            biteship_status: trackingStatus,
+            waybill: syncWaybill,
+            waybill_source: syncWaybillSource,
+          },
+        });
 
       if (syncActivityError) {
-        console.error("[order-manager] Failed to log sync activity:", syncActivityError);
+        console.error(
+          "[order-manager] Failed to log sync activity:",
+          syncActivityError,
+        );
       }
 
       return new Response(JSON.stringify({ success: true, data: updated }), {

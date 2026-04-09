@@ -1,6 +1,4 @@
-/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
-
-import { getSupabaseAdminClient } from './supabase.ts';
+import { getSupabaseAdminClient } from "./supabase.ts";
 
 interface BiteshipOrderItem {
   name: string;
@@ -40,7 +38,7 @@ type BiteshipOrderPayload = {
   destination_coordinate?: { latitude: number; longitude: number };
   courier_company: string;
   courier_type: string;
-  delivery_type: 'now' | 'scheduled';
+  delivery_type: "now" | "scheduled";
   delivery_date?: string;
   delivery_time?: string;
   items: BiteshipOrderItem[];
@@ -75,13 +73,24 @@ export interface StoreSettings {
   origin_area_id: string | null;
 }
 
+export type ShippingActivityActorType = "admin" | "system";
+
+interface PersistBiteshipShipmentParams {
+  orderId: string;
+  biteshipOrderId: string;
+  waybillNumber?: string | null;
+  actorType: ShippingActivityActorType;
+  actorId?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
 function normalizeStorePostalCode(value: unknown): string | null {
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     const normalizedValue = value.trim();
     return /^[1-9][0-9]{4}$/.test(normalizedValue) ? normalizedValue : null;
   }
 
-  if (typeof value === 'number' && Number.isInteger(value)) {
+  if (typeof value === "number" && Number.isInteger(value)) {
     const normalizedValue = String(value);
     return /^[1-9][0-9]{4}$/.test(normalizedValue) ? normalizedValue : null;
   }
@@ -90,11 +99,11 @@ function normalizeStorePostalCode(value: unknown): string | null {
 }
 
 function normalizeStoreCoordinate(value: unknown): number | null {
-  if (typeof value === 'number') {
+  if (typeof value === "number") {
     return Number.isFinite(value) ? value : null;
   }
 
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     const normalizedValue = value.trim();
     if (!normalizedValue) {
       return null;
@@ -111,11 +120,15 @@ function hasStoreOriginPostalCode(settings: StoreSettings): boolean {
   return normalizeStorePostalCode(settings.origin_postal_code) !== null;
 }
 
-export function getRequiredStoreOriginPostalCode(settings: StoreSettings): string {
-  const originPostalCode = normalizeStorePostalCode(settings.origin_postal_code);
+export function getRequiredStoreOriginPostalCode(
+  settings: StoreSettings,
+): string {
+  const originPostalCode = normalizeStorePostalCode(
+    settings.origin_postal_code,
+  );
   if (!originPostalCode) {
     throw new Error(
-      'Missing origin_postal_code in settings table. Configure a valid 5-digit Indonesian shipping origin postal code starting with digits 1-9 before creating Biteship orders.',
+      "Missing origin_postal_code in settings table. Configure a valid 5-digit Indonesian shipping origin postal code starting with digits 1-9 before creating Biteship orders.",
     );
   }
 
@@ -123,22 +136,30 @@ export function getRequiredStoreOriginPostalCode(settings: StoreSettings): strin
 }
 
 function hasStoreOriginCoordinates(settings: StoreSettings): boolean {
-  return settings.origin_latitude !== null && settings.origin_longitude !== null;
+  return (
+    settings.origin_latitude !== null && settings.origin_longitude !== null
+  );
 }
 
-export function assertStoreSettingsHaveRateOrigin(settings: StoreSettings): void {
-  if (settings.origin_area_id || hasStoreOriginCoordinates(settings) || hasStoreOriginPostalCode(settings)) {
+export function assertStoreSettingsHaveRateOrigin(
+  settings: StoreSettings,
+): void {
+  if (
+    settings.origin_area_id ||
+    hasStoreOriginCoordinates(settings) ||
+    hasStoreOriginPostalCode(settings)
+  ) {
     return;
   }
 
   throw new Error(
-    'Missing shipping origin configuration. Set origin_area_id, origin coordinates, or origin_postal_code in settings table.',
+    "Missing shipping origin configuration. Set origin_area_id, origin coordinates, or origin_postal_code in settings table.",
   );
 }
 
 interface EnabledCourierServiceSelection {
   companyCode: string;
-  serviceCode: string | '*';
+  serviceCode: string | "*";
 }
 
 interface BiteshipRatePricing {
@@ -147,31 +168,36 @@ interface BiteshipRatePricing {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === "object" && value !== null;
 }
 
-function normalizeEnabledCourierSelection(value: string): EnabledCourierServiceSelection | null {
+function normalizeEnabledCourierSelection(
+  value: string,
+): EnabledCourierServiceSelection | null {
   const trimmedValue = value.trim().toLowerCase();
   if (!trimmedValue) {
     return null;
   }
 
-  const [companyCode, ...serviceParts] = trimmedValue.split(':');
+  const [companyCode, ...serviceParts] = trimmedValue.split(":");
   const normalizedCompanyCode = companyCode.trim();
   if (!normalizedCompanyCode) {
     return null;
   }
 
   if (serviceParts.length === 0) {
-    return { companyCode: normalizedCompanyCode, serviceCode: '*' };
+    return { companyCode: normalizedCompanyCode, serviceCode: "*" };
   }
 
-  const normalizedServiceCode = serviceParts.join(':').trim();
+  const normalizedServiceCode = serviceParts.join(":").trim();
   if (!normalizedServiceCode) {
     return null;
   }
 
-  return { companyCode: normalizedCompanyCode, serviceCode: normalizedServiceCode };
+  return {
+    companyCode: normalizedCompanyCode,
+    serviceCode: normalizedServiceCode,
+  };
 }
 
 function parseEnabledCourierServices(
@@ -182,7 +208,7 @@ function parseEnabledCourierServices(
   }
 
   const selections = new Map<string, EnabledCourierServiceSelection>();
-  for (const rawSelection of value.split(',')) {
+  for (const rawSelection of value.split(",")) {
     const normalizedSelection = normalizeEnabledCourierSelection(rawSelection);
     if (!normalizedSelection) {
       continue;
@@ -204,27 +230,31 @@ function serializeEnabledCourierServices(
 
   return selections
     .map((selection) =>
-      selection.serviceCode === '*'
+      selection.serviceCode === "*"
         ? selection.companyCode
         : `${selection.companyCode}:${selection.serviceCode}`,
     )
-    .join(',');
+    .join(",");
 }
 
 export function getEnabledCouriers(settings: StoreSettings): string {
   const selections = parseEnabledCourierServices(settings.enabled_couriers);
   if (selections.length === 0) {
-    return '';
+    return "";
   }
 
-  return Array.from(new Set(selections.map((selection) => selection.companyCode))).join(',');
+  return Array.from(
+    new Set(selections.map((selection) => selection.companyCode)),
+  ).join(",");
 }
 
 export function filterRatesByEnabledServices(
   responseData: unknown,
   settings: StoreSettings,
 ): unknown {
-  const enabledSelections = parseEnabledCourierServices(settings.enabled_couriers);
+  const enabledSelections = parseEnabledCourierServices(
+    settings.enabled_couriers,
+  );
   if (!isRecord(responseData) || !Array.isArray(responseData.pricing)) {
     return responseData;
   }
@@ -238,7 +268,8 @@ export function filterRatesByEnabledServices(
 
   const allowedServicesByCompany = new Map<string, Set<string>>();
   for (const selection of enabledSelections) {
-    const companyServices = allowedServicesByCompany.get(selection.companyCode) ?? new Set<string>();
+    const companyServices =
+      allowedServicesByCompany.get(selection.companyCode) ?? new Set<string>();
     companyServices.add(selection.serviceCode);
     allowedServicesByCompany.set(selection.companyCode, companyServices);
   }
@@ -260,7 +291,7 @@ export function filterRatesByEnabledServices(
       return false;
     }
 
-    return allowedServices.has('*') || allowedServices.has(serviceCode);
+    return allowedServices.has("*") || allowedServices.has(serviceCode);
   });
 
   return {
@@ -280,7 +311,9 @@ export function isCourierServiceEnabled(
     return false;
   }
 
-  const enabledSelections = parseEnabledCourierServices(settings.enabled_couriers);
+  const enabledSelections = parseEnabledCourierServices(
+    settings.enabled_couriers,
+  );
   if (enabledSelections.length === 0) {
     return false;
   }
@@ -288,7 +321,8 @@ export function isCourierServiceEnabled(
   return enabledSelections.some((selection) => {
     return (
       selection.companyCode === normalizedCompanyCode &&
-      (selection.serviceCode === '*' || selection.serviceCode === normalizedServiceCode)
+      (selection.serviceCode === "*" ||
+        selection.serviceCode === normalizedServiceCode)
     );
   });
 }
@@ -302,7 +336,7 @@ export function assertCompleteStoreSettings(settings: StoreSettings): void {
     !settings.store_address
   ) {
     throw new Error(
-      'Missing shop shipper configuration. Ensure store_name, phone_number, email, organization, and store_address are set in settings table.',
+      "Missing shop shipper configuration. Ensure store_name, phone_number, email, organization, and store_address are set in settings table.",
     );
   }
 
@@ -321,7 +355,11 @@ interface OrderItem {
   quantity?: number;
 }
 
-function getRequiredTrimmedValue(value: string | null | undefined, fieldLabel: string, orderId: string): string {
+function getRequiredTrimmedValue(
+  value: string | null | undefined,
+  fieldLabel: string,
+  orderId: string,
+): string {
   const normalizedValue = value?.trim();
 
   if (!normalizedValue) {
@@ -331,7 +369,11 @@ function getRequiredTrimmedValue(value: string | null | undefined, fieldLabel: s
   return normalizedValue;
 }
 
-function getRequiredOrderItemName(item: OrderItem, orderId: string, itemIndex: number): string {
+function getRequiredOrderItemName(
+  item: OrderItem,
+  orderId: string,
+  itemIndex: number,
+): string {
   const productName = item.products?.name?.trim();
 
   if (!productName) {
@@ -343,7 +385,11 @@ function getRequiredOrderItemName(item: OrderItem, orderId: string, itemIndex: n
   return productName;
 }
 
-function getRequiredOrderItemWeight(item: OrderItem, orderId: string, itemIndex: number): number {
+function getRequiredOrderItemWeight(
+  item: OrderItem,
+  orderId: string,
+  itemIndex: number,
+): number {
   const rawWeight = item.products?.weight;
   const parsedWeight = Number(rawWeight);
 
@@ -359,6 +405,7 @@ function getRequiredOrderItemWeight(item: OrderItem, orderId: string, itemIndex:
 
 interface Order {
   id: string;
+  midtrans_order_id?: string | null;
   tracking_id?: string | null;
   origin_area_id: string;
   destination_area_id: string | null;
@@ -380,29 +427,31 @@ interface Order {
 export async function getStoreSettings(): Promise<StoreSettings> {
   const adminClient = getSupabaseAdminClient();
   const { data, error } = await adminClient
-    .from('settings')
+    .from("settings")
     .select(
-      'store_name, phone_number, email, organization, store_address, enabled_couriers, origin_postal_code, origin_latitude, origin_longitude, origin_area_id',
+      "store_name, phone_number, email, organization, store_address, enabled_couriers, origin_postal_code, origin_latitude, origin_longitude, origin_area_id",
     )
-    .eq('id', 1)
+    .eq("id", 1)
     .maybeSingle();
 
   if (error) {
-    console.error('[getStoreSettings] Database error:', error);
+    console.error("[getStoreSettings] Database error:", error);
     throw new Error(`Failed to fetch store settings: ${error.message}`);
   }
 
   if (!data) {
-    throw new Error('Store settings not found (expected row with id=1)');
+    throw new Error("Store settings not found (expected row with id=1)");
   }
 
   return {
-    store_name: data.store_name || '',
-    phone_number: data.phone_number || '',
-    email: data.email || '',
-    organization: data.organization || '',
-    store_address: data.store_address || '',
-    enabled_couriers: serializeEnabledCourierServices(parseEnabledCourierServices(data.enabled_couriers)),
+    store_name: data.store_name || "",
+    phone_number: data.phone_number || "",
+    email: data.email || "",
+    organization: data.organization || "",
+    store_address: data.store_address || "",
+    enabled_couriers: serializeEnabledCourierServices(
+      parseEnabledCourierServices(data.enabled_couriers),
+    ),
     origin_postal_code: normalizeStorePostalCode(data.origin_postal_code),
     origin_latitude: normalizeStoreCoordinate(data.origin_latitude),
     origin_longitude: normalizeStoreCoordinate(data.origin_longitude),
@@ -410,22 +459,82 @@ export async function getStoreSettings(): Promise<StoreSettings> {
   };
 }
 
+export async function persistBiteshipShipment(
+  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  params: PersistBiteshipShipmentParams,
+): Promise<void> {
+  const normalizedWaybillNumber = params.waybillNumber?.trim() || null;
+  const updatePayload: Record<string, unknown> = {
+    biteship_order_id: params.biteshipOrderId,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (normalizedWaybillNumber) {
+    updatePayload.waybill_number = normalizedWaybillNumber;
+    updatePayload.waybill_source = "system";
+  }
+
+  const { error: updateError } = await adminClient
+    .from("orders")
+    .update(updatePayload)
+    .eq("id", params.orderId);
+
+  if (updateError) {
+    throw updateError;
+  }
+
+  const activityPayload: Record<string, unknown> = {
+    order_id: params.orderId,
+    action: "shipping_created",
+    actor_type: params.actorType,
+    metadata: {
+      biteship_order_id: params.biteshipOrderId,
+      waybill_number: normalizedWaybillNumber,
+      waybill_source: normalizedWaybillNumber ? "system" : null,
+      ...(params.metadata ?? {}),
+    },
+  };
+
+  if (params.actorType === "admin" && params.actorId) {
+    activityPayload.actor_id = params.actorId;
+  }
+
+  const { error: activityError } = await adminClient
+    .from("order_activities")
+    .insert(activityPayload);
+
+  if (activityError) {
+    console.error("[biteship] Failed to log shipping activity:", activityError);
+  }
+}
+
 export const createBiteshipOrder = async (
   order: Order,
   apiKey: string,
 ): Promise<BiteshipOrderResponse> => {
-  const BITESHIP_BASE_URL = 'https://api.biteship.com/v1';
+  const BITESHIP_BASE_URL = "https://api.biteship.com/v1";
 
   if (!order.destination_area_id && !order.destination_postal_code) {
-    throw new Error('Missing destination_area_id and destination_postal_code on order');
+    throw new Error(
+      "Missing destination_area_id and destination_postal_code on order",
+    );
   }
-  if (!order.courier_code) throw new Error('Missing courier_code on order');
-  if (!order.courier_service) throw new Error('Missing courier_service on order');
+  if (!order.courier_code) throw new Error("Missing courier_code on order");
+  if (!order.courier_service)
+    throw new Error("Missing courier_service on order");
 
   const settings = await getStoreSettings();
   assertCompleteStoreSettings(settings);
-  if (!isCourierServiceEnabled(settings, order.courier_code, order.courier_service)) {
-    throw new Error(`Disabled courier service: ${order.courier_code}:${order.courier_service}`);
+  if (
+    !isCourierServiceEnabled(
+      settings,
+      order.courier_code,
+      order.courier_service,
+    )
+  ) {
+    throw new Error(
+      `Disabled courier service: ${order.courier_code}:${order.courier_service}`,
+    );
   }
   const shipperName = settings.store_name;
   const shipperPhone = settings.phone_number;
@@ -437,24 +546,24 @@ export const createBiteshipOrder = async (
   const originLongitude = settings.origin_longitude;
   const destinationContactName = getRequiredTrimmedValue(
     order.profiles?.full_name,
-    'Destination contact name',
+    "Destination contact name",
     order.id,
   );
   const destinationContactPhone = getRequiredTrimmedValue(
     order.addresses?.phone_number,
-    'Destination contact phone',
+    "Destination contact phone",
     order.id,
   );
   const destinationAddress = getRequiredTrimmedValue(
     order.addresses?.street_address,
-    'Destination address',
+    "Destination address",
     order.id,
   );
 
   const items: BiteshipOrderItem[] = (order.order_items || []).map(
     (item: OrderItem, index: number): BiteshipOrderItem => ({
       name: getRequiredOrderItemName(item, order.id, index),
-      description: item.products?.description || '',
+      description: item.products?.description || "",
       value: Math.round(Number(item.price_at_purchase)),
       quantity: Number(item.quantity),
       weight: getRequiredOrderItemWeight(item, order.id, index),
@@ -471,13 +580,13 @@ export const createBiteshipOrder = async (
     origin_address: shopAddress,
     origin_postal_code: Number(originPostalCode),
     ...(originLatitude !== null && originLongitude !== null
-       ? {
-           origin_coordinate: {
-             latitude: originLatitude,
-             longitude: originLongitude,
-           },
-         }
-       : {}),
+      ? {
+          origin_coordinate: {
+            latitude: originLatitude,
+            longitude: originLongitude,
+          },
+        }
+      : {}),
 
     destination_contact_name: destinationContactName,
     destination_contact_phone: destinationContactPhone,
@@ -497,22 +606,28 @@ export const createBiteshipOrder = async (
 
     courier_company: order.courier_code,
     courier_type: order.courier_service,
-    delivery_type: 'now',
+    delivery_type: "now",
     items: items,
+    reference_id: order.midtrans_order_id || order.id,
+    metadata: {
+      order_id: order.id,
+      midtrans_order_id: order.midtrans_order_id || null,
+      source: "webhook_side_effects",
+    },
   };
 
   console.log(`[biteship] Creating order for order ${order.id}`);
 
   const authPrefix =
-    apiKey.startsWith('biteship_live.') || apiKey.startsWith('biteship_test.')
-      ? ''
-      : 'biteship_test.';
+    apiKey.startsWith("biteship_live.") || apiKey.startsWith("biteship_test.")
+      ? ""
+      : "biteship_test.";
   const authKey = `${authPrefix}${apiKey}`;
 
   const response = await fetch(`${BITESHIP_BASE_URL}/orders`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       Authorization: authKey,
     },
     body: JSON.stringify(payload),
@@ -522,7 +637,7 @@ export const createBiteshipOrder = async (
 
   if (!response.ok) {
     console.error(`[biteship] API Error:`, JSON.stringify(result));
-    throw new Error(result.message || 'Failed to create Biteship order');
+    throw new Error(result.message || "Failed to create Biteship order");
   }
 
   return result as BiteshipOrderResponse;
