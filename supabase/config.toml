@@ -377,10 +377,28 @@ backend = "postgres"
 [functions.biteship]
 verify_jwt = false
 
+[functions.ban-customer]
+verify_jwt = false
+
+[functions.cleanup-orphan-storage]
+verify_jwt = false
+
+[functions.confirm-midtrans-payment]
+verify_jwt = false
+
 [functions.order-manager]
 verify_jwt = false
 
 [functions.create-snap-token]
+verify_jwt = false
+
+[functions.midtrans-webhook]
+verify_jwt = false
+
+[functions.process-webhook-side-effects]
+verify_jwt = false
+
+[functions.reconcile-pending-midtrans-payments]
 verify_jwt = false
 
 # Experimental features may be deprecated any time
