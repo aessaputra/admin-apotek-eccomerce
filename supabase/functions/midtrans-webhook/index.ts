@@ -457,7 +457,7 @@ Deno.serve(async (req) => {
         order.id,
         true,
         true,
-        !order.biteship_order_id,
+        false, // Defer Biteship courier creation to 'awaiting_shipment' manual transition state
         null,
       );
       existingSideEffectTask = await getSideEffectTask(adminClient, order.id);

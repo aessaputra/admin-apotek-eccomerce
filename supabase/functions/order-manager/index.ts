@@ -2,6 +2,11 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
 import { corsHeaders } from "../_shared/cors.ts";
 import { getSupabaseAdminClient } from "../_shared/supabase.ts";
+import {
+  getSideEffectTask,
+  saveSideEffectTask,
+  triggerWebhookSideEffectProcessor,
+} from "../_shared/webhook-side-effects.ts";
 
 type TransitionPayload = {
   to: string;
@@ -336,6 +341,31 @@ Deno.serve(async (req: Request) => {
       if (activityError) {
         console.error("[order-manager] Failed to log activity:", activityError);
         // Don't throw - order already updated, just log the error
+      }
+
+      // Enqueue courier fulfillment if moving to awaiting_shipment
+      if (to === "awaiting_shipment" && !order.biteship_order_id) {
+        try {
+          const existingTask = await getSideEffectTask(adminClient, body.orderId);
+          await saveSideEffectTask(
+            adminClient,
+            body.orderId,
+            existingTask?.needs_cart_cleanup ?? false, // Preserve existing flag
+            existingTask?.needs_stock ?? false, // Preserve existing flag
+            true, // Enable courier creation
+            existingTask?.last_error ?? null,
+            existingTask?.pending_biteship_order_id ?? null,
+            existingTask?.pending_tracking_id ?? null,
+            existingTask?.pending_waybill_number ?? null,
+            null, // leaseOwner
+            existingTask?.last_error_code ?? null,
+            existingTask?.failed_permanently_at ? true : false,
+          );
+          triggerWebhookSideEffectProcessor(body.orderId);
+        } catch (queueError) {
+          console.error("[order-manager] Failed to enqueue biteship side effect:", queueError);
+          // Non-blocking: we continue since DB status already changed
+        }
       }
 
       return new Response(JSON.stringify({ success: true, data: updated }), {
