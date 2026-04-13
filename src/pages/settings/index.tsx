@@ -57,7 +57,7 @@ const CourierPickerTrigger: React.FC<CourierPickerTriggerProps> = ({
         return null;
       }
 
-      const [_, ...serviceParts] = selection.split(":");
+      const [, ...serviceParts] = selection.split(":");
       const fallbackCourier = getFallbackCourierOption(companyCode);
       const serviceCode = serviceParts.join(":") || "*";
 
@@ -238,7 +238,11 @@ export const Settings: React.FC = () => {
             name="enabled_couriers"
             help={
               <>
-                {translate("settings.fields.couriersHelp", {}, "Pilih layanan kurir yang ingin ditampilkan saat perhitungan ongkir. Anda dapat mengatur jenis layanan untuk setiap kurir.")}
+                {translate(
+                  "settings.fields.couriersHelp",
+                  {},
+                  "Choose which courier services should appear during shipping rate calculation. You can configure service types for each courier."
+                )}
                 {couriersError && (
                   <Typography.Text type="danger" style={{ display: "block", marginTop: 4 }}>
                     {couriersFallback
@@ -267,7 +271,7 @@ export const Settings: React.FC = () => {
             help={translate(
               "settings.fields.originAreaIdHelp",
               {},
-              "Optional for rates when postal code or map coordinates are already configured, but recommended for the most accurate Biteship area matching."
+              "Optional when postal code or map coordinates are already configured, but recommended for the most accurate Biteship area matching."
             )}
           >
             <BiteshipAreaSearch
@@ -315,9 +319,6 @@ export const Settings: React.FC = () => {
               onLocationChange={handleLocationChange}
               height="300px"
             />
-            <Typography.Text type="secondary" style={{ fontSize: "12px", marginTop: "8px", display: "block" }}>
-              {translate("settings.fields.mapHelperText", "Or click directly on the map to select location")}
-            </Typography.Text>
           </Form.Item>
           <Row gutter={16}>
             <Col span={12}>

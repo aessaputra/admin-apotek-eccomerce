@@ -109,7 +109,7 @@ export const CourierPickerModal: React.FC<CourierPickerModalProps> = ({
     }
 
     const fallbackCourier = getFallbackCourierOption(companyCode);
-    const [_, ...serviceParts] = normalizedSelection.split(":");
+    const [, ...serviceParts] = normalizedSelection.split(":");
     const serviceCode = serviceParts.join(":") || "*";
 
     return {
@@ -364,7 +364,11 @@ export const CourierPickerModal: React.FC<CourierPickerModalProps> = ({
                           checked={isSelected}
                           disabled={readOnly}
                           onChange={() => handleServiceToggle(service.key)}
-                          aria-label={`Toggle ${group.companyLabel} ${service.serviceLabel}`}
+                          aria-label={translate(
+                            "settings.courierPicker.serviceToggleAria",
+                            { company: group.companyLabel, service: service.serviceLabel },
+                            `Toggle ${group.companyLabel} ${service.serviceLabel}`
+                          )}
                         />
                       </div>
                     );
