@@ -284,6 +284,18 @@
     "trackingSynced": "Pelacakan Tersinkron",
     "syncFailed": "Sinkronisasi Gagal",
     "trackingSyncSuccess": "Status diperbarui menjadi {{status}}",
+    "biteshipAlertTitle": "Biteship memerlukan perhatian",
+    "biteshipAlertStatusLabel": "Status Biteship",
+    "biteshipAlertUnknown": "Biteship melaporkan kendala pengiriman yang perlu ditinjau manual.",
+    "biteshipAlerts": {
+      "on_hold": "Pengiriman sedang ditahan dan memerlukan perhatian admin.",
+      "rejected": "Pengiriman ditolak oleh kurir atau penerima.",
+      "courier_not_found": "Tidak ada kurir yang tersedia untuk pengiriman ini.",
+      "return_in_transit": "Paket sedang dikembalikan ke pengirim.",
+      "returned": "Paket telah dikembalikan ke pengirim.",
+      "disposed": "Paket dimusnahkan oleh kurir.",
+      "cancelled": "Pengiriman dibatalkan di Biteship."
+    },
     "activityTitle": "Aktivitas Pesanan",
     "noActivities": "Belum ada aktivitas",
     "paymentTypes": {
@@ -320,10 +332,10 @@
     "waybillModeAuto": "Otomatis"
   },
   "orderStatus": {
-    "pending": "Menunggu",
+    "pending": "Menunggu Pembayaran",
     "processing": "Diproses",
     "paid": "Lunas",
-    "awaiting_shipment": "Menunggu Pengiriman",
+    "awaiting_shipment": "Siap Dikirim",
     "shipped": "Diserahkan ke Kurir",
     "in_transit": "Dalam Perjalanan",
     "delivered": "Terkirim",

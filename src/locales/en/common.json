@@ -284,6 +284,18 @@
     "trackingSynced": "Tracking Synced",
     "syncFailed": "Sync Failed",
     "trackingSyncSuccess": "Status updated to {{status}}",
+    "biteshipAlertTitle": "Biteship requires attention",
+    "biteshipAlertStatusLabel": "Biteship status",
+    "biteshipAlertUnknown": "Biteship reported a delivery issue that needs manual review.",
+    "biteshipAlerts": {
+      "on_hold": "Shipment is on hold and requires admin attention.",
+      "rejected": "Shipment was rejected by the courier or recipient.",
+      "courier_not_found": "No courier was available for this shipment.",
+      "return_in_transit": "Package is returning to the sender.",
+      "returned": "Package has been returned to the sender.",
+      "disposed": "Package was disposed by the courier.",
+      "cancelled": "Shipment was cancelled in Biteship."
+    },
     "activityTitle": "Order Activities",
     "noActivities": "No activities yet",
     "paymentTypes": {
@@ -320,10 +332,10 @@
     "waybillModeAuto": "Auto"
   },
   "orderStatus": {
-    "pending": "Pending",
+    "pending": "Awaiting Payment",
     "processing": "Processing",
     "paid": "Paid",
-    "awaiting_shipment": "Awaiting Shipment",
+    "awaiting_shipment": "Ready to Ship",
     "shipped": "Handed to Courier",
     "in_transit": "In Transit",
     "delivered": "Delivered",
