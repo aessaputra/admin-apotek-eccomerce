@@ -255,6 +255,7 @@
       "midtransOrderId": "Midtrans Order ID",
       "midtransTransactionId": "Midtrans Transaction ID",
       "biteshipOrderId": "Biteship Order ID",
+      "biteshipTrackingId": "Biteship Tracking ID",
       "courierCode": "Courier Code",
       "updatedAt": "Updated At"
     },
@@ -282,15 +283,48 @@
     "syncTracking": "Sync Tracking",
     "trackingSynced": "Tracking Synced",
     "syncFailed": "Sync Failed",
+    "trackingSyncSuccess": "Status updated to {{status}}",
     "activityTitle": "Order Activities",
-    "noActivities": "No activities yet"
+    "noActivities": "No activities yet",
+    "paymentTypes": {
+      "bank_transfer": "Bank Transfer",
+      "credit_card": "Credit Card",
+      "gopay": "GoPay",
+      "qris": "QRIS",
+      "shopeepay": "ShopeePay",
+      "cstore": "Convenience Store",
+      "echannel": "Mandiri Bill Payment",
+      "akulaku": "Akulaku",
+      "kredivo": "Kredivo"
+    },
+    "activity": {
+      "actors": {
+        "system": "System",
+        "admin": "Admin"
+      },
+      "paymentSuccess": "Payment verified successfully",
+      "paymentUpdated": "Payment status updated",
+      "statusUpdated": "{{actor}} changed status: {{from}} → {{to}}",
+      "trackingSynced": "Tracking synced from Biteship",
+      "shippingCreated": "Shipping order created in Biteship",
+      "unknown": "{{action}}: {{from}} → {{to}}"
+    },
+    "tooltips": {
+      "statusSystemControlled": "This status is controlled by the system (webhook)",
+      "webhookControlled": "Certain statuses are managed automatically by the webhook",
+      "waybillLocked": "Waybill is locked after shipment",
+      "waybillAuto": "Waybill number comes from Biteship",
+      "waybillManual": "For non-Biteship couriers"
+    },
+    "waybillModeManual": "Manual",
+    "waybillModeAuto": "Auto"
   },
   "orderStatus": {
     "pending": "Pending",
     "processing": "Processing",
     "paid": "Paid",
     "awaiting_shipment": "Awaiting Shipment",
-    "shipped": "Shipped",
+    "shipped": "Handed to Courier",
     "in_transit": "In Transit",
     "delivered": "Delivered",
     "cancelled": "Cancelled"
@@ -413,6 +447,7 @@
       "couriersLoadError": "Failed to load live courier services. Editing is temporarily disabled to avoid saving incomplete data.",
       "originAreaId": "Origin Area",
       "originAreaIdPlaceholder": "Search area, district, or city...",
+      "originAreaIdHelp": "Optional when postal code or map coordinates are already configured, but recommended for the most accurate Biteship area matching.",
       "originPostalCode": "Postal Code",
       "originPostalCodePlaceholder": "Enter postal code",
       "originLatitude": "Latitude",
@@ -420,7 +455,6 @@
       "originLongitude": "Longitude",
       "originLongitudePlaceholder": "Auto-filled from map",
       "mapLocationPicker": "Store Location",
-      "mapHelperText": "Or click directly on the map to select location",
       "storeAddress": "Full Store Address",
       "storeAddressPlaceholder": "Enter full store address",
       "primaryLogo": "Primary Logo",
@@ -436,6 +470,7 @@
       "organizationRequired": "Organization is required for shipping",
       "areaIdRequired": "Origin Area is required",
       "postalCodeRequired": "Postal Code is required",
+      "postalCodeInvalid": "Postal code must be a valid 5-digit Indonesian postal code starting with digits 1-9",
       "latitudeRequired": "Latitude is required",
       "longitudeRequired": "Longitude is required",
       "addressRequired": "Address is required"
@@ -454,9 +489,17 @@
       "disableAllServices": "Disable all services",
       "selectAll": "Select All",
       "clearAll": "Clear All",
+      "serviceToggleAria": "Toggle {{company}} {{service}}",
       "loadError": "Failed to load live courier services. Editing is temporarily disabled to avoid saving incomplete data.",
       "loading": "Loading couriers...",
       "noCouriers": "No couriers available"
+    },
+    "mapLocationPicker": {
+      "searchPlaceholder": "Search pharmacy, clinic, district, or location...",
+      "searchError": "Failed to search locations. Please try again.",
+      "interactionHint": "Or click the map or drag the pin to choose a more precise location.",
+      "selectResultAria": "Select {{location}}",
+      "closeResultsAria": "Close search results"
     },
     "noAreasFound": "No areas found",
     "noCouriersFound": "No couriers available",
