@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
 import { corsHeaders } from "../_shared/cors.ts";
+import { resolveBiteshipStatus } from "../_shared/order-status.ts";
 import { getSupabaseAdminClient } from "../_shared/supabase.ts";
 import {
   getSideEffectTask,
@@ -60,16 +61,6 @@ const MANUAL_WAYBILL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9-]{4,63}$/;
 
 function canTransition(from: string, to: string): boolean {
   return (TRANSITION_RULES[from] || []).includes(to);
-}
-
-function mapBiteshipStatus(status: string, fallback: string): string {
-  const statusMap: Record<string, string> = {
-    allocated: "awaiting_shipment",
-    picked_up: "shipped",
-    in_transit: "in_transit",
-    delivered: "delivered",
-  };
-  return statusMap[status] || fallback;
 }
 
 function canApplySyncedStatus(currentStatus: string, nextStatus: string): boolean {
@@ -494,7 +485,8 @@ Deno.serve(async (req: Request) => {
       const trackingStatus = String(trackingData.status || "");
       const waybill =
         String(trackingData.waybill || trackingData.waybill_id || "") || null;
-      const nextStatus = mapBiteshipStatus(trackingStatus, order.status);
+      const statusResolution = resolveBiteshipStatus(trackingStatus, order.status);
+      const nextStatus = statusResolution.nextStatus;
 
       if (TERMINAL_STATUSES.has(order.status)) {
         return new Response(
@@ -574,6 +566,10 @@ Deno.serve(async (req: Request) => {
             biteship_order_id: order.biteship_order_id,
             tracking_id: trackingId,
             biteship_status: trackingStatus,
+            biteship_status_mapped: statusResolution.mapped,
+            biteship_exception_status: statusResolution.exception?.status ?? null,
+            biteship_exception_alert_type: statusResolution.exception?.alertType ?? null,
+            biteship_exception_message_key: statusResolution.exception?.messageKey ?? null,
             waybill: syncWaybill,
             waybill_source: syncWaybillSource,
           },
