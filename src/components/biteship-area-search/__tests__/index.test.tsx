@@ -3,7 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BiteshipAreaSearch } from "..";
 
 const mocks = vi.hoisted(() => {
-  const translate = vi.fn((key: string, defaultMessage?: string) => defaultMessage ?? key);
+  const translate = vi.fn((key: string, paramsOrFallback?: Record<string, unknown> | string, fallback?: string) => {
+    if (typeof paramsOrFallback === "string") {
+      return paramsOrFallback;
+    }
+
+    return fallback ?? key;
+  });
   const getSession = vi.fn();
   const autoCompleteProps: Array<{
     onSearch: (value: string) => void;

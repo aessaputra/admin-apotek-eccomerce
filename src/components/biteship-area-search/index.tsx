@@ -192,7 +192,7 @@ export const BiteshipAreaSearch: React.FC<BiteshipAreaSearchProps> = ({
         loading ? (
           <Spin size="small" />
         ) : (
-          translate("settings.noAreasFound", "No areas found")
+          translate("settings.noAreasFound", {}, "No areas found")
         )
       }
       filterOption={false}

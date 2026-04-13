@@ -8,6 +8,29 @@ const mocks = vi.hoisted(() => {
   const on = vi.fn();
   const off = vi.fn();
   const markerPosition = { lat: -6.3, lng: 106.9 };
+  const translate = vi.fn((key: string, params?: Record<string, unknown>, fallback?: string) => {
+    if (key === "settings.mapLocationPicker.searchPlaceholder") {
+      return "Cari apotek, klinik, kecamatan, atau lokasi...";
+    }
+
+    if (key === "settings.mapLocationPicker.searchError") {
+      return "Gagal mencari lokasi. Silakan coba lagi.";
+    }
+
+    if (key === "settings.mapLocationPicker.interactionHint") {
+      return "Atau klik pada peta atau seret pin untuk memilih lokasi yang lebih presisi.";
+    }
+
+    if (key === "settings.mapLocationPicker.selectResultAria") {
+      return `Pilih ${params?.location ?? ""}`;
+    }
+
+    if (key === "settings.mapLocationPicker.closeResultsAria") {
+      return "Tutup hasil pencarian";
+    }
+
+    return fallback ?? key;
+  });
 
   return {
     messageError,
@@ -15,8 +38,13 @@ const mocks = vi.hoisted(() => {
     on,
     off,
     markerPosition,
+    translate,
   };
 });
+
+vi.mock("@refinedev/core", () => ({
+  useTranslation: () => ({ translate: mocks.translate }),
+}));
 
 vi.mock("antd", () => ({
   Input: {
@@ -96,6 +124,7 @@ vi.mock("leaflet", () => ({
 describe("MapLocationPicker", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    mocks.translate.mockClear();
     mocks.messageError.mockReset();
     mocks.flyTo.mockReset();
     mocks.on.mockReset();
@@ -144,7 +173,7 @@ describe("MapLocationPicker", () => {
       await vi.advanceTimersByTimeAsync(500);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Select Jakarta Selatan" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pilih Jakarta Selatan" }));
 
     expect(onLocationChange).toHaveBeenCalledWith("-6.200000", "106.800000");
     expect(mocks.flyTo).toHaveBeenCalledWith([-6.2, 106.8], 16, { duration: 1.5 });

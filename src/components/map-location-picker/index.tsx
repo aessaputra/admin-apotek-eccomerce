@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Input, List, Typography, Space, message } from "antd";
+import { useTranslation } from "@refinedev/core";
 import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import { Icon, type LatLngExpression } from "leaflet";
 import "leaflet/dist/leaflet.css";
+import i18n from "../../i18n";
 
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -68,6 +70,7 @@ interface SearchSectionProps {
 }
 
 const SearchSection: React.FC<SearchSectionProps> = ({ onLocationSelect }) => {
+  const { translate } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<NominatimResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -83,12 +86,14 @@ const SearchSection: React.FC<SearchSectionProps> = ({ onLocationSelect }) => {
 
     setIsSearching(true);
     try {
+      const activeLanguage = i18n.resolvedLanguage?.startsWith("en") ? "en" : "id";
+
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=ID&limit=5`,
         {
           headers: {
             "User-Agent": "PharmacyAdminPanel/1.0",
-            "Accept-Language": "id",
+            "Accept-Language": activeLanguage,
           },
         }
       );
@@ -102,12 +107,12 @@ const SearchSection: React.FC<SearchSectionProps> = ({ onLocationSelect }) => {
       setShowResults(data.length > 0);
     } catch (error) {
       console.error("Nominatim search error:", error);
-      message.error("Gagal mencari lokasi. Silakan coba lagi.");
+      message.error(translate("settings.mapLocationPicker.searchError"));
       setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
-  }, []);
+  }, [translate]);
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
@@ -141,7 +146,7 @@ const SearchSection: React.FC<SearchSectionProps> = ({ onLocationSelect }) => {
   return (
     <div style={{ position: "relative", zIndex: 1000 }}>
       <Input.Search
-        placeholder="Cari apotek, klinik, kecamatan, atau lokasi..."
+        placeholder={translate("settings.mapLocationPicker.searchPlaceholder")}
         value={searchQuery}
         onChange={(e) => handleSearchChange(e.target.value)}
         loading={isSearching}
@@ -189,7 +194,7 @@ const SearchSection: React.FC<SearchSectionProps> = ({ onLocationSelect }) => {
               }}
               tabIndex={0}
               role="button"
-              aria-label={`Select ${item.display_name}`}
+              aria-label={translate("settings.mapLocationPicker.selectResultAria", { location: item.display_name }, `Select ${item.display_name}`)}
             >
               <Typography.Text style={{ fontSize: "13px" }}>
                 {item.display_name}
@@ -217,7 +222,7 @@ const SearchSection: React.FC<SearchSectionProps> = ({ onLocationSelect }) => {
             background: "transparent",
           }}
           onClick={() => setShowResults(false)}
-          aria-label="Close search results"
+          aria-label={translate("settings.mapLocationPicker.closeResultsAria")}
         />
       )}
     </div>
@@ -285,6 +290,7 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
   onLocationChange,
   height = "300px",
 }) => {
+  const { translate } = useTranslation();
   const getInitialPosition = useCallback(() => {
     const lat =
       typeof latitude === "string"
@@ -323,7 +329,7 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
   );
 
   const handleLocationSelect = useCallback(
-    (lat: number, lng: number, _displayName: string) => {
+    (lat: number, lng: number) => {
       setPosition({ lat, lng });
       setFlyToPosition({ lat, lng });
       setShouldFly(true);
@@ -341,7 +347,7 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
       <Space direction="vertical" style={{ width: "100%", marginBottom: 12 }}>
         <SearchSection onLocationSelect={handleLocationSelect} />
         <Typography.Text type="secondary" style={{ fontSize: "12px" }}>
-          Atau klik langsung pada peta / seret pin untuk memilih lokasi tepat
+          {translate("settings.mapLocationPicker.interactionHint")}
         </Typography.Text>
       </Space>
 
