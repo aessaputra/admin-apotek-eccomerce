@@ -4,7 +4,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrderShow } from "../orders/show";
 
 const mocks = vi.hoisted(() => {
-  const translate = vi.fn((key: string) => key);
+  const translate = vi.fn((key: string, paramsOrFallback?: Record<string, unknown> | string, fallback?: string) => {
+    if (key.startsWith("orderStatus.") || key.startsWith("paymentStatus.")) {
+      return key;
+    }
+
+    if (typeof paramsOrFallback === "string") {
+      return paramsOrFallback;
+    }
+
+    return fallback ?? key;
+  });
   const useShow = vi.fn();
   const success = vi.fn();
   const error = vi.fn();
@@ -50,8 +60,6 @@ vi.mock("../../utils/functions-error", () => ({
 }));
 
 vi.mock("antd", async () => {
-  const ReactModule = await import("react");
-
   const FormComponent = ({ children, onFinish }: { children: React.ReactNode; onFinish?: (values: Record<string, unknown>) => void }) => (
     <form
       onSubmit={(event) => {
@@ -211,14 +219,14 @@ describe("OrderShow", () => {
     });
 
     expect(screen.getByText("order-1")).not.toBeNull();
-    expect(screen.getByText("settlement")).not.toBeNull();
+    expect(screen.getByText("paymentStatus.settlement")).not.toBeNull();
     expect(screen.getByText("Vitamin C")).not.toBeNull();
     expect(
       screen.getByText((content) => content.includes("orderStatus.awaiting_shipment")),
     ).not.toBeNull();
     expect(screen.queryByText("orderStatus.paid")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Sync" }));
+    fireEvent.click(screen.getByRole("button", { name: "orders.syncTracking" }));
 
     await waitFor(() => {
       expect(mocks.invoke).toHaveBeenCalledWith("order-manager", {
@@ -251,6 +259,32 @@ describe("OrderShow", () => {
       expect(mocks.setFieldsValue).toHaveBeenCalledWith({ status: "delivered", waybill_number: "" });
     });
 
-    expect(screen.queryByRole("button", { name: "Sync" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "orders.syncTracking" })).toBeNull();
+  });
+
+  it("shows only next-step status options for shipped orders", async () => {
+    mocks.useShow.mockReturnValue({
+      result: {
+        id: "order-3",
+        total_amount: 25000,
+        status: "shipped",
+        payment_status: "settlement",
+        waybill_number: "WB999",
+        created_at: "2026-04-01T00:00:00.000Z",
+        order_items: [],
+      },
+      query: { isLoading: false },
+    });
+
+    render(<OrderShow />);
+
+    await waitFor(() => {
+      expect(mocks.setFieldsValue).toHaveBeenCalledWith({ status: "shipped", waybill_number: "WB999" });
+    });
+
+    expect(screen.getByText((content) => content.includes("orderStatus.in_transit"))).not.toBeNull();
+    expect(screen.getByText((content) => content.includes("orderStatus.delivered"))).not.toBeNull();
+    expect(screen.queryByText("orderStatus.shipped,orderStatus.in_transit,orderStatus.delivered")).toBeNull();
+    expect(screen.getByText("orderStatus.in_transit,orderStatus.delivered")).not.toBeNull();
   });
 });

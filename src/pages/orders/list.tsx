@@ -2,6 +2,19 @@ import { List, useTable, ShowButton, FilterDropdown, getDefaultFilter } from "@r
 import { useTranslation } from "@refinedev/core";
 import { Table, Space, Tooltip, Select, Tag } from "antd";
 import { STATUS_COLORS, PAYMENT_COLORS, getStatusOptions, getPaymentOptions } from "../../constants/orders";
+import { getFallbackCourierOption } from "../../constants/couriers";
+
+const formatDisplayLabel = (value: string | null | undefined) => {
+  if (!value) {
+    return "-";
+  }
+
+  return value
+    .split(/[_-]/g)
+    .filter(Boolean)
+    .map((part) => (part.length <= 3 ? part.toUpperCase() : `${part.charAt(0).toUpperCase()}${part.slice(1)}`))
+    .join(" ");
+};
 
 export const OrderList: React.FC = () => {
   const { translate } = useTranslation();
@@ -29,7 +42,7 @@ export const OrderList: React.FC = () => {
           dataIndex="status"
           title={translate("orders.fields.status")}
           render={(v: string) => (
-            <Tag color={STATUS_COLORS[v] ?? "default"}>{v ?? "-"}</Tag>
+            <Tag color={STATUS_COLORS[v] ?? "default"}>{v ? translate(`orderStatus.${v}`, {}, formatDisplayLabel(v)) : "-"}</Tag>
           )}
           filterDropdown={(props) => (
             <FilterDropdown
@@ -56,7 +69,7 @@ export const OrderList: React.FC = () => {
           dataIndex="payment_status"
           title={translate("orders.fields.payment")}
           render={(v: string) => (
-            <Tag color={PAYMENT_COLORS[v] ?? "default"}>{v ?? "-"}</Tag>
+            <Tag color={PAYMENT_COLORS[v] ?? "default"}>{v ? translate(`paymentStatus.${v}`, {}, formatDisplayLabel(v)) : "-"}</Tag>
           )}
           filterDropdown={(props) => (
             <FilterDropdown
@@ -79,8 +92,18 @@ export const OrderList: React.FC = () => {
           )}
           defaultFilteredValue={getDefaultFilter("payment_status", filters, "eq")}
         />
-        <Table.Column dataIndex="payment_type" title={translate("orders.fields.paymentType")} render={(v) => v || "-"} />
-        <Table.Column dataIndex="courier_code" title={translate("orders.fields.courierCode")} render={(v) => v || "-"} />
+        <Table.Column
+          dataIndex="payment_type"
+          title={translate("orders.fields.paymentType")}
+          render={(v: string | null | undefined) => (
+            v ? translate(`orders.paymentTypes.${v}`, {}, formatDisplayLabel(v)) : "-"
+          )}
+        />
+        <Table.Column
+          dataIndex="courier_code"
+          title={translate("orders.fields.courierCode")}
+          render={(v: string | null | undefined) => (v ? getFallbackCourierOption(v).label : "-")}
+        />
         <Table.Column dataIndex="waybill_number" title={translate("orders.fields.waybillNumber")} render={(v) => v || "-"} />
         <Table.Column dataIndex="created_at" title={translate("orders.fields.created")} render={(v) => v ? new Date(v).toLocaleDateString() : "-"} />
         <Table.Column

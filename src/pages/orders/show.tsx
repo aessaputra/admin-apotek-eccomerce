@@ -4,6 +4,7 @@ import { Show, DateField, NumberField } from "@refinedev/antd";
 import { Typography, Table, Tag, Descriptions, Form, Select, Input, Button, Card, App, Timeline, Spin, Tooltip, Switch, Alert, Space } from "antd";
 import { SyncOutlined, InfoCircleOutlined, LockOutlined, WarningOutlined } from "@ant-design/icons";
 import { STATUS_COLORS, PAYMENT_COLORS, getStatusOptions, TRANSITION_RULES } from "../../constants/orders";
+import { getFallbackCourierOption } from "../../constants/couriers";
 import { supabaseClient } from "../../providers/supabase-client";
 import { getFunctionsErrorMessage } from "../../utils/functions-error";
 
@@ -53,6 +54,18 @@ interface Activity {
 const TERMINAL_STATUSES = ["delivered", "cancelled"];
 // Only lock for terminal statuses - shipped can still transition to delivered
 const LOCKED_STATUSES = ["delivered", "cancelled"];
+
+const formatDisplayLabel = (value: string | null | undefined) => {
+  if (!value) {
+    return "-";
+  }
+
+  return value
+    .split(/[_-]/g)
+    .filter(Boolean)
+    .map((part) => (part.length <= 3 ? part.toUpperCase() : `${part.charAt(0).toUpperCase()}${part.slice(1)}`))
+    .join(" ");
+};
 
 export const OrderShow: React.FC = () => {
   const { translate } = useTranslation();
@@ -144,9 +157,14 @@ export const OrderShow: React.FC = () => {
         orderId: record.id,
       });
 
+      const syncedStatus = typeof result?.data?.status === "string" ? result.data.status : undefined;
+      const syncedStatusLabel = syncedStatus
+        ? translate(`orderStatus.${syncedStatus}`, {}, formatDisplayLabel(syncedStatus))
+        : translate("orders.trackingSynced");
+
       modal.success({
         title: translate("orders.trackingSynced"),
-        content: `Status updated to ${result?.data?.status ?? "updated"}`,
+        content: translate("orders.trackingSyncSuccess", { status: syncedStatusLabel }, `Status updated to ${syncedStatusLabel}`),
       });
       loadActivities();
     } catch (err) {
@@ -218,11 +236,11 @@ export const OrderShow: React.FC = () => {
   const allowed = TRANSITION_RULES[current] ?? [];
   const baseOptions = isStatusDropdownLocked
     ? STATUS_OPTIONS.filter((opt) => opt.value === current)
-    : STATUS_OPTIONS.filter((opt) => opt.value === current || allowed.includes(String(opt.value)));
+    : STATUS_OPTIONS.filter((opt) => allowed.includes(String(opt.value)));
   const currentInOptions = STATUS_OPTIONS.some((opt) => opt.value === current);
   const availableStatusOptions = currentInOptions
     ? baseOptions
-    : [...baseOptions, { value: current, label: translate(`orderStatus.${current}`) }];
+    : [...baseOptions, { value: current, label: translate(`orderStatus.${current}`, {}, formatDisplayLabel(current)) }];
 
   useEffect(() => {
     if (record) {
@@ -242,18 +260,50 @@ export const OrderShow: React.FC = () => {
   };
 
   const getActivityText = (activity: Activity) => {
-    const statusFrom = activity.old_status ? translate(`orderStatus.${activity.old_status}`) : "-";
-    const statusTo = activity.new_status ? translate(`orderStatus.${activity.new_status}`) : "-";
-    const actor = activity.actor_type === "system" ? "Sistem" : "Admin";
+    const statusFrom = activity.old_status
+      ? translate(`orderStatus.${activity.old_status}`, {}, formatDisplayLabel(activity.old_status))
+      : "-";
+    const statusTo = activity.new_status
+      ? translate(`orderStatus.${activity.new_status}`, {}, formatDisplayLabel(activity.new_status))
+      : "-";
+    const actor = translate(
+      `orders.activity.actors.${activity.actor_type === "system" ? "system" : "admin"}`,
+      {},
+      activity.actor_type === "system" ? "System" : "Admin"
+    );
+
     switch (activity.action) {
-      case "payment_success": return "Pembayaran berhasil diverifikasi";
-      case "payment_updated": return "Status pembayaran diperbarui";
-      case "status_update": return `${actor} mengubah status: ${statusFrom} → ${statusTo}`;
-      case "sync_tracking": return "Sync tracking dari Biteship";
-      case "shipping_created": return "Order pengiriman dibuat di Biteship";
-      default: return `${activity.action}: ${statusFrom} → ${statusTo}`;
+      case "payment_success":
+        return translate("orders.activity.paymentSuccess", {}, "Payment verified successfully");
+      case "payment_updated":
+        return translate("orders.activity.paymentUpdated", {}, "Payment status updated");
+      case "status_update":
+        return translate(
+          "orders.activity.statusUpdated",
+          { actor, from: statusFrom, to: statusTo },
+          `${actor} changed status: ${statusFrom} → ${statusTo}`
+        );
+      case "sync_tracking":
+        return translate("orders.activity.trackingSynced", {}, "Tracking synced from Biteship");
+      case "shipping_created":
+        return translate("orders.activity.shippingCreated", {}, "Shipping order created in Biteship");
+      default:
+        return translate(
+          "orders.activity.unknown",
+          { action: activity.action, from: statusFrom, to: statusTo },
+          `${activity.action}: ${statusFrom} → ${statusTo}`
+        );
     }
   };
+
+  const paymentTypeLabel = record?.payment_type
+    ? translate(`orders.paymentTypes.${record.payment_type}`, {}, formatDisplayLabel(record.payment_type))
+    : "-";
+  const courierLabel = record?.courier_code ? getFallbackCourierOption(record.courier_code).label : "-";
+  const courierServiceLabel = record?.courier_service ? formatDisplayLabel(record.courier_service) : null;
+  const courierDescription = record?.courier_code
+    ? `${courierLabel}${courierServiceLabel ? ` • ${courierServiceLabel}` : ""}${record.shipping_etd ? ` (${record.shipping_etd})` : ""}`
+    : "-";
 
   const getWaybillSourceBadge = () => {
     if (!record?.waybill_number) return null;
@@ -281,14 +331,20 @@ export const OrderShow: React.FC = () => {
         <Descriptions.Item label={translate("orders.fields.id")}>{record?.id ?? "-"}</Descriptions.Item>
         <Descriptions.Item label={translate("orders.fields.status")}>
           <Tag color={STATUS_COLORS[record?.status ?? ""] ?? "default"}>
-            {record?.status ? translate(`orderStatus.${record.status}`) : "-"}
+            {record?.status ? translate(`orderStatus.${record.status}`, {}, formatDisplayLabel(record.status)) : "-"}
           </Tag>
-          {isStatusDropdownLocked && <Tooltip title="Status ini dikontrol oleh sistem (webhook)"><LockOutlined style={{ marginLeft: 8, color: "#999" }} /></Tooltip>}
+          {isStatusDropdownLocked && (
+            <Tooltip title={translate("orders.tooltips.statusSystemControlled")}>
+              <LockOutlined style={{ marginLeft: 8, color: "#999" }} />
+            </Tooltip>
+          )}
         </Descriptions.Item>
         <Descriptions.Item label={translate("orders.fields.paymentStatus")}>
-          <Tag color={PAYMENT_COLORS[record?.payment_status ?? ""] ?? "default"}>{record?.payment_status ?? "-"}</Tag>
+          <Tag color={PAYMENT_COLORS[record?.payment_status ?? ""] ?? "default"}>
+            {record?.payment_status ? translate(`paymentStatus.${record.payment_status}`, {}, formatDisplayLabel(record.payment_status)) : "-"}
+          </Tag>
         </Descriptions.Item>
-        <Descriptions.Item label={translate("orders.fields.paymentType")}><Text>{record?.payment_type ?? "-"}</Text></Descriptions.Item>
+        <Descriptions.Item label={translate("orders.fields.paymentType")}><Text>{paymentTypeLabel}</Text></Descriptions.Item>
         <Descriptions.Item label={translate("orders.fields.midtransOrderId")}><Text copyable>{record?.midtrans_order_id ?? "-"}</Text></Descriptions.Item>
         <Descriptions.Item label={translate("orders.fields.midtransTransactionId")}><Text copyable>{record?.midtrans_transaction_id ?? "-"}</Text></Descriptions.Item>
         <Descriptions.Item label={translate("orders.fields.date")}><DateField value={record?.created_at} format="LLL" /></Descriptions.Item>
@@ -298,7 +354,7 @@ export const OrderShow: React.FC = () => {
       <Descriptions bordered size="small" column={1}>
         <Descriptions.Item label={translate("orders.fields.productSubtotal")}><NumberField value={record?.total_amount} options={{ style: "currency", currency: "IDR" }} /></Descriptions.Item>
         <Descriptions.Item label={translate("orders.fields.shippingCost")}>{record?.shipping_cost != null ? `Rp ${Number(record.shipping_cost).toLocaleString("id-ID")}` : "-"}</Descriptions.Item>
-        <Descriptions.Item label={translate("orders.fields.courier")}>{record?.courier_code ? `${record.courier_code} - ${record.courier_service ?? ""} (${record.shipping_etd ?? ""})` : "-"}</Descriptions.Item>
+        <Descriptions.Item label={translate("orders.fields.courier")}>{courierDescription}</Descriptions.Item>
         <Descriptions.Item label={translate("orders.fields.waybillNumber")}>
           <Space>
             <Text strong copyable={!!record?.waybill_number}>{record?.waybill_number ?? "-"}</Text>
@@ -307,9 +363,15 @@ export const OrderShow: React.FC = () => {
         </Descriptions.Item>
         <Descriptions.Item label={translate("orders.fields.biteshipOrderId")}>
           <Text copyable>{record?.biteship_order_id ?? "-"}</Text>
-          {canSyncTracking && <Tooltip title={translate("orders.syncTracking")}><Button type="text" icon={<SyncOutlined spin={syncing} />} onClick={handleSyncTracking} loading={syncing} style={{ marginLeft: 8 }} size="small">Sync</Button></Tooltip>}
+          {canSyncTracking && (
+            <Tooltip title={translate("orders.syncTracking")}>
+              <Button type="text" icon={<SyncOutlined spin={syncing} />} onClick={handleSyncTracking} loading={syncing} style={{ marginLeft: 8 }} size="small">
+                {translate("orders.syncTracking")}
+              </Button>
+            </Tooltip>
+          )}
         </Descriptions.Item>
-        <Descriptions.Item label="Biteship Tracking ID">
+        <Descriptions.Item label={translate("orders.fields.biteshipTrackingId")}>
           <Text copyable={!!record?.biteship_tracking_id}>{record?.biteship_tracking_id ?? "-"}</Text>
         </Descriptions.Item>
         <Descriptions.Item label={translate("orders.fields.updatedAt")}>{record?.updated_at ? <DateField value={record.updated_at} format="LLL" /> : "-"}</Descriptions.Item>
@@ -320,7 +382,7 @@ export const OrderShow: React.FC = () => {
           <span>
             {translate("orders.updateOrder")}
             {isStatusDropdownLocked && (
-              <Tooltip title="Status tertentu dikontrol otomatis oleh webhook">
+              <Tooltip title={translate("orders.tooltips.webhookControlled")}>
                 <InfoCircleOutlined style={{ marginLeft: 8, color: "#faad14" }} />
               </Tooltip>
             )}
@@ -333,7 +395,7 @@ export const OrderShow: React.FC = () => {
             name="status"
             label={translate("orders.fields.status")}
             rules={[{ required: true }]}
-            tooltip={isStatusDropdownLocked ? "Status ini dikontrol oleh sistem webhook" : undefined}
+            tooltip={isStatusDropdownLocked ? translate("orders.tooltips.statusSystemControlled") : undefined}
           >
             <Select options={availableStatusOptions} style={{ minWidth: 160 }} disabled={isStatusDropdownLocked || isFormDisabled} />
           </Form.Item>
@@ -349,21 +411,26 @@ export const OrderShow: React.FC = () => {
                       size="small"
                       checked={manualWaybillMode}
                       onChange={setManualWaybillMode}
-                      checkedChildren="Manual"
-                      unCheckedChildren="Auto"
+                      checkedChildren={translate("orders.waybillModeManual")}
+                      unCheckedChildren={translate("orders.waybillModeAuto")}
                     />
                   </Tooltip>
                 )}
               </Space>
             }
-            tooltip={isWaybillFullyLocked ? "Resi terkunci setelah pengiriman" : isWaybillAutoGenerated ? "Nomor resi dari Biteship" : "Untuk kurir non-Biteship"}
+            tooltip={isWaybillFullyLocked
+              ? translate("orders.tooltips.waybillLocked")
+              : isWaybillAutoGenerated
+                ? translate("orders.tooltips.waybillAuto")
+                : translate("orders.tooltips.waybillManual")}
             dependencies={["status"]}
             rules={[
               ({ getFieldValue }) => ({
                 validator(_, value) {
                   if (getFieldValue("status") !== "shipped") return Promise.resolve();
                   if (String(value ?? "").trim()) return Promise.resolve();
-                  return Promise.reject(new Error(translate("orders.waybillRequired", { status: "shipped" })));
+                  const shippedStatusLabel = translate("orderStatus.shipped", {}, formatDisplayLabel("shipped"));
+                  return Promise.reject(new Error(translate("orders.waybillRequired", { status: shippedStatusLabel })));
                 },
               }),
             ]}
@@ -406,7 +473,7 @@ export const OrderShow: React.FC = () => {
       </Card>
 
       <Title level={5} style={{ marginTop: 24 }}>{translate("orders.activityTitle")}</Title>
-      <Card bodyStyle={{ padding: "12px 24px" }}>
+      <Card styles={{ body: { padding: "12px 24px" } }}>
         {loadingActivities ? <Spin /> : activities.length === 0 ? <Text type="secondary">{translate("orders.noActivities")}</Text> : (
           <Timeline items={activities.map((activity) => ({ dot: getActivityIcon(activity.action), children: <div><div>{getActivityText(activity)}</div><Text type="secondary" style={{ fontSize: 12 }}><DateField value={activity.created_at} format="DD/MM/YYYY HH:mm" /></Text></div> }))} />
         )}

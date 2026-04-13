@@ -7,7 +7,17 @@ import { OrderList } from "../orders/list";
 import { ProductList } from "../products/list";
 
 const mocks = vi.hoisted(() => {
-  const translate = vi.fn((key: string) => key);
+  const translate = vi.fn((key: string, paramsOrFallback?: Record<string, unknown> | string, fallback?: string) => {
+    if (key.startsWith("orderStatus.") || key.startsWith("paymentStatus.")) {
+      return key;
+    }
+
+    if (typeof paramsOrFallback === "string") {
+      return paramsOrFallback;
+    }
+
+    return fallback ?? key;
+  });
   const useTable = vi.fn();
   const handleBan = vi.fn();
   const handleUnban = vi.fn();
@@ -259,10 +269,10 @@ describe("list pages", () => {
 
     expect(screen.getByText("order-1")).not.toBeNull();
     expect(screen.getByText("Rp 25.000")).not.toBeNull();
-    expect(screen.getByText("pending")).not.toBeNull();
-    expect(screen.getByText("settlement")).not.toBeNull();
-    expect(screen.getByText("bank_transfer")).not.toBeNull();
-    expect(screen.getByText("jne")).not.toBeNull();
+    expect(screen.getByText("orderStatus.pending")).not.toBeNull();
+    expect(screen.getByText("paymentStatus.settlement")).not.toBeNull();
+    expect(screen.getByText("Bank Transfer")).not.toBeNull();
+    expect(screen.getByText("JNE")).not.toBeNull();
     expect(screen.getByText("WB123")).not.toBeNull();
     expect(screen.getByText("show:orders:order-1")).not.toBeNull();
     expect(screen.getByLabelText("orders.filterStatus")).not.toBeNull();
