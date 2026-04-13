@@ -1,4 +1,8 @@
-import { createBiteshipOrder, persistBiteshipShipment } from "./biteship.ts";
+import {
+  createBiteshipOrder,
+  persistBiteshipShipment,
+} from "./biteship.ts";
+import { fetchOrderShippingAddress } from "./biteship-order-helpers.ts";
 import { getSupabaseAdminClient } from "./supabase.ts";
 import type { BiteshipOrderResponse, Order, OrderItem } from "./types.ts";
 
@@ -214,6 +218,31 @@ export async function saveSideEffectTask(
   }
 }
 
+export async function ensureSettlementSideEffectsQueued(
+  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  orderId: string,
+  paymentStatus: string,
+): Promise<boolean> {
+  if (paymentStatus !== "settlement") {
+    return false;
+  }
+
+  let existingSideEffectTask = await getSideEffectTask(adminClient, orderId);
+  if (!existingSideEffectTask) {
+    await saveSideEffectTask(
+      adminClient,
+      orderId,
+      true,
+      true,
+      false,
+      null,
+    );
+    existingSideEffectTask = await getSideEffectTask(adminClient, orderId);
+  }
+
+  return !!existingSideEffectTask;
+}
+
 export async function claimSideEffectTask(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
   orderId: string,
@@ -323,7 +352,6 @@ async function getOrderForSideEffects(
       `
       *,
       profiles (full_name, phone_number),
-      addresses (*),
       order_items (
         *,
         products (*)
@@ -337,7 +365,13 @@ async function getOrderForSideEffects(
     return null;
   }
 
-  return data as unknown as Order;
+  const order = data as Order;
+  const shippingAddress = await fetchOrderShippingAddress(adminClient, order);
+
+  return {
+    ...order,
+    addresses: shippingAddress,
+  };
 }
 
 async function clearOrderCart(
@@ -582,12 +616,8 @@ export async function processWebhookSideEffectTask(
       for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
           await renewSideEffectTaskLease(adminClient, orderId, leaseOwner);
-          type BiteshipOrderInput = Parameters<typeof createBiteshipOrder>[0];
           biteshipResponse = (await withTimeout(
-            createBiteshipOrder(
-              order as unknown as BiteshipOrderInput,
-              biteshipKey,
-            ),
+            createBiteshipOrder(order, biteshipKey),
             BITESHIP_CALL_TIMEOUT_MS,
             "Biteship request timeout",
           )) as BiteshipOrderResponse;

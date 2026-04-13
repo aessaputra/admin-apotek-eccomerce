@@ -40,10 +40,11 @@ export interface OrderProfile {
 }
 
 export interface OrderAddress {
+  id?: string | null;
   phone_number?: string | null;
   street_address?: string | null;
-  latitude?: string | null;
-  longitude?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface Order {
@@ -67,6 +68,7 @@ export interface Order {
   waybill_source?: "system" | "manual" | null;
   destination_area_id?: string | null;
   destination_postal_code?: number | null;
+  shipping_address_id?: string | null;
   courier_code?: string | null;
   courier_service?: string | null;
   order_items?: OrderItem[] | null;

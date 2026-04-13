@@ -12,8 +12,7 @@ import {
 } from "../_shared/midtrans.ts";
 import { getSupabaseAdminClient } from "../_shared/supabase.ts";
 import {
-  getSideEffectTask,
-  saveSideEffectTask,
+  ensureSettlementSideEffectsQueued,
   triggerWebhookSideEffectProcessor,
 } from "../_shared/webhook-side-effects.ts";
 import type {
@@ -161,7 +160,6 @@ async function getOrderWithRetry(
         `
         *,
         profiles (full_name, phone_number),
-        addresses (*),
         order_items (
           *,
           products (*)
@@ -449,22 +447,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    let existingSideEffectTask = await getSideEffectTask(adminClient, order.id);
-
-    if (persistedPaymentStatus === "settlement" && !existingSideEffectTask) {
-      await saveSideEffectTask(
-        adminClient,
-        order.id,
-        true,
-        true,
-        false, // Defer Biteship courier creation to 'awaiting_shipment' manual transition state
-        null,
-      );
-      existingSideEffectTask = await getSideEffectTask(adminClient, order.id);
-    }
-
-    const shouldRunFulfillment =
-      persistedPaymentStatus === "settlement" && !!existingSideEffectTask;
+    const shouldRunFulfillment = await ensureSettlementSideEffectsQueued(
+      adminClient,
+      order.id,
+      persistedPaymentStatus,
+    );
 
     if (!shouldRunFulfillment) {
       if (!applied && ignorableNoop) {

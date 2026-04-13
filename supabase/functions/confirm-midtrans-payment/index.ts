@@ -11,8 +11,7 @@ import {
 } from "../_shared/midtrans.ts";
 import { getSupabaseAdminClient } from "../_shared/supabase.ts";
 import {
-  getSideEffectTask,
-  saveSideEffectTask,
+  ensureSettlementSideEffectsQueued,
   triggerWebhookSideEffectProcessor,
 } from "../_shared/webhook-side-effects.ts";
 import type {
@@ -135,7 +134,6 @@ Deno.serve(async (req) => {
         `
         *,
         profiles (full_name, phone_number),
-        addresses (*),
         order_items (
           *,
           products (*)
@@ -265,26 +263,14 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Transition was not persisted" }, 409);
     }
 
-    if (persistedPaymentStatus === "settlement") {
-      let existingSideEffectTask = await getSideEffectTask(
+    if (
+      await ensureSettlementSideEffectsQueued(
         adminClient,
         order.id,
-      );
-      if (!existingSideEffectTask) {
-        await saveSideEffectTask(
-          adminClient,
-          order.id,
-          true,
-          true,
-          !order.biteship_order_id,
-          null,
-        );
-        existingSideEffectTask = await getSideEffectTask(adminClient, order.id);
-      }
-
-      if (existingSideEffectTask) {
-        triggerWebhookSideEffectProcessor(order.id);
-      }
+        persistedPaymentStatus,
+      )
+    ) {
+      triggerWebhookSideEffectProcessor(order.id);
     }
 
     return jsonResponse({

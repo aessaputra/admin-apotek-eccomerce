@@ -1,4 +1,8 @@
 import { getSupabaseAdminClient } from "./supabase.ts";
+import {
+  buildBiteshipOrderDestinationFields,
+} from "./biteship-order-helpers.ts";
+import type { Order, OrderItem } from "./types.ts";
 
 interface BiteshipOrderItem {
   name: string;
@@ -353,32 +357,6 @@ export function assertCompleteStoreSettings(settings: StoreSettings): void {
   getRequiredStoreOriginPostalCode(settings);
 }
 
-interface OrderProduct {
-  name: string;
-  description?: string;
-  weight?: number;
-}
-
-interface OrderItem {
-  products?: OrderProduct;
-  price_at_purchase?: number;
-  quantity?: number;
-}
-
-function getRequiredTrimmedValue(
-  value: string | null | undefined,
-  fieldLabel: string,
-  orderId: string,
-): string {
-  const normalizedValue = value?.trim();
-
-  if (!normalizedValue) {
-    throw new Error(`${fieldLabel} is required for Biteship order ${orderId}.`);
-  }
-
-  return normalizedValue;
-}
-
 function getRequiredOrderItemName(
   item: OrderItem,
   orderId: string,
@@ -411,27 +389,6 @@ function getRequiredOrderItemWeight(
   }
 
   return parsedWeight;
-}
-
-interface Order {
-  id: string;
-  midtrans_order_id?: string | null;
-  tracking_id?: string | null;
-  origin_area_id: string;
-  destination_area_id: string | null;
-  destination_postal_code?: number | null;
-  courier_code: string;
-  courier_service: string;
-  order_items?: OrderItem[];
-  profiles?: {
-    full_name?: string;
-  };
-  addresses?: {
-    phone_number?: string;
-    street_address?: string;
-    latitude?: string | null;
-    longitude?: string | null;
-  };
 }
 
 export async function getStoreSettings(): Promise<StoreSettings> {
@@ -577,12 +534,10 @@ async function retrieveBiteshipOrder(
   return result;
 }
 
-export const createBiteshipOrder = async (
+export function buildBiteshipOrderPayload(
   order: Order,
-  apiKey: string,
-): Promise<BiteshipOrderResponse> => {
-  const BITESHIP_BASE_URL = "https://api.biteship.com/v1";
-
+  settings: StoreSettings,
+): BiteshipOrderPayload {
   if (!order.destination_area_id && !order.destination_postal_code) {
     throw new Error(
       "Missing destination_area_id and destination_postal_code on order",
@@ -592,7 +547,6 @@ export const createBiteshipOrder = async (
   if (!order.courier_service)
     throw new Error("Missing courier_service on order");
 
-  const settings = await getStoreSettings();
   assertCompleteStoreSettings(settings);
   if (
     !isCourierServiceEnabled(
@@ -613,21 +567,6 @@ export const createBiteshipOrder = async (
   const originPostalCode = getRequiredStoreOriginPostalCode(settings);
   const originLatitude = settings.origin_latitude;
   const originLongitude = settings.origin_longitude;
-  const destinationContactName = getRequiredTrimmedValue(
-    order.profiles?.full_name,
-    "Destination contact name",
-    order.id,
-  );
-  const destinationContactPhone = getRequiredTrimmedValue(
-    order.addresses?.phone_number,
-    "Destination contact phone",
-    order.id,
-  );
-  const destinationAddress = getRequiredTrimmedValue(
-    order.addresses?.street_address,
-    "Destination address",
-    order.id,
-  );
 
   const items: BiteshipOrderItem[] = (order.order_items || []).map(
     (item: OrderItem, index: number): BiteshipOrderItem => ({
@@ -638,6 +577,7 @@ export const createBiteshipOrder = async (
       weight: getRequiredOrderItemWeight(item, order.id, index),
     }),
   );
+  const destinationFields = buildBiteshipOrderDestinationFields(order);
 
   const payload: BiteshipOrderPayload = {
     shipper_contact_name: shipperName,
@@ -657,21 +597,7 @@ export const createBiteshipOrder = async (
         }
       : {}),
 
-    destination_contact_name: destinationContactName,
-    destination_contact_phone: destinationContactPhone,
-    destination_address: destinationAddress,
-    ...(order.destination_area_id
-      ? { destination_area_id: order.destination_area_id }
-      : { destination_postal_code: Number(order.destination_postal_code) }),
-
-    ...(order.addresses?.latitude && order.addresses?.longitude
-      ? {
-          destination_coordinate: {
-            latitude: Number(order.addresses.latitude),
-            longitude: Number(order.addresses.longitude),
-          },
-        }
-      : {}),
+    ...destinationFields,
 
     courier_company: order.courier_code,
     courier_type: order.courier_service,
@@ -684,6 +610,17 @@ export const createBiteshipOrder = async (
       source: "webhook_side_effects",
     },
   };
+
+  return payload;
+}
+
+export const createBiteshipOrder = async (
+  order: Order,
+  apiKey: string,
+): Promise<BiteshipOrderResponse> => {
+  const BITESHIP_BASE_URL = "https://api.biteship.com/v1";
+  const settings = await getStoreSettings();
+  const payload = buildBiteshipOrderPayload(order, settings);
 
   console.log(`[biteship] Creating order for order ${order.id}`);
 
