@@ -153,7 +153,7 @@ export const Dashboard: React.FC = () => {
                 dataIndex="status"
                 title={translate("dashboard.orderStatus")}
                 render={(v: string) => (
-                  <Tag color={STATUS_COLORS[v] ?? "default"}>{v ?? "-"}</Tag>
+                  <Tag color={STATUS_COLORS[v] ?? "default"}>{v ? translate(`orderStatus.${v}`) : "-"}</Tag>
                 )}
               />
               <Table.Column
