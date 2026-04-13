@@ -50,6 +50,12 @@ interface Activity {
   created_at: string;
 }
 
+interface BiteshipExceptionInfo {
+  status: string;
+  alertType: "warning" | "error" | "info";
+  messageKey: string;
+}
+
 // Statuses where the status dropdown is locked (terminal states)
 const TERMINAL_STATUSES = ["delivered", "cancelled"];
 // Only lock for terminal statuses - shipped can still transition to delivered
@@ -64,6 +70,18 @@ const formatDisplayLabel = (value: string | null | undefined) => {
     .split(/[_-]/g)
     .filter(Boolean)
     .map((part) => (part.length <= 3 ? part.toUpperCase() : `${part.charAt(0).toUpperCase()}${part.slice(1)}`))
+    .join(" ");
+};
+
+const formatBiteshipStatusLabel = (value: string | null | undefined) => {
+  if (!value) {
+    return "-";
+  }
+
+  return value
+    .split(/[_-]/g)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join(" ");
 };
 
@@ -105,6 +123,20 @@ export const OrderShow: React.FC = () => {
 
   // Show override reason field when: manual mode is on AND Biteship order exists (i.e. overriding system waybill)
   const showOverrideReason = manualWaybillMode && hasBiteship && !isWaybillFullyLocked;
+
+  const latestSyncActivity = activities.find((activity) => activity.action === "sync_tracking");
+
+  const latestBiteshipException = latestSyncActivity && typeof latestSyncActivity.metadata?.biteship_exception_status === "string"
+    ? latestSyncActivity
+    : undefined;
+
+  const biteshipExceptionInfo: BiteshipExceptionInfo | null = latestBiteshipException
+    ? {
+        status: String(latestBiteshipException.metadata.biteship_exception_status),
+        alertType: (String(latestBiteshipException.metadata.biteship_exception_alert_type || "warning") as BiteshipExceptionInfo["alertType"]),
+        messageKey: String(latestBiteshipException.metadata.biteship_exception_message_key || ""),
+      }
+    : null;
 
   const loadActivities = useCallback(async () => {
     if (!record?.id) return;
@@ -376,6 +408,29 @@ export const OrderShow: React.FC = () => {
         </Descriptions.Item>
         <Descriptions.Item label={translate("orders.fields.updatedAt")}>{record?.updated_at ? <DateField value={record.updated_at} format="LLL" /> : "-"}</Descriptions.Item>
       </Descriptions>
+
+      {biteshipExceptionInfo && (
+        <Alert
+          style={{ marginTop: 16 }}
+          type={biteshipExceptionInfo.alertType}
+          showIcon
+          message={translate("orders.biteshipAlertTitle")}
+          description={
+            <Space direction="vertical" size={4}>
+              <Text>
+                {translate(
+                  `orders.biteshipAlerts.${biteshipExceptionInfo.messageKey}`,
+                  {},
+                  translate("orders.biteshipAlertUnknown")
+                )}
+              </Text>
+              <Text type="secondary">
+                {translate("orders.biteshipAlertStatusLabel")}: {formatBiteshipStatusLabel(biteshipExceptionInfo.status)}
+              </Text>
+            </Space>
+          }
+        />
+      )}
 
       <Card
         title={

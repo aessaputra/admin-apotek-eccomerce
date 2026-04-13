@@ -138,7 +138,7 @@ vi.mock("antd", async () => {
     Spin: () => <div>loading</div>,
     Tooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Switch: ({ checked, onChange }: { checked?: boolean; onChange?: (checked: boolean) => void }) => <input type="checkbox" checked={checked} onChange={() => onChange?.(!checked)} />,
-    Alert: ({ message }: { message: React.ReactNode }) => <div>{message}</div>,
+    Alert: ({ message, description }: { message: React.ReactNode; description?: React.ReactNode }) => <div><div>{message}</div><div>{description}</div></div>,
     Space: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   };
 });
@@ -175,6 +175,19 @@ describe("OrderShow", () => {
                   actor_type: "admin",
                   metadata: {},
                   created_at: "2026-04-01T10:00:00.000Z",
+                },
+                {
+                  id: "act-2",
+                  action: "sync_tracking",
+                  old_status: "in_transit",
+                  new_status: "in_transit",
+                  actor_type: "admin",
+                  metadata: {
+                    biteship_exception_status: "on_hold",
+                    biteship_exception_alert_type: "warning",
+                    biteship_exception_message_key: "on_hold",
+                  },
+                  created_at: "2026-04-02T10:00:00.000Z",
                 },
               ],
               error: null,
@@ -260,6 +273,96 @@ describe("OrderShow", () => {
     });
 
     expect(screen.queryByRole("button", { name: "orders.syncTracking" })).toBeNull();
+  });
+
+  it("renders a biteship warning when the latest sync reports an exception state", async () => {
+    mocks.useShow.mockReturnValue({
+      result: {
+        id: "order-4",
+        total_amount: 25000,
+        status: "in_transit",
+        payment_status: "settlement",
+        biteship_order_id: "BT-4",
+        biteship_tracking_id: "TR-4",
+        created_at: "2026-04-01T00:00:00.000Z",
+        order_items: [],
+      },
+      query: { isLoading: false },
+    });
+
+    render(<OrderShow />);
+
+    await waitFor(() => {
+      expect(mocks.setFieldsValue).toHaveBeenCalledWith({ status: "in_transit", waybill_number: "" });
+    });
+
+    expect(screen.getByText("orders.biteshipAlertTitle")).not.toBeNull();
+    expect(screen.getByText("orders.biteshipAlertUnknown")).not.toBeNull();
+    expect(screen.getByText((content) => content.includes("orders.biteshipAlertStatusLabel") && content.includes("On Hold"))).not.toBeNull();
+  });
+
+  it("does not keep showing an old biteship warning after a newer healthy sync", async () => {
+    mocks.from.mockReturnValueOnce({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          order: vi.fn(() => ({
+            limit: vi.fn().mockResolvedValue({
+              data: [
+                {
+                  id: "act-healthy",
+                  action: "sync_tracking",
+                  old_status: "shipped",
+                  new_status: "in_transit",
+                  actor_type: "admin",
+                  metadata: {
+                    biteship_status: "dropping_off",
+                    biteship_status_mapped: true,
+                  },
+                  created_at: "2026-04-03T10:00:00.000Z",
+                },
+                {
+                  id: "act-old-warning",
+                  action: "sync_tracking",
+                  old_status: "in_transit",
+                  new_status: "in_transit",
+                  actor_type: "admin",
+                  metadata: {
+                    biteship_exception_status: "on_hold",
+                    biteship_exception_alert_type: "warning",
+                    biteship_exception_message_key: "on_hold",
+                  },
+                  created_at: "2026-04-02T10:00:00.000Z",
+                },
+              ],
+              error: null,
+            }),
+          })),
+        })),
+      })),
+    });
+
+    mocks.useShow.mockReturnValue({
+      result: {
+        id: "order-5",
+        total_amount: 25000,
+        status: "in_transit",
+        payment_status: "settlement",
+        biteship_order_id: "BT-5",
+        biteship_tracking_id: "TR-5",
+        created_at: "2026-04-01T00:00:00.000Z",
+        order_items: [],
+      },
+      query: { isLoading: false },
+    });
+
+    render(<OrderShow />);
+
+    await waitFor(() => {
+      expect(mocks.setFieldsValue).toHaveBeenCalledWith({ status: "in_transit", waybill_number: "" });
+    });
+
+    expect(screen.queryByText("orders.biteshipAlertTitle")).toBeNull();
+    expect(screen.queryByText("orders.biteshipAlertUnknown")).toBeNull();
   });
 
   it("shows only next-step status options for shipped orders", async () => {
