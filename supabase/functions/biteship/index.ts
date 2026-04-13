@@ -4,26 +4,16 @@ import {
   assertCompleteStoreSettings,
   assertStoreSettingsHaveRateOrigin,
   filterRatesByEnabledServices,
-  getRequiredStoreOriginPostalCode,
   getEnabledCouriers,
+  getRequiredStoreOriginPostalCode,
   persistBiteshipShipment,
   getStoreSettings,
   isCourierServiceEnabled,
   type StoreSettings,
 } from "../_shared/biteship.ts";
+import { buildRatesRequestPayloads } from "../_shared/biteship-rates.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { getSupabaseAdminClient } from "../_shared/supabase.ts";
-
-interface BiteshipProxyRequest {
-  action:
-    | "rates"
-    | "track"
-    | "maps"
-    | "draft_order"
-    | "create_order"
-    | "couriers";
-  payload?: Record<string, unknown>;
-}
 
 declare const Deno: {
   serve: (handler: (req: Request) => Response | Promise<Response>) => void;
@@ -42,11 +32,6 @@ const JWKS = createRemoteJWKSet(
   new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`),
 );
 const JWT_ISSUER = `${supabaseUrl}/auth/v1`;
-
-// Validate tracking_id to prevent URL manipulation
-function isValidTrackingId(id: string): boolean {
-  return /^[a-zA-Z0-9_-]+$/.test(id);
-}
 
 // Validate maps input to prevent injection attacks
 function validateMapsInput(input: unknown): {
@@ -228,7 +213,15 @@ Deno.serve(async (req: Request) => {
     }
 
     // 4. Parse request
-    const { action, payload }: BiteshipProxyRequest = await req.json();
+    const requestBody: unknown = await req.json();
+    const action =
+      isRecord(requestBody) && typeof requestBody.action === "string"
+        ? requestBody.action
+        : "";
+    const payload =
+      isRecord(requestBody) && isRecord(requestBody.payload)
+        ? requestBody.payload
+        : undefined;
 
     if (!action) {
       return new Response(JSON.stringify({ error: "Action is required" }), {
@@ -237,8 +230,12 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const isRatesAction = action === "rates";
+    const isCreateOrderAction = action === "create_order";
+    const isTrackAction = action === "track";
+
     // 5. Validate action-specific requirements before fetching settings
-    if (action === "create_order") {
+    if (isCreateOrderAction) {
       return new Response(
         JSON.stringify({
           error:
@@ -251,7 +248,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (action === "track") {
+    if (isTrackAction) {
       return new Response(
         JSON.stringify({
           error:
@@ -264,20 +261,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 6. Validate tracking_id format to prevent URL manipulation
-    if (action === "track" && payload?.tracking_id) {
-      const trackingId = String(payload.tracking_id);
-      if (!isValidTrackingId(trackingId)) {
-        return new Response(
-          JSON.stringify({ error: "Invalid tracking_id format" }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
-      }
-    }
-
     // 7. Build Biteship request
     let endpoint = "";
     let method = "POST";
@@ -286,9 +269,9 @@ Deno.serve(async (req: Request) => {
     // Fetch store settings only for actions that require them
     let settings: StoreSettings | undefined;
     const needsSettings =
-      action === "rates" ||
+      isRatesAction ||
       action === "draft_order" ||
-      action === "create_order";
+      isCreateOrderAction;
 
     if (needsSettings) {
       try {
@@ -305,7 +288,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    if (action === "rates") {
+    if (isRatesAction) {
       try {
         assertStoreSettingsHaveRateOrigin(settings!);
       } catch (error: unknown) {
@@ -356,21 +339,6 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      // Priority: area_id > coordinates > postal_code
-      const originFields = settings!.origin_area_id
-        ? { origin_area_id: settings!.origin_area_id }
-        : settings!.origin_latitude !== null &&
-            settings!.origin_longitude !== null
-          ? {
-              origin_latitude: settings!.origin_latitude,
-              origin_longitude: settings!.origin_longitude,
-            }
-          : {
-              origin_postal_code: Number(
-                getRequiredStoreOriginPostalCode(settings!),
-              ),
-            };
-
       if (!enabledCouriers) {
         return new Response(JSON.stringify({ success: true, pricing: [] }), {
           status: 200,
@@ -378,11 +346,82 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      requestPayload = {
-        ...ratesPayload,
-        ...originFields,
-        couriers: enabledCouriers,
-      };
+      const requestedCouriers =
+        typeof ratesPayload.couriers === "string" && ratesPayload.couriers.trim()
+          ? ratesPayload.couriers
+          : enabledCouriers;
+
+      const [ratePayload] = buildRatesRequestPayloads(
+        settings!,
+        ratesPayload,
+        requestedCouriers,
+      );
+
+      if (!ratePayload) {
+        return new Response(JSON.stringify({ success: true, pricing: [] }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const endpoint = "/v1/rates/couriers";
+      const biteshipUrl = `${BITESHIP_API_URL}${endpoint}`;
+      const authPrefix =
+        BITESHIP_API_KEY.startsWith("biteship_live.") ||
+        BITESHIP_API_KEY.startsWith("biteship_test.")
+          ? ""
+          : "biteship_test.";
+      const authKey = `${authPrefix}${BITESHIP_API_KEY}`;
+
+      console.log(
+        "[biteship] rates payload:",
+        JSON.stringify(getLoggablePayload(ratePayload)),
+      );
+      console.log(`[biteship] Calling: POST ${biteshipUrl}`);
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+
+      let rateResponseData: unknown;
+      let rateResponseStatus = 200;
+
+      try {
+        const biteshipResponse = await fetch(biteshipUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            authorization: authKey,
+          },
+          body: JSON.stringify(ratePayload),
+          signal: controller.signal,
+        });
+
+        rateResponseStatus = biteshipResponse.status;
+        rateResponseData = await biteshipResponse.json();
+
+        if (!biteshipResponse.ok) {
+          console.error(
+            `[biteship] Biteship API error — action: rates, status: ${biteshipResponse.status}, payload: ${JSON.stringify(getLoggablePayload(ratePayload))}, body: ${JSON.stringify(rateResponseData)}`,
+          );
+
+          return new Response(JSON.stringify({ error: rateResponseData }), {
+            status: biteshipResponse.status,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      const filteredRateResponse = filterRatesByEnabledServices(
+        rateResponseData,
+        settings!,
+      );
+
+      return new Response(JSON.stringify(filteredRateResponse), {
+        status: rateResponseStatus,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (action === "create_order") {
