@@ -26,16 +26,27 @@ vi.mock("@refinedev/core", () => ({
 }));
 
 vi.mock("antd", async () => {
-  const ReactModule = await import("react");
-
   const ListComponent = ({ dataSource, renderItem }: { dataSource: unknown[]; renderItem: (item: unknown, index: number) => React.ReactNode }) => (
     <div data-testid="list">
-      {dataSource.map((item, index) => renderItem(item, index))}
+      {dataSource.map((item, index) => {
+        const key =
+          typeof item === "object" &&
+          item !== null &&
+          "id" in item &&
+          typeof (item as { id?: unknown }).id === "string"
+            ? (item as { id: string }).id
+            : String(index);
+
+        return <React.Fragment key={key}>{renderItem(item, index)}</React.Fragment>;
+      })}
     </div>
   );
 
   const CardComponent = ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
-    <button type="button" data-testid="card" onClick={onClick} className="card-mock">{children}</button>
+    onClick ?
+      <button type="button" data-testid="card" onClick={onClick} className="card-mock">{children}</button>
+    :
+      <div data-testid="card" className="card-mock">{children}</div>
   );
 
   return {
@@ -280,11 +291,11 @@ describe("HomeBannerMediaLibrary", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("card")).not.toBeNull();
+      expect(screen.getByTestId("select-area")).not.toBeNull();
     });
 
-    const card = screen.getByTestId("card");
-    fireEvent.click(card);
+    const selectArea = screen.getByTestId("select-area");
+    fireEvent.click(selectArea);
 
     expect(mockOnSelect).toHaveBeenCalledWith("banners/home_banner_top/banner1.webp");
   });

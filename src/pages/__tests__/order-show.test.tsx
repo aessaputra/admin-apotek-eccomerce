@@ -134,7 +134,7 @@ vi.mock("antd", async () => {
         },
       }),
     },
-    Timeline: ({ items }: { items?: Array<{ children: React.ReactNode }> }) => <div>{items?.map((item) => <div key={String(item.children)}>{item.children}</div>)}</div>,
+    Timeline: ({ items }: { items?: Array<{ children: React.ReactNode }> }) => <div>{items?.map((item, index) => <div key={index}>{item.children}</div>)}</div>,
     Spin: () => <div>loading</div>,
     Tooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Switch: ({ checked, onChange }: { checked?: boolean; onChange?: (checked: boolean) => void }) => <input type="checkbox" checked={checked} onChange={() => onChange?.(!checked)} />,

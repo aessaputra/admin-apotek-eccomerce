@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { App, Button, Card, Empty, Flex, Image, List, Modal, Popconfirm, Space, Spin, Typography, message } from "antd";
 import { DeleteOutlined, EyeOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useTranslation } from "@refinedev/core";
-import { getHomeBannerStoragePrefix, isHomeBannerPlacementKey, type HomeBannerPlacementKey } from "../../constants/home-banners";
+import { getHomeBannerStoragePrefix, isHomeBannerPlacementKey } from "../../constants/home-banners";
 import { supabaseClient } from "../../providers/supabase-client";
 import { getPublicUrlFromStoragePath, MEDIA_BUCKET } from "../../utils/storage";
 
@@ -137,19 +137,6 @@ export const HomeBannerMediaLibrary: React.FC<MediaLibraryProps> = ({
     }
   };
 
-  const showDeleteConfirm = (objectPath: string) => {
-    modal.confirm({
-      title: translate("homeBanners.mediaLibrary.deleteConfirmTitle"),
-      content: translate("homeBanners.mediaLibrary.deleteConfirmContent", {
-        filename: getObjectLabel(objectPath),
-      }),
-      okText: translate("homeBanners.mediaLibrary.deleteConfirmOk"),
-      okButtonProps: { danger: true },
-      cancelText: translate("buttons.cancel"),
-      onOk: () => handleDelete(objectPath),
-    });
-  };
-
   if (!resolvedPlacementKey) {
     return (
       <Typography.Text type="secondary">
@@ -181,6 +168,7 @@ export const HomeBannerMediaLibrary: React.FC<MediaLibraryProps> = ({
       ) : (
         <List
           dataSource={objects}
+          rowKey="id"
           renderItem={(item) => {
             const objectPath = `${getHomeBannerStoragePrefix(resolvedPlacementKey)}${item.name}`;
             const publicUrl = getPublicUrlFromStoragePath(objectPath, MEDIA_BUCKET);
@@ -191,43 +179,56 @@ export const HomeBannerMediaLibrary: React.FC<MediaLibraryProps> = ({
               <List.Item>
                 <Card
                   size="small"
-                  hoverable
                   style={{ width: "100%" }}
                   styles={{ body: { padding: 12 } }}
-                  onClick={() => onSelect(objectPath)}
                 >
                   <Flex gap={12} align="center">
-                    <Image
-                      src={publicUrl ?? undefined}
-                      alt={item.name}
-                      width={64}
-                      height={64}
-                      style={{ objectFit: "cover", borderRadius: 4 }}
-                      preview={false}
-                      fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect fill='%23f0f0f0' width='64' height='64'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23999' font-size='10'%3ENo preview%3C/text%3E%3C/svg%3E"
-                    />
-                    <Flex vertical style={{ flex: 1, minWidth: 0 }}>
-                      <Typography.Text
-                        ellipsis
-                        strong={isSelected}
-                        style={{ color: isSelected ? "#1890ff" : undefined }}
-                      >
-                        {getObjectLabel(objectPath)}
-                      </Typography.Text>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        {translate("homeBanners.mediaLibrary.uploadedOn", {
-                          date: formatDate(item.created_at),
-                        })}
-                      </Typography.Text>
-                    </Flex>
+                    <button
+                      type="button"
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        cursor: "pointer",
+                        padding: 0,
+                        border: "none",
+                        background: "transparent",
+                        textAlign: "left",
+                      }}
+                      onClick={() => onSelect(objectPath)}
+                      data-testid="select-area"
+                      aria-pressed={isSelected}
+                    >
+                      <Flex gap={12} align="center">
+                        <Image
+                          src={publicUrl ?? undefined}
+                          alt={item.name}
+                          width={64}
+                          height={64}
+                          style={{ objectFit: "cover", borderRadius: 4 }}
+                          preview={false}
+                          fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect fill='%23f0f0f0' width='64' height='64'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23999' font-size='10'%3ENo preview%3C/text%3E%3C/svg%3E"
+                        />
+                        <Flex vertical style={{ flex: 1, minWidth: 0 }}>
+                          <Typography.Text
+                            ellipsis
+                            strong={isSelected}
+                            style={{ color: isSelected ? "#1890ff" : undefined }}
+                          >
+                            {getObjectLabel(objectPath)}
+                          </Typography.Text>
+                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                            {translate("homeBanners.mediaLibrary.uploadedOn", {
+                              date: formatDate(item.created_at),
+                            })}
+                          </Typography.Text>
+                        </Flex>
+                      </Flex>
+                    </button>
                     <Space>
                       <Button
                         size="small"
                         icon={<EyeOutlined />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePreview(objectPath);
-                        }}
+                        onClick={() => handlePreview(objectPath)}
                       >
                         {translate("homeBanners.mediaLibrary.preview")}
                       </Button>
@@ -236,11 +237,7 @@ export const HomeBannerMediaLibrary: React.FC<MediaLibraryProps> = ({
                         description={translate("homeBanners.mediaLibrary.deleteConfirmContent", {
                           filename: getObjectLabel(objectPath),
                         })}
-                        onConfirm={(e) => {
-                          e?.stopPropagation();
-                          void handleDelete(objectPath);
-                        }}
-                        onCancel={(e) => e?.stopPropagation()}
+                        onConfirm={() => void handleDelete(objectPath)}
                         okText={translate("homeBanners.mediaLibrary.deleteConfirmOk")}
                         cancelText={translate("buttons.cancel")}
                         okButtonProps={{ danger: true, loading: isDeleting }}
@@ -250,7 +247,6 @@ export const HomeBannerMediaLibrary: React.FC<MediaLibraryProps> = ({
                           danger
                           icon={<DeleteOutlined />}
                           loading={isDeleting}
-                          onClick={(e) => e.stopPropagation()}
                         >
                           {translate("homeBanners.mediaLibrary.delete")}
                         </Button>
