@@ -1,7 +1,6 @@
 import { getSupabaseAdminClient } from "./supabase.ts";
-import {
-  buildBiteshipOrderDestinationFields,
-} from "./biteship-order-helpers.ts";
+import { buildBiteshipOrderDestinationFields } from "./biteship-order-helpers.ts";
+import { buildOrderEndpoint } from "./biteship-public-tracking.ts";
 import type { Order, OrderItem } from "./types.ts";
 
 interface BiteshipOrderItem {
@@ -512,15 +511,12 @@ async function retrieveBiteshipOrder(
   orderId: string,
   authKey: string,
 ): Promise<BiteshipOrderResponse> {
-  const response = await fetch(
-    `https://api.biteship.com/v1/orders/${orderId}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: authKey,
-      },
+  const response = await fetch(`https://api.biteship.com${buildOrderEndpoint(orderId)}`, {
+    method: "GET",
+    headers: {
+      Authorization: authKey,
     },
-  );
+  });
 
   const result = (await response.json()) as BiteshipOrderResponse &
     BiteshipApiErrorResponse;

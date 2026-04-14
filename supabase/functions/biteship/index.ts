@@ -11,6 +11,10 @@ import {
   isCourierServiceEnabled,
   type StoreSettings,
 } from "../_shared/biteship.ts";
+import {
+  buildPublicTrackingEndpoint,
+  buildTrackingEndpoint,
+} from "../_shared/biteship-public-tracking.ts";
 import { buildRatesRequestPayloads } from "../_shared/biteship-rates.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { getSupabaseAdminClient } from "../_shared/supabase.ts";
@@ -233,6 +237,8 @@ Deno.serve(async (req: Request) => {
     const isRatesAction = action === "rates";
     const isCreateOrderAction = action === "create_order";
     const isTrackAction = action === "track";
+    const isTrackPublicAction = action === "track_public";
+    let publicTrackingPayload: Record<string, unknown> | undefined;
 
     // 5. Validate action-specific requirements before fetching settings
     if (isCreateOrderAction) {
@@ -261,17 +267,77 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    if (isTrackPublicAction) {
+      const orderId =
+        isRecord(payload) && typeof payload.order_id === "string"
+          ? payload.order_id.trim()
+          : "";
+
+      if (!orderId) {
+        return new Response(JSON.stringify({ error: "order_id is required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const adminClient = getSupabaseAdminClient();
+      const { data: order, error: orderError } = await adminClient
+        .from("orders")
+        .select("id, user_id, waybill_number, courier_code, status")
+        .eq("id", orderId)
+        .eq("user_id", userId)
+        .single();
+
+      if (orderError || !order) {
+        return new Response(JSON.stringify({ error: "Order not found" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!order.waybill_number?.trim()) {
+        return new Response(
+          JSON.stringify({
+            error: "Waybill number is not available for this order yet",
+          }),
+          {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      if (!order.courier_code?.trim()) {
+        return new Response(
+          JSON.stringify({
+            error: "Courier code is not available for this order",
+          }),
+          {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      publicTrackingPayload = {
+        order_id: order.id,
+        waybill_id: order.waybill_number,
+        courier_code: order.courier_code,
+      };
+    }
+
     // 7. Build Biteship request
     let endpoint = "";
     let method = "POST";
     let requestPayload = isRecord(payload) ? payload : undefined;
+    if (publicTrackingPayload) {
+      requestPayload = publicTrackingPayload;
+    }
 
     // Fetch store settings only for actions that require them
     let settings: StoreSettings | undefined;
     const needsSettings =
-      isRatesAction ||
-      action === "draft_order" ||
-      isCreateOrderAction;
+      isRatesAction || action === "draft_order" || isCreateOrderAction;
 
     if (needsSettings) {
       try {
@@ -347,7 +413,8 @@ Deno.serve(async (req: Request) => {
       }
 
       const requestedCouriers =
-        typeof ratesPayload.couriers === "string" && ratesPayload.couriers.trim()
+        typeof ratesPayload.couriers === "string" &&
+        ratesPayload.couriers.trim()
           ? ratesPayload.couriers
           : enabledCouriers;
 
@@ -499,9 +566,23 @@ Deno.serve(async (req: Request) => {
         endpoint = "/v1/orders";
         break;
       case "track":
-        endpoint = `/v1/trackings/${payload?.tracking_id}`;
+        endpoint = buildTrackingEndpoint(
+          typeof payload?.tracking_id === "string" ? payload.tracking_id : "",
+        );
         method = "GET";
         break;
+      case "track_public": {
+        endpoint = buildPublicTrackingEndpoint(
+          typeof requestPayload?.waybill_id === "string"
+            ? requestPayload.waybill_id
+            : "",
+          typeof requestPayload?.courier_code === "string"
+            ? requestPayload.courier_code
+            : "",
+        );
+        method = "GET";
+        break;
+      }
       case "maps": {
         // Validate input before building URL
         const validation = validateMapsInput(payload?.input);
