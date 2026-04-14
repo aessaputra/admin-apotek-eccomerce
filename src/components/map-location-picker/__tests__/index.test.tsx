@@ -198,16 +198,28 @@ describe("MapLocationPicker", () => {
       })
     );
 
-    render(<MapLocationPicker />);
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
 
-    fireEvent.change(screen.getByLabelText("Cari apotek, klinik, kecamatan, atau lokasi..."), {
-      target: { value: "bandung" },
-    });
+    try {
+      render(<MapLocationPicker />);
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(500);
-    });
+      fireEvent.change(screen.getByLabelText("Cari apotek, klinik, kecamatan, atau lokasi..."), {
+        target: { value: "bandung" },
+      });
 
-    expect(mocks.messageError).toHaveBeenCalledWith("Gagal mencari lokasi. Silakan coba lagi.");
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Nominatim search error:",
+        expect.any(Error),
+      );
+      expect(mocks.messageError).toHaveBeenCalledWith("Gagal mencari lokasi. Silakan coba lagi.");
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });
