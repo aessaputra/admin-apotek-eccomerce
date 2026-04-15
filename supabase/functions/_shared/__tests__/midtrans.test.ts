@@ -26,6 +26,7 @@ const baseOrder: Order = {
     receiver_name: "Budi Penerima",
     phone_number: "08121111111",
     street_address: "Jl. Mawar No. 10",
+    address_note: "Blok B lantai 2",
     city: "Jakarta Selatan",
     province: "DKI Jakarta",
     postal_code: "12345",
@@ -80,6 +81,17 @@ describe("buildSnapPayload", () => {
         country_code: "IDN",
       },
     });
+  });
+
+  it("does not merge optional address_note into Midtrans address lines", () => {
+    const payload = buildSnapPayload(baseOrder, authUser);
+
+    expect(payload.customer_details.shipping_address?.address).toBe(
+      "Jl. Mawar No. 10",
+    );
+    expect(payload.customer_details.billing_address?.address).toBe(
+      "Jl. Mawar No. 10",
+    );
   });
 
   it("omits address blocks when shipping address is unavailable", () => {
