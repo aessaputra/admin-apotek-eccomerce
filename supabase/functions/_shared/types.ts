@@ -44,6 +44,7 @@ export interface OrderAddress {
   receiver_name?: string | null;
   phone_number?: string | null;
   street_address?: string | null;
+  address_note?: string | null;
   city?: string | null;
   province?: string | null;
   postal_code?: string | null;

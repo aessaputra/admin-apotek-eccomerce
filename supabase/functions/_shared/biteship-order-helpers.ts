@@ -4,6 +4,7 @@ type BiteshipOrderDestinationFields = {
   destination_contact_name: string;
   destination_contact_phone: string;
   destination_address: string;
+  destination_note?: string;
   destination_coordinate?: {
     latitude: number;
     longitude: number;
@@ -60,6 +61,14 @@ function getDestinationCoordinate(order: Order): {
   return { latitude, longitude };
 }
 
+function getOptionalTrimmedValue(
+  value: string | null | undefined,
+): string | null {
+  const normalizedValue = value?.trim();
+
+  return normalizedValue ? normalizedValue : null;
+}
+
 function requiresDestinationCoordinate(order: Order): boolean {
   return order.courier_service?.trim().toLowerCase() === "instant";
 }
@@ -91,6 +100,13 @@ export function buildBiteshipOrderDestinationFields(
       "Destination address",
       order.id,
     ),
+    ...(getOptionalTrimmedValue(order.addresses?.address_note)
+      ? {
+          destination_note: getOptionalTrimmedValue(
+            order.addresses?.address_note,
+          )!,
+        }
+      : {}),
     ...(order.destination_area_id
       ? { destination_area_id: order.destination_area_id }
       : { destination_postal_code: Number(order.destination_postal_code) }),
@@ -126,7 +142,7 @@ export async function fetchOrderShippingAddress(
   const { data, error } = await adminClient
     .from("addresses")
     .select(
-      "id, receiver_name, phone_number, street_address, city, province, postal_code, country_code, area_id, latitude, longitude",
+      "id, receiver_name, phone_number, street_address, address_note, city, province, postal_code, country_code, area_id, latitude, longitude",
     )
     .eq("id", shippingAddressId)
     .maybeSingle();

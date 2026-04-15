@@ -24,6 +24,7 @@ const baseOrder: Order = {
     receiver_name: "Penerima Utama",
     phone_number: "0811111111",
     street_address: "Jl. Pembeli No. 2",
+    address_note: "Blok A2 dekat pos satpam",
     city: "Jakarta Selatan",
     province: "DKI Jakarta",
     postal_code: "12345",
@@ -53,6 +54,7 @@ describe("fetchOrderShippingAddress", () => {
       receiver_name: "Penerima Utama",
       phone_number: "0811111111",
       street_address: "Jl. Pembeli No. 2",
+      address_note: "Blok A2 dekat pos satpam",
       city: "Jakarta Selatan",
       province: "DKI Jakarta",
       postal_code: "12345",
@@ -70,7 +72,7 @@ describe("fetchOrderShippingAddress", () => {
     };
     const select = (columns: string) => {
       expect(columns).toBe(
-        "id, receiver_name, phone_number, street_address, city, province, postal_code, country_code, area_id, latitude, longitude",
+        "id, receiver_name, phone_number, street_address, address_note, city, province, postal_code, country_code, area_id, latitude, longitude",
       );
       return { eq };
     };
@@ -119,7 +121,20 @@ describe("buildBiteshipOrderPayload", () => {
     });
 
     expect(payload.destination_area_id).toBe("DEST-AREA-ID");
+    expect(payload.destination_note).toBe("Blok A2 dekat pos satpam");
     expect(payload).not.toHaveProperty("destination_coordinate");
+  });
+
+  it("omits destination_note when address_note is blank", () => {
+    const payload = buildBiteshipOrderDestinationFields({
+      ...baseOrder,
+      addresses: {
+        ...baseOrder.addresses!,
+        address_note: "   ",
+      },
+    });
+
+    expect(payload).not.toHaveProperty("destination_note");
   });
 
   it("includes destination_coordinate for instant courier payloads when address has coordinates", () => {

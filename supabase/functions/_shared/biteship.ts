@@ -38,6 +38,7 @@ type BiteshipOrderPayload = {
   destination_contact_name: string;
   destination_contact_phone: string;
   destination_address: string;
+  destination_note?: string;
   destination_coordinate?: { latitude: number; longitude: number };
   courier_company: string;
   courier_type: string;
@@ -511,12 +512,15 @@ async function retrieveBiteshipOrder(
   orderId: string,
   authKey: string,
 ): Promise<BiteshipOrderResponse> {
-  const response = await fetch(`https://api.biteship.com${buildOrderEndpoint(orderId)}`, {
-    method: "GET",
-    headers: {
-      Authorization: authKey,
+  const response = await fetch(
+    `https://api.biteship.com${buildOrderEndpoint(orderId)}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: authKey,
+      },
     },
-  });
+  );
 
   const result = (await response.json()) as BiteshipOrderResponse &
     BiteshipApiErrorResponse;
