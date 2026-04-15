@@ -21,8 +21,14 @@ const baseOrder: Order = {
   },
   addresses: {
     id: "address-1",
+    receiver_name: "Penerima Utama",
     phone_number: "0811111111",
     street_address: "Jl. Pembeli No. 2",
+    city: "Jakarta Selatan",
+    province: "DKI Jakarta",
+    postal_code: "12345",
+    country_code: "ID",
+    area_id: "DEST-AREA-ID",
     latitude: -6.2088,
     longitude: 106.8456,
   },
@@ -44,8 +50,14 @@ describe("fetchOrderShippingAddress", () => {
   it("fetches address data explicitly through shipping_address_id", async () => {
     const address: OrderAddress = {
       id: "address-1",
+      receiver_name: "Penerima Utama",
       phone_number: "0811111111",
       street_address: "Jl. Pembeli No. 2",
+      city: "Jakarta Selatan",
+      province: "DKI Jakarta",
+      postal_code: "12345",
+      country_code: "ID",
+      area_id: "DEST-AREA-ID",
       latitude: -6.2088,
       longitude: 106.8456,
     };
@@ -58,7 +70,7 @@ describe("fetchOrderShippingAddress", () => {
     };
     const select = (columns: string) => {
       expect(columns).toBe(
-        "id, phone_number, street_address, latitude, longitude",
+        "id, receiver_name, phone_number, street_address, city, province, postal_code, country_code, area_id, latitude, longitude",
       );
       return { eq };
     };
@@ -81,51 +93,75 @@ describe("fetchOrderShippingAddress", () => {
 describe("buildBiteshipOrderPayload", () => {
   it("fails with a clear error when instant courier orders have no destination coordinate", () => {
     expect(() =>
-      buildBiteshipOrderDestinationFields(
-        {
-          ...baseOrder,
-          courier_code: "grab",
-          courier_service: "instant",
-          addresses: {
-            ...baseOrder.addresses!,
-            latitude: null,
-            longitude: null,
-          },
+      buildBiteshipOrderDestinationFields({
+        ...baseOrder,
+        courier_code: "grab",
+        courier_service: "instant",
+        addresses: {
+          ...baseOrder.addresses!,
+          latitude: null,
+          longitude: null,
         },
-      ),
+      }),
     ).toThrow(
       "Destination coordinate is required for instant courier grab:instant on order order-1",
     );
   });
 
   it("allows regular courier payloads without destination coordinate", () => {
-    const payload = buildBiteshipOrderDestinationFields(
-      {
-        ...baseOrder,
-        addresses: {
-          ...baseOrder.addresses!,
-          latitude: null,
-          longitude: null,
-        },
+    const payload = buildBiteshipOrderDestinationFields({
+      ...baseOrder,
+      addresses: {
+        ...baseOrder.addresses!,
+        latitude: null,
+        longitude: null,
       },
-    );
+    });
 
     expect(payload.destination_area_id).toBe("DEST-AREA-ID");
     expect(payload).not.toHaveProperty("destination_coordinate");
   });
 
   it("includes destination_coordinate for instant courier payloads when address has coordinates", () => {
-    const payload = buildBiteshipOrderDestinationFields(
-      {
-        ...baseOrder,
-        courier_code: "grab",
-        courier_service: "instant",
-      },
-    );
+    const payload = buildBiteshipOrderDestinationFields({
+      ...baseOrder,
+      courier_code: "grab",
+      courier_service: "instant",
+    });
 
     expect(payload.destination_coordinate).toEqual({
       latitude: -6.2088,
       longitude: 106.8456,
     });
+  });
+
+  it("prefers receiver_name from shipping address for destination contact name", () => {
+    const payload = buildBiteshipOrderDestinationFields(baseOrder);
+
+    expect(payload.destination_contact_name).toBe("Penerima Utama");
+  });
+
+  it("falls back to profile full_name when receiver_name is missing", () => {
+    const payload = buildBiteshipOrderDestinationFields({
+      ...baseOrder,
+      addresses: {
+        ...baseOrder.addresses!,
+        receiver_name: null,
+      },
+    });
+
+    expect(payload.destination_contact_name).toBe("Jane Doe");
+  });
+
+  it("falls back to profile full_name when receiver_name is blank", () => {
+    const payload = buildBiteshipOrderDestinationFields({
+      ...baseOrder,
+      addresses: {
+        ...baseOrder.addresses!,
+        receiver_name: "   ",
+      },
+    });
+
+    expect(payload.destination_contact_name).toBe("Jane Doe");
   });
 });

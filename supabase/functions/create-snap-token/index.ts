@@ -110,7 +110,7 @@ Deno.serve(async (req: Request) => {
     const { data: rawOrder, error: orderError } = await adminClient
       .from("orders")
       .select(
-        "*, order_items(*, products(name, categories(name))), profiles(id, full_name, phone_number)",
+        "*, order_items(*, products(name, categories(name))), profiles(id, full_name, phone_number), addresses(id, receiver_name, phone_number, street_address, city, province, postal_code, country_code, area_id, latitude, longitude)",
       )
       .eq("id", orderId)
       .single();

@@ -41,10 +41,27 @@ export interface OrderProfile {
 
 export interface OrderAddress {
   id?: string | null;
+  receiver_name?: string | null;
   phone_number?: string | null;
   street_address?: string | null;
+  city?: string | null;
+  province?: string | null;
+  postal_code?: string | null;
+  country_code?: string | null;
+  area_id?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+}
+
+export interface MidtransAddress {
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  postal_code?: string;
+  country_code?: string;
 }
 
 export interface Order {
@@ -95,6 +112,8 @@ export interface SnapPayload {
     last_name?: string;
     email: string;
     phone?: string;
+    billing_address?: MidtransAddress;
+    shipping_address?: MidtransAddress;
   };
 }
 

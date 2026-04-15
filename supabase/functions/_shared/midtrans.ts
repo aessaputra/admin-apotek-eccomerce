@@ -1,4 +1,5 @@
 import type {
+  MidtransAddress,
   MidtransStatusMapping,
   MidtransStatusLike,
   MidtransStatusResponse,
@@ -84,6 +85,73 @@ const STALE_PAYMENT_STATUS_MAP: Record<PaymentStatus, PaymentStatus[]> = {
   partial_refund: [],
   chargeback: ["partial_chargeback"],
   partial_chargeback: [],
+};
+
+const MIDTRANS_COUNTRY_CODE = "IDN";
+
+const trimToUndefined = (
+  value: string | null | undefined,
+): string | undefined => {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+};
+
+const splitName = (
+  fullName: string | null | undefined,
+): { firstName?: string; lastName?: string } => {
+  const normalizedName = trimToUndefined(fullName);
+  if (!normalizedName) {
+    return {};
+  }
+
+  const [firstName, ...rest] = normalizedName.split(/\s+/);
+  const lastName = rest.join(" ").trim();
+
+  return {
+    firstName,
+    ...(lastName ? { lastName } : {}),
+  };
+};
+
+const normalizeCountryCode = (
+  countryCode: string | null | undefined,
+): string => {
+  const normalized = trimToUndefined(countryCode)?.toUpperCase();
+  if (!normalized || normalized === "ID" || normalized === "IDN") {
+    return MIDTRANS_COUNTRY_CODE;
+  }
+
+  return normalized;
+};
+
+const buildMidtransAddress = (
+  order: Order,
+  user: AuthUser,
+): MidtransAddress | undefined => {
+  if (!order.addresses) {
+    return undefined;
+  }
+
+  const receiverName = trimToUndefined(order.addresses.receiver_name);
+  const recipientName = splitName(receiverName ?? order.profiles?.full_name);
+  const email = trimToUndefined(user.email);
+  const phone = trimToUndefined(order.addresses.phone_number);
+  const addressLine = trimToUndefined(order.addresses.street_address);
+  const city = trimToUndefined(order.addresses.city);
+  const postalCode = trimToUndefined(order.addresses.postal_code);
+
+  const address: MidtransAddress = {
+    ...(recipientName.firstName ? { first_name: recipientName.firstName } : {}),
+    ...(recipientName.lastName ? { last_name: recipientName.lastName } : {}),
+    ...(email ? { email } : {}),
+    ...(phone ? { phone } : {}),
+    ...(addressLine ? { address: addressLine } : {}),
+    ...(city ? { city } : {}),
+    ...(postalCode ? { postal_code: postalCode } : {}),
+    country_code: normalizeCountryCode(order.addresses.country_code),
+  };
+
+  return Object.keys(address).length > 0 ? address : undefined;
 };
 
 declare const Deno: {
@@ -265,7 +333,8 @@ export const assertMidtransCurrencyConsistency = (
   payloadCurrency: string | null | undefined,
   orderId: string,
 ): string => {
-  const normalizedVerifiedCurrency = normalizeMidtransCurrency(verifiedCurrency);
+  const normalizedVerifiedCurrency =
+    normalizeMidtransCurrency(verifiedCurrency);
   const normalizedPayloadCurrency = normalizeMidtransCurrency(payloadCurrency);
 
   if (
@@ -327,7 +396,10 @@ export const buildMidtransPaymentRecord = ({
   existingPaidAt: string | null | undefined;
 }) => {
   const orderReference =
-    payload?.order_id || verifiedStatus.order_id || order.midtrans_order_id || order.id;
+    payload?.order_id ||
+    verifiedStatus.order_id ||
+    order.midtrans_order_id ||
+    order.id;
   const currency = assertMidtransCurrencyConsistency(
     verifiedStatus.currency,
     payload?.currency,
@@ -387,7 +459,9 @@ export const buildMidtransPaymentRecord = ({
       verifiedStatus.approval_code || payload?.approval_code || null,
     eci: verifiedStatus.eci || payload?.eci || null,
     channel_response_code:
-      verifiedStatus.channel_response_code || payload?.channel_response_code || null,
+      verifiedStatus.channel_response_code ||
+      payload?.channel_response_code ||
+      null,
     channel_response_message:
       verifiedStatus.channel_response_message ||
       payload?.channel_response_message ||
@@ -446,11 +520,19 @@ export const buildSnapPayload = (order: Order, user: AuthUser): SnapPayload => {
     });
   }
 
+  const shippingAddress = buildMidtransAddress(order, user);
+
   const customerDetails = {
     first_name: order.profiles?.full_name?.split(" ")[0] || "Customer",
     last_name: order.profiles?.full_name?.split(" ").slice(1).join(" ") || "",
     email: user.email || "",
     phone: order.profiles?.phone_number || "",
+    ...(shippingAddress
+      ? {
+          shipping_address: shippingAddress,
+          billing_address: shippingAddress,
+        }
+      : {}),
   };
 
   return {

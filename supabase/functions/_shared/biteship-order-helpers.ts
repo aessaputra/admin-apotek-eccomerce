@@ -8,17 +8,16 @@ type BiteshipOrderDestinationFields = {
     latitude: number;
     longitude: number;
   };
-} &
-  (
-    | {
-        destination_area_id: string;
-        destination_postal_code?: number;
-      }
-    | {
-        destination_area_id?: string;
-        destination_postal_code: number;
-      }
-  );
+} & (
+  | {
+      destination_area_id: string;
+      destination_postal_code?: number;
+    }
+  | {
+      destination_area_id?: string;
+      destination_postal_code: number;
+    }
+);
 
 function getRequiredTrimmedValue(
   value: string | null | undefined,
@@ -32,6 +31,15 @@ function getRequiredTrimmedValue(
   }
 
   return normalizedValue;
+}
+
+function getPreferredRecipientName(order: Order): string | null | undefined {
+  const receiverName = order.addresses?.receiver_name?.trim();
+  if (receiverName) {
+    return receiverName;
+  }
+
+  return order.profiles?.full_name;
 }
 
 function toFiniteCoordinate(value: number | null | undefined): number | null {
@@ -69,7 +77,7 @@ export function buildBiteshipOrderDestinationFields(
 
   return {
     destination_contact_name: getRequiredTrimmedValue(
-      order.profiles?.full_name,
+      getPreferredRecipientName(order),
       "Destination contact name",
       order.id,
     ),
@@ -96,7 +104,10 @@ export async function fetchOrderShippingAddress(
   adminClient: {
     from: (table: string) => {
       select: (columns: string) => {
-        eq: (column: string, value: string) => {
+        eq: (
+          column: string,
+          value: string,
+        ) => {
           maybeSingle: () => Promise<{
             data: OrderAddress | null;
             error: { message: string } | null;
@@ -114,7 +125,9 @@ export async function fetchOrderShippingAddress(
 
   const { data, error } = await adminClient
     .from("addresses")
-    .select("id, phone_number, street_address, latitude, longitude")
+    .select(
+      "id, receiver_name, phone_number, street_address, city, province, postal_code, country_code, area_id, latitude, longitude",
+    )
     .eq("id", shippingAddressId)
     .maybeSingle();
 
