@@ -1,4 +1,5 @@
 import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Settings from "../settings";
@@ -131,7 +132,6 @@ vi.mock("antd", () => {
         disabled,
         value,
         onChange,
-        autoFocus,
         style,
       }: {
         placeholder?: string;
@@ -141,7 +141,6 @@ vi.mock("antd", () => {
         disabled?: boolean;
         value?: string;
         onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-        autoFocus?: boolean;
         style?: React.CSSProperties;
       }) => (
         <textarea
@@ -152,7 +151,6 @@ vi.mock("antd", () => {
           data-disabled={disabled ? "true" : "false"}
           value={value}
           onChange={onChange}
-          autoFocus={autoFocus}
           style={style}
         />
       ),
@@ -214,6 +212,22 @@ vi.mock("@ant-design/icons", () => ({
 }));
 
 describe("form pages", () => {
+  function renderWithQueryClient(ui: React.ReactElement) {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    return render(
+      <QueryClientProvider client={queryClient}>
+        {ui}
+      </QueryClientProvider>
+    );
+  }
+
   beforeEach(() => {
     mocks.translate.mockClear();
     mocks.useForm.mockReset();
@@ -309,7 +323,7 @@ describe("form pages", () => {
       },
     });
 
-    render(<Settings />);
+    renderWithQueryClient(<Settings />);
 
     expect(screen.getByText("BiteshipAreaSearch")).not.toBeNull();
     expect(screen.getByText("MapLocationPicker")).not.toBeNull();

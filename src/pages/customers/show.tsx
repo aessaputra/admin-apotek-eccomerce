@@ -3,6 +3,7 @@ import { useShow, useTranslation } from "@refinedev/core";
 import { Show, DateField } from "@refinedev/antd";
 import { Typography, Avatar, Space, Tag, Button } from "antd";
 import { useBanToggle } from "../../hooks/useBanToggle";
+import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 
 const { Title, Text } = Typography;
 
@@ -22,12 +23,13 @@ export const CustomerShow: React.FC = () => {
     resource: "profiles",
     id: id ?? "",
   });
+  const avatarUrl = resolveStoragePublicUrl(record?.avatar_url ?? null, MEDIA_BUCKET);
 
   return (
     <Show isLoading={isLoading}>
       <Title level={5}>{translate("customers.fields.profile")}</Title>
       <Space align="center" size="middle">
-        <Avatar src={record?.avatar_url} size={64}>
+        <Avatar src={avatarUrl ?? undefined} size={64}>
           {record?.full_name?.[0]?.toUpperCase() ?? "?"}
         </Avatar>
         <span>{record?.full_name || "-"}</span>

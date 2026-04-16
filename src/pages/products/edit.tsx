@@ -7,7 +7,7 @@ import { DescriptionEditorModal } from "../../components/description-editor-moda
 import { slugify } from "../../utils/slugify";
 import { supabaseClient } from "../../providers/supabase-client";
 import {
-  getStoragePathFromPublicUrl,
+  getStoragePathFromReference,
   MEDIA_BUCKET,
 } from "../../utils/storage";
 
@@ -21,6 +21,10 @@ const PRODUCT_WEIGHT_RULES = [
 ];
 
 interface ProductImage { id: string; url: string; sort_order: number }
+
+function normalizeProductImageValue(value: string): string {
+  return getStoragePathFromReference(value, MEDIA_BUCKET) ?? value;
+}
 
 export const ProductEdit: React.FC = () => {
   const { translate } = useTranslation();
@@ -39,7 +43,7 @@ export const ProductEdit: React.FC = () => {
     if (data?.product_images && Array.isArray(data.product_images)) {
       const urls = [...data.product_images]
         .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-        .map((p) => p.url);
+        .map((p) => normalizeProductImageValue(p.url));
       form.setFieldsValue({ images: urls });
     }
   }, [data?.product_images, form]);
@@ -66,10 +70,15 @@ export const ProductEdit: React.FC = () => {
     const original = (data?.product_images ?? []) as ProductImage[];
 
     try {
-      const removed = original.filter((o) => !currentUrls.includes(o.url));
+      const normalizedOriginal = original.map((item) => ({
+        ...item,
+        normalizedUrl: normalizeProductImageValue(item.url),
+      }));
+
+      const removed = normalizedOriginal.filter((o) => !currentUrls.includes(o.normalizedUrl));
       const removedResults = await Promise.allSettled(
         removed.map(async (img) => {
-          const path = getStoragePathFromPublicUrl(img.url, MEDIA_BUCKET);
+          const path = getStoragePathFromReference(img.normalizedUrl, MEDIA_BUCKET);
           if (path) {
             await supabaseClient.storage.from(MEDIA_BUCKET).remove([path]);
           }
@@ -86,11 +95,11 @@ export const ProductEdit: React.FC = () => {
 
       const updateResults = await Promise.allSettled(
         currentUrls.map(async (url, i) => {
-          const existing = original.find((o) => o.url === url);
+          const existing = normalizedOriginal.find((o) => o.normalizedUrl === url);
           if (existing) {
             const { error: updateError } = await supabaseClient
               .from("product_images")
-              .update({ sort_order: i })
+              .update({ sort_order: i, url })
               .eq("id", existing.id);
             if (updateError) throw updateError;
           } else {

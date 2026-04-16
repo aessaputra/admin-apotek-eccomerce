@@ -37,7 +37,7 @@ Refine's hooks and components simplifies the development process and eliminates 
 
 ## Storage & Orphan Cleanup
 
-Image uploads use immediate upload (Refine best practice). Orphan files (uploaded but form never saved) are cleaned up automatically via **pg_cron** weekly (every Sunday at 02:00 UTC).
+Image uploads use immediate upload (Refine best practice). The application deletes replaced and explicitly removed files immediately, while `cleanup-orphan-storage` now runs as a **daily dry-run pg_cron reconciliation job** with a grace period. When delete mode is enabled later, it will quarantine old orphan candidates before any permanent removal.
 
 ### One-time setup: Vault secrets
 
@@ -52,7 +52,9 @@ select vault.create_secret('YOUR_SERVICE_ROLE_KEY', 'service_role_key');
 
 ```bash
 curl -X POST "https://ibmpikevzfuqtfpdpkyy.supabase.co/functions/v1/cleanup-orphan-storage" \
-  -H "Authorization: Bearer YOUR_SERVICE_ROLE_KEY"
+  -H "Authorization: Bearer YOUR_SERVICE_ROLE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"mode":"dry-run","triggerSource":"manual"}'
 ```
 
 ## Learn More

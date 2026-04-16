@@ -1,6 +1,7 @@
 import { useShow, useTranslation } from "@refinedev/core";
 import { Show, NumberField } from "@refinedev/antd";
 import { Typography, Image, Tag, Space } from "antd";
+import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -45,14 +46,20 @@ export const ProductShow: React.FC = () => {
       {images.length > 0 ? (
         <Space wrap size="middle">
           {images.map((img) => (
-            <Image
-              key={img.id}
-              src={img.url}
-              alt=""
-              width={120}
-              height={120}
-              style={{ objectFit: "cover", borderRadius: 8 }}
-            />
+            (() => {
+              const previewUrl = resolveStoragePublicUrl(img.url, MEDIA_BUCKET);
+
+              return previewUrl ? (
+                <Image
+                  key={img.id}
+                  src={previewUrl}
+                  alt=""
+                  width={120}
+                  height={120}
+                  style={{ objectFit: "cover", borderRadius: 8 }}
+                />
+              ) : null;
+            })()
           ))}
         </Space>
       ) : (

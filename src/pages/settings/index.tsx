@@ -1,15 +1,17 @@
 import { Edit, useForm } from "@refinedev/antd";
 import { useTranslation } from "@refinedev/core";
+import { useQueryClient } from "@tanstack/react-query";
 import { Form, Input, Tabs, Card, Row, Col, Upload, Typography, Button, Space, Tag } from "antd";
 import { useState } from "react";
 import type { TabsProps } from "antd";
 import { SettingOutlined } from "@ant-design/icons";
 import { useSupabaseUpload } from "../../hooks/useSupabaseUpload";
 import { useBiteshipCouriers } from "../../hooks/useBiteshipCouriers";
-import { MEDIA_BUCKET } from "../../utils/storage";
+import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 import { BiteshipAreaSearch } from "../../components/biteship-area-search";
 import { MapLocationPicker } from "../../components/map-location-picker";
 import { CourierPickerModal } from "../../components/courier-picker-modal";
+import { STORE_BRANDING_QUERY_KEY } from "../../hooks/useStoreBranding";
 import {
   getFallbackCourierOption,
   getCourierSelectionCompany,
@@ -113,13 +115,13 @@ const CourierPickerTrigger: React.FC<CourierPickerTriggerProps> = ({
 
 interface LogoUploadProps {
   value?: string;
-  onChange?: (url: string | undefined) => void;
+  onChange?: (path: string | undefined) => void;
   placeholder?: string;
 }
 
 const LogoUpload: React.FC<LogoUploadProps> = ({ value, onChange, placeholder }) => {
   const fileList = value
-    ? [{ uid: "-1", name: "logo", url: value, status: "done" as const }]
+    ? [{ uid: "-1", name: "logo", url: resolveStoragePublicUrl(value, MEDIA_BUCKET) ?? value, status: "done" as const }]
     : [];
 
   const { beforeUpload, customRequest, handleRemove } = useSupabaseUpload(
@@ -153,6 +155,7 @@ const LogoUpload: React.FC<LogoUploadProps> = ({ value, onChange, placeholder })
 
 export const Settings: React.FC = () => {
   const { translate } = useTranslation();
+  const queryClient = useQueryClient();
   const { couriers, loading: couriersLoading, error: couriersError, isFallback: couriersFallback } = useBiteshipCouriers();
   const [courierModalOpen, setCourierModalOpen] = useState(false);
   const { formProps, saveButtonProps, form } = useForm<SettingsFormValues>({
@@ -162,6 +165,9 @@ export const Settings: React.FC = () => {
     redirect: false,
     mutationMode: "pessimistic",
     warnWhenUnsavedChanges: true,
+    onMutationSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: STORE_BRANDING_QUERY_KEY });
+    },
     successNotification: {
       message: translate("settings.saveSuccess", {}, "Settings saved successfully"),
       type: "success",

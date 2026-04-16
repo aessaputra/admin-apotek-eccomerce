@@ -3,7 +3,8 @@ import { message } from "antd";
 import type { RcFile } from "antd/es/upload/interface";
 import { supabaseClient } from "../providers/supabase-client";
 import {
-  getStoragePathFromPublicUrl,
+  getPublicUrlFromStoragePath,
+  getStoragePathFromReference,
   sanitizeFilename,
   validateImageFile,
 } from "../utils/storage";
@@ -60,7 +61,7 @@ export function useSupabaseUpload(
 
         // Handle replacement if needed
         if (replaceOnUpload && typeof value === "string" && value) {
-          const oldPath = getStoragePathFromPublicUrl(value, bucket);
+          const oldPath = getStoragePathFromReference(value, bucket);
           if (oldPath) {
             try {
               await supabaseClient.storage.from(bucket).remove([oldPath]);
@@ -85,15 +86,15 @@ export function useSupabaseUpload(
 
         if (error) throw error;
 
-        const { data } = supabaseClient.storage.from(bucket).getPublicUrl(path);
+        const publicUrl = getPublicUrlFromStoragePath(path, bucket);
 
         if (Array.isArray(value)) {
-          (onChange as (v: string[]) => void)?.([...value, data.publicUrl]);
+          (onChange as (v: string[]) => void)?.([...value, path]);
         } else {
-          (onChange as (v: string | undefined) => void)?.(data.publicUrl);
+          (onChange as (v: string | undefined) => void)?.(path);
         }
 
-        onSuccess?.({ url: data.publicUrl });
+        onSuccess?.({ path, url: publicUrl });
       } catch (err) {
         onError?.(err as Error);
       }
@@ -103,7 +104,7 @@ export function useSupabaseUpload(
 
   const handleRemove = useCallback(
     async (url: string) => {
-      const path = getStoragePathFromPublicUrl(url, bucket);
+      const path = getStoragePathFromReference(url, bucket);
       if (path) {
         try {
           await supabaseClient.storage.from(bucket).remove([path]);

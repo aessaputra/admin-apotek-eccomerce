@@ -7,6 +7,7 @@ import {
 } from "@refinedev/antd";
 import { useTranslation } from "@refinedev/core";
 import { Table, Image, Space, Tooltip } from "antd";
+import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 
 interface ProductImage { url: string }
 interface ProductRecord {
@@ -30,9 +31,9 @@ export const ProductList: React.FC = () => {
           title={translate("products.fields.image")}
           width={80}
           render={(_, record: ProductRecord) => {
-            const url = record.product_images?.[0]?.url;
-            return url ? (
-              <Image src={url} alt="" width={40} height={40} style={{ objectFit: "cover" }} />
+            const previewUrl = resolveStoragePublicUrl(record.product_images?.[0]?.url ?? null, MEDIA_BUCKET);
+            return previewUrl ? (
+              <Image src={previewUrl} alt="" width={40} height={40} style={{ objectFit: "cover" }} />
             ) : (
               "-"
             );

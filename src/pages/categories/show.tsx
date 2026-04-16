@@ -1,6 +1,7 @@
 import { useShow, useTranslation } from "@refinedev/core";
 import { Show } from "@refinedev/antd";
 import { Typography, Image } from "antd";
+import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 
 const { Title, Text } = Typography;
 
@@ -18,13 +19,14 @@ export const CategoryShow: React.FC = () => {
     result: record,
     query: { isLoading },
   } = useShow<CategoryRecord>();
+  const logoUrl = resolveStoragePublicUrl(record?.logo_url ?? null, MEDIA_BUCKET);
 
   return (
     <Show isLoading={isLoading}>
       <Title level={5}>{translate("categories.fields.logo")}</Title>
-      {record?.logo_url ? (
+      {logoUrl ? (
         <Image
-          src={record.logo_url}
+          src={logoUrl}
           alt=""
           width={80}
           height={80}

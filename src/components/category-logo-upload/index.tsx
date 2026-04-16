@@ -1,6 +1,6 @@
 import { Upload } from "antd";
 import { useSupabaseUpload } from "../../hooks/useSupabaseUpload";
-import { MEDIA_BUCKET } from "../../utils/storage";
+import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 
 interface CategoryLogoUploadProps {
   value?: string;
@@ -12,7 +12,7 @@ export const CategoryLogoUpload: React.FC<CategoryLogoUploadProps> = ({
   onChange,
 }) => {
   const fileList = value
-    ? [{ uid: "-1", name: "logo", url: value, status: "done" as const }]
+    ? [{ uid: "-1", name: "logo", url: resolveStoragePublicUrl(value, MEDIA_BUCKET) ?? value, status: "done" as const }]
     : [];
 
   const { beforeUpload, customRequest, handleRemove } = useSupabaseUpload(

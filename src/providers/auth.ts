@@ -1,6 +1,7 @@
 import { AuthProvider } from "@refinedev/core";
 import i18n from "../i18n";
 import { supabaseClient } from "./supabase-client";
+import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../utils/storage";
 
 const ADMIN_ROLE = "admin";
 
@@ -236,7 +237,7 @@ const authProvider: AuthProvider = {
     return {
       id: data.user.id,
       name,
-      avatar: profile?.avatar_url ?? undefined,
+      avatar: resolveStoragePublicUrl(profile?.avatar_url ?? null, MEDIA_BUCKET) ?? undefined,
     };
   },
 };

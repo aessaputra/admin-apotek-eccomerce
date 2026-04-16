@@ -1,12 +1,22 @@
 export const MEDIA_BUCKET = "media";
-const REFERENCE_PAGE_SIZE = 1000;
+export const REFERENCE_PAGE_SIZE = 1000;
+export const DEFAULT_SAMPLE_LIMIT = 25;
+
+export const MANAGED_MEDIA_PREFIXES = [
+  "categories/",
+  "products/",
+  "avatars/",
+  "banners/home_banner_top/",
+  "banners/home_banner_bottom/",
+  "settings/",
+] as const;
 
 export const MEDIA_REFERENCE_SOURCES = [
-  { table: "product_images", columns: ["url"] },
-  { table: "categories", columns: ["logo_url"] },
-  { table: "profiles", columns: ["avatar_url"] },
-  { table: "home_banners", columns: ["media_path"] },
-  { table: "settings", columns: ["primary_logo_url", "app_icon_url"] },
+  { table: "product_images", idColumn: "id", columns: ["url"] },
+  { table: "categories", idColumn: "id", columns: ["logo_url"] },
+  { table: "profiles", idColumn: "id", columns: ["avatar_url"] },
+  { table: "home_banners", idColumn: "id", columns: ["media_path"] },
+  { table: "settings", idColumn: "id", columns: ["primary_logo_url", "app_icon_url"] },
 ] as const;
 
 type ReferenceRow = Record<string, unknown>;
@@ -28,9 +38,18 @@ export type CleanupSupabaseClient = {
   from: (table: string) => SupabaseTableQuery;
 };
 
+export interface InvalidReference {
+  table: string;
+  column: string;
+  rowId: string | null;
+  rawValue: string;
+  reason: string;
+}
+
 export interface ReferencedMediaPathsResult {
   paths: Set<string>;
   invalidReferenceCount: number;
+  invalidReferences: InvalidReference[];
 }
 
 export interface CleanupRequestError {
@@ -52,13 +71,33 @@ function normalizeRelativeStoragePath(value: string): string | null {
   return isSafeStoragePath(trimmedValue) ? trimmedValue : null;
 }
 
-function extractBucketPathFromUrl(value: string, bucket: string): string | null {
+function inspectStorageReference(
+  value: unknown,
+  bucket: string,
+): { path: string | null; reason: string | null; rawValue: string | null } {
+  if (typeof value !== "string") {
+    return { path: null, reason: null, rawValue: null };
+  }
+
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return { path: null, reason: null, rawValue: value };
+  }
+
+  if (!trimmedValue.startsWith("http://") && !trimmedValue.startsWith("https://")) {
+    return {
+      path: normalizeRelativeStoragePath(trimmedValue),
+      reason: isSafeStoragePath(trimmedValue) ? null : "unsafe_relative_path",
+      rawValue: value,
+    };
+  }
+
   let url: URL;
 
   try {
-    url = new URL(value);
+    url = new URL(trimmedValue);
   } catch {
-    return null;
+    return { path: null, reason: "invalid_url", rawValue: value };
   }
 
   const prefixes = [
@@ -77,30 +116,31 @@ function extractBucketPathFromUrl(value: string, bucket: string): string | null 
     try {
       normalizedPath = decodeURIComponent(url.pathname.slice(prefix.length));
     } catch {
-      return null;
+      return { path: null, reason: "invalid_url_encoding", rawValue: value };
     }
 
-    return isSafeStoragePath(normalizedPath) ? normalizedPath : null;
+    return {
+      path: isSafeStoragePath(normalizedPath) ? normalizedPath : null,
+      reason: isSafeStoragePath(normalizedPath) ? null : "unsafe_storage_path",
+      rawValue: value,
+    };
   }
 
-  return null;
+  return { path: null, reason: "unsupported_storage_url", rawValue: value };
 }
 
 export function normalizeStorageReference(value: unknown, bucket: string): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  return extractBucketPathFromUrl(value, bucket) ?? normalizeRelativeStoragePath(value);
+  return inspectStorageReference(value, bucket).path;
 }
 
-function buildSelectClause(columns: readonly string[]): string {
-  return columns.join(", ");
+function buildSelectClause(idColumn: string, columns: readonly string[]): string {
+  return Array.from(new Set([idColumn, ...columns])).join(", ");
 }
 
 async function loadAllRows(
   supabase: CleanupSupabaseClient,
   table: string,
+  idColumn: string,
   columns: readonly string[],
 ): Promise<ReferenceRow[]> {
   const rows: ReferenceRow[] = [];
@@ -109,7 +149,10 @@ async function loadAllRows(
   while (true) {
     const from = page * REFERENCE_PAGE_SIZE;
     const to = from + REFERENCE_PAGE_SIZE - 1;
-    const { data, error } = await supabase.from(table).select(buildSelectClause(columns)).range(from, to);
+    const { data, error } = await supabase
+      .from(table)
+      .select(buildSelectClause(idColumn, columns))
+      .range(from, to);
 
     if (error) {
       throw new Error(`Failed to load ${table} media references: ${error.message}`);
@@ -155,37 +198,53 @@ export function getCleanupRequestError(
   return null;
 }
 
+export function filterManagedMediaPaths(paths: string[]): string[] {
+  return paths.filter((path) => MANAGED_MEDIA_PREFIXES.some((prefix) => path.startsWith(prefix)));
+}
+
 export async function collectReferencedMediaPaths(
   supabase: CleanupSupabaseClient,
   bucket: string,
+  options?: { sampleLimit?: number },
 ): Promise<ReferencedMediaPathsResult> {
+  const sampleLimit = options?.sampleLimit ?? DEFAULT_SAMPLE_LIMIT;
   const results = await Promise.all(
-    MEDIA_REFERENCE_SOURCES.map(async ({ table, columns }) => {
-      const data = await loadAllRows(supabase, table, columns);
-      return { columns, data };
+    MEDIA_REFERENCE_SOURCES.map(async ({ table, idColumn, columns }) => {
+      const data = await loadAllRows(supabase, table, idColumn, columns);
+      return { table, idColumn, columns, data };
     }),
   );
 
   const paths = new Set<string>();
   let invalidReferenceCount = 0;
+  const invalidReferences: InvalidReference[] = [];
 
-  for (const { columns, data } of results) {
+  for (const { table, idColumn, columns, data } of results) {
     for (const row of data) {
+      const rowId = row[idColumn] == null ? null : String(row[idColumn]);
+
       for (const column of columns) {
-        const rawValue = row[column];
+        const inspection = inspectStorageReference(row[column], bucket);
 
-        if (rawValue == null || rawValue === "") {
+        if (!inspection.rawValue) {
           continue;
         }
 
-        const normalizedPath = normalizeStorageReference(rawValue, bucket);
-
-        if (!normalizedPath) {
+        if (!inspection.path) {
           invalidReferenceCount += 1;
+          if (invalidReferences.length < sampleLimit) {
+            invalidReferences.push({
+              table,
+              column,
+              rowId,
+              rawValue: inspection.rawValue,
+              reason: inspection.reason ?? "invalid_reference",
+            });
+          }
           continue;
         }
 
-        paths.add(normalizedPath);
+        paths.add(inspection.path);
       }
     }
   }
@@ -193,5 +252,6 @@ export async function collectReferencedMediaPaths(
   return {
     paths,
     invalidReferenceCount,
+    invalidReferences,
   };
 }

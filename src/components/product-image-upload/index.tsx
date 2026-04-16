@@ -1,6 +1,6 @@
 import { Upload } from "antd";
 import { useSupabaseUpload } from "../../hooks/useSupabaseUpload";
-import { MEDIA_BUCKET } from "../../utils/storage";
+import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 
 interface ProductImageUploadProps {
   value?: string[];
@@ -14,7 +14,7 @@ export const ProductImageUpload: React.FC<ProductImageUploadProps> = ({
   const fileList = (Array.isArray(value) ? value : []).map((url, i) => ({
     uid: `-${i}-${url}`,
     name: `image-${i + 1}`,
-    url,
+    url: resolveStoragePublicUrl(url, MEDIA_BUCKET) ?? url,
     status: "done" as const,
   }));
 

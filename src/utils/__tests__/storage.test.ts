@@ -3,6 +3,9 @@ import {
   sanitizeFilename,
   validateImageFile,
   getStoragePathFromPublicUrl,
+  getStoragePathFromReference,
+  getPublicUrlFromStoragePath,
+  resolveStoragePublicUrl,
   MAX_IMAGE_SIZE_BYTES,
 } from "../storage";
 
@@ -81,6 +84,43 @@ describe("storage utils", () => {
     it("should return null for non-matching URL", () => {
       const url = "https://other-site.com/file.jpg";
       expect(getStoragePathFromPublicUrl(url, bucket)).toBe(null);
+    });
+  });
+
+  describe("getStoragePathFromReference", () => {
+    const bucket = "media";
+
+    it("supports both public URLs and bucket-relative paths", () => {
+      expect(
+        getStoragePathFromReference(
+          "https://example.supabase.co/storage/v1/object/public/media/products/item1.jpg",
+          bucket,
+        ),
+      ).toBe("products/item1.jpg");
+
+      expect(getStoragePathFromReference("products/item1.jpg", bucket)).toBe("products/item1.jpg");
+    });
+
+    it("rejects unsafe or empty references", () => {
+      expect(getStoragePathFromReference("", bucket)).toBeNull();
+      expect(getStoragePathFromReference("../secret.txt", bucket)).toBeNull();
+      expect(getStoragePathFromReference("products//item1.jpg", bucket)).toBeNull();
+    });
+  });
+
+  describe("public URL helpers", () => {
+    it("builds and resolves public URLs from relative paths and preserves remote URLs", () => {
+      const expectedBaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+      expect(getPublicUrlFromStoragePath("products/item1.jpg", "media")).toBe(
+        `${expectedBaseUrl}/storage/v1/object/public/media/products/item1.jpg`,
+      );
+      expect(resolveStoragePublicUrl("products/item1.jpg", "media")).toBe(
+        `${expectedBaseUrl}/storage/v1/object/public/media/products/item1.jpg`,
+      );
+      expect(resolveStoragePublicUrl("https://cdn.example.com/media/item1.jpg", "media")).toBe(
+        "https://cdn.example.com/media/item1.jpg",
+      );
     });
   });
 });

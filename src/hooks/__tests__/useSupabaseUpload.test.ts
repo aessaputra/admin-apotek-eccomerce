@@ -7,11 +7,9 @@ const mocks = vi.hoisted(() => {
   const getUser = vi.fn();
   const remove = vi.fn();
   const upload = vi.fn();
-  const getPublicUrl = vi.fn();
   const from = vi.fn(() => ({
     remove,
     upload,
-    getPublicUrl,
   }));
 
   return {
@@ -19,7 +17,6 @@ const mocks = vi.hoisted(() => {
     getUser,
     remove,
     upload,
-    getPublicUrl,
     from,
   };
 });
@@ -47,25 +44,18 @@ describe("useSupabaseUpload", () => {
     mocks.getUser.mockReset();
     mocks.remove.mockReset();
     mocks.upload.mockReset();
-    mocks.getPublicUrl.mockReset();
     mocks.from.mockClear();
 
     mocks.getUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
     mocks.remove.mockResolvedValue({ data: [] });
     mocks.upload.mockResolvedValue({ error: null });
-    mocks.getPublicUrl.mockReturnValue({
-      data: { publicUrl: "https://demo.supabase.co/storage/v1/object/public/media/uploads/file.png" },
-    });
+
   });
 
   it("rejects invalid files before upload and shows an error message", () => {
     const onChange = vi.fn();
     const { result } = renderHook(() =>
-      useSupabaseUpload(
-        { bucket: "media", pathPrefix: "uploads/" },
-        undefined,
-        onChange
-      )
+      useSupabaseUpload({ bucket: "media", pathPrefix: "uploads/" }, undefined, onChange),
     );
 
     const invalidFile = new File(["bad"], "notes.txt", { type: "text/plain" });
@@ -76,7 +66,7 @@ describe("useSupabaseUpload", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it("replaces the previous single file upload and updates the field value", async () => {
+  it("replaces the previous single file upload and stores the canonical path", async () => {
     const onChange = vi.fn();
     vi.spyOn(Date, "now").mockReturnValue(1711987200000);
 
@@ -89,8 +79,8 @@ describe("useSupabaseUpload", () => {
           includeUserId: true,
         },
         "https://demo.supabase.co/storage/v1/object/public/media/avatars/old-avatar.png",
-        onChange
-      )
+        onChange,
+      ),
     );
 
     const onSuccess = vi.fn();
@@ -104,13 +94,12 @@ describe("useSupabaseUpload", () => {
       expect(mocks.upload).toHaveBeenCalledWith(
         "avatars/user-1-1711987200000-new_avatar.png",
         nextFile,
-        { upsert: true, cacheControl: "3600" }
+        { upsert: true, cacheControl: "3600" },
       );
-      expect(onChange).toHaveBeenCalledWith(
-        "https://demo.supabase.co/storage/v1/object/public/media/uploads/file.png"
-      );
+      expect(onChange).toHaveBeenCalledWith("avatars/user-1-1711987200000-new_avatar.png");
       expect(onSuccess).toHaveBeenCalledWith({
-        url: "https://demo.supabase.co/storage/v1/object/public/media/uploads/file.png",
+        path: "avatars/user-1-1711987200000-new_avatar.png",
+        url: `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/media/avatars/user-1-1711987200000-new_avatar.png`,
       });
       expect(onError).not.toHaveBeenCalled();
     });
@@ -120,13 +109,14 @@ describe("useSupabaseUpload", () => {
 
   it("appends uploaded files when the field value is an array", async () => {
     const onChange = vi.fn();
+    vi.spyOn(Date, "now").mockReturnValue(1711987200001);
 
     const { result } = renderHook(() =>
       useSupabaseUpload(
         { bucket: "media", pathPrefix: "products/" },
-        ["https://demo.supabase.co/storage/v1/object/public/media/products/existing.png"],
-        onChange
-      )
+        ["products/existing.png"],
+        onChange,
+      ),
     );
 
     result.current.customRequest({
@@ -135,10 +125,12 @@ describe("useSupabaseUpload", () => {
 
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith([
-        "https://demo.supabase.co/storage/v1/object/public/media/products/existing.png",
-        "https://demo.supabase.co/storage/v1/object/public/media/uploads/file.png",
+        "products/existing.png",
+        "products/1711987200001-gallery.png",
       ]);
     });
+
+    vi.mocked(Date.now).mockRestore();
   });
 
   it("removes stored files and clears array values on delete", async () => {
@@ -147,23 +139,37 @@ describe("useSupabaseUpload", () => {
     const { result } = renderHook(() =>
       useSupabaseUpload(
         { bucket: "media", pathPrefix: "products/" },
-        [
-          "https://demo.supabase.co/storage/v1/object/public/media/products/keep.png",
-          "https://demo.supabase.co/storage/v1/object/public/media/products/remove.png",
-        ],
-        onChange
-      )
+        ["products/keep.png", "products/remove.png"],
+        onChange,
+      ),
     );
 
-    result.current.handleRemove(
-      "https://demo.supabase.co/storage/v1/object/public/media/products/remove.png"
-    );
+    result.current.handleRemove("products/remove.png");
 
     await waitFor(() => {
       expect(mocks.remove).toHaveBeenCalledWith(["products/remove.png"]);
-      expect(onChange).toHaveBeenCalledWith([
-        "https://demo.supabase.co/storage/v1/object/public/media/products/keep.png",
-      ]);
+      expect(onChange).toHaveBeenCalledWith(["products/keep.png"]);
+    });
+  });
+
+  it("removes stored files referenced by public URL and clears single values on delete", async () => {
+    const onChange = vi.fn();
+
+    const { result } = renderHook(() =>
+      useSupabaseUpload(
+        { bucket: "media", pathPrefix: "settings/" },
+        "settings/current-logo.png",
+        onChange,
+      ),
+    );
+
+    result.current.handleRemove(
+      `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/media/settings/current-logo.png`,
+    );
+
+    await waitFor(() => {
+      expect(mocks.remove).toHaveBeenCalledWith(["settings/current-logo.png"]);
+      expect(onChange).toHaveBeenCalledWith(undefined);
     });
   });
 });

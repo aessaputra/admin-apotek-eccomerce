@@ -1,20 +1,20 @@
 import type { DataProvider } from "@refinedev/core";
 import { dataProvider as supabaseDataProvider } from "@refinedev/supabase";
 import { supabaseClient } from "./supabase-client";
-import { getStoragePathFromPublicUrl, MEDIA_BUCKET } from "../utils/storage";
+import { getStoragePathFromReference, MEDIA_BUCKET } from "../utils/storage";
 
 const baseDataProvider = supabaseDataProvider(supabaseClient);
 
 async function deleteCategoryLogo(logoUrl: string | null | undefined): Promise<void> {
   if (!logoUrl) return;
-  const path = getStoragePathFromPublicUrl(logoUrl, MEDIA_BUCKET);
+  const path = getStoragePathFromReference(logoUrl, MEDIA_BUCKET);
   if (!path) return;
   await supabaseClient.storage.from(MEDIA_BUCKET).remove([path]);
 }
 
 async function deleteProductImages(productImages: { url: string }[]): Promise<void> {
   const deletions = (productImages || []).map(async (img) => {
-    const path = getStoragePathFromPublicUrl(img.url, MEDIA_BUCKET);
+    const path = getStoragePathFromReference(img.url, MEDIA_BUCKET);
     if (path) {
       await supabaseClient.storage.from(MEDIA_BUCKET).remove([path]);
     }

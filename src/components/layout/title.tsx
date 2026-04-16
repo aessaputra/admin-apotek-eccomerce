@@ -1,6 +1,8 @@
 import type { RefineLayoutThemedTitleProps } from "@refinedev/antd";
 import { ThemedTitle } from "@refinedev/antd";
 import { useTranslation } from "@refinedev/core";
+import { useStoreBranding } from "../../hooks/useStoreBranding";
+import { BrandingIcon } from "./branding-icon";
 
 /**
  * Title component menggunakan ThemedTitle dari Refine.
@@ -9,22 +11,13 @@ import { useTranslation } from "@refinedev/core";
  */
 export const Title: React.FC<RefineLayoutThemedTitleProps> = ({ collapsed }) => {
   const { translate } = useTranslation();
+  const { storeName, primaryLogoUrl } = useStoreBranding();
 
   return (
     <ThemedTitle
       collapsed={collapsed}
-      icon={
-        <img
-          src="/logo-icon.png"
-          alt=""
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
-          }}
-        />
-      }
-      text={translate("app.title")}
+      icon={<BrandingIcon src={primaryLogoUrl} />}
+      text={storeName ?? translate("app.title")}
     />
   );
 };

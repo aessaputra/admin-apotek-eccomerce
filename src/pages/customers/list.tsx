@@ -9,6 +9,7 @@ import {
 import { useTranslation } from "@refinedev/core";
 import { Table, Space, Avatar, Input, Tooltip, Tag, Button } from "antd";
 import { useBanToggle } from "../../hooks/useBanToggle";
+import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 
 export const CustomerList: React.FC = () => {
   const { translate } = useTranslation();
@@ -36,7 +37,7 @@ export const CustomerList: React.FC = () => {
           )}
           render={(_, record: { full_name?: string; avatar_url?: string }) => (
             <Space>
-              <Avatar src={record.avatar_url} size="small">
+              <Avatar src={resolveStoragePublicUrl(record.avatar_url ?? null, MEDIA_BUCKET) ?? undefined} size="small">
                 {record.full_name?.[0]?.toUpperCase() ?? "?"}
               </Avatar>
               <span>{record.full_name || "-"}</span>

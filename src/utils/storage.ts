@@ -51,13 +51,18 @@ export function validateImageFile(file: File): ValidateImageResult {
  * Validates path to prevent path traversal attacks.
  * @see https://owasp.org/www-community/attacks/Path_Traversal
  */
-function isPathSafe(path: string): boolean {
+export function isStoragePathSafe(path: string): boolean {
   return (
     path.length > 0 &&
     !path.includes("..") &&
     !path.startsWith("/") &&
     !path.includes("//")
   );
+}
+
+function normalizeStoragePath(value: string): string | null {
+  const trimmedValue = value.trim();
+  return trimmedValue && isStoragePathSafe(trimmedValue) ? trimmedValue : null;
 }
 
 /**
@@ -76,17 +81,45 @@ export function getStoragePathFromPublicUrl(
   );
   const match = publicUrl.match(pattern);
   const path = match ? match[1] : null;
-  return path && isPathSafe(path) ? path : null;
+  return path ? normalizeStoragePath(path) : null;
+}
+
+export function getStoragePathFromReference(
+  value: string | null | undefined,
+  bucket: string
+): string | null {
+  if (!value || typeof value !== "string") return null;
+
+  return getStoragePathFromPublicUrl(value, bucket) ?? normalizeStoragePath(value);
 }
 
 export function getPublicUrlFromStoragePath(
   path: string,
   bucket: string
 ): string | null {
-  if (!path || typeof path !== "string" || !isPathSafe(path)) return null;
+  if (!path || typeof path !== "string") return null;
+
+  const normalizedPath = normalizeStoragePath(path);
+  if (!normalizedPath) return null;
 
   const baseUrl = import.meta.env.VITE_SUPABASE_URL;
   if (!baseUrl) return null;
 
-  return `${baseUrl}/storage/v1/object/public/${bucket}/${path}`;
+  return `${baseUrl}/storage/v1/object/public/${bucket}/${normalizedPath}`;
+}
+
+export function resolveStoragePublicUrl(
+  value: string | null | undefined,
+  bucket: string
+): string | null {
+  if (!value || typeof value !== "string") return null;
+
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return null;
+
+  if (trimmedValue.startsWith("http://") || trimmedValue.startsWith("https://")) {
+    return trimmedValue;
+  }
+
+  return getPublicUrlFromStoragePath(trimmedValue, bucket);
 }

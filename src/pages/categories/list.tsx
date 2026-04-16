@@ -7,6 +7,7 @@ import {
 } from "@refinedev/antd";
 import { useTranslation } from "@refinedev/core";
 import { Table, Image, Space, Tooltip } from "antd";
+import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 
 export const CategoryList: React.FC = () => {
   const { translate } = useTranslation();
@@ -21,13 +22,15 @@ export const CategoryList: React.FC = () => {
           dataIndex="logo_url"
           title={translate("categories.fields.logo")}
           width={80}
-          render={(url: string) =>
-            url ? (
-              <Image src={url} alt="" width={40} height={40} style={{ objectFit: "cover" }} />
+          render={(value: string) => {
+            const previewUrl = resolveStoragePublicUrl(value, MEDIA_BUCKET);
+
+            return previewUrl ? (
+              <Image src={previewUrl} alt="" width={40} height={40} style={{ objectFit: "cover" }} />
             ) : (
               "-"
-            )
-          }
+            );
+          }}
         />
         <Table.Column dataIndex="name" title={translate("categories.fields.name")} />
         <Table.Column dataIndex="slug" title={translate("categories.fields.slug")} />

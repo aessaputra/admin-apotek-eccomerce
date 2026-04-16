@@ -1,6 +1,6 @@
 import { Upload } from "antd";
 import { useSupabaseUpload } from "../../hooks/useSupabaseUpload";
-import { MEDIA_BUCKET } from "../../utils/storage";
+import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 
 interface AvatarUploadProps {
   value?: string;
@@ -12,7 +12,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
   onChange,
 }) => {
   const fileList = value
-    ? [{ uid: "-1", name: "avatar", url: value, status: "done" as const }]
+    ? [{ uid: "-1", name: "avatar", url: resolveStoragePublicUrl(value, MEDIA_BUCKET) ?? value, status: "done" as const }]
     : [];
 
   const { beforeUpload, customRequest, handleRemove } = useSupabaseUpload(
