@@ -127,6 +127,14 @@ describe("App", () => {
       "report_customer_sales",
     ]);
 
+    expect(resources.find((resource) => resource.name === "orders")).toEqual(
+      expect.objectContaining({
+        meta: expect.objectContaining({
+          readResource: "order_read_model",
+        }),
+      }),
+    );
+
     expect(captured.refineProps?.options).toEqual({
       syncWithLocation: true,
       warnWhenUnsavedChanges: true,

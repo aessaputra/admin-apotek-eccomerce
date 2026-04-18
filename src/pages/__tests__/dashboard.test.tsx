@@ -128,4 +128,23 @@ describe("Dashboard", () => {
     expect(screen.getByText("Handed to Courier")).not.toBeNull();
     expect(screen.queryByText("shipped")).toBeNull();
   });
+
+  it("queries revenue using settled payment status", () => {
+    render(<Dashboard />);
+
+    expect(mocks.useList).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resource: "orders",
+        pagination: { mode: "off" },
+        filters: expect.arrayContaining([
+          expect.objectContaining({
+            field: "payment_status",
+            operator: "eq",
+            value: "settlement",
+          }),
+        ]),
+        meta: { select: "total_amount" },
+      }),
+    );
+  });
 });

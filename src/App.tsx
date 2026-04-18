@@ -38,6 +38,7 @@ import { ColorModeContextProvider } from "./contexts/color-mode";
 import { Header } from "./components/header";
 import { AuthTitle } from "./components/layout/auth-title";
 import { Title } from "./components/layout/title";
+import { ORDER_READ_RESOURCE } from "./constants/resources";
 import authProvider from "./providers/auth";
 import { dataProvider } from "./providers/data";
 import { supabaseClient } from "./providers/supabase-client";
@@ -105,7 +106,10 @@ function App() {
                     name: "orders",
                     list: "/orders",
                     show: "/orders/show/:id",
-                    meta: { icon: <ShoppingCartOutlined /> },
+                    meta: {
+                      icon: <ShoppingCartOutlined />,
+                      readResource: ORDER_READ_RESOURCE,
+                    },
                   },
                   {
                     name: "profiles",

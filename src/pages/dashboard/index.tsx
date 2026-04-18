@@ -33,11 +33,11 @@ export const Dashboard: React.FC = () => {
     meta: { count: "exact" },
   });
 
-  // Revenue: sum of delivered orders
+  // Revenue: sum of settled payments
   const { result: revenueResult } = useList({
     resource: "orders",
     pagination: { mode: "off" },
-    filters: [{ field: "status", operator: "eq", value: "delivered" }],
+    filters: [{ field: "payment_status", operator: "eq", value: "settlement" }],
     meta: { select: "total_amount" },
   });
 
