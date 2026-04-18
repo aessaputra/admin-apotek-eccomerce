@@ -1,26 +1,40 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
+  const getList = vi.fn();
   const getOne = vi.fn();
   const getMany = vi.fn();
   const deleteOne = vi.fn();
   const deleteMany = vi.fn();
   const remove = vi.fn();
   const storageFrom = vi.fn(() => ({ remove }));
+  const orderItemsEq = vi.fn();
   const bannerSelectEq = vi.fn();
-  const from = vi.fn(() => ({
-    select: vi.fn(() => ({
-      eq: bannerSelectEq,
-    })),
-  }));
+  const from = vi.fn((table: string) => {
+    if (table === "order_items") {
+      return {
+        select: vi.fn(() => ({
+          eq: orderItemsEq,
+        })),
+      };
+    }
+
+    return {
+      select: vi.fn(() => ({
+        eq: bannerSelectEq,
+      })),
+    };
+  });
 
   return {
+    getList,
     getOne,
     getMany,
     deleteOne,
     deleteMany,
     remove,
     storageFrom,
+    orderItemsEq,
     bannerSelectEq,
     from,
   };
@@ -28,6 +42,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@refinedev/supabase", () => ({
   dataProvider: vi.fn(() => ({
+    getList: mocks.getList,
     getOne: mocks.getOne,
     getMany: mocks.getMany,
     deleteOne: mocks.deleteOne,
@@ -48,6 +63,7 @@ import { dataProvider } from "../data";
 
 describe("dataProvider custom deletes", () => {
   beforeEach(() => {
+    mocks.getList.mockReset();
     mocks.getOne.mockReset();
     mocks.getMany.mockReset();
     mocks.deleteOne.mockReset();
@@ -55,12 +71,141 @@ describe("dataProvider custom deletes", () => {
     mocks.remove.mockReset();
     mocks.storageFrom.mockClear();
     mocks.from.mockClear();
+    mocks.orderItemsEq.mockReset();
     mocks.bannerSelectEq.mockReset();
 
+    mocks.getList.mockResolvedValue({ data: [], total: 0 });
     mocks.deleteOne.mockResolvedValue({ data: { id: "1" } });
     mocks.deleteMany.mockResolvedValue({ data: [{ id: "1" }] });
     mocks.remove.mockResolvedValue({ data: [] });
+    mocks.orderItemsEq.mockResolvedValue({ data: [], error: null });
     mocks.bannerSelectEq.mockResolvedValue({ data: [], error: null });
+  });
+
+  it("routes order list reads through order_read_model", async () => {
+    const getListMethod = dataProvider.getList;
+
+    expect(getListMethod).toBeTypeOf("function");
+
+    if (!getListMethod) {
+      throw new Error("getList is not implemented");
+    }
+
+    const params = {
+      resource: "orders",
+      pagination: { current: 1, pageSize: 10 },
+      sorters: [],
+      filters: [],
+      meta: { select: "*" },
+    };
+
+    await getListMethod(params);
+
+    expect(mocks.getList).toHaveBeenCalledWith({
+      ...params,
+      resource: "order_read_model",
+    });
+  });
+
+  it("routes order batch reads through order_read_model", async () => {
+    const getManyMethod = dataProvider.getMany;
+
+    expect(getManyMethod).toBeTypeOf("function");
+
+    if (!getManyMethod) {
+      throw new Error("getMany is not implemented");
+    }
+
+    const params = {
+      resource: "orders",
+      ids: ["order-1", "order-2"],
+      meta: { select: "*" },
+    };
+
+    await getManyMethod(params);
+
+    expect(mocks.getMany).toHaveBeenCalledWith({
+      ...params,
+      resource: "order_read_model",
+    });
+  });
+
+  it("hydrates order detail from order_read_model and merges order_items", async () => {
+    const getOneMethod = dataProvider.getOne;
+
+    expect(getOneMethod).toBeTypeOf("function");
+
+    if (!getOneMethod) {
+      throw new Error("getOne is not implemented");
+    }
+
+    mocks.getOne.mockResolvedValueOnce({
+      data: {
+        id: "order-1",
+        payment_status: "settlement",
+        waybill_number: "WB-123",
+      },
+    });
+    mocks.orderItemsEq.mockResolvedValueOnce({
+      data: [
+        {
+          id: "item-1",
+          order_id: "order-1",
+          quantity: 2,
+          products: { name: "Paracetamol" },
+        },
+      ],
+      error: null,
+    });
+
+    const result = await getOneMethod({
+      resource: "orders",
+      id: "order-1",
+      meta: { select: "*, order_items(*, products(name))" },
+    });
+
+    expect(mocks.getOne).toHaveBeenCalledWith({
+      resource: "order_read_model",
+      id: "order-1",
+      meta: { select: "*" },
+    });
+    expect(mocks.from).toHaveBeenCalledWith("order_items");
+    expect(mocks.orderItemsEq).toHaveBeenCalledWith("order_id", "order-1");
+    expect(result).toEqual({
+      data: {
+        id: "order-1",
+        payment_status: "settlement",
+        waybill_number: "WB-123",
+        order_items: [
+          {
+            id: "item-1",
+            order_id: "order-1",
+            quantity: 2,
+            products: { name: "Paracetamol" },
+          },
+        ],
+      },
+    });
+  });
+
+  it("keeps non-order reads on their original resources", async () => {
+    const getOneMethod = dataProvider.getOne;
+
+    expect(getOneMethod).toBeTypeOf("function");
+
+    if (!getOneMethod) {
+      throw new Error("getOne is not implemented");
+    }
+
+    const params = {
+      resource: "categories",
+      id: "cat-1",
+      meta: { select: "*" },
+    };
+
+    await getOneMethod(params);
+
+    expect(mocks.getOne).toHaveBeenCalledWith(params);
   });
 
   it("removes a category logo from storage before deleting the record", async () => {

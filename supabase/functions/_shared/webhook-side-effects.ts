@@ -3,6 +3,11 @@ import {
   persistBiteshipShipment,
 } from "./biteship.ts";
 import { fetchOrderShippingAddress } from "./biteship-order-helpers.ts";
+import { getOrderAggregateById } from "./order-aggregate.ts";
+import {
+  deriveSettlementSideEffectFlags,
+  shouldQueueBiteshipFulfillment,
+} from "./order-flow-rules.ts";
 import { getSupabaseAdminClient } from "./supabase.ts";
 import type { BiteshipOrderResponse, Order, OrderItem } from "./types.ts";
 
@@ -23,6 +28,7 @@ export interface SideEffectTask {
   needs_biteship: boolean;
   retry_count: number;
   updated_at: string;
+  last_error: string | null;
   lease_owner: string | null;
   lease_until: string | null;
   next_retry_at: string | null;
@@ -127,7 +133,7 @@ export async function getSideEffectTask(
   const { data, error } = await adminClient
     .from("webhook_side_effect_tasks")
     .select(
-      "needs_cart_cleanup, needs_stock, needs_biteship, retry_count, updated_at, lease_owner, lease_until, next_retry_at, last_attempted_at, last_error_code, failed_permanently_at, pending_biteship_order_id, pending_tracking_id, pending_waybill_number",
+      "needs_cart_cleanup, needs_stock, needs_biteship, retry_count, updated_at, last_error, lease_owner, lease_until, next_retry_at, last_attempted_at, last_error_code, failed_permanently_at, pending_biteship_order_id, pending_tracking_id, pending_waybill_number",
     )
     .eq("order_id", orderId)
     .maybeSingle();
@@ -223,24 +229,50 @@ export async function ensureSettlementSideEffectsQueued(
   orderId: string,
   paymentStatus: string,
 ): Promise<boolean> {
-  if (paymentStatus !== "settlement") {
+  const order = await getOrderAggregateById(adminClient, orderId);
+  const existingSideEffectTask = await getSideEffectTask(adminClient, orderId);
+  const nextSideEffects = order
+    ? deriveSettlementSideEffectFlags({
+        paymentStatus,
+        status: order.status,
+        biteshipOrderId: order.biteship_order_id,
+        courierCode: order.courier_code,
+        existingNeedsBiteship: existingSideEffectTask?.needs_biteship,
+        pendingBiteshipOrderId: existingSideEffectTask?.pending_biteship_order_id,
+      })
+    : null;
+
+  if (!order || !nextSideEffects) {
     return false;
   }
 
-  let existingSideEffectTask = await getSideEffectTask(adminClient, orderId);
   if (!existingSideEffectTask) {
     await saveSideEffectTask(
       adminClient,
       orderId,
-      true,
-      true,
-      false,
+      nextSideEffects.needsCartCleanup,
+      nextSideEffects.needsStock,
+      nextSideEffects.needsBiteship,
       null,
     );
-    existingSideEffectTask = await getSideEffectTask(adminClient, orderId);
+  } else {
+    await saveSideEffectTask(
+      adminClient,
+      orderId,
+      nextSideEffects.needsCartCleanup,
+      nextSideEffects.needsStock,
+      nextSideEffects.needsBiteship,
+      null,
+      existingSideEffectTask.pending_biteship_order_id ?? null,
+      existingSideEffectTask.pending_tracking_id ?? null,
+      existingSideEffectTask.pending_waybill_number ?? null,
+      null,
+      null,
+      false,
+    );
   }
 
-  return !!existingSideEffectTask;
+  return true;
 }
 
 export async function claimSideEffectTask(
@@ -346,26 +378,12 @@ async function getOrderForSideEffects(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
   orderId: string,
 ): Promise<Order | null> {
-  const { data, error } = await adminClient
-    .from("orders")
-    .select(
-      `
-      *,
-      profiles (full_name, phone_number),
-      order_items (
-        *,
-        products (*)
-      )
-    `,
-    )
-    .eq("id", orderId)
-    .maybeSingle();
+  const order = await getOrderAggregateById(adminClient, orderId);
 
-  if (error || !data) {
+  if (!order) {
     return null;
   }
 
-  const order = data as Order;
   const shippingAddress = await fetchOrderShippingAddress(adminClient, order);
 
   return {
@@ -518,7 +536,7 @@ export async function processWebhookSideEffectTask(
       return {
         processed: true,
         needsRetry: false,
-        message: "Order no longer requires fulfillment side effects",
+        message: "Order fulfillment side effects are waiting for settlement",
       };
     }
 

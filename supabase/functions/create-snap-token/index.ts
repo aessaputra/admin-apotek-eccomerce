@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
 import { corsHeaders } from "../_shared/cors.ts";
 import { buildSnapPayload } from "../_shared/midtrans.ts";
+import { getOrderAggregateById } from "../_shared/order-aggregate.ts";
 import { getSupabaseAdminClient } from "../_shared/supabase.ts";
 import type { AuthUser, Order, SnapResponse } from "../_shared/types.ts";
 
@@ -45,6 +46,121 @@ type MidtransSnapError = {
   error_messages?: string[];
   status_message?: string;
 };
+
+type PaymentSessionRow = {
+  midtrans_order_id?: string | null;
+  snap_token?: string | null;
+  redirect_url?: string | null;
+  snap_token_created_at?: string | null;
+};
+
+async function getLatestPaymentSession(
+  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  orderId: string,
+): Promise<PaymentSessionRow | null> {
+  const { data, error } = await adminClient
+    .from("payments")
+    .select("midtrans_order_id, snap_token, redirect_url, snap_token_created_at")
+    .eq("order_id", orderId)
+    .order("updated_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new HttpError(500, "Failed to look up latest payment session");
+  }
+
+  return (data as PaymentSessionRow | null) ?? null;
+}
+
+async function waitForAvailableSnapSession(
+  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  orderId: string,
+  isTokenExpired: (createdAt: string | null | undefined) => boolean,
+): Promise<PaymentSessionRow | null> {
+  const attempts = 6;
+  const delayMs = 500;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const session = await getLatestPaymentSession(adminClient, orderId);
+
+    if (
+      session?.snap_token &&
+      session.redirect_url &&
+      !isTokenExpired(session.snap_token_created_at)
+    ) {
+      return session;
+    }
+
+    if (attempt < attempts - 1) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+
+  return null;
+}
+
+async function persistPaymentSession(
+  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  order: Order,
+  values: {
+    midtransOrderId: string;
+    snapToken?: string;
+    redirectUrl?: string;
+    snapTokenCreatedAt?: string;
+    grossAmount?: number;
+  },
+): Promise<void> {
+  const { data: existingPayment, error: paymentLookupError } = await adminClient
+    .from("payments")
+    .select("id")
+    .eq("order_id", order.id)
+    .order("updated_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (paymentLookupError) {
+    throw new HttpError(500, "Failed to look up payment session");
+  }
+
+  const payload = {
+    order_id: order.id,
+    user_id: order.user_id ?? null,
+    checkout_idempotency_key: order.checkout_idempotency_key ?? null,
+    midtrans_order_id: values.midtransOrderId,
+    status: order.payment_status,
+    payment_type: order.payment_type ?? null,
+    gross_amount:
+      values.grossAmount ??
+      (order.gross_amount != null ? Number(order.gross_amount) : Number(order.total_amount || 0) + Number(order.shipping_cost || 0)),
+    expiry_time: order.expired_at ?? null,
+    snap_token: values.snapToken ?? order.snap_token ?? null,
+    redirect_url: values.redirectUrl ?? order.snap_redirect_url ?? null,
+    snap_token_created_at:
+      values.snapTokenCreatedAt ?? order.snap_token_created_at ?? null,
+  };
+
+  if (existingPayment?.id) {
+    const { error } = await adminClient
+      .from("payments")
+      .update(payload)
+      .eq("id", existingPayment.id);
+
+    if (error) {
+      throw new HttpError(500, "Failed to update payment session");
+    }
+
+    return;
+  }
+
+  const { error } = await adminClient.from("payments").insert(payload);
+
+  if (error) {
+    throw new HttpError(500, "Failed to create payment session");
+  }
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -107,19 +223,12 @@ Deno.serve(async (req: Request) => {
     }
 
     const adminClient = getSupabaseAdminClient();
-    const { data: rawOrder, error: orderError } = await adminClient
-      .from("orders")
-      .select(
-        "*, order_items(*, products(name, categories(name))), profiles(id, full_name, phone_number), addresses(id, receiver_name, phone_number, street_address, address_note, city, province, postal_code, country_code, area_id, latitude, longitude)",
-      )
-      .eq("id", orderId)
-      .single();
+    const order = await getOrderAggregateById(adminClient, orderId);
 
-    if (orderError || !rawOrder) {
+    if (!order) {
       throw new HttpError(404, "Order not found");
     }
 
-    const order = rawOrder as unknown as Order;
     if (order.user_id !== userId) {
       throw new HttpError(403, "Forbidden");
     }
@@ -152,7 +261,7 @@ Deno.serve(async (req: Request) => {
 
     if (order.checkout_idempotency_key) {
       const { data: idempotentOrder } = await adminClient
-        .from("orders")
+        .from("order_read_model")
         .select(
           "id, user_id, snap_token, snap_redirect_url, snap_token_created_at",
         )
@@ -170,14 +279,12 @@ Deno.serve(async (req: Request) => {
         !isTokenExpired(idempotentOrder.snap_token_created_at)
       ) {
         if (idempotentOrder.id !== order.id) {
-          await adminClient
-            .from("orders")
-            .update({
-              snap_token: idempotentOrder.snap_token,
-              snap_redirect_url: idempotentOrder.snap_redirect_url,
-              snap_token_created_at: idempotentOrder.snap_token_created_at,
-            })
-            .eq("id", order.id);
+          await persistPaymentSession(adminClient, order, {
+            midtransOrderId: order.midtrans_order_id ?? ensureMidtransOrderId(order),
+            snapToken: idempotentOrder.snap_token,
+            redirectUrl: idempotentOrder.snap_redirect_url,
+            snapTokenCreatedAt: idempotentOrder.snap_token_created_at,
+          });
         }
 
         return jsonResponse({
@@ -187,85 +294,151 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const midtransOrderId = ensureMidtransOrderId(order);
-    if (!order.midtrans_order_id) {
-      const { error: updateOrderIdError } = await adminClient
-        .from("orders")
-        .update({ midtrans_order_id: midtransOrderId })
-        .eq("id", order.id);
-
-      if (updateOrderIdError) {
-        throw new HttpError(500, "Failed to persist midtrans_order_id");
-      }
-    }
-
-    const payload = buildSnapPayload(
+    const lockOwner = crypto.randomUUID();
+    const lockAcquiredResponse = await adminClient.rpc(
+      "acquire_snap_token_generation_lock",
       {
-        ...order,
-        midtrans_order_id: midtransOrderId,
+        p_order_id: order.id,
+        p_checkout_idempotency_key: order.checkout_idempotency_key ?? order.id,
+        p_owner: lockOwner,
+        p_ttl_seconds: 90,
       },
-      {
-        id: userId,
-        email: userEmail,
-      } as AuthUser,
     );
 
-    const serverKey = Deno.env.get("MIDTRANS_SERVER_KEY");
-    if (!serverKey) {
-      throw new HttpError(500, "Midtrans server key not configured");
+    if (lockAcquiredResponse.error) {
+      throw new HttpError(500, "Failed to acquire payment token lock");
     }
 
-    const isProduction = Deno.env.get("MIDTRANS_IS_PRODUCTION") === "true";
-    const midtransApiUrl = isProduction
-      ? "https://app.midtrans.com/snap/v1/transactions"
-      : "https://app.sandbox.midtrans.com/snap/v1/transactions";
+    const lockAcquired = lockAcquiredResponse.data === true;
 
-    const midtransResponse = await fetch(midtransApiUrl, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: `Basic ${btoa(`${serverKey}:`)}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const midtransData =
-      (await midtransResponse.json()) as Partial<SnapResponse> &
-        MidtransSnapError;
-    if (
-      !midtransResponse.ok ||
-      !midtransData.token ||
-      !midtransData.redirect_url
-    ) {
-      throw new HttpError(
-        502,
-        midtransData.error_messages?.[0] ||
-          midtransData.status_message ||
-          "Midtrans token creation failed",
+    if (!lockAcquired) {
+      const pendingSession = await waitForAvailableSnapSession(
+        adminClient,
+        order.id,
+        isTokenExpired,
       );
+
+      if (pendingSession?.snap_token && pendingSession.redirect_url) {
+        return jsonResponse({
+          snap_token: pendingSession.snap_token,
+          redirect_url: pendingSession.redirect_url,
+        });
+      }
+
+      throw new HttpError(409, "Payment token generation is already in progress");
     }
 
-    const nowIso = new Date().toISOString();
-    const { error: persistSnapError } = await adminClient
-      .from("orders")
-      .update({
-        midtrans_order_id: midtransOrderId,
+    try {
+      const latestPaymentSession = await getLatestPaymentSession(adminClient, order.id);
+
+      if (
+        latestPaymentSession?.snap_token &&
+        latestPaymentSession.redirect_url &&
+        !isTokenExpired(latestPaymentSession.snap_token_created_at)
+      ) {
+        return jsonResponse({
+          snap_token: latestPaymentSession.snap_token,
+          redirect_url: latestPaymentSession.redirect_url,
+        });
+      }
+
+      const midtransOrderId = latestPaymentSession?.midtrans_order_id ??
+        ensureMidtransOrderId(order);
+      await persistPaymentSession(adminClient, order, {
+        midtransOrderId,
+      });
+
+      const payload = buildSnapPayload(
+        {
+          ...order,
+          midtrans_order_id: midtransOrderId,
+        },
+        {
+          id: userId,
+          email: userEmail,
+        } as AuthUser,
+      );
+
+      const serverKey = Deno.env.get("MIDTRANS_SERVER_KEY");
+      if (!serverKey) {
+        throw new HttpError(500, "Midtrans server key not configured");
+      }
+
+      const isProduction = Deno.env.get("MIDTRANS_IS_PRODUCTION") === "true";
+      const midtransApiUrl = isProduction
+        ? "https://app.midtrans.com/snap/v1/transactions"
+        : "https://app.sandbox.midtrans.com/snap/v1/transactions";
+
+      const MIDTRANS_REQUEST_TIMEOUT_MS = 30_000;
+
+      let midtransResponse: Response;
+      try {
+        midtransResponse = await fetch(midtransApiUrl, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization: `Basic ${btoa(`${serverKey}:`)}`,
+          },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(MIDTRANS_REQUEST_TIMEOUT_MS),
+        });
+      } catch (error: unknown) {
+        if (
+          error instanceof Error &&
+          (error.name === "AbortError" || error.name === "TimeoutError")
+        ) {
+          throw new HttpError(504, "Midtrans token creation timed out");
+        }
+
+        throw error;
+      }
+
+      const midtransData =
+        (await midtransResponse.json()) as Partial<SnapResponse> &
+          MidtransSnapError;
+      if (
+        !midtransResponse.ok ||
+        !midtransData.token ||
+        !midtransData.redirect_url
+      ) {
+        throw new HttpError(
+          502,
+          midtransData.error_messages?.[0] ||
+            midtransData.status_message ||
+            "Midtrans token creation failed",
+        );
+      }
+
+      const nowIso = new Date().toISOString();
+      await persistPaymentSession(adminClient, order, {
+        midtransOrderId,
+        snapToken: midtransData.token,
+        redirectUrl: midtransData.redirect_url,
+        snapTokenCreatedAt: nowIso,
+        grossAmount: payload.transaction_details.gross_amount,
+      });
+
+      return jsonResponse({
         snap_token: midtransData.token,
-        snap_redirect_url: midtransData.redirect_url,
-        snap_token_created_at: nowIso,
-        gross_amount: payload.transaction_details.gross_amount,
-      })
-      .eq("id", order.id);
+        redirect_url: midtransData.redirect_url,
+      });
+    } finally {
+      const releaseLockResponse = await adminClient.rpc(
+        "release_snap_token_generation_lock",
+        {
+          p_order_id: order.id,
+          p_owner: lockOwner,
+        },
+      );
 
-    if (persistSnapError) {
-      throw new HttpError(500, "Failed to store snap token in order");
+      if (releaseLockResponse.error) {
+        console.error(
+          "[create-snap-token] Failed to release payment token lock:",
+          releaseLockResponse.error.message,
+        );
+      }
     }
-
-    return jsonResponse({
-      snap_token: midtransData.token,
-      redirect_url: midtransData.redirect_url,
-    });
   } catch (error: unknown) {
     if (error instanceof HttpError) {
       return jsonResponse({ error: error.message }, error.status);

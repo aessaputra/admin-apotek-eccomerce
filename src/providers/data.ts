@@ -1,9 +1,32 @@
-import type { DataProvider } from "@refinedev/core";
+import type {
+  BaseRecord,
+  DataProvider,
+  GetOneParams,
+  GetOneResponse,
+} from "@refinedev/core";
 import { dataProvider as supabaseDataProvider } from "@refinedev/supabase";
 import { supabaseClient } from "./supabase-client";
+import { ORDER_READ_RESOURCE } from "../constants/resources";
 import { getStoragePathFromReference, MEDIA_BUCKET } from "../utils/storage";
 
 const baseDataProvider = supabaseDataProvider(supabaseClient);
+
+function mapOrdersReadResource(resource: string): string {
+  return resource === "orders" ? ORDER_READ_RESOURCE : resource;
+}
+
+async function getOrderItems(orderId: string | number) {
+  const { data, error } = await supabaseClient
+    .from("order_items")
+    .select("*, products(name)")
+    .eq("order_id", String(orderId));
+
+  if (error) {
+    throw error;
+  }
+
+  return data ?? [];
+}
 
 async function deleteCategoryLogo(logoUrl: string | null | undefined): Promise<void> {
   if (!logoUrl) return;
@@ -53,6 +76,46 @@ async function deleteBannerMediaIfUnreferenced(
 
 export const dataProvider: DataProvider = {
   ...baseDataProvider,
+  getList: async (params) => {
+    // Keep the admin-facing Refine resource named `orders`, but serve reads from
+    // the denormalized compatibility view built on top of orders/payments/shipments.
+    return baseDataProvider.getList({
+      ...params,
+      resource: mapOrdersReadResource(params.resource),
+    });
+  },
+  getMany: async (params) => {
+    return baseDataProvider.getMany({
+      ...params,
+      resource: mapOrdersReadResource(params.resource),
+    });
+  },
+  getOne: async <TData extends BaseRecord = BaseRecord>(
+    params: GetOneParams,
+  ): Promise<GetOneResponse<TData>> => {
+    if (params.resource !== "orders") {
+      return baseDataProvider.getOne<TData>(params);
+    }
+
+    // Order detail reads come from the same compatibility view, then stitch
+    // `order_items` back in because the view intentionally exposes only the
+    // denormalized order/payment/shipment fields.
+    const [{ data: order }, orderItems] = await Promise.all([
+      baseDataProvider.getOne({
+        ...params,
+        resource: ORDER_READ_RESOURCE,
+        meta: { ...params.meta, select: "*" },
+      }),
+      getOrderItems(params.id),
+    ]);
+
+    return {
+      data: {
+        ...(order as BaseRecord),
+        order_items: orderItems,
+      } as unknown as TData,
+    };
+  },
   deleteOne: async (params) => {
     if (params.resource === "categories") {
       try {

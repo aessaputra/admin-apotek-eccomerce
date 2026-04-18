@@ -77,13 +77,17 @@ export interface Order {
   expired_at?: string | null;
   checkout_idempotency_key?: string | null;
   midtrans_order_id?: string | null;
+  midtrans_transaction_id?: string | null;
   snap_token?: string | null;
   snap_redirect_url?: string | null;
   snap_token_created_at?: string | null;
+  paid_at?: string | null;
   biteship_order_id?: string | null;
   biteship_tracking_id?: string | null;
+  shipping_etd?: string | null;
   waybill_number?: string | null;
   waybill_source?: "system" | "manual" | null;
+  origin_area_id?: string | null;
   destination_area_id?: string | null;
   destination_postal_code?: number | null;
   shipping_address_id?: string | null;

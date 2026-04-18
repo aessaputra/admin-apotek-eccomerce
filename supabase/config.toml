@@ -386,6 +386,12 @@ verify_jwt = false
 [functions.confirm-midtrans-payment]
 verify_jwt = false
 
+[functions.cancel-user-order]
+verify_jwt = false
+
+[functions.create-checkout-order]
+verify_jwt = false
+
 [functions.order-manager]
 verify_jwt = false
 
