@@ -14,6 +14,7 @@ import {
   ensureSettlementSideEffectsQueued,
   triggerWebhookSideEffectProcessor,
 } from "../_shared/webhook-side-effects.ts";
+import { getOrderAggregateById } from "../_shared/order-aggregate.ts";
 import type {
   MidtransStatusResponse,
   Order,
@@ -128,26 +129,12 @@ Deno.serve(async (req) => {
     }
 
     const adminClient = getSupabaseAdminClient();
-    const { data: rawOrder, error: orderError } = await adminClient
-      .from("orders")
-      .select(
-        `
-        *,
-        profiles (full_name, phone_number),
-        order_items (
-          *,
-          products (*)
-        )
-      `,
-      )
-      .eq("id", orderId)
-      .maybeSingle();
+    const order = await getOrderAggregateById(adminClient, orderId);
 
-    if (orderError || !rawOrder) {
+    if (!order) {
       return jsonResponse({ error: "Order not found" }, 404);
     }
 
-    const order = rawOrder as unknown as Order;
     if (order.user_id !== userId) {
       return jsonResponse({ error: "Forbidden" }, 403);
     }
@@ -258,6 +245,8 @@ Deno.serve(async (req) => {
       !isIgnorableMidtransNoop(
         transition?.payment_status as PaymentStatus | undefined,
         newPaymentStatus,
+        transition?.order_status as string | undefined,
+        newOrderStatus,
       )
     ) {
       return jsonResponse({ error: "Transition was not persisted" }, 409);

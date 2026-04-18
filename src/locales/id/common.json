@@ -260,6 +260,11 @@
       "updatedAt": "Diperbarui"
     },
     "updateOrder": "Update Pesanan",
+    "actionsTitle": "Aksi Pesanan",
+    "actionsDescription": "Tinjau detail pesanan terbaru sebelum memperbarui status atau informasi pengiriman.",
+    "currentOrderStatus": "Status Pesanan Saat Ini",
+    "currentPaymentStatus": "Status Pembayaran Saat Ini",
+    "nextOrderStatus": "Status Pesanan Berikutnya",
     "productList": "Daftar Produk",
     "orderInfo": "Informasi Pesanan",
     "totalAndShipping": "Total & Ongkir",
@@ -276,10 +281,11 @@
     "showDetail": "Lihat Detail",
     "waybillSourceSystem": "Otomatis (Biteship)",
     "waybillSourceManual": "Manual",
-    "waybillOverrideReason": "Alasan Override",
-    "waybillOverridePlaceholder": "Mengapa Anda memasukkan resi secara manual?",
+    "waybillOverrideReason": "Alasan Mengisi Resi Manual",
+    "waybillOverridePlaceholder": "Jelaskan alasan Anda mengisi nomor resi secara manual",
     "enableManualWaybill": "Masukkan resi manual",
-    "manualWaybillWarning": "Input manual — pesanan Biteship tetap ada, tetapi nomor resi akan diganti secara manual",
+    "manualWaybillWarning": "Input manual aktif — pengiriman Biteship sudah ada, tetapi nomor resi akan diganti.",
+    "providerManagedWaybillHelp": "Biteship mengelola pengiriman ini. Gunakan Sinkronkan Pelacakan untuk pembaruan dari provider, dan aktifkan input resi manual hanya untuk fallback atau override.",
     "syncTracking": "Sinkronkan Pelacakan",
     "trackingSynced": "Pelacakan Tersinkron",
     "syncFailed": "Sinkronisasi Gagal",
@@ -322,8 +328,8 @@
       "unknown": "{{action}}: {{from}} → {{to}}"
     },
     "tooltips": {
-      "statusSystemControlled": "Status ini dikontrol oleh sistem (webhook)",
-      "webhookControlled": "Status tertentu dikontrol otomatis oleh webhook",
+      "statusSystemControlled": "Status ini diperbarui otomatis oleh sistem",
+      "webhookControlled": "Beberapa status akan berubah otomatis setelah ada pembaruan pembayaran atau pengiriman",
       "waybillLocked": "Resi terkunci setelah pengiriman",
       "waybillAuto": "Nomor resi berasal dari Biteship",
       "waybillManual": "Untuk kurir non-Biteship"
@@ -332,7 +338,7 @@
     "waybillModeAuto": "Otomatis"
   },
   "orderStatus": {
-    "pending": "Menunggu Pembayaran",
+    "pending": "Pesanan Baru",
     "processing": "Diproses",
     "paid": "Lunas",
     "awaiting_shipment": "Siap Dikirim",
@@ -342,7 +348,7 @@
     "cancelled": "Dibatalkan"
   },
   "paymentStatus": {
-    "pending": "Menunggu Pembayaran",
+    "pending": "Belum Dibayar",
     "authorize": "Terverifikasi",
     "settlement": "Pembayaran Berhasil",
     "deny": "Pembayaran Ditolak",

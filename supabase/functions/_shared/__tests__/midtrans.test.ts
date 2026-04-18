@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSnapPayload, calculateMidtransGrossAmount } from "../midtrans.ts";
+import {
+  buildSnapPayload,
+  calculateMidtransGrossAmount,
+  isIgnorableMidtransNoop,
+} from "../midtrans.ts";
 import type { AuthUser, Order } from "../types.ts";
 
 const authUser: AuthUser = {
@@ -141,5 +145,32 @@ describe("buildSnapPayload", () => {
       first_name: "Jane",
       last_name: "Customer",
     });
+  });
+});
+
+describe("isIgnorableMidtransNoop", () => {
+  it("treats duplicate payment transitions as ignorable only when the order status already matches", () => {
+    expect(
+      isIgnorableMidtransNoop(
+        "settlement",
+        "settlement",
+        "processing",
+        "processing",
+      ),
+    ).toBe(true);
+
+    expect(
+      isIgnorableMidtransNoop(
+        "settlement",
+        "cancel",
+        "processing",
+        "cancelled",
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps the legacy payment-only fallback when order status is unavailable", () => {
+    expect(isIgnorableMidtransNoop("settlement", "cancel")).toBe(true);
+    expect(isIgnorableMidtransNoop("pending", "settlement")).toBe(false);
   });
 });

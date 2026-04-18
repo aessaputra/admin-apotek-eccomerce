@@ -10,6 +10,12 @@ export interface BiteshipStatusResolution {
   };
 }
 
+export function getPersistedBiteshipShipmentStatus(
+  status?: string | null,
+): string {
+  return status?.trim() || "awaiting_shipment";
+}
+
 const FORWARD_STATUS_MAP: Record<string, string> = {
   allocated: "awaiting_shipment",
   confirmed: "awaiting_shipment",

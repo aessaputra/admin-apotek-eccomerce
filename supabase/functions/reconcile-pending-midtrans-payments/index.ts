@@ -13,6 +13,7 @@ import {
   ensureSettlementSideEffectsQueued,
   triggerWebhookSideEffectProcessor,
 } from "../_shared/webhook-side-effects.ts";
+import { getOrderAggregateById } from "../_shared/order-aggregate.ts";
 import type { MidtransStatusResponse, Order, PaymentStatus } from "../_shared/types.ts";
 
 declare const Deno: {
@@ -114,17 +115,8 @@ async function listPendingOrders(
 ): Promise<Order[]> {
   const safeLimit = Math.max(1, Math.min(limit, 50));
   const { data, error } = await adminClient
-    .from("orders")
-    .select(
-      `
-      *,
-      profiles (full_name, phone_number),
-      order_items (
-        *,
-        products (*)
-      )
-    `,
-    )
+    .from("order_read_model")
+    .select("id")
     .in("payment_status", ["pending", "authorize"])
     .not("midtrans_order_id", "is", null)
     .not("snap_token", "is", null)
@@ -135,7 +127,15 @@ async function listPendingOrders(
     throw new Error(`Failed to list pending orders: ${error.message}`);
   }
 
-  return (data ?? []) as unknown[] as Order[];
+  const ids = (data ?? [])
+    .map((row) => row.id)
+    .filter((value): value is string => typeof value === "string");
+
+  const orders = await Promise.all(
+    ids.map((id) => getOrderAggregateById(adminClient, id)),
+  );
+
+  return orders.filter((order): order is Order => order !== null);
 }
 
 Deno.serve(async (req) => {
@@ -275,6 +275,8 @@ Deno.serve(async (req) => {
           !isIgnorableMidtransNoop(
             transition?.payment_status as PaymentStatus | undefined,
             newPaymentStatus,
+            transition?.order_status as string | undefined,
+            newOrderStatus,
           )
         ) {
           results.push({

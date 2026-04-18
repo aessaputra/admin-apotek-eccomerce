@@ -1,6 +1,7 @@
 import { getSupabaseAdminClient } from "./supabase.ts";
 import { buildBiteshipOrderDestinationFields } from "./biteship-order-helpers.ts";
 import { buildOrderEndpoint } from "./biteship-public-tracking.ts";
+import { getPersistedBiteshipShipmentStatus } from "./order-status.ts";
 import type { Order, OrderItem } from "./types.ts";
 
 interface BiteshipOrderItem {
@@ -93,6 +94,7 @@ interface PersistBiteshipShipmentParams {
   biteshipOrderId: string;
   trackingId?: string | null;
   waybillNumber?: string | null;
+  shipmentStatus?: string | null;
   actorType: ShippingActivityActorType;
   actorId?: string | null;
   metadata?: Record<string, unknown>;
@@ -432,21 +434,24 @@ export async function persistBiteshipShipment(
 ): Promise<void> {
   const normalizedTrackingId = params.trackingId?.trim() || null;
   const normalizedWaybillNumber = params.waybillNumber?.trim() || null;
-  const updatePayload: Record<string, unknown> = {
+  const shipmentPayload: Record<string, unknown> = {
+    order_id: params.orderId,
+    provider: "biteship",
+    status: getPersistedBiteshipShipmentStatus(params.shipmentStatus),
     biteship_order_id: params.biteshipOrderId,
     biteship_tracking_id: normalizedTrackingId,
+    latest_biteship_payload: params.metadata ?? {},
     updated_at: new Date().toISOString(),
   };
 
   if (normalizedWaybillNumber) {
-    updatePayload.waybill_number = normalizedWaybillNumber;
-    updatePayload.waybill_source = "system";
+    shipmentPayload.waybill_number = normalizedWaybillNumber;
+    shipmentPayload.waybill_source = "system";
   }
 
   const { error: updateError } = await adminClient
-    .from("orders")
-    .update(updatePayload)
-    .eq("id", params.orderId);
+    .from("shipments")
+    .upsert(shipmentPayload, { onConflict: "order_id" });
 
   if (updateError) {
     throw updateError;

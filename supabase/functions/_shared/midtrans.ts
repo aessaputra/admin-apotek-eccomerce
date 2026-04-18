@@ -208,6 +208,33 @@ export const verifyMidtransTransaction = async (
   return data as MidtransStatusResponse;
 };
 
+export const cancelMidtransTransaction = async (
+  orderId: string,
+  serverKey: string,
+): Promise<void> => {
+  const isProduction = Deno.env.get("MIDTRANS_IS_PRODUCTION") === "true";
+  const baseUrl = isProduction
+    ? "https://api.midtrans.com/v2"
+    : "https://api.sandbox.midtrans.com/v2";
+
+  const response = await fetch(`${baseUrl}/${orderId}/cancel`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `Basic ${btoa(`${serverKey}:`)}`,
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      `Midtrans cancel failed: ${data.status_message || response.statusText}`,
+    );
+  }
+};
+
 export const mapMidtransStatus = (
   transactionStatus: string,
   fraudStatus: string,
@@ -278,18 +305,27 @@ export const isConfirmedMidtransSuccess = (
 export const isIgnorableMidtransNoop = (
   currentPaymentStatus: PaymentStatus | null | undefined,
   nextPaymentStatus: PaymentStatus,
+  persistedOrderStatus?: string | null,
+  nextOrderStatus?: string | null,
 ): boolean => {
   if (!currentPaymentStatus) {
     return false;
   }
 
-  if (currentPaymentStatus === nextPaymentStatus) {
+  const paymentNoop = currentPaymentStatus === nextPaymentStatus ||
+    STALE_PAYMENT_STATUS_MAP[nextPaymentStatus].includes(
+    currentPaymentStatus,
+  );
+
+  if (!paymentNoop) {
+    return false;
+  }
+
+  if (nextOrderStatus == null || persistedOrderStatus == null) {
     return true;
   }
 
-  return STALE_PAYMENT_STATUS_MAP[nextPaymentStatus].includes(
-    currentPaymentStatus,
-  );
+  return persistedOrderStatus === nextOrderStatus;
 };
 
 export const normalizeMidtransPaymentType = (
@@ -493,6 +529,17 @@ export const buildSnapPayload = (order: Order, user: AuthUser): SnapPayload => {
   }
 
   const calculatedGrossAmount = calculateMidtransGrossAmount(order);
+  const persistedGrossAmount = order.gross_amount != null
+    ? Math.round(Number(order.gross_amount))
+    : null;
+
+  if (
+    persistedGrossAmount != null &&
+    Number.isFinite(persistedGrossAmount) &&
+    persistedGrossAmount !== calculatedGrossAmount
+  ) {
+    throw new Error("Order gross_amount does not match itemized total");
+  }
 
   const itemDetails: SnapItemDetail[] = (order.order_items || []).map(
     (item, index) => {
@@ -538,7 +585,7 @@ export const buildSnapPayload = (order: Order, user: AuthUser): SnapPayload => {
   return {
     transaction_details: {
       order_id: order.midtrans_order_id,
-      gross_amount: calculatedGrossAmount,
+      gross_amount: persistedGrossAmount ?? calculatedGrossAmount,
     },
     item_details: itemDetails,
     customer_details: customerDetails,

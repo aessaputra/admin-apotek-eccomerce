@@ -260,6 +260,11 @@
       "updatedAt": "Updated At"
     },
     "updateOrder": "Update Order",
+    "actionsTitle": "Order Actions",
+    "actionsDescription": "Review the latest order details before updating the status or shipment information.",
+    "currentOrderStatus": "Current Order Status",
+    "currentPaymentStatus": "Current Payment Status",
+    "nextOrderStatus": "Next Order Status",
     "productList": "Product List",
     "orderInfo": "Order Information",
     "totalAndShipping": "Total & Shipping",
@@ -276,10 +281,11 @@
     "showDetail": "View Detail",
     "waybillSourceSystem": "Auto (Biteship)",
     "waybillSourceManual": "Manual",
-    "waybillOverrideReason": "Override Reason",
-    "waybillOverridePlaceholder": "Why are you entering the waybill manually?",
+    "waybillOverrideReason": "Reason for Manual Waybill",
+    "waybillOverridePlaceholder": "Explain why you are entering the waybill manually",
     "enableManualWaybill": "Enter waybill manually",
-    "manualWaybillWarning": "Manual entry — Biteship order exists but waybill will be overridden",
+    "manualWaybillWarning": "Manual entry enabled — a Biteship shipment already exists, but the waybill number will be replaced.",
+    "providerManagedWaybillHelp": "Biteship manages this shipment. Use Sync Tracking for provider updates, and enable manual waybill entry only for fallback or override cases.",
     "syncTracking": "Sync Tracking",
     "trackingSynced": "Tracking Synced",
     "syncFailed": "Sync Failed",
@@ -322,8 +328,8 @@
       "unknown": "{{action}}: {{from}} → {{to}}"
     },
     "tooltips": {
-      "statusSystemControlled": "This status is controlled by the system (webhook)",
-      "webhookControlled": "Certain statuses are managed automatically by the webhook",
+      "statusSystemControlled": "This status is updated automatically by the system",
+      "webhookControlled": "Some statuses update automatically after payment or delivery updates",
       "waybillLocked": "Waybill is locked after shipment",
       "waybillAuto": "Waybill number comes from Biteship",
       "waybillManual": "For non-Biteship couriers"
@@ -332,7 +338,7 @@
     "waybillModeAuto": "Auto"
   },
   "orderStatus": {
-    "pending": "Awaiting Payment",
+    "pending": "New Order",
     "processing": "Processing",
     "paid": "Paid",
     "awaiting_shipment": "Ready to Ship",
@@ -342,7 +348,7 @@
     "cancelled": "Cancelled"
   },
   "paymentStatus": {
-    "pending": "Pending",
+    "pending": "Unpaid",
     "authorize": "Authorize",
     "settlement": "Settlement",
     "deny": "Deny",

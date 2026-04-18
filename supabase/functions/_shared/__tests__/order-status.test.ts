@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveBiteshipStatus } from "../order-status.ts";
+import {
+  getPersistedBiteshipShipmentStatus,
+  resolveBiteshipStatus,
+} from "../order-status.ts";
 
 describe("resolveBiteshipStatus", () => {
   it("maps forward Biteship progress into existing admin statuses", () => {
@@ -62,5 +65,12 @@ describe("resolveBiteshipStatus", () => {
       nextStatus: "processing",
       mapped: false,
     });
+  });
+
+  it("defaults persisted Biteship shipment state to awaiting_shipment until explicit sync progress exists", () => {
+    expect(getPersistedBiteshipShipmentStatus()).toBe("awaiting_shipment");
+    expect(getPersistedBiteshipShipmentStatus(null)).toBe("awaiting_shipment");
+    expect(getPersistedBiteshipShipmentStatus("   ")).toBe("awaiting_shipment");
+    expect(getPersistedBiteshipShipmentStatus("in_transit")).toBe("in_transit");
   });
 });

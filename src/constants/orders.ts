@@ -58,3 +58,40 @@ export const TRANSITION_RULES: Record<string, string[]> = {
   shipped: ["in_transit", "delivered"],
   in_transit: ["delivered"],
 };
+
+type OrderTransitionOptions = {
+  hasProviderManagedShipment?: boolean;
+  allowManualWaybillOverride?: boolean;
+};
+
+const PROVIDER_MANAGED_SYNC_ONLY_TRANSITIONS: Partial<Record<string, string[]>> = {
+  awaiting_shipment: ["shipped"],
+  shipped: ["in_transit", "delivered"],
+  in_transit: ["delivered"],
+};
+
+export function getAvailableOrderTransitions(
+  currentStatus: string,
+  options: OrderTransitionOptions = {},
+): string[] {
+  const transitions = TRANSITION_RULES[currentStatus] ?? [];
+
+  if (!options.hasProviderManagedShipment) {
+    return transitions;
+  }
+
+  const syncOnlyTransitions = PROVIDER_MANAGED_SYNC_ONLY_TRANSITIONS[currentStatus] ?? [];
+
+  if (syncOnlyTransitions.length === 0) {
+    return transitions;
+  }
+
+  if (
+    currentStatus === "awaiting_shipment" &&
+    options.allowManualWaybillOverride
+  ) {
+    return transitions;
+  }
+
+  return transitions.filter((status) => !syncOnlyTransitions.includes(status));
+}

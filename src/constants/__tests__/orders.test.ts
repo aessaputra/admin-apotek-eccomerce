@@ -3,6 +3,7 @@ import {
   PAYMENT_COLORS,
   STATUS_COLORS,
   TRANSITION_RULES,
+  getAvailableOrderTransitions,
   getPaymentOptions,
   getStatusOptions,
 } from "../orders";
@@ -83,5 +84,40 @@ describe("order constants", () => {
     const values = getStatusOptions(translate).map((option) => option.value);
 
     expect(values).not.toContain("paid");
+  });
+
+  it("keeps Biteship-managed awaiting_shipment orders on provider-driven transitions by default", () => {
+    expect(
+      getAvailableOrderTransitions("awaiting_shipment", {
+        hasProviderManagedShipment: true,
+      }),
+    ).toEqual(["cancelled"]);
+
+    expect(
+      getAvailableOrderTransitions("awaiting_shipment", {
+        hasProviderManagedShipment: true,
+        allowManualWaybillOverride: true,
+      }),
+    ).toEqual(["shipped", "cancelled"]);
+  });
+
+  it("keeps downstream provider-managed shipping progress sync-driven", () => {
+    expect(
+      getAvailableOrderTransitions("shipped", {
+        hasProviderManagedShipment: true,
+      }),
+    ).toEqual([]);
+
+    expect(
+      getAvailableOrderTransitions("in_transit", {
+        hasProviderManagedShipment: true,
+      }),
+    ).toEqual([]);
+
+    expect(
+      getAvailableOrderTransitions("shipped", {
+        hasProviderManagedShipment: false,
+      }),
+    ).toEqual(["in_transit", "delivered"]);
   });
 });

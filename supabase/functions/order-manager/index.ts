@@ -1,6 +1,13 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
 import { corsHeaders } from "../_shared/cors.ts";
+import {
+  buildShipmentRestorePayload,
+  runMutationWithRollback,
+  type ShipmentSnapshot,
+  toShipmentSnapshot,
+} from "../_shared/order-manager-mutation.ts";
+import { requiresBiteshipSyncForProviderStatusTransition } from "../_shared/order-flow-rules.ts";
 import { resolveBiteshipStatus } from "../_shared/order-status.ts";
 import { getSupabaseAdminClient } from "../_shared/supabase.ts";
 import {
@@ -103,6 +110,120 @@ function normalizeWaybillNumber(value: unknown): string | null {
     : null;
 }
 
+async function upsertShipmentPatch(
+  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  orderId: string,
+  values: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await adminClient
+    .from("shipments")
+    .upsert(
+      {
+        order_id: orderId,
+        ...values,
+      },
+      { onConflict: "order_id" },
+    );
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function readShipmentSnapshot(
+  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  orderId: string,
+): Promise<ShipmentSnapshot> {
+  const { data, error } = await adminClient
+    .from("shipments")
+    .select(
+      "provider, status, biteship_order_id, biteship_tracking_id, waybill_number, waybill_source, waybill_overridden_by, waybill_override_reason, waybill_overridden_at, latest_biteship_status",
+    )
+    .eq("order_id", orderId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return toShipmentSnapshot(data);
+}
+
+async function restoreMutationState(
+  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  params: {
+    orderId: string;
+    rollbackTimestamp: string;
+    originalOrderStatus: string;
+    originalPaymentStatus: string | null;
+    originalShipment: ShipmentSnapshot;
+    operationTimestamp: string;
+    revertPayment: boolean;
+    revertShipment: boolean;
+  },
+): Promise<void> {
+  const {
+    orderId,
+    rollbackTimestamp,
+    originalOrderStatus,
+    originalPaymentStatus,
+    originalShipment,
+    operationTimestamp,
+    revertPayment,
+    revertShipment,
+  } = params;
+
+  const { error: orderRollbackError } = await adminClient
+    .from("orders")
+    .update({
+      status: originalOrderStatus,
+      updated_at: rollbackTimestamp,
+    })
+    .eq("id", orderId);
+
+  if (orderRollbackError) {
+    throw orderRollbackError;
+  }
+
+  if (revertPayment && originalPaymentStatus) {
+    const { error: paymentRollbackError } = await adminClient
+      .from("payments")
+      .update({
+        status: originalPaymentStatus,
+        updated_at: rollbackTimestamp,
+      })
+      .eq("order_id", orderId);
+
+    if (paymentRollbackError) {
+      throw paymentRollbackError;
+    }
+  }
+
+  if (!revertShipment) {
+    return;
+  }
+
+  const shipmentRestorePayload = buildShipmentRestorePayload(
+    originalShipment,
+    rollbackTimestamp,
+  );
+
+  if (shipmentRestorePayload) {
+    await upsertShipmentPatch(adminClient, orderId, shipmentRestorePayload);
+    return;
+  }
+
+  const { error: shipmentDeleteError } = await adminClient
+    .from("shipments")
+    .delete()
+    .eq("order_id", orderId)
+    .eq("updated_at", operationTimestamp);
+
+  if (shipmentDeleteError) {
+    throw shipmentDeleteError;
+  }
+}
+
 async function requireAdmin(req: Request): Promise<{ userId: string }> {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
@@ -173,7 +294,7 @@ Deno.serve(async (req: Request) => {
 
     const adminClient = getSupabaseAdminClient();
     const { data: order, error: orderError } = await adminClient
-      .from("orders")
+      .from("order_read_model")
       .select(
         "id, status, payment_status, waybill_number, waybill_source, biteship_order_id, biteship_tracking_id",
       )
@@ -212,8 +333,12 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      const operationTimestamp = new Date().toISOString();
+      const originalShipment = await readShipmentSnapshot(adminClient, body.orderId);
       const nextWaybill =
         body.payload?.waybill_number?.trim() || order.waybill_number || null;
+      const effectiveWaybillSource =
+        body.payload?.waybill_source ?? order.waybill_source ?? null;
 
       if (
         body.payload?.waybill_source === "manual" &&
@@ -227,6 +352,28 @@ Deno.serve(async (req: Request) => {
           }),
           {
             status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      if (
+        requiresBiteshipSyncForProviderStatusTransition({
+          targetStatus: to,
+          biteshipOrderId: order.biteship_order_id,
+          waybillSource: effectiveWaybillSource,
+        })
+      ) {
+        const targetLabel =
+          to === "shipped"
+            ? "enter shipped status unless you are applying a manual waybill override"
+            : `set ${to} manually`;
+        return new Response(
+          JSON.stringify({
+            error: `Biteship-managed shipments must use sync_tracking to ${targetLabel}`,
+          }),
+          {
+            status: 409,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
@@ -247,8 +394,21 @@ Deno.serve(async (req: Request) => {
       // Build update payload with optional waybill override metadata
       const updatePayload: Record<string, unknown> = {
         status: to,
+        updated_at: operationTimestamp,
+      };
+
+      const paymentUpdatePayload: Record<string, unknown> = {};
+      const shipmentUpdatePayload: Record<string, unknown> = {
+        status:
+          to === "awaiting_shipment" ||
+          to === "shipped" ||
+          to === "in_transit" ||
+          to === "delivered" ||
+          to === "cancelled"
+            ? to
+            : undefined,
         waybill_number: nextWaybill,
-        updated_at: new Date().toISOString(),
+        updated_at: operationTimestamp,
       };
 
       // When cancelling order, also update payment_status to maintain consistency
@@ -261,10 +421,10 @@ Deno.serve(async (req: Request) => {
           currentPaymentStatus === "capture"
         ) {
           // Payment already settled - mark as refund (actual refund should be initiated separately)
-          updatePayload.payment_status = "refund";
+          paymentUpdatePayload.status = "refund";
         } else if (currentPaymentStatus === "pending") {
           // Payment still pending - mark as cancelled (void operation)
-          updatePayload.payment_status = "cancel";
+          paymentUpdatePayload.status = "cancel";
         }
         // For other statuses (expire, deny, refund), leave as-is
       }
@@ -273,7 +433,7 @@ Deno.serve(async (req: Request) => {
       if (
         body.payload?.waybill_source === "manual" &&
         body.payload?.waybill_number?.trim()
-      ) {
+        ) {
         if (!body.payload?.waybill_override_reason?.trim() && order.biteship_order_id) {
           return new Response(
             JSON.stringify({
@@ -286,30 +446,82 @@ Deno.serve(async (req: Request) => {
             },
           );
         }
-        updatePayload.waybill_source = "manual";
-        updatePayload.waybill_overridden_by = userId;
-        updatePayload.waybill_override_reason =
+        shipmentUpdatePayload.waybill_source = "manual";
+        shipmentUpdatePayload.waybill_overridden_by = userId;
+        shipmentUpdatePayload.waybill_override_reason =
           body.payload.waybill_override_reason || null;
-        updatePayload.waybill_overridden_at = new Date().toISOString();
+        shipmentUpdatePayload.waybill_overridden_at = new Date().toISOString();
       } else if (
         body.payload?.waybill_number?.trim() &&
         !order.biteship_order_id
       ) {
         // No Biteship — still manual but not an override
-        updatePayload.waybill_source = "manual";
+        shipmentUpdatePayload.waybill_source = "manual";
       }
 
-      const { data: updated, error: updateError } = await adminClient
-        .from("orders")
-        .update(updatePayload)
-        .eq("id", body.orderId)
-        .eq("status", order.status) // Prevent race condition: ensure status hasn't changed
-        .select("id, status, waybill_number, waybill_source, updated_at")
-        .single();
+      let paymentUpdated = false;
+      let shipmentUpdated = false;
 
-      if (updateError) {
-        throw updateError;
-      }
+      const updated = await runMutationWithRollback({
+        apply: async () => {
+          const { data: updatedOrder, error: updateError } = await adminClient
+            .from("orders")
+            .update(updatePayload)
+            .eq("id", body.orderId)
+            .eq("status", order.status)
+            .select("id, status, updated_at")
+            .single();
+
+          if (updateError) {
+            throw updateError;
+          }
+
+          if (Object.keys(paymentUpdatePayload).length > 0) {
+            const { error: paymentUpdateError } = await adminClient
+              .from("payments")
+              .update({
+                ...paymentUpdatePayload,
+                updated_at: operationTimestamp,
+              })
+              .eq("order_id", body.orderId);
+
+            if (paymentUpdateError) {
+              throw paymentUpdateError;
+            }
+
+            paymentUpdated = true;
+          }
+
+          if (
+            nextWaybill ||
+            shipmentUpdatePayload.status ||
+            shipmentUpdatePayload.waybill_source
+          ) {
+            await upsertShipmentPatch(adminClient, body.orderId, shipmentUpdatePayload);
+            shipmentUpdated = true;
+          }
+
+          return updatedOrder;
+        },
+        shouldRollback: (updatedOrder) => Boolean(updatedOrder),
+        rollback: () => restoreMutationState(adminClient, {
+          orderId: body.orderId,
+          rollbackTimestamp: new Date().toISOString(),
+          originalOrderStatus: order.status,
+          originalPaymentStatus: order.payment_status ?? null,
+          originalShipment,
+          operationTimestamp,
+          revertPayment: paymentUpdated,
+          revertShipment: shipmentUpdated,
+        }),
+        onRollbackError: (rollbackError, mutationError) => {
+          console.error("[order-manager] Failed to rollback transition mutation:", {
+            mutationError: String(mutationError),
+            rollbackError: String(rollbackError),
+            orderId: body.orderId,
+          });
+        },
+      });
 
       const { error: activityError } = await adminClient
         .from("order_activities")
@@ -324,7 +536,7 @@ Deno.serve(async (req: Request) => {
             notes: body.payload?.notes ?? null,
             waybill: nextWaybill,
             waybill_source:
-              updatePayload.waybill_source ?? order.waybill_source ?? null,
+              shipmentUpdatePayload.waybill_source ?? order.waybill_source ?? null,
             override_reason: body.payload?.waybill_override_reason ?? null,
           },
         });
@@ -438,19 +650,14 @@ Deno.serve(async (req: Request) => {
             ?.waybill_id as string | undefined) || "",
         );
 
-        const { error: recoverUpdateError } = await adminClient
-          .from("orders")
-          .update({
-            biteship_tracking_id: trackingId,
-            waybill_number: recoveredWaybill || order.waybill_number || null,
-            waybill_source: recoveredWaybill ? "system" : order.waybill_source,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", body.orderId);
-
-        if (recoverUpdateError) {
-          throw recoverUpdateError;
-        }
+        await upsertShipmentPatch(adminClient, body.orderId, {
+          provider: "biteship",
+          biteship_order_id: order.biteship_order_id,
+          biteship_tracking_id: trackingId,
+          waybill_number: recoveredWaybill || order.waybill_number || null,
+          waybill_source: recoveredWaybill ? "system" : order.waybill_source,
+          updated_at: new Date().toISOString(),
+        });
       }
 
       const trackingResp = await fetch(
@@ -533,25 +740,62 @@ Deno.serve(async (req: Request) => {
         ? "system"
         : (order.waybill_source ?? null);
 
-      const { data: updated, error: updateError } = await adminClient
-        .from("orders")
-        .update({
-          status: nextStatus,
-          biteship_tracking_id: trackingId,
-          waybill_number: syncWaybill,
-          waybill_source: syncWaybillSource,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", body.orderId)
-        .eq("status", order.status)
-        .select(
-          "id, status, biteship_tracking_id, waybill_number, waybill_source, updated_at",
-        )
-        .single();
+      const operationTimestamp = new Date().toISOString();
+      const originalShipment = await readShipmentSnapshot(adminClient, body.orderId);
+      let shipmentUpdated = false;
 
-      if (updateError) {
-        throw updateError;
-      }
+      const updated = await runMutationWithRollback({
+        apply: async () => {
+          const { data: updatedOrder, error: updateError } = await adminClient
+            .from("orders")
+            .update({
+              status: nextStatus,
+              updated_at: operationTimestamp,
+            })
+            .eq("id", body.orderId)
+            .eq("status", order.status)
+            .select(
+              "id, status, updated_at",
+            )
+            .single();
+
+          if (updateError) {
+            throw updateError;
+          }
+
+          await upsertShipmentPatch(adminClient, body.orderId, {
+            provider: "biteship",
+            status: nextStatus,
+            biteship_order_id: order.biteship_order_id,
+            biteship_tracking_id: trackingId,
+            waybill_number: syncWaybill,
+            waybill_source: syncWaybillSource,
+            latest_biteship_status: trackingStatus,
+            updated_at: operationTimestamp,
+          });
+          shipmentUpdated = true;
+
+          return updatedOrder;
+        },
+        shouldRollback: (updatedOrder) => Boolean(updatedOrder),
+        rollback: () => restoreMutationState(adminClient, {
+          orderId: body.orderId,
+          rollbackTimestamp: new Date().toISOString(),
+          originalOrderStatus: order.status,
+          originalPaymentStatus: order.payment_status ?? null,
+          originalShipment,
+          operationTimestamp,
+          revertPayment: false,
+          revertShipment: shipmentUpdated,
+        }),
+        onRollbackError: (rollbackError, mutationError) => {
+          console.error("[order-manager] Failed to rollback sync mutation:", {
+            mutationError: String(mutationError),
+            rollbackError: String(rollbackError),
+            orderId: body.orderId,
+          });
+        },
+      });
 
       const { error: syncActivityError } = await adminClient
         .from("order_activities")

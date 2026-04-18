@@ -282,7 +282,7 @@ Deno.serve(async (req: Request) => {
 
       const adminClient = getSupabaseAdminClient();
       const { data: order, error: orderError } = await adminClient
-        .from("orders")
+        .from("order_read_model")
         .select("id, user_id, waybill_number, courier_code, status")
         .eq("id", orderId)
         .eq("user_id", userId)

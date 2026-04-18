@@ -4,6 +4,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrderShow } from "../orders/show";
 
 const mocks = vi.hoisted(() => {
+  const formValues = {
+    status: "processing",
+    waybill_number: "WB123",
+    waybill_override_reason: "",
+  };
+
+  const resetFormValues = () => {
+    formValues.status = "processing";
+    formValues.waybill_number = "WB123";
+    formValues.waybill_override_reason = "";
+  };
+
   const translate = vi.fn((key: string, paramsOrFallback?: Record<string, unknown> | string, fallback?: string) => {
     if (key.startsWith("orderStatus.") || key.startsWith("paymentStatus.")) {
       return key;
@@ -20,6 +32,7 @@ const mocks = vi.hoisted(() => {
   const error = vi.fn();
   const confirm = vi.fn();
   const setFieldsValue = vi.fn();
+  const refetch = vi.fn();
   const from = vi.fn();
   const invoke = vi.fn();
 
@@ -30,8 +43,11 @@ const mocks = vi.hoisted(() => {
     error,
     confirm,
     setFieldsValue,
+    refetch,
     from,
     invoke,
+    formValues,
+    resetFormValues,
   };
 });
 
@@ -64,7 +80,11 @@ vi.mock("antd", async () => {
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        onFinish?.({ status: "processing", waybill_number: "WB123" });
+        onFinish?.({
+          status: mocks.formValues.status,
+          waybill_number: mocks.formValues.waybill_number,
+          waybill_override_reason: mocks.formValues.waybill_override_reason,
+        });
       }}
     >
       {children}
@@ -73,7 +93,18 @@ vi.mock("antd", async () => {
 
   const Form = Object.assign(FormComponent, {
     Item: ({ children, label }: { children: React.ReactNode; label?: React.ReactNode }) => <div><div>{label}</div>{children}</div>,
-    useForm: () => [{ setFieldsValue: mocks.setFieldsValue }],
+    useForm: () => [{ setFieldsValue: (values: Record<string, unknown>) => {
+      if (typeof values.status === "string") {
+        mocks.formValues.status = values.status;
+      }
+      if (typeof values.waybill_number === "string") {
+        mocks.formValues.waybill_number = values.waybill_number;
+      }
+      if (typeof values.waybill_override_reason === "string") {
+        mocks.formValues.waybill_override_reason = values.waybill_override_reason;
+      }
+      mocks.setFieldsValue(values);
+    } }],
   });
 
   const Table = ({ dataSource = [], columns = [] }: { dataSource?: Record<string, unknown>[]; columns?: Array<{ title?: React.ReactNode; dataIndex?: unknown; key?: string; render?: (value: unknown, record: Record<string, unknown>) => React.ReactNode }> }) => (
@@ -116,14 +147,44 @@ vi.mock("antd", async () => {
     Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
     Descriptions,
     Form,
-    Select: ({ options }: { options?: Array<{ label: string; value: string }> }) => <div>{options?.map((option) => option.label).join(",")}</div>,
+    Select: ({ options, disabled }: { options?: Array<{ label: string; value: string }>; disabled?: boolean }) => (
+      <select
+        aria-label="status-select"
+        value={mocks.formValues.status}
+        disabled={disabled}
+        onChange={(event) => {
+          mocks.formValues.status = event.target.value;
+        }}
+      >
+        {options?.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+    ),
     Input: Object.assign(
-      ({ placeholder }: { placeholder?: string }) => <input aria-label={placeholder ?? "input"} />,
+      ({ placeholder, disabled }: { placeholder?: string; disabled?: boolean }) => (
+        <input
+          aria-label={placeholder ?? "input"}
+          disabled={disabled}
+          value={mocks.formValues.waybill_number}
+          onChange={(event) => {
+            mocks.formValues.waybill_number = event.target.value;
+          }}
+        />
+      ),
       {
-        TextArea: ({ placeholder }: { placeholder?: string }) => <textarea aria-label={placeholder ?? "textarea"} />,
+        TextArea: ({ placeholder }: { placeholder?: string }) => (
+          <textarea
+            aria-label={placeholder ?? "textarea"}
+            value={mocks.formValues.waybill_override_reason}
+            onChange={(event) => {
+              mocks.formValues.waybill_override_reason = event.target.value;
+            }}
+          />
+        ),
       }
     ),
-    Button: ({ children, onClick, htmlType, loading }: { children: React.ReactNode; onClick?: () => void; htmlType?: "submit" | "button"; loading?: boolean }) => <button type={htmlType ?? "button"} onClick={onClick} data-loading={String(Boolean(loading))}>{children}</button>,
+    Button: ({ children, onClick, htmlType, loading, disabled }: { children: React.ReactNode; onClick?: () => void; htmlType?: "submit" | "button"; loading?: boolean; disabled?: boolean }) => <button type={htmlType ?? "button"} onClick={onClick} data-loading={String(Boolean(loading))} disabled={disabled}>{children}</button>,
     Card: ({ title, children }: { title?: React.ReactNode; children: React.ReactNode }) => <div><div>{title}</div>{children}</div>,
     App: {
       useApp: () => ({
@@ -152,12 +213,15 @@ vi.mock("@ant-design/icons", () => ({
 
 describe("OrderShow", () => {
   beforeEach(() => {
+    mocks.resetFormValues();
     mocks.translate.mockClear();
     mocks.useShow.mockReset();
     mocks.success.mockReset();
     mocks.error.mockReset();
     mocks.confirm.mockReset();
     mocks.setFieldsValue.mockReset();
+    mocks.refetch.mockReset();
+    mocks.refetch.mockResolvedValue(undefined);
     mocks.from.mockReset();
     mocks.invoke.mockReset();
 
@@ -221,23 +285,32 @@ describe("OrderShow", () => {
           { id: "item-1", quantity: 2, price_at_purchase: 5000, products: { name: "Vitamin C" } },
         ],
       },
-      query: { isLoading: false },
+      query: { isLoading: false, refetch: mocks.refetch },
     });
     mocks.invoke.mockResolvedValue({ data: { data: { status: "shipped" } }, error: null });
 
     render(<OrderShow />);
+
+    expect(mocks.useShow).toHaveBeenCalledWith();
 
     await waitFor(() => {
       expect(mocks.setFieldsValue).toHaveBeenCalledWith({ status: "processing", waybill_number: "WB123" });
     });
 
     expect(screen.getByText("order-1")).not.toBeNull();
-    expect(screen.getByText("paymentStatus.settlement")).not.toBeNull();
+    expect(screen.getAllByText("orders.currentOrderStatus")).toHaveLength(2);
+    expect(screen.getAllByText("orders.currentPaymentStatus")).toHaveLength(2);
+    expect(screen.getByText("orders.nextOrderStatus")).not.toBeNull();
+    expect(screen.getByText("orders.actionsTitle")).not.toBeNull();
+    expect(screen.getByText("orders.actionsDescription")).not.toBeNull();
+    expect(screen.queryByText("orders.fields.status")).toBeNull();
+    expect(screen.getAllByText("paymentStatus.settlement")).toHaveLength(2);
     expect(screen.getByText("Vitamin C")).not.toBeNull();
     expect(
       screen.getByText((content) => content.includes("orderStatus.awaiting_shipment")),
     ).not.toBeNull();
     expect(screen.queryByText("orderStatus.paid")).toBeNull();
+    expect(screen.getAllByRole("button", { name: "orders.syncTracking" })).toHaveLength(1);
 
     fireEvent.click(screen.getByRole("button", { name: "orders.syncTracking" }));
 
@@ -248,6 +321,7 @@ describe("OrderShow", () => {
           orderId: "order-1",
         },
       });
+      expect(mocks.refetch).toHaveBeenCalledTimes(1);
       expect(mocks.success).toHaveBeenCalled();
     });
   });
@@ -263,7 +337,7 @@ describe("OrderShow", () => {
         created_at: "2026-04-01T00:00:00.000Z",
         order_items: [],
       },
-      query: { isLoading: false },
+      query: { isLoading: false, refetch: mocks.refetch },
     });
 
     render(<OrderShow />);
@@ -287,7 +361,7 @@ describe("OrderShow", () => {
         created_at: "2026-04-01T00:00:00.000Z",
         order_items: [],
       },
-      query: { isLoading: false },
+      query: { isLoading: false, refetch: mocks.refetch },
     });
 
     render(<OrderShow />);
@@ -352,7 +426,7 @@ describe("OrderShow", () => {
         created_at: "2026-04-01T00:00:00.000Z",
         order_items: [],
       },
-      query: { isLoading: false },
+      query: { isLoading: false, refetch: mocks.refetch },
     });
 
     render(<OrderShow />);
@@ -376,7 +450,7 @@ describe("OrderShow", () => {
         created_at: "2026-04-01T00:00:00.000Z",
         order_items: [],
       },
-      query: { isLoading: false },
+      query: { isLoading: false, refetch: mocks.refetch },
     });
 
     render(<OrderShow />);
@@ -385,9 +459,174 @@ describe("OrderShow", () => {
       expect(mocks.setFieldsValue).toHaveBeenCalledWith({ status: "shipped", waybill_number: "WB999" });
     });
 
-    expect(screen.getByText((content) => content.includes("orderStatus.in_transit"))).not.toBeNull();
-    expect(screen.getByText((content) => content.includes("orderStatus.delivered"))).not.toBeNull();
-    expect(screen.queryByText("orderStatus.shipped,orderStatus.in_transit,orderStatus.delivered")).toBeNull();
-    expect(screen.getByText("orderStatus.in_transit,orderStatus.delivered")).not.toBeNull();
+    expect(screen.getByRole("option", { name: "orderStatus.shipped" })).not.toBeNull();
+    expect(screen.getByRole("option", { name: "orderStatus.in_transit" })).not.toBeNull();
+    expect(screen.getByRole("option", { name: "orderStatus.delivered" })).not.toBeNull();
+  });
+
+  it("keeps Biteship-managed shipped orders sync-driven by hiding manual downstream status options", async () => {
+    mocks.useShow.mockReturnValue({
+      result: {
+        id: "order-3b",
+        total_amount: 25000,
+        status: "shipped",
+        payment_status: "settlement",
+        biteship_order_id: "BT-3b",
+        biteship_tracking_id: "TR-3b",
+        waybill_number: "WB1000",
+        waybill_source: "system",
+        created_at: "2026-04-01T00:00:00.000Z",
+        order_items: [],
+      },
+      query: { isLoading: false, refetch: mocks.refetch },
+    });
+
+    render(<OrderShow />);
+
+    await waitFor(() => {
+      expect(mocks.setFieldsValue).toHaveBeenCalledWith({ status: "shipped", waybill_number: "WB1000" });
+    });
+
+    expect(screen.getByRole("option", { name: "orderStatus.shipped" })).not.toBeNull();
+    expect(screen.queryByRole("option", { name: "orderStatus.in_transit" })).toBeNull();
+    expect(screen.queryByRole("option", { name: "orderStatus.delivered" })).toBeNull();
+    expect(screen.getByRole("button", { name: "buttons.save" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  it("keeps Biteship-managed in_transit orders sync-driven by hiding manual delivery transition", async () => {
+    mocks.useShow.mockReturnValue({
+      result: {
+        id: "order-3c",
+        total_amount: 25000,
+        status: "in_transit",
+        payment_status: "settlement",
+        biteship_order_id: "BT-3c",
+        biteship_tracking_id: "TR-3c",
+        waybill_number: "WB1001",
+        waybill_source: "system",
+        created_at: "2026-04-01T00:00:00.000Z",
+        order_items: [],
+      },
+      query: { isLoading: false, refetch: mocks.refetch },
+    });
+
+    render(<OrderShow />);
+
+    await waitFor(() => {
+      expect(mocks.setFieldsValue).toHaveBeenCalledWith({ status: "in_transit", waybill_number: "WB1001" });
+    });
+
+    expect(screen.queryByRole("option", { name: "orderStatus.delivered" })).toBeNull();
+    expect(screen.getByRole("button", { name: "buttons.save" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  it("hides manual waybill entry by default for Biteship-managed awaiting_shipment orders", async () => {
+    mocks.useShow.mockReturnValue({
+      result: {
+        id: "order-6",
+        total_amount: 25000,
+        status: "awaiting_shipment",
+        payment_status: "settlement",
+        biteship_order_id: "BT-6",
+        biteship_tracking_id: "TR-6",
+        created_at: "2026-04-01T00:00:00.000Z",
+        order_items: [],
+      },
+      query: { isLoading: false, refetch: mocks.refetch },
+    });
+
+    render(<OrderShow />);
+
+    await waitFor(() => {
+      expect(mocks.setFieldsValue).toHaveBeenCalledWith({ status: "awaiting_shipment", waybill_number: "" });
+    });
+
+    expect(screen.getByRole("option", { name: "orderStatus.cancelled" })).not.toBeNull();
+    expect(screen.queryByRole("option", { name: "orderStatus.shipped" })).toBeNull();
+    expect(screen.queryByLabelText("orders.waybillPlaceholder")).toBeNull();
+    expect(screen.getByText("orders.providerManagedWaybillHelp")).not.toBeNull();
+  });
+
+  it("shows manual waybill override controls after enabling override mode", async () => {
+    mocks.useShow.mockReturnValue({
+      result: {
+        id: "order-7",
+        total_amount: 25000,
+        status: "awaiting_shipment",
+        payment_status: "settlement",
+        biteship_order_id: "BT-7",
+        waybill_number: "AUTO-12345",
+        waybill_source: "system",
+        created_at: "2026-04-01T00:00:00.000Z",
+        order_items: [],
+      },
+      query: { isLoading: false, refetch: mocks.refetch },
+    });
+
+    render(<OrderShow />);
+
+    await waitFor(() => {
+      expect(mocks.setFieldsValue).toHaveBeenCalledWith({ status: "awaiting_shipment", waybill_number: "AUTO-12345" });
+    });
+
+    fireEvent.click(screen.getByRole("checkbox"));
+
+    expect(screen.getByLabelText("orders.waybillPlaceholder")).not.toBeNull();
+    expect(screen.getByLabelText("orders.waybillOverridePlaceholder")).not.toBeNull();
+    expect(screen.getByText("orders.manualWaybillWarning")).not.toBeNull();
+    expect(screen.getByRole("option", { name: "orderStatus.shipped" })).not.toBeNull();
+    expect(screen.getByRole("option", { name: "orderStatus.cancelled" })).not.toBeNull();
+  });
+
+  it("submits a manual override payload for Biteship-managed shipped transitions", async () => {
+    mocks.useShow.mockReturnValue({
+      result: {
+        id: "order-8",
+        total_amount: 25000,
+        status: "awaiting_shipment",
+        payment_status: "settlement",
+        biteship_order_id: "BT-8",
+        waybill_number: "AUTO-12345",
+        waybill_source: "system",
+        created_at: "2026-04-01T00:00:00.000Z",
+        order_items: [],
+      },
+      query: { isLoading: false, refetch: mocks.refetch },
+    });
+    mocks.invoke.mockResolvedValue({ data: { data: { status: "shipped" } }, error: null });
+
+    render(<OrderShow />);
+
+    await waitFor(() => {
+      expect(mocks.setFieldsValue).toHaveBeenCalledWith({ status: "awaiting_shipment", waybill_number: "AUTO-12345" });
+    });
+
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.change(screen.getByRole("combobox", { name: "status-select" }), {
+      target: { value: "shipped" },
+    });
+    fireEvent.change(screen.getByLabelText("orders.waybillPlaceholder"), {
+      target: { value: "MANUAL-9988" },
+    });
+    fireEvent.change(screen.getByLabelText("orders.waybillOverridePlaceholder"), {
+      target: { value: "Provider resi unavailable during handoff" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "buttons.save" }));
+
+    await waitFor(() => {
+      expect(mocks.invoke).toHaveBeenCalledWith("order-manager", {
+        body: {
+          action: "transition_status",
+          orderId: "order-8",
+          payload: {
+            to: "shipped",
+            waybill_number: "MANUAL-9988",
+            waybill_source: "manual",
+            waybill_override_reason: "Provider resi unavailable during handoff",
+          },
+        },
+      });
+    });
   });
 });

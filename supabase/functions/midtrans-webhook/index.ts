@@ -15,6 +15,7 @@ import {
   ensureSettlementSideEffectsQueued,
   triggerWebhookSideEffectProcessor,
 } from "../_shared/webhook-side-effects.ts";
+import { getOrderAggregateByMidtransOrderId } from "../_shared/order-aggregate.ts";
 import type {
   MidtransStatusResponse,
   MidtransWebhookPayload,
@@ -147,31 +148,17 @@ async function getOrderWithRetry(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
   midtransOrderId: string,
   attempts = 3,
-): Promise<{ data: unknown; error: unknown }> {
-  let latestResult: { data: unknown; error: unknown } = {
-    data: null,
-    error: null,
-  };
+): Promise<Order | null> {
+  let latestOrder: Order | null = null;
 
   for (let index = 0; index < attempts; index += 1) {
-    const { data, error } = await adminClient
-      .from("orders")
-      .select(
-        `
-        *,
-        profiles (full_name, phone_number),
-        order_items (
-          *,
-          products (*)
-        )
-      `,
-      )
-      .eq("midtrans_order_id", midtransOrderId)
-      .single();
+    latestOrder = await getOrderAggregateByMidtransOrderId(
+      adminClient,
+      midtransOrderId,
+    );
 
-    latestResult = { data, error };
-    if (data && !error) {
-      return latestResult;
+    if (latestOrder) {
+      return latestOrder;
     }
 
     if (index < attempts - 1) {
@@ -179,7 +166,7 @@ async function getOrderWithRetry(
     }
   }
 
-  return latestResult;
+  return latestOrder;
 }
 
 async function upsertPaymentRecord(
@@ -290,17 +277,16 @@ Deno.serve(async (req) => {
       return errorResponse("Status verification failed, retry later", 503);
     }
 
-    const { data: rawOrder, error: orderError } = await getOrderWithRetry(
+    const order = await getOrderWithRetry(
       adminClient,
       payload.order_id,
     );
 
-    if (orderError || !rawOrder) {
+    if (!order) {
       console.warn("[midtrans-webhook] Order not found for:", payload.order_id);
       return errorResponse("Order not found, retry later", 503);
     }
 
-    const order = rawOrder as unknown as Order;
     const verifiedFraudStatus =
       verifiedStatus.fraud_status || payload.fraud_status || "";
     const payloadSuccessSignal =
@@ -409,6 +395,8 @@ Deno.serve(async (req) => {
       isIgnorableMidtransNoop(
         transition?.payment_status as PaymentStatus | undefined,
         newPaymentStatus,
+        transition?.order_status as string | undefined,
+        newOrderStatus,
       );
 
     await upsertPaymentRecord(
