@@ -29,9 +29,6 @@ _.njsproj
 _.sln
 \*.sw?
 
-# Agent files
-.agents/
-
 # System files
 .sisyphus/
 
