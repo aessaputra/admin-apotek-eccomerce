@@ -256,14 +256,18 @@
       "midtransTransactionId": "Midtrans Transaction ID",
       "biteshipOrderId": "Biteship Order ID",
       "biteshipTrackingId": "Biteship Tracking ID",
-      "courierCode": "Courier Code",
-      "updatedAt": "Updated At"
-    },
+        "courierCode": "Courier Code",
+        "updatedAt": "Updated At",
+        "deliveredAt": "Delivered At",
+        "complaintWindowExpiresAt": "Confirmation / Complaint Deadline",
+        "customerCompletedAt": "Customer Completed At"
+      },
     "updateOrder": "Update Order",
     "actionsTitle": "Order Actions",
     "actionsDescription": "Review the latest order details before updating the status or shipment information.",
-    "currentOrderStatus": "Current Order Status",
-    "currentPaymentStatus": "Current Payment Status",
+      "currentOrderStatus": "Current Order Status",
+      "customerCompletionStage": "Customer Completion Stage",
+      "currentPaymentStatus": "Current Payment Status",
     "nextOrderStatus": "Next Order Status",
     "productList": "Product List",
     "orderInfo": "Order Information",
@@ -302,7 +306,12 @@
       "disposed": "Package was disposed by the courier.",
       "cancelled": "Shipment was cancelled in Biteship."
     },
-    "activityTitle": "Order Activities",
+      "customerCompletionStages": {
+        "not_applicable": "Not Applicable",
+        "awaiting_customer": "Awaiting Customer Confirmation",
+        "completed": "Completed"
+      },
+      "activityTitle": "Order Activities",
     "noActivities": "No activities yet",
     "paymentTypes": {
       "bank_transfer": "Bank Transfer",
@@ -316,17 +325,19 @@
       "kredivo": "Kredivo"
     },
     "activity": {
-      "actors": {
-        "system": "System",
-        "admin": "Admin"
+        "actors": {
+          "system": "System",
+          "admin": "Admin",
+          "customer": "Customer"
+        },
+        "paymentSuccess": "Payment verified successfully",
+        "paymentUpdated": "Payment status updated",
+        "statusUpdated": "{{actor}} changed status: {{from}} → {{to}}",
+        "trackingSynced": "Tracking synced from Biteship",
+        "shippingCreated": "Shipping order created in Biteship",
+        "customerCompleted": "{{actor}} confirmed receipt of the order",
+        "unknown": "{{action}}: {{from}} → {{to}}"
       },
-      "paymentSuccess": "Payment verified successfully",
-      "paymentUpdated": "Payment status updated",
-      "statusUpdated": "{{actor}} changed status: {{from}} → {{to}}",
-      "trackingSynced": "Tracking synced from Biteship",
-      "shippingCreated": "Shipping order created in Biteship",
-      "unknown": "{{action}}: {{from}} → {{to}}"
-    },
     "tooltips": {
       "statusSystemControlled": "This status is updated automatically by the system",
       "webhookControlled": "Some statuses update automatically after payment or delivery updates",

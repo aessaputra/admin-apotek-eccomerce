@@ -256,14 +256,18 @@
       "midtransTransactionId": "Midtrans Transaction ID",
       "biteshipOrderId": "Biteship Order ID",
       "biteshipTrackingId": "Biteship Tracking ID",
-      "courierCode": "Kode Kurir",
-      "updatedAt": "Diperbarui"
-    },
+        "courierCode": "Kode Kurir",
+        "updatedAt": "Diperbarui",
+        "deliveredAt": "Waktu Terkirim",
+        "complaintWindowExpiresAt": "Batas Konfirmasi / Komplain",
+        "customerCompletedAt": "Waktu Selesai oleh Pelanggan"
+      },
     "updateOrder": "Update Pesanan",
     "actionsTitle": "Aksi Pesanan",
     "actionsDescription": "Tinjau detail pesanan terbaru sebelum memperbarui status atau informasi pengiriman.",
-    "currentOrderStatus": "Status Pesanan Saat Ini",
-    "currentPaymentStatus": "Status Pembayaran Saat Ini",
+      "currentOrderStatus": "Status Pesanan Saat Ini",
+      "customerCompletionStage": "Tahap Penyelesaian Pelanggan",
+      "currentPaymentStatus": "Status Pembayaran Saat Ini",
     "nextOrderStatus": "Status Pesanan Berikutnya",
     "productList": "Daftar Produk",
     "orderInfo": "Informasi Pesanan",
@@ -302,7 +306,12 @@
       "disposed": "Paket dimusnahkan oleh kurir.",
       "cancelled": "Pengiriman dibatalkan di Biteship."
     },
-    "activityTitle": "Aktivitas Pesanan",
+      "customerCompletionStages": {
+        "not_applicable": "Belum Berlaku",
+        "awaiting_customer": "Menunggu Konfirmasi Pelanggan",
+        "completed": "Selesai"
+      },
+      "activityTitle": "Aktivitas Pesanan",
     "noActivities": "Belum ada aktivitas",
     "paymentTypes": {
       "bank_transfer": "Transfer Bank",
@@ -316,17 +325,19 @@
       "kredivo": "Kredivo"
     },
     "activity": {
-      "actors": {
-        "system": "Sistem",
-        "admin": "Admin"
+        "actors": {
+          "system": "Sistem",
+          "admin": "Admin",
+          "customer": "Pelanggan"
+        },
+        "paymentSuccess": "Pembayaran berhasil diverifikasi",
+        "paymentUpdated": "Status pembayaran diperbarui",
+        "statusUpdated": "{{actor}} mengubah status: {{from}} → {{to}}",
+        "trackingSynced": "Pelacakan disinkronkan dari Biteship",
+        "shippingCreated": "Pesanan pengiriman dibuat di Biteship",
+        "customerCompleted": "{{actor}} mengonfirmasi penerimaan pesanan",
+        "unknown": "{{action}}: {{from}} → {{to}}"
       },
-      "paymentSuccess": "Pembayaran berhasil diverifikasi",
-      "paymentUpdated": "Status pembayaran diperbarui",
-      "statusUpdated": "{{actor}} mengubah status: {{from}} → {{to}}",
-      "trackingSynced": "Pelacakan disinkronkan dari Biteship",
-      "shippingCreated": "Pesanan pengiriman dibuat di Biteship",
-      "unknown": "{{action}}: {{from}} → {{to}}"
-    },
     "tooltips": {
       "statusSystemControlled": "Status ini diperbarui otomatis oleh sistem",
       "webhookControlled": "Beberapa status akan berubah otomatis setelah ada pembaruan pembayaran atau pengiriman",

@@ -84,3 +84,25 @@ Pada state yang direkonsiliasi ini, komponen live yang harus ada adalah:
   - `public.snap_token_generation_locks`
 
 Jika di masa depan diperlukan parity histori migration yang lebih ketat untuk compliance atau operasi, lakukan lewat prosedur rekonsiliasi baru yang terdokumentasi — **bukan** dengan update/delete manual pada histori live yang ada sekarang.
+
+## 2026-04-21 customer completion migration alignment
+
+Pada 2026-04-21 dua migration customer-completion berikut awalnya ada di repo dengan timestamp lokal:
+
+1. `20260421090428_add_customer_completion_stage.sql`
+2. `20260421095013_refine_customer_order_bucket_derivation.sql`
+
+Saat didorong ke remote melalui MCP Supabase, histori live mencatat dua versi berikut di `supabase_migrations.schema_migrations`:
+
+1. `20260421111409 / add_customer_completion_stage`
+2. `20260421111439 / refine_customer_order_bucket_derivation`
+
+Berbeda dengan rekonsiliasi insiden checkout di atas, pasangan ini bersifat **1:1** terhadap intent dan isi migration lokal. Karena schema live sudah benar dan mismatch hanya pada versi file lokal, keputusan operasional yang diambil adalah:
+
+- **jangan edit manual histori live**, dan
+- **selaraskan filename migration lokal ke versi remote** agar workflow `supabase migration list` / `db push` kembali konsisten.
+
+Hasil kanonis repo setelah penyelarasan:
+
+1. `20260421111409_add_customer_completion_stage.sql`
+2. `20260421111439_refine_customer_order_bucket_derivation.sql`

@@ -28,6 +28,11 @@ interface OrderRecord {
   user_id: string;
   total_amount: string | number;
   status: string;
+  customer_completion_stage?: string | null;
+  delivered_at?: string | null;
+  complaint_window_expires_at?: string | null;
+  customer_completed_at?: string | null;
+  customer_completion_source?: string | null;
   payment_status: string;
   shipping_cost?: string | number | null;
   courier_code?: string | null;
@@ -306,6 +311,7 @@ export const OrderShow: React.FC = () => {
       case "status_update": return <Tag color="blue">↻</Tag>;
       case "sync_tracking": return <Tag color="cyan">⟳</Tag>;
       case "shipping_created": return <Tag color="purple">📦</Tag>;
+      case "customer_completed": return <Tag color="green">✓</Tag>;
       default: return <Tag>•</Tag>;
     }
   };
@@ -317,11 +323,13 @@ export const OrderShow: React.FC = () => {
     const statusTo = activity.new_status
       ? translate(`orderStatus.${activity.new_status}`, {}, formatDisplayLabel(activity.new_status))
       : "-";
-    const actor = translate(
-      `orders.activity.actors.${activity.actor_type === "system" ? "system" : "admin"}`,
-      {},
-      activity.actor_type === "system" ? "System" : "Admin"
-    );
+    const resolvedActor = activity.actor_type === 'customer'
+      ? translate('orders.activity.actors.customer', {}, 'Customer')
+      : translate(
+          `orders.activity.actors.${activity.actor_type === 'system' ? 'system' : 'admin'}`,
+          {},
+          activity.actor_type === 'system' ? 'System' : 'Admin'
+        );
 
     switch (activity.action) {
       case "payment_success":
@@ -331,13 +339,19 @@ export const OrderShow: React.FC = () => {
       case "status_update":
         return translate(
           "orders.activity.statusUpdated",
-          { actor, from: statusFrom, to: statusTo },
-          `${actor} changed status: ${statusFrom} → ${statusTo}`
+          { actor: resolvedActor, from: statusFrom, to: statusTo },
+          `${resolvedActor} changed status: ${statusFrom} → ${statusTo}`
         );
       case "sync_tracking":
         return translate("orders.activity.trackingSynced", {}, "Tracking synced from Biteship");
       case "shipping_created":
         return translate("orders.activity.shippingCreated", {}, "Shipping order created in Biteship");
+      case 'customer_completed':
+        return translate(
+          'orders.activity.customerCompleted',
+          { actor: resolvedActor },
+          `${resolvedActor} confirmed receipt of the order`
+        );
       default:
         return translate(
           "orders.activity.unknown",
@@ -358,6 +372,13 @@ export const OrderShow: React.FC = () => {
   const currentOrderStatusLabel = record?.status
     ? translate(`orderStatus.${record.status}`, {}, formatDisplayLabel(record.status))
     : "-";
+  const customerCompletionStageLabel = record?.customer_completion_stage
+    ? translate(
+        `orders.customerCompletionStages.${record.customer_completion_stage}`,
+        {},
+        formatDisplayLabel(record.customer_completion_stage)
+      )
+    : '-';
   const currentPaymentStatusLabel = record?.payment_status
     ? translate(`paymentStatus.${record.payment_status}`, {}, formatDisplayLabel(record.payment_status))
     : "-";
@@ -394,13 +415,18 @@ export const OrderShow: React.FC = () => {
             <Tooltip title={translate("orders.tooltips.statusSystemControlled")}>
               <LockOutlined style={{ marginLeft: 8, color: "#999" }} />
             </Tooltip>
-          )}
-        </Descriptions.Item>
-        <Descriptions.Item label={translate("orders.currentPaymentStatus")}>
-          <Tag color={PAYMENT_COLORS[record?.payment_status ?? ""] ?? "default"}>
-            {currentPaymentStatusLabel}
-          </Tag>
-        </Descriptions.Item>
+            )}
+          </Descriptions.Item>
+          <Descriptions.Item label={translate('orders.customerCompletionStage')}>
+            <Tag color={record?.customer_completion_stage === 'completed' ? 'green' : 'gold'}>
+              {customerCompletionStageLabel}
+            </Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label={translate("orders.currentPaymentStatus")}>
+            <Tag color={PAYMENT_COLORS[record?.payment_status ?? ""] ?? "default"}>
+              {currentPaymentStatusLabel}
+            </Tag>
+          </Descriptions.Item>
         <Descriptions.Item label={translate("orders.fields.paymentType")}><Text>{paymentTypeLabel}</Text></Descriptions.Item>
         <Descriptions.Item label={translate("orders.fields.midtransOrderId")}><Text copyable>{record?.midtrans_order_id ?? "-"}</Text></Descriptions.Item>
         <Descriptions.Item label={translate("orders.fields.midtransTransactionId")}><Text copyable>{record?.midtrans_transaction_id ?? "-"}</Text></Descriptions.Item>
@@ -425,6 +451,19 @@ export const OrderShow: React.FC = () => {
           <Text copyable={!!record?.biteship_tracking_id}>{record?.biteship_tracking_id ?? "-"}</Text>
         </Descriptions.Item>
         <Descriptions.Item label={translate("orders.fields.updatedAt")}>{record?.updated_at ? <DateField value={record.updated_at} format="LLL" /> : "-"}</Descriptions.Item>
+        <Descriptions.Item label={translate('orders.fields.deliveredAt')}>
+          {record?.delivered_at ? <DateField value={record.delivered_at} format="LLL" /> : '-'}
+        </Descriptions.Item>
+        <Descriptions.Item label={translate('orders.fields.complaintWindowExpiresAt')}>
+          {record?.complaint_window_expires_at ? (
+            <DateField value={record.complaint_window_expires_at} format="LLL" />
+          ) : '-'}
+        </Descriptions.Item>
+        <Descriptions.Item label={translate('orders.fields.customerCompletedAt')}>
+          {record?.customer_completed_at ? (
+            <DateField value={record.customer_completed_at} format="LLL" />
+          ) : '-'}
+        </Descriptions.Item>
       </Descriptions>
 
       {biteshipExceptionInfo && (
