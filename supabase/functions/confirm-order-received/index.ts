@@ -1,6 +1,10 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createRemoteJWKSet, jwtVerify } from 'npm:jose@5';
 import { corsHeaders } from '../_shared/cors.ts';
+import {
+  ORDER_DETAIL_NOTIFICATION_ROUTE,
+  insertNotificationOrThrow,
+} from '../_shared/notification-helpers.ts';
 import { getSupabaseAdminClient } from '../_shared/supabase.ts';
 
 type OrderRow = {
@@ -25,14 +29,14 @@ type OrderActivitiesInsert = {
 type OrdersTableQuery = {
   select: (columns: string) => {
     eq: (column: string, value: string) => {
-      maybeSingle: () => Promise<{ data: OrderRow | null; error: { message: string } | null }>;
+      maybeSingle: () => PromiseLike<{ data: OrderRow | null; error: { message: string } | null }>;
     };
   };
   update: (values: Record<string, unknown>) => {
     eq: (column: string, value: string) => {
       is: (column: string, value: null) => {
         select: (columns: string) => {
-          maybeSingle: () => Promise<{ data: OrderRow | null; error: { message: string } | null }>;
+          maybeSingle: () => PromiseLike<{ data: OrderRow | null; error: { message: string } | null }>;
         };
       };
     };
@@ -40,13 +44,42 @@ type OrdersTableQuery = {
 };
 
 type OrderActivitiesTableQuery = {
-  insert: (values: OrderActivitiesInsert) => Promise<{ error: { message: string } | null }>;
+  insert: (values: OrderActivitiesInsert) => PromiseLike<{ error: { message: string } | null }>;
+};
+
+type NotificationsTableQuery = {
+  insert: (values: Record<string, unknown>) => PromiseLike<{ error: { message?: string; code?: string } | null }>;
 };
 
 type ConfirmOrderReceivedAdminClient = {
   from(table: 'orders'): OrdersTableQuery;
   from(table: 'order_activities'): OrderActivitiesTableQuery;
+  from(table: 'notifications'): NotificationsTableQuery;
 };
+
+async function ensureOrderCompletedNotification(
+  adminClient: ConfirmOrderReceivedAdminClient,
+  userId: string | null,
+  orderId: string,
+): Promise<void> {
+  await insertNotificationOrThrow(
+    adminClient,
+    {
+      userId,
+      type: 'order_completed',
+      title: 'Pesanan selesai',
+      body: 'Terima kasih. Pesananmu sudah selesai dan tercatat di riwayat pesanan.',
+      ctaRoute: ORDER_DETAIL_NOTIFICATION_ROUTE,
+      data: {
+        orderId,
+        completionStage: 'completed',
+      },
+      priority: 'normal',
+      sourceEventKey: `order_completed:${orderId}`,
+    },
+    '[confirm-order-received]',
+  );
+}
 
 declare const Deno: {
   serve: (handler: (req: Request) => Response | Promise<Response>) => void;
@@ -109,7 +142,7 @@ Deno.serve(async req => {
       return jsonResponse({ error: 'order_id is required' }, 400);
     }
 
-    const adminClient = getSupabaseAdminClient() as ConfirmOrderReceivedAdminClient;
+    const adminClient = getSupabaseAdminClient() as unknown as ConfirmOrderReceivedAdminClient;
     const { data: order, error: orderError } = await adminClient
       .from('orders')
       .select(
@@ -135,6 +168,8 @@ Deno.serve(async req => {
     }
 
     if (order.customer_completed_at) {
+      await ensureOrderCompletedNotification(adminClient, order.user_id, orderId);
+
       return jsonResponse({
         success: true,
         data: {
@@ -175,6 +210,8 @@ Deno.serve(async req => {
         throw new Error(`Failed to re-read order: ${existingOrderError.message}`);
       }
 
+      await ensureOrderCompletedNotification(adminClient, order.user_id, orderId);
+
       return jsonResponse({
         success: true,
         data: {
@@ -205,6 +242,8 @@ Deno.serve(async req => {
     if (activityError) {
       console.error('[confirm-order-received] Failed to log activity:', activityError);
     }
+
+    await ensureOrderCompletedNotification(adminClient, order.user_id, orderId);
 
     return jsonResponse({
       success: true,
