@@ -12,6 +12,10 @@ import {
 } from "../_shared/midtrans.ts";
 import { getSupabaseAdminClient } from "../_shared/supabase.ts";
 import {
+  ORDER_DETAIL_NOTIFICATION_ROUTE,
+  insertNotificationOrThrow,
+} from "../_shared/notification-helpers.ts";
+import {
   ensureSettlementSideEffectsQueued,
   triggerWebhookSideEffectProcessor,
 } from "../_shared/webhook-side-effects.ts";
@@ -82,6 +86,71 @@ function getExpectedOrderAmount(order: Order): number {
   }
 
   return Math.round(calculatedGrossAmount);
+}
+
+function buildPaymentNotification(orderId: string, paymentStatus: PaymentStatus) {
+  if (paymentStatus === "settlement") {
+    return {
+      type: "payment_settlement",
+      title: "Pembayaran berhasil",
+      body: "Pembayaran pesananmu sudah kami terima. Pesanan akan segera diproses.",
+      priority: "high" as const,
+      sourceEventKey: `payment_settlement:${orderId}`,
+    };
+  }
+
+  if (paymentStatus === "expire") {
+    return {
+      type: "payment_failed_or_expired",
+      title: "Pembayaran kedaluwarsa",
+      body: "Batas waktu pembayaran pesananmu telah berakhir. Silakan buat pesanan baru jika masih dibutuhkan.",
+      priority: "normal" as const,
+      sourceEventKey: `payment_failed_or_expired:expire:${orderId}`,
+    };
+  }
+
+  if (paymentStatus === "deny") {
+    return {
+      type: "payment_failed_or_expired",
+      title: "Pembayaran belum berhasil",
+      body: "Pembayaran pesananmu belum berhasil diproses. Silakan cek metode pembayaran lalu coba lagi.",
+      priority: "normal" as const,
+      sourceEventKey: `payment_failed_or_expired:deny:${orderId}`,
+    };
+  }
+
+  return null;
+}
+
+async function ensurePaymentNotification(
+  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  orderId: string,
+  userId: string | null,
+  paymentStatus: PaymentStatus,
+): Promise<void> {
+  const paymentNotification = buildPaymentNotification(orderId, paymentStatus);
+
+  if (!paymentNotification) {
+    return;
+  }
+
+  await insertNotificationOrThrow(
+    adminClient,
+    {
+      userId,
+      type: paymentNotification.type,
+      title: paymentNotification.title,
+      body: paymentNotification.body,
+      ctaRoute: ORDER_DETAIL_NOTIFICATION_ROUTE,
+      data: {
+        orderId,
+        paymentStatus,
+      },
+      priority: paymentNotification.priority,
+      sourceEventKey: paymentNotification.sourceEventKey,
+    },
+    "[midtrans-webhook]",
+  );
 }
 
 async function persistRawNotificationEarly(
@@ -433,6 +502,7 @@ Deno.serve(async (req) => {
             verifiedStatus.transaction_id || payload.transaction_id || null,
         },
       });
+
     }
 
     const shouldRunFulfillment = await ensureSettlementSideEffectsQueued(
@@ -442,6 +512,13 @@ Deno.serve(async (req) => {
     );
 
     if (!shouldRunFulfillment) {
+      await ensurePaymentNotification(
+        adminClient,
+        order.id,
+        order.user_id ?? null,
+        persistedPaymentStatus,
+      );
+
       if (!applied && ignorableNoop) {
         return jsonResponse(
           {
@@ -456,6 +533,13 @@ Deno.serve(async (req) => {
     }
 
     triggerWebhookSideEffectProcessor(order.id);
+
+    await ensurePaymentNotification(
+      adminClient,
+      order.id,
+      order.user_id ?? null,
+      persistedPaymentStatus,
+    );
 
     return jsonResponse({ status: "ok" }, 200);
   } catch (error: unknown) {

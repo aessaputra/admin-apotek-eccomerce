@@ -2,6 +2,12 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
 import { corsHeaders } from "../_shared/cors.ts";
 import {
+  type NotificationInsertPayload,
+  ORDER_DETAIL_NOTIFICATION_ROUTE,
+  TRACK_SHIPMENT_NOTIFICATION_ROUTE,
+  insertNotificationOrThrow,
+} from "../_shared/notification-helpers.ts";
+import {
   buildShipmentRestorePayload,
   runMutationWithRollback,
   type ShipmentSnapshot,
@@ -110,6 +116,88 @@ function normalizeWaybillNumber(value: unknown): string | null {
     : null;
 }
 
+function buildOrderStatusNotification(
+  nextStatus: string,
+  orderId: string,
+): Pick<
+  NotificationInsertPayload,
+  "type" | "title" | "body" | "ctaRoute" | "data" | "priority" | "sourceEventKey"
+> | null {
+  if (nextStatus === "processing") {
+    return {
+      type: "order_processing",
+      title: "Pesanan diproses",
+      body: "Pesananmu sedang kami siapkan. Kami akan memberi kabar saat siap dikirim.",
+      ctaRoute: ORDER_DETAIL_NOTIFICATION_ROUTE,
+      data: {
+        orderId,
+      },
+      priority: "normal",
+      sourceEventKey: `order_processing:${orderId}`,
+    };
+  }
+
+  if (nextStatus === "awaiting_shipment") {
+    return {
+      type: "order_awaiting_shipment",
+      title: "Pesanan siap dikirim",
+      body: "Pesananmu sudah siap dikirim. Kami sedang menyiapkan pengiriman ke alamat tujuan.",
+      ctaRoute: ORDER_DETAIL_NOTIFICATION_ROUTE,
+      data: {
+        orderId,
+      },
+      priority: "normal",
+      sourceEventKey: `order_awaiting_shipment:${orderId}`,
+    };
+  }
+
+  if (nextStatus === "shipped") {
+    return {
+      type: "order_shipped",
+      title: "Pesanan dikirim",
+      body: "Pesananmu sudah dikirim. Kamu bisa melacak pengiriman dari aplikasi.",
+      ctaRoute: TRACK_SHIPMENT_NOTIFICATION_ROUTE,
+      data: {
+        orderId,
+        shipmentStage: "shipped",
+      },
+      priority: "high",
+      sourceEventKey: `order_shipped:manual:${orderId}`,
+    };
+  }
+
+  if (nextStatus === "in_transit") {
+    return {
+      type: "order_shipped",
+      title: "Pesanan dalam perjalanan",
+      body: "Pesananmu sedang dalam perjalanan. Pantau status terbarunya di aplikasi.",
+      ctaRoute: TRACK_SHIPMENT_NOTIFICATION_ROUTE,
+      data: {
+        orderId,
+        shipmentStage: "in_transit",
+      },
+      priority: "normal",
+      sourceEventKey: `order_shipped:in_transit:${orderId}`,
+    };
+  }
+
+  if (nextStatus === "delivered") {
+    return {
+      type: "order_delivered_action_required",
+      title: "Pesanan sudah tiba",
+      body: "Pesananmu sudah tiba. Konfirmasi penerimaan jika pesanan sudah sesuai.",
+      ctaRoute: ORDER_DETAIL_NOTIFICATION_ROUTE,
+      data: {
+        orderId,
+      },
+      priority: "high",
+      sourceEventKey: `order_delivered_action_required:${orderId}`,
+    };
+  }
+
+  return null;
+}
+
 async function upsertShipmentPatch(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
   orderId: string,
@@ -147,6 +235,33 @@ async function readShipmentSnapshot(
   }
 
   return toShipmentSnapshot(data);
+}
+
+async function ensureAwaitingShipmentSideEffectsQueued(
+  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  orderId: string,
+  biteshipOrderId: string | null | undefined,
+): Promise<void> {
+  if (biteshipOrderId) {
+    return;
+  }
+
+  const existingTask = await getSideEffectTask(adminClient, orderId);
+  await saveSideEffectTask(
+    adminClient,
+    orderId,
+    existingTask?.needs_cart_cleanup ?? false,
+    existingTask?.needs_stock ?? false,
+    true,
+    existingTask?.last_error ?? null,
+    existingTask?.pending_biteship_order_id ?? null,
+    existingTask?.pending_tracking_id ?? null,
+    existingTask?.pending_waybill_number ?? null,
+    null,
+    existingTask?.last_error_code ?? null,
+    existingTask?.failed_permanently_at ? true : false,
+  );
+  triggerWebhookSideEffectProcessor(orderId);
 }
 
 async function restoreMutationState(
@@ -296,7 +411,7 @@ Deno.serve(async (req: Request) => {
     const { data: order, error: orderError } = await adminClient
       .from("order_read_model")
       .select(
-        "id, status, payment_status, waybill_number, waybill_source, biteship_order_id, biteship_tracking_id",
+        "id, user_id, status, payment_status, waybill_number, waybill_source, biteship_order_id, biteship_tracking_id",
       )
       .eq("id", body.orderId)
       .single();
@@ -310,11 +425,59 @@ Deno.serve(async (req: Request) => {
 
     if (body.action === "transition_status") {
       const to = body.payload?.to;
+      const orderStatusNotification = to
+        ? buildOrderStatusNotification(to, body.orderId)
+        : null;
+
       if (!to) {
         return new Response(
           JSON.stringify({ error: "payload.to is required" }),
           {
             status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      if (order.status === to && orderStatusNotification) {
+        if (to === "awaiting_shipment") {
+          try {
+            await ensureAwaitingShipmentSideEffectsQueued(
+              adminClient,
+              body.orderId,
+              order.biteship_order_id,
+            );
+          } catch (queueError) {
+            console.error("[order-manager] Failed to enqueue biteship side effect:", queueError);
+          }
+        }
+
+        await insertNotificationOrThrow(
+          adminClient,
+          {
+            userId: order.user_id,
+            type: orderStatusNotification.type,
+            title: orderStatusNotification.title,
+            body: orderStatusNotification.body,
+            ctaRoute: orderStatusNotification.ctaRoute,
+            data: orderStatusNotification.data,
+            priority: orderStatusNotification.priority,
+            sourceEventKey: orderStatusNotification.sourceEventKey,
+          },
+          "[order-manager]",
+        );
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              id: order.id,
+              status: order.status,
+              notification_backfilled: true,
+            },
+          }),
+          {
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
@@ -433,7 +596,7 @@ Deno.serve(async (req: Request) => {
       if (
         body.payload?.waybill_source === "manual" &&
         body.payload?.waybill_number?.trim()
-        ) {
+      ) {
         if (!body.payload?.waybill_override_reason?.trim() && order.biteship_order_id) {
           return new Response(
             JSON.stringify({
@@ -549,26 +712,32 @@ Deno.serve(async (req: Request) => {
       // Enqueue courier fulfillment if moving to awaiting_shipment
       if (to === "awaiting_shipment" && !order.biteship_order_id) {
         try {
-          const existingTask = await getSideEffectTask(adminClient, body.orderId);
-          await saveSideEffectTask(
+          await ensureAwaitingShipmentSideEffectsQueued(
             adminClient,
             body.orderId,
-            existingTask?.needs_cart_cleanup ?? false, // Preserve existing flag
-            existingTask?.needs_stock ?? false, // Preserve existing flag
-            true, // Enable courier creation
-            existingTask?.last_error ?? null,
-            existingTask?.pending_biteship_order_id ?? null,
-            existingTask?.pending_tracking_id ?? null,
-            existingTask?.pending_waybill_number ?? null,
-            null, // leaseOwner
-            existingTask?.last_error_code ?? null,
-            existingTask?.failed_permanently_at ? true : false,
+            order.biteship_order_id,
           );
-          triggerWebhookSideEffectProcessor(body.orderId);
         } catch (queueError) {
           console.error("[order-manager] Failed to enqueue biteship side effect:", queueError);
           // Non-blocking: we continue since DB status already changed
         }
+      }
+
+      if (orderStatusNotification) {
+        await insertNotificationOrThrow(
+          adminClient,
+          {
+            userId: order.user_id,
+            type: orderStatusNotification.type,
+            title: orderStatusNotification.title,
+            body: orderStatusNotification.body,
+            ctaRoute: orderStatusNotification.ctaRoute,
+            data: orderStatusNotification.data,
+            priority: orderStatusNotification.priority,
+            sourceEventKey: orderStatusNotification.sourceEventKey,
+          },
+          "[order-manager]",
+        );
       }
 
       return new Response(JSON.stringify({ success: true, data: updated }), {
@@ -823,6 +992,25 @@ Deno.serve(async (req: Request) => {
         console.error(
           "[order-manager] Failed to log sync activity:",
           syncActivityError,
+        );
+      }
+
+      const shipmentNotification = buildOrderStatusNotification(nextStatus, body.orderId);
+
+      if (shipmentNotification && nextStatus !== "shipped") {
+        await insertNotificationOrThrow(
+          adminClient,
+          {
+            userId: order.user_id,
+            type: shipmentNotification.type,
+            title: shipmentNotification.title,
+            body: shipmentNotification.body,
+            ctaRoute: shipmentNotification.ctaRoute,
+            data: shipmentNotification.data,
+            priority: shipmentNotification.priority,
+            sourceEventKey: shipmentNotification.sourceEventKey,
+          },
+          "[order-manager]",
         );
       }
 
