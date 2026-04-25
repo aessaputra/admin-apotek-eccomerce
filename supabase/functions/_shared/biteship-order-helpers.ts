@@ -1,3 +1,5 @@
+import { parseBiteshipPostalCode } from "./biteship-postal-code.ts";
+import { shouldUseInstantBiteshipContract } from "./biteship-courier-contract.ts";
 import type { Order, OrderAddress } from "./types.ts";
 
 type BiteshipOrderDestinationFields = {
@@ -10,6 +12,14 @@ type BiteshipOrderDestinationFields = {
     longitude: number;
   };
 } & (
+  | {
+      destination_coordinate: {
+        latitude: number;
+        longitude: number;
+      };
+      destination_area_id?: never;
+      destination_postal_code?: never;
+    }
   | {
       destination_area_id: string;
       destination_postal_code?: number;
@@ -69,22 +79,22 @@ function getOptionalTrimmedValue(
   return normalizedValue ? normalizedValue : null;
 }
 
-function requiresDestinationCoordinate(order: Order): boolean {
-  return order.courier_service?.trim().toLowerCase() === "instant";
-}
-
 export function buildBiteshipOrderDestinationFields(
   order: Order,
 ): BiteshipOrderDestinationFields {
   const destinationCoordinate = getDestinationCoordinate(order);
+  const usesInstantContract = shouldUseInstantBiteshipContract(
+    order.courier_code,
+    order.courier_service,
+  );
 
-  if (requiresDestinationCoordinate(order) && !destinationCoordinate) {
+  if (usesInstantContract && !destinationCoordinate) {
     throw new Error(
-      `Destination coordinate is required for instant courier ${order.courier_code}:${order.courier_service} on order ${order.id}. Ensure the shipping address has latitude and longitude.`,
+      `Destination coordinate is required for instant courier ${order.courier_code}:${order.courier_service} on order ${order.id}. Ensure the shipping address has latitude and longitude before creating a Biteship order.`,
     );
   }
 
-  return {
+  const destinationContactFields = {
     destination_contact_name: getRequiredTrimmedValue(
       getPreferredRecipientName(order),
       "Destination contact name",
@@ -107,12 +117,25 @@ export function buildBiteshipOrderDestinationFields(
           )!,
         }
       : {}),
+  };
+
+  if (usesInstantContract) {
+    return {
+      ...destinationContactFields,
+      destination_coordinate: destinationCoordinate!,
+    };
+  }
+
+  return {
+    ...destinationContactFields,
     ...(order.destination_area_id
       ? { destination_area_id: order.destination_area_id }
-      : { destination_postal_code: Number(order.destination_postal_code) }),
-    ...(destinationCoordinate
-      ? { destination_coordinate: destinationCoordinate }
-      : {}),
+      : {
+          destination_postal_code: parseBiteshipPostalCode(
+            order.destination_postal_code,
+            "destination_postal_code",
+          ),
+        }),
   };
 }
 

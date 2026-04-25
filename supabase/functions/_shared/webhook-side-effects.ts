@@ -1,12 +1,13 @@
 import {
   createBiteshipOrder,
+  getStandardBiteshipShipmentOriginAreaId,
+  getStoreSettings,
   persistBiteshipShipment,
 } from "./biteship.ts";
 import { fetchOrderShippingAddress } from "./biteship-order-helpers.ts";
 import { getOrderAggregateById } from "./order-aggregate.ts";
 import {
   deriveSettlementSideEffectFlags,
-  shouldQueueBiteshipFulfillment,
 } from "./order-flow-rules.ts";
 import { getSupabaseAdminClient } from "./supabase.ts";
 import type { BiteshipOrderResponse, Order, OrderItem } from "./types.ts";
@@ -607,12 +608,14 @@ export async function processWebhookSideEffectTask(
 
     if (needsBiteship && pendingBiteshipOrderId) {
       try {
+        const settings = await getStoreSettings();
         await persistBiteshipShipment(adminClient, {
           orderId,
           biteshipOrderId: pendingBiteshipOrderId,
           trackingId: pendingTrackingId,
           waybillNumber: pendingWaybillNumber,
           actorType: "system",
+          originAreaId: getStandardBiteshipShipmentOriginAreaId(order, settings),
           metadata: {
             source: "process_webhook_side_effects_pending_task",
           },
@@ -676,12 +679,14 @@ export async function processWebhookSideEffectTask(
         );
 
         try {
+          const settings = await getStoreSettings();
           await persistBiteshipShipment(adminClient, {
             orderId,
             biteshipOrderId: biteshipResponse.id,
             trackingId: biteshipResponse.courier?.tracking_id || null,
             waybillNumber: biteshipResponse.courier?.waybill_id || null,
             actorType: "system",
+            originAreaId: getStandardBiteshipShipmentOriginAreaId(order, settings),
             metadata: {
               source: "process_webhook_side_effects",
               tracking_id: biteshipResponse.courier?.tracking_id || null,

@@ -1,5 +1,6 @@
-import { getSupabaseAdminClient } from "./supabase.ts";
 import { buildBiteshipOrderDestinationFields } from "./biteship-order-helpers.ts";
+import { shouldUseInstantBiteshipContract } from "./biteship-courier-contract.ts";
+import { parseBiteshipPostalCode, tryParseBiteshipPostalCode } from "./biteship-postal-code.ts";
 import { buildOrderEndpoint } from "./biteship-public-tracking.ts";
 import { getPersistedBiteshipShipmentStatus } from "./order-status.ts";
 import type { Order, OrderItem } from "./types.ts";
@@ -18,6 +19,11 @@ interface BiteshipOrderItem {
 
 type BiteshipOrderPayloadDestination =
   | {
+      destination_coordinate: { latitude: number; longitude: number };
+      destination_area_id?: never;
+      destination_postal_code?: never;
+    }
+  | {
       destination_area_id: string;
       destination_postal_code?: number;
     }
@@ -34,6 +40,7 @@ type BiteshipOrderPayload = {
   origin_contact_name: string;
   origin_contact_phone: string;
   origin_address: string;
+  origin_area_id?: string;
   origin_postal_code?: number;
   origin_coordinate?: { latitude: number; longitude: number };
   destination_contact_name: string;
@@ -97,18 +104,36 @@ interface PersistBiteshipShipmentParams {
   shipmentStatus?: string | null;
   actorType: ShippingActivityActorType;
   actorId?: string | null;
+  originAreaId?: string | null;
   metadata?: Record<string, unknown>;
 }
 
-function normalizeStorePostalCode(value: unknown): string | null {
-  if (typeof value === "string") {
-    const normalizedValue = value.trim();
-    return /^\d{5}$/.test(normalizedValue) ? normalizedValue : null;
-  }
+interface SupabaseMutationResult {
+  error: unknown | null;
+}
 
-  if (typeof value === "number" && Number.isInteger(value)) {
-    const normalizedValue = String(value).padStart(5, "0");
-    return /^\d{5}$/.test(normalizedValue) ? normalizedValue : null;
+interface BiteshipShipmentAdminClient {
+  from(table: "shipments"): {
+    upsert: (
+      payload: Record<string, unknown>,
+      options: { onConflict: string },
+    ) => Promise<SupabaseMutationResult>;
+  };
+  from(table: "order_activities"): {
+    insert: (payload: Record<string, unknown>) => Promise<SupabaseMutationResult>;
+  };
+}
+
+async function getSupabaseAdminClient() {
+  const supabaseModule = await import("./supabase.ts");
+
+  return supabaseModule.getSupabaseAdminClient();
+}
+
+function normalizeStorePostalCode(value: unknown): string | null {
+  if (typeof value === "string" || typeof value === "number") {
+    const parsedValue = tryParseBiteshipPostalCode(value, "origin_postal_code");
+    return parsedValue === null ? null : String(parsedValue);
   }
 
   return null;
@@ -359,6 +384,86 @@ export function assertCompleteStoreSettings(settings: StoreSettings): void {
   getRequiredStoreOriginPostalCode(settings);
 }
 
+function assertCompleteStoreShipperSettings(settings: StoreSettings): void {
+  if (
+    !settings.store_name ||
+    !settings.phone_number ||
+    !settings.email ||
+    !settings.organization ||
+    !settings.store_address
+  ) {
+    throw new Error(
+      "Missing shop shipper configuration. Ensure store_name, phone_number, email, organization, and store_address are set in settings table.",
+    );
+  }
+}
+
+function getStoreOriginCoordinates(settings: StoreSettings): {
+  latitude: number;
+  longitude: number;
+} | null {
+  if (
+    typeof settings.origin_latitude !== "number" ||
+    !Number.isFinite(settings.origin_latitude) ||
+    typeof settings.origin_longitude !== "number" ||
+    !Number.isFinite(settings.origin_longitude)
+  ) {
+    return null;
+  }
+
+  return {
+    latitude: settings.origin_latitude,
+    longitude: settings.origin_longitude,
+  };
+}
+
+function getStandardOrderOriginFields(
+  settings: StoreSettings,
+): { origin_area_id: string } | { origin_postal_code: number } {
+  const originAreaId = settings.origin_area_id?.trim() ?? "";
+  if (originAreaId) {
+    return { origin_area_id: originAreaId };
+  }
+
+  return {
+    origin_postal_code: parseBiteshipPostalCode(
+      getRequiredStoreOriginPostalCode(settings),
+      "origin_postal_code",
+    ),
+  };
+}
+
+function getInstantOrderOriginFields(settings: StoreSettings): {
+  origin_coordinate: { latitude: number; longitude: number };
+} {
+  const originCoordinates = getStoreOriginCoordinates(settings);
+  if (!originCoordinates) {
+    throw new Error(
+      "Origin coordinate is required for instant Biteship orders. Configure origin_latitude and origin_longitude in settings table before creating instant courier orders.",
+    );
+  }
+
+  return { origin_coordinate: originCoordinates };
+}
+
+export function shouldUseInstantBiteshipOrderContract(order: Order): boolean {
+  return shouldUseInstantBiteshipContract(
+    order.courier_code,
+    order.courier_service,
+  );
+}
+
+export function getStandardBiteshipShipmentOriginAreaId(
+  order: Order,
+  settings: StoreSettings,
+): string | null {
+  if (shouldUseInstantBiteshipOrderContract(order)) {
+    return null;
+  }
+
+  return settings.origin_area_id?.trim() || null;
+}
+
 function getRequiredOrderItemName(
   item: OrderItem,
   orderId: string,
@@ -394,7 +499,7 @@ function getRequiredOrderItemWeight(
 }
 
 export async function getStoreSettings(): Promise<StoreSettings> {
-  const adminClient = getSupabaseAdminClient();
+  const adminClient = await getSupabaseAdminClient();
   const { data, error } = await adminClient
     .from("settings")
     .select(
@@ -429,7 +534,7 @@ export async function getStoreSettings(): Promise<StoreSettings> {
 }
 
 export async function persistBiteshipShipment(
-  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  adminClient: BiteshipShipmentAdminClient,
   params: PersistBiteshipShipmentParams,
 ): Promise<void> {
   const normalizedTrackingId = params.trackingId?.trim() || null;
@@ -447,6 +552,11 @@ export async function persistBiteshipShipment(
   if (normalizedWaybillNumber) {
     shipmentPayload.waybill_number = normalizedWaybillNumber;
     shipmentPayload.waybill_source = "system";
+  }
+
+  const normalizedOriginAreaId = params.originAreaId?.trim() || null;
+  if (normalizedOriginAreaId) {
+    shipmentPayload.origin_area_id = normalizedOriginAreaId;
   }
 
   const { error: updateError } = await adminClient
@@ -543,16 +653,22 @@ export function buildBiteshipOrderPayload(
   order: Order,
   settings: StoreSettings,
 ): BiteshipOrderPayload {
-  if (!order.destination_area_id && !order.destination_postal_code) {
-    throw new Error(
-      "Missing destination_area_id and destination_postal_code on order",
-    );
-  }
   if (!order.courier_code) throw new Error("Missing courier_code on order");
   if (!order.courier_service)
     throw new Error("Missing courier_service on order");
 
-  assertCompleteStoreSettings(settings);
+  const usesInstantContract = shouldUseInstantBiteshipOrderContract(order);
+  if (
+    !usesInstantContract &&
+    !order.destination_area_id &&
+    !order.destination_postal_code
+  ) {
+    throw new Error(
+      "Missing destination_area_id and destination_postal_code on order",
+    );
+  }
+
+  assertCompleteStoreShipperSettings(settings);
   if (
     !isCourierServiceEnabled(
       settings,
@@ -569,9 +685,9 @@ export function buildBiteshipOrderPayload(
   const shipperEmail = settings.email;
   const shipperOrganization = settings.organization;
   const shopAddress = settings.store_address;
-  const originPostalCode = getRequiredStoreOriginPostalCode(settings);
-  const originLatitude = settings.origin_latitude;
-  const originLongitude = settings.origin_longitude;
+  const originFields = usesInstantContract
+    ? getInstantOrderOriginFields(settings)
+    : getStandardOrderOriginFields(settings);
 
   const items: BiteshipOrderItem[] = (order.order_items || []).map(
     (item: OrderItem, index: number): BiteshipOrderItem => ({
@@ -592,15 +708,7 @@ export function buildBiteshipOrderPayload(
     origin_contact_name: shipperName,
     origin_contact_phone: shipperPhone,
     origin_address: shopAddress,
-    origin_postal_code: Number(originPostalCode),
-    ...(originLatitude !== null && originLongitude !== null
-      ? {
-          origin_coordinate: {
-            latitude: originLatitude,
-            longitude: originLongitude,
-          },
-        }
-      : {}),
+    ...originFields,
 
     ...destinationFields,
 
