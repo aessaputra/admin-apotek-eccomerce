@@ -15,7 +15,13 @@ import {
   buildPublicTrackingEndpoint,
   buildTrackingEndpoint,
 } from "../_shared/biteship-public-tracking.ts";
-import { buildRatesRequestPayloads } from "../_shared/biteship-rates.ts";
+import { parseBiteshipPostalCode } from "../_shared/biteship-postal-code.ts";
+import {
+  buildMergedRatesResponse,
+  buildRatesRequestPayloads,
+  type RatesExecutionFailure,
+  type RatesExecutionSuccess,
+} from "../_shared/biteship-rates.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { getSupabaseAdminClient } from "../_shared/supabase.ts";
 
@@ -144,7 +150,10 @@ function withServerShipperAndOriginFields(
     origin_contact_name: settings.store_name,
     origin_contact_phone: settings.phone_number,
     origin_address: settings.store_address,
-    origin_postal_code: Number(getRequiredStoreOriginPostalCode(settings)),
+    origin_postal_code: parseBiteshipPostalCode(
+      getRequiredStoreOriginPostalCode(settings),
+      "origin_postal_code",
+    ),
   };
 }
 
@@ -161,6 +170,31 @@ function withoutClientOriginFields(
   } = payload;
 
   return safePayload;
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+    if (!trimmedValue) {
+      return null;
+    }
+
+    const parsedValue = Number(trimmedValue);
+    return Number.isFinite(parsedValue) ? parsedValue : null;
+  }
+
+  return null;
+}
+
+function hasDestinationCoordinates(payload: Record<string, unknown>): boolean {
+  return (
+    toFiniteNumber(payload.destination_latitude) !== null &&
+    toFiniteNumber(payload.destination_longitude) !== null
+  );
 }
 
 Deno.serve(async (req: Request) => {
@@ -380,23 +414,46 @@ Deno.serve(async (req: Request) => {
         typeof ratesPayload.destination_area_id === "string"
           ? ratesPayload.destination_area_id.trim()
           : "";
-      const destinationPostalCode = Number(
-        ratesPayload.destination_postal_code ??
-          ratesPayload.destination_postalcode ??
-          NaN,
-      );
+      const rawDestinationPostalCode =
+        ratesPayload.destination_postal_code ?? ratesPayload.destination_postalcode;
       const hasDestinationAreaId = destinationAreaId.length > 0;
-      const hasDestinationPostalCode =
-        Number.isFinite(destinationPostalCode) &&
-        Number.isInteger(destinationPostalCode) &&
-        destinationPostalCode >= 10000 &&
-        destinationPostalCode <= 99999;
+      let hasDestinationPostalCode = false;
 
-      if (!hasDestinationAreaId && !hasDestinationPostalCode) {
+      if (rawDestinationPostalCode !== null && rawDestinationPostalCode !== undefined) {
+        try {
+          ratesPayload.destination_postal_code = parseBiteshipPostalCode(
+            typeof rawDestinationPostalCode === "string" ||
+              typeof rawDestinationPostalCode === "number"
+              ? rawDestinationPostalCode
+              : undefined,
+            "destination_postal_code",
+          );
+          hasDestinationPostalCode = true;
+        } catch (error: unknown) {
+          return new Response(
+            JSON.stringify({
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "destination_postal_code must be valid.",
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
+      }
+
+      if (
+        !hasDestinationAreaId &&
+        !hasDestinationPostalCode &&
+        !hasDestinationCoordinates(ratesPayload)
+      ) {
         return new Response(
           JSON.stringify({
             error:
-              "Missing destination location for rates. Provide destination_area_id or destination_postal_code. Check addresses.postal_code/subdistrict mapping.",
+              "Missing destination location for rates. Provide destination_area_id or destination_postal_code for standard couriers, or destination_latitude and destination_longitude for instant couriers. Check addresses.postal_code/subdistrict mapping.",
           }),
           {
             status: 400,
@@ -418,15 +475,20 @@ Deno.serve(async (req: Request) => {
           ? ratesPayload.couriers
           : enabledCouriers;
 
-      const [ratePayload] = buildRatesRequestPayloads(
+      const ratesRequestResult = buildRatesRequestPayloads(
         settings!,
         ratesPayload,
         requestedCouriers,
       );
 
-      if (!ratePayload) {
-        return new Response(JSON.stringify({ success: true, pricing: [] }), {
-          status: 200,
+      if (ratesRequestResult.requests.length === 0) {
+        const emptyRatesResponse = buildMergedRatesResponse(
+          [],
+          [],
+          ratesRequestResult.skipped,
+        );
+        return new Response(JSON.stringify(emptyRatesResponse.body), {
+          status: emptyRatesResponse.status,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -440,53 +502,77 @@ Deno.serve(async (req: Request) => {
           : "biteship_test.";
       const authKey = `${authPrefix}${BITESHIP_API_KEY}`;
 
-      console.log(
-        "[biteship] rates payload:",
-        JSON.stringify(getLoggablePayload(ratePayload)),
-      );
-      console.log(`[biteship] Calling: POST ${biteshipUrl}`);
+      const successfulRateResponses: RatesExecutionSuccess[] = [];
+      const failedRateResponses: RatesExecutionFailure[] = [];
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
+      for (const rateRequest of ratesRequestResult.requests) {
+        console.log(
+          `[biteship] rates ${rateRequest.group} payload:`,
+          JSON.stringify(getLoggablePayload(rateRequest.payload)),
+        );
+        console.log(`[biteship] Calling: POST ${biteshipUrl}`);
 
-      let rateResponseData: unknown;
-      let rateResponseStatus = 200;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
 
-      try {
-        const biteshipResponse = await fetch(biteshipUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            authorization: authKey,
-          },
-          body: JSON.stringify(ratePayload),
-          signal: controller.signal,
-        });
-
-        rateResponseStatus = biteshipResponse.status;
-        rateResponseData = await biteshipResponse.json();
-
-        if (!biteshipResponse.ok) {
-          console.error(
-            `[biteship] Biteship API error — action: rates, status: ${biteshipResponse.status}, payload: ${JSON.stringify(getLoggablePayload(ratePayload))}, body: ${JSON.stringify(rateResponseData)}`,
-          );
-
-          return new Response(JSON.stringify({ error: rateResponseData }), {
-            status: biteshipResponse.status,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        try {
+          const biteshipResponse = await fetch(biteshipUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              authorization: authKey,
+            },
+            body: JSON.stringify(rateRequest.payload),
+            signal: controller.signal,
           });
+
+          const rateResponseData: unknown = await biteshipResponse.json();
+
+          if (!biteshipResponse.ok) {
+            console.error(
+              `[biteship] Biteship API error — action: rates, group: ${rateRequest.group}, status: ${biteshipResponse.status}, payload: ${JSON.stringify(getLoggablePayload(rateRequest.payload))}, body: ${JSON.stringify(rateResponseData)}`,
+            );
+            failedRateResponses.push({
+              group: rateRequest.group,
+              couriers: rateRequest.couriers,
+              status: biteshipResponse.status,
+              error: rateResponseData,
+            });
+            continue;
+          }
+
+          successfulRateResponses.push({
+            group: rateRequest.group,
+            couriers: rateRequest.couriers,
+            status: biteshipResponse.status,
+            data: filterRatesByEnabledServices(rateResponseData, settings!),
+          });
+        } catch (error: unknown) {
+          const isAbortError =
+            error instanceof DOMException && error.name === "AbortError";
+          failedRateResponses.push({
+            group: rateRequest.group,
+            couriers: rateRequest.couriers,
+            status: isAbortError ? 504 : 502,
+            error: isAbortError
+              ? "Biteship rates request timed out."
+              : error instanceof Error
+                ? error.message
+                : "Biteship rates request failed.",
+          });
+        } finally {
+          clearTimeout(timeout);
         }
-      } finally {
-        clearTimeout(timeout);
       }
 
-      const filteredRateResponse = filterRatesByEnabledServices(
-        rateResponseData,
-        settings!,
+      const mergedRateResponse = buildMergedRatesResponse(
+        successfulRateResponses,
+        failedRateResponses,
+        ratesRequestResult.skipped,
       );
 
-      return new Response(JSON.stringify(filteredRateResponse), {
-        status: rateResponseStatus,
+      return new Response(JSON.stringify(mergedRateResponse.body), {
+        status: mergedRateResponse.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
