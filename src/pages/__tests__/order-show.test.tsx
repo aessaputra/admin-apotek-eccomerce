@@ -326,6 +326,52 @@ describe("OrderShow", () => {
     });
   });
 
+  it("renders order item SKU snapshots with an explicit fallback for legacy rows", async () => {
+    mocks.useShow.mockReturnValue({
+      result: {
+        id: "order-sku",
+        total_amount: 40000,
+        status: "processing",
+        payment_status: "settlement",
+        created_at: "2026-04-01T00:00:00.000Z",
+        order_items: [
+          {
+            id: "item-with-sku",
+            quantity: 1,
+            price_at_purchase: 25000,
+            product_sku_at_purchase: "VIT-C-001",
+            products: { name: "Vitamin C" },
+          },
+          {
+            id: "item-null-sku",
+            quantity: 1,
+            price_at_purchase: 15000,
+            product_sku_at_purchase: null,
+            products: { name: "Legacy Product" },
+          },
+          {
+            id: "item-blank-sku",
+            quantity: 1,
+            price_at_purchase: 5000,
+            product_sku_at_purchase: "   ",
+            products: { name: "Blank SKU Product" },
+          },
+        ],
+      },
+      query: { isLoading: false, refetch: mocks.refetch },
+    });
+
+    render(<OrderShow />);
+
+    await waitFor(() => {
+      expect(mocks.setFieldsValue).toHaveBeenCalledWith({ status: "processing", waybill_number: "" });
+    });
+
+    expect(screen.getByText("orders.fields.sku")).not.toBeNull();
+    expect(screen.getByText("VIT-C-001")).not.toBeNull();
+    expect(screen.getAllByText("SKU belum tersimpan")).toHaveLength(2);
+  });
+
   it("hides sync action for terminal biteship orders", async () => {
     mocks.useShow.mockReturnValue({
       result: {

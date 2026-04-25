@@ -20,6 +20,7 @@ interface OrderItem {
   product_id: string;
   quantity: number;
   price_at_purchase: string | number;
+  product_sku_at_purchase?: string | null;
   products?: { name: string } | null;
 }
 
@@ -382,6 +383,11 @@ export const OrderShow: React.FC = () => {
   const currentPaymentStatusLabel = record?.payment_status
     ? translate(`paymentStatus.${record.payment_status}`, {}, formatDisplayLabel(record.payment_status))
     : "-";
+  const formatSkuSnapshot = (value: string | null | undefined) => {
+    const sku = value?.trim();
+
+    return sku || translate("orders.skuNotStored", {}, "SKU belum tersimpan");
+  };
 
   const getWaybillSourceBadge = () => {
     if (!record?.waybill_number) return null;
@@ -397,6 +403,7 @@ export const OrderShow: React.FC = () => {
 
   const columns = [
     { title: translate("orders.fields.product"), dataIndex: ["products", "name"], key: "product", render: (_: unknown, row: OrderItem) => row.products?.name ?? "-" },
+    { title: translate("orders.fields.sku"), dataIndex: "product_sku_at_purchase", key: "sku", render: (v: string | null | undefined) => formatSkuSnapshot(v) },
     { title: translate("orders.fields.quantity"), dataIndex: "quantity", key: "quantity", width: 80 },
     { title: translate("orders.fields.unitPrice"), dataIndex: "price_at_purchase", key: "price", render: (v: string | number) => `Rp ${Number(v || 0).toLocaleString("id-ID")}` },
     { title: translate("orders.fields.subtotal"), key: "subtotal", render: (_: unknown, row: OrderItem) => `Rp ${(Number(row.price_at_purchase || 0) * (row.quantity || 0)).toLocaleString("id-ID")}` },

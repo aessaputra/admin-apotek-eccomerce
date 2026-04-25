@@ -14,6 +14,7 @@ interface ProductImage {
 interface ProductRecord {
   id: string;
   name: string;
+  sku?: string;
   slug: string;
   description?: string | null;
   price: string | number;
@@ -68,6 +69,9 @@ export const ProductShow: React.FC = () => {
 
       <Title level={5}>{translate("products.fields.name")}</Title>
       <Text>{record?.name ?? "-"}</Text>
+
+      <Title level={5}>{translate("products.fields.sku")}</Title>
+      <Text>{record?.sku ?? "-"}</Text>
 
       <Title level={5}>{translate("products.fields.slug")}</Title>
       <Text>{record?.slug ?? "-"}</Text>

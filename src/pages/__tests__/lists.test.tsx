@@ -199,6 +199,7 @@ describe("list pages", () => {
             id: "prod-1",
             product_images: [{ url: "https://example.com/image.png" }],
             name: "Vitamin C",
+            sku: "SUPP-VITAMIN-C-1000-AB12",
             slug: "vitamin-c",
             categories: { name: "Supplements" },
             price: 15000,
@@ -213,6 +214,7 @@ describe("list pages", () => {
     render(<ProductList />);
 
     expect(screen.getByText("Vitamin C")).not.toBeNull();
+    expect(screen.getByText("SUPP-VITAMIN-C-1000-AB12")).not.toBeNull();
     expect(screen.getByText("vitamin-c")).not.toBeNull();
     expect(screen.getByText("Supplements")).not.toBeNull();
     expect(screen.getByText("Rp 15.000")).not.toBeNull();

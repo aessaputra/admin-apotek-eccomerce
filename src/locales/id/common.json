@@ -62,6 +62,7 @@
     "fields": {
       "image": "Gambar",
       "name": "Nama",
+      "sku": "SKU",
       "slug": "Slug",
       "category": "Kategori",
       "price": "Harga",
@@ -79,6 +80,11 @@
     "status": {
       "active": "Aktif",
       "inactive": "Nonaktif"
+    },
+    "validation": {
+      "skuRequired": "SKU wajib diisi",
+      "skuInvalid": "SKU harus 4-50 karakter menggunakan huruf besar, angka, dan tanda hubung.",
+      "skuDuplicate": "SKU ini sudah digunakan oleh produk lain."
     },
     "imagesSaveError": "Gagal menyimpan gambar produk",
     "description": {
@@ -242,6 +248,7 @@
       "payment": "Pembayaran",
       "created": "Dibuat",
       "product": "Produk",
+      "sku": "SKU",
       "quantity": "Qty",
       "unitPrice": "Harga Satuan",
       "subtotal": "Subtotal",
@@ -270,6 +277,7 @@
       "currentPaymentStatus": "Status Pembayaran Saat Ini",
     "nextOrderStatus": "Status Pesanan Berikutnya",
     "productList": "Daftar Produk",
+    "skuNotStored": "SKU belum tersimpan",
     "orderInfo": "Informasi Pesanan",
     "totalAndShipping": "Total & Ongkir",
     "waybillRequired": "No. resi wajib diisi saat status {{status}}",

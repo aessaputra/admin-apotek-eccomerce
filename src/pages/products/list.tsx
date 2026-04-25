@@ -12,6 +12,7 @@ import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 interface ProductImage { url: string }
 interface ProductRecord {
   id: string;
+  sku?: string;
   product_images?: ProductImage[];
   categories?: { name: string } | null;
 }
@@ -40,6 +41,7 @@ export const ProductList: React.FC = () => {
           }}
         />
         <Table.Column dataIndex="name" title={translate("products.fields.name")} />
+        <Table.Column dataIndex="sku" title={translate("products.fields.sku")} />
         <Table.Column dataIndex="slug" title={translate("products.fields.slug")} />
         <Table.Column
           dataIndex={["categories", "name"]}

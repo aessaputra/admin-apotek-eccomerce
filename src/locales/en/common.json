@@ -62,6 +62,7 @@
     "fields": {
       "image": "Image",
       "name": "Name",
+      "sku": "SKU",
       "slug": "Slug",
       "category": "Category",
       "price": "Price",
@@ -79,6 +80,11 @@
     "status": {
       "active": "Active",
       "inactive": "Inactive"
+    },
+    "validation": {
+      "skuRequired": "SKU is required",
+      "skuInvalid": "SKU must be 4-50 characters using uppercase letters, numbers, and hyphens.",
+      "skuDuplicate": "This SKU is already used by another product."
     },
     "imagesSaveError": "Failed to save product images",
     "description": {
@@ -242,6 +248,7 @@
       "payment": "Payment",
       "created": "Created",
       "product": "Product",
+      "sku": "SKU",
       "quantity": "Qty",
       "unitPrice": "Unit Price",
       "subtotal": "Subtotal",
@@ -270,6 +277,7 @@
       "currentPaymentStatus": "Current Payment Status",
     "nextOrderStatus": "Next Order Status",
     "productList": "Product List",
+    "skuNotStored": "SKU not stored",
     "orderInfo": "Order Information",
     "totalAndShipping": "Total & Shipping",
     "waybillRequired": "Waybill number is required when status is {{status}}",

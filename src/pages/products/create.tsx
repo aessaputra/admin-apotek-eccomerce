@@ -1,9 +1,12 @@
+import { useRef } from "react";
 import { Create, useForm, useSelect } from "@refinedev/antd";
 import { useTranslation } from "@refinedev/core";
 import { Form, Input, InputNumber, Select, message } from "antd";
 import { ProductImageUpload } from "../../components/product-image-upload";
 import { DescriptionEditorModal } from "../../components/description-editor-modal";
+import { useProductSkuField } from "../../hooks/useProductSkuField";
 import { slugify } from "../../utils/slugify";
+import { generateSkuCandidate } from "../../utils/sku";
 import { supabaseClient } from "../../providers/supabase-client";
 
 const PRODUCT_WEIGHT_RULES = [
@@ -15,9 +18,41 @@ const PRODUCT_WEIGHT_RULES = [
   },
 ];
 
+type ProductFormValues = Record<string, unknown>;
+
+interface SelectOption {
+  label?: unknown;
+  value?: unknown;
+  options?: SelectOption[];
+}
+
+function getOptionLabel(options: unknown, value: unknown): string {
+  if (!Array.isArray(options)) return "";
+
+  for (const option of options as SelectOption[]) {
+    if (option.value === value) {
+      return typeof option.label === "string" || typeof option.label === "number"
+        ? String(option.label)
+        : "";
+    }
+
+    const nestedLabel = getOptionLabel(option.options, value);
+    if (nestedLabel) return nestedLabel;
+  }
+
+  return "";
+}
+
 export const ProductCreate: React.FC = () => {
   const { translate } = useTranslation();
   const { formProps, saveButtonProps, form } = useForm();
+  const skuTouchedRef = useRef(false);
+  const {
+    handleDuplicateSkuSubmitError,
+    handleSkuBlur,
+    normalizeAndValidateSku,
+    skuRules,
+  } = useProductSkuField({ form, translate });
   const { selectProps } = useSelect({
     resource: "categories",
     optionLabel: "name",
@@ -31,14 +66,32 @@ export const ProductCreate: React.FC = () => {
     if ("name" in changed && changed.name != null) {
       form.setFieldValue("slug", slugify(String(changed.name)));
     }
+    if ("sku" in changed) {
+      skuTouchedRef.current = true;
+    }
+    if (!skuTouchedRef.current && ("name" in changed || "category_id" in changed)) {
+      const categoryLabel = getOptionLabel(selectProps.options, all.category_id);
+      form.setFieldValue("sku", generateSkuCandidate({
+        categorySlugOrName: categoryLabel,
+        productName: typeof all.name === "string" ? all.name : "",
+      }));
+    }
     formProps.onValuesChange?.(changed, all);
   };
 
-  const handleFinish = async (values: Record<string, unknown>) => {
+  const handleFinish = async (values: ProductFormValues) => {
     const { images = [], ...productValues } = values;
-    const result = (await formProps.onFinish?.({ ...productValues })) as
-      | { data?: { id?: string } }
-      | undefined;
+    const sku = await normalizeAndValidateSku(productValues.sku);
+    let result: { data?: { id?: string } } | undefined;
+
+    try {
+      result = (await formProps.onFinish?.({ ...productValues, sku })) as
+        | { data?: { id?: string } }
+        | undefined;
+    } catch (error) {
+      handleDuplicateSkuSubmitError(error);
+      throw error;
+    }
     const productId = result?.data?.id;
     if (productId && Array.isArray(images) && images.length > 0) {
       const { error } = await supabaseClient.from("product_images").insert(
@@ -66,6 +119,13 @@ export const ProductCreate: React.FC = () => {
       >
         <Form.Item label={translate("products.fields.name")} name="name" rules={[{ required: true }]}>
           <Input />
+        </Form.Item>
+        <Form.Item
+          label={translate("products.fields.sku")}
+          name="sku"
+          rules={skuRules}
+        >
+          <Input onChange={() => { skuTouchedRef.current = true; }} onBlur={handleSkuBlur} />
         </Form.Item>
         <Form.Item label={translate("products.fields.slug")} name="slug" rules={[{ required: true }]}>
           <Input />

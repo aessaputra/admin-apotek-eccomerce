@@ -1,6 +1,8 @@
 import type {
   BaseRecord,
   DataProvider,
+  GetListResponse,
+  GetManyResponse,
   GetOneParams,
   GetOneResponse,
 } from "@refinedev/core";
@@ -10,22 +12,79 @@ import { ORDER_READ_RESOURCE } from "../constants/resources";
 import { getStoragePathFromReference, MEDIA_BUCKET } from "../utils/storage";
 
 const baseDataProvider = supabaseDataProvider(supabaseClient);
+const PRODUCT_READ_RESOURCE = "admin_products";
+const PRODUCT_IMAGE_CLEANUP_SELECT = "id, product_images(url)";
 
-function mapOrdersReadResource(resource: string): string {
-  return resource === "orders" ? ORDER_READ_RESOURCE : resource;
+type DataProviderGetListParams = Parameters<NonNullable<DataProvider["getList"]>>[0];
+type DataProviderGetManyParams = Parameters<NonNullable<DataProvider["getMany"]>>[0];
+
+interface AdminProductRecord extends BaseRecord {
+  images?: unknown;
+  product_images?: unknown;
+  category_name?: string | null;
+  category_slug?: string | null;
+  categories?: unknown;
+}
+
+interface AdminOrderItemRecord {
+  product_name?: string | null;
+}
+
+function mapReadResource(resource: string): string {
+  if (resource === "orders") return ORDER_READ_RESOURCE;
+  if (resource === "products") return PRODUCT_READ_RESOURCE;
+  return resource;
+}
+
+function withProductReadMeta<TParams extends { resource: string; meta?: Record<string, unknown> }>(params: TParams): TParams {
+  if (params.resource !== "products") return params;
+
+  return {
+    ...params,
+    meta: { ...params.meta, select: "*" },
+  };
+}
+
+function normalizeAdminProduct<TData extends BaseRecord = BaseRecord>(record: TData): TData {
+  const adminRecord = record as TData & AdminProductRecord;
+  const categoryName = adminRecord.category_name;
+  const categorySlug = adminRecord.category_slug;
+
+  return {
+    ...adminRecord,
+    product_images: Array.isArray(adminRecord.product_images)
+      ? adminRecord.product_images
+      : Array.isArray(adminRecord.images)
+        ? adminRecord.images
+        : [],
+    categories: adminRecord.categories ?? (categoryName || categorySlug
+      ? { name: categoryName ?? "", slug: categorySlug ?? undefined }
+      : null),
+  } as TData;
+}
+
+function normalizeAdminProducts<TData extends BaseRecord = BaseRecord>(records: TData[]): TData[] {
+  return records.map((record) => normalizeAdminProduct(record));
+}
+
+function normalizeOrderItem(row: AdminOrderItemRecord) {
+  return {
+    ...row,
+    products: { name: row.product_name ?? "" },
+  };
 }
 
 async function getOrderItems(orderId: string | number) {
   const { data, error } = await supabaseClient
-    .from("order_items")
-    .select("*, products(name)")
+    .from("admin_order_items")
+    .select("id, order_id, product_id, product_name, quantity, price_at_purchase, product_sku_at_purchase, created_at")
     .eq("order_id", String(orderId));
 
   if (error) {
     throw error;
   }
 
-  return data ?? [];
+  return (data ?? []).map(normalizeOrderItem);
 }
 
 async function deleteCategoryLogo(logoUrl: string | null | undefined): Promise<void> {
@@ -76,23 +135,57 @@ async function deleteBannerMediaIfUnreferenced(
 
 export const dataProvider: DataProvider = {
   ...baseDataProvider,
-  getList: async (params) => {
-    // Keep the admin-facing Refine resource named `orders`, but serve reads from
-    // the denormalized compatibility view built on top of orders/payments/shipments.
-    return baseDataProvider.getList({
-      ...params,
-      resource: mapOrdersReadResource(params.resource),
+  getList: async <TData extends BaseRecord = BaseRecord>(
+    params: DataProviderGetListParams,
+  ): Promise<GetListResponse<TData>> => {
+    // Keep admin-facing Refine resource names stable, while serving protected
+    // order/product reads from admin-safe read models. Mutations still use base tables.
+    const result = await baseDataProvider.getList<TData>({
+      ...withProductReadMeta(params),
+      resource: mapReadResource(params.resource),
     });
+
+    if (params.resource !== "products") {
+      return result;
+    }
+
+    return {
+      ...result,
+      data: normalizeAdminProducts(result.data),
+    };
   },
-  getMany: async (params) => {
-    return baseDataProvider.getMany({
-      ...params,
-      resource: mapOrdersReadResource(params.resource),
+  getMany: async <TData extends BaseRecord = BaseRecord>(
+    params: DataProviderGetManyParams,
+  ): Promise<GetManyResponse<TData>> => {
+    const result = await baseDataProvider.getMany<TData>({
+      ...withProductReadMeta(params),
+      resource: mapReadResource(params.resource),
     });
+
+    if (params.resource !== "products") {
+      return result;
+    }
+
+    return {
+      ...result,
+      data: normalizeAdminProducts(result.data),
+    };
   },
   getOne: async <TData extends BaseRecord = BaseRecord>(
     params: GetOneParams,
   ): Promise<GetOneResponse<TData>> => {
+    if (params.resource === "products") {
+      const result = await baseDataProvider.getOne<TData>({
+        ...withProductReadMeta(params),
+        resource: PRODUCT_READ_RESOURCE,
+      });
+
+      return {
+        ...result,
+        data: normalizeAdminProduct(result.data),
+      };
+    }
+
     if (params.resource !== "orders") {
       return baseDataProvider.getOne<TData>(params);
     }
@@ -135,7 +228,7 @@ export const dataProvider: DataProvider = {
         const { data } = await baseDataProvider.getOne({
           resource: "products",
           id: params.id,
-          meta: { select: "*, product_images(*)" },
+          meta: { select: PRODUCT_IMAGE_CLEANUP_SELECT },
         });
         const images = (data as { product_images?: { url: string }[] })?.product_images ?? [];
         await deleteProductImages(images);
@@ -182,7 +275,7 @@ export const dataProvider: DataProvider = {
         const { data } = await baseDataProvider.getMany({
           resource: "products",
           ids: params.ids,
-          meta: { select: "*, product_images(*)" },
+          meta: { select: PRODUCT_IMAGE_CLEANUP_SELECT },
         });
         const items = Array.isArray(data) ? data : [];
         await Promise.allSettled(

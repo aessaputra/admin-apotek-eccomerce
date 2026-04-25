@@ -182,9 +182,10 @@ describe("detail and dashboard pages", () => {
 
   it("renders product detail content including images and status", () => {
     mocks.useShow.mockReturnValue({
-      result: {
-        name: "Vitamin C",
-        slug: "vitamin-c",
+        result: {
+          name: "Vitamin C",
+          sku: "SUPP-VITAMIN-C-1000-AB12",
+          slug: "vitamin-c",
         description: "Immune support",
         price: 15000,
         stock: 5,
@@ -203,6 +204,7 @@ describe("detail and dashboard pages", () => {
     render(<ProductShow />);
 
     expect(screen.getByText("Vitamin C")).not.toBeNull();
+    expect(screen.getByText("SUPP-VITAMIN-C-1000-AB12")).not.toBeNull();
     expect(screen.getByText("vitamin-c")).not.toBeNull();
     expect(screen.getByText("Immune support")).not.toBeNull();
     expect(screen.getByText("Supplements")).not.toBeNull();
@@ -212,9 +214,10 @@ describe("detail and dashboard pages", () => {
 
   it("preserves line breaks for long plain-text product descriptions", () => {
     mocks.useShow.mockReturnValue({
-      result: {
-        name: "Vitamin C",
-        slug: "vitamin-c",
+        result: {
+          name: "Vitamin C",
+          sku: "SUPP-VITAMIN-C-1000-AB12",
+          slug: "vitamin-c",
         description: "Line 1\n\nLine 2",
         price: 15000,
         stock: 5,

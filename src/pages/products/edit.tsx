@@ -4,6 +4,7 @@ import { useTranslation } from "@refinedev/core";
 import { Form, Input, InputNumber, Select, message } from "antd";
 import { ProductImageUpload } from "../../components/product-image-upload";
 import { DescriptionEditorModal } from "../../components/description-editor-modal";
+import { useProductSkuField } from "../../hooks/useProductSkuField";
 import { slugify } from "../../utils/slugify";
 import { supabaseClient } from "../../providers/supabase-client";
 import {
@@ -22,6 +23,13 @@ const PRODUCT_WEIGHT_RULES = [
 
 interface ProductImage { id: string; url: string; sort_order: number }
 
+interface ProductData {
+  id?: string;
+  product_images?: ProductImage[];
+}
+
+type ProductFormValues = Record<string, unknown>;
+
 function normalizeProductImageValue(value: string): string {
   return getStoragePathFromReference(value, MEDIA_BUCKET) ?? value;
 }
@@ -37,7 +45,13 @@ export const ProductEdit: React.FC = () => {
     optionValue: "id",
   });
 
-  const data = query?.data?.data as { product_images?: ProductImage[] } | undefined;
+  const data = query?.data?.data as ProductData | undefined;
+  const {
+    handleDuplicateSkuSubmitError,
+    handleSkuBlur,
+    normalizeAndValidateSku,
+    skuRules,
+  } = useProductSkuField({ form, translate, currentProductId: data?.id });
 
   useEffect(() => {
     if (data?.product_images && Array.isArray(data.product_images)) {
@@ -58,11 +72,19 @@ export const ProductEdit: React.FC = () => {
     formProps.onValuesChange?.(changed, all);
   };
 
-  const handleFinish = async (values: Record<string, unknown>) => {
+  const handleFinish = async (values: ProductFormValues) => {
     const { images = [], ...productValues } = values;
-    const result = (await formProps.onFinish?.({ ...productValues })) as
-      | { data?: { id?: string } }
-      | undefined;
+    const sku = await normalizeAndValidateSku(productValues.sku);
+    let result: { data?: { id?: string } } | undefined;
+
+    try {
+      result = (await formProps.onFinish?.({ ...productValues, sku })) as
+        | { data?: { id?: string } }
+        | undefined;
+    } catch (error) {
+      handleDuplicateSkuSubmitError(error);
+      throw error;
+    }
     const productId = result?.data?.id;
     if (!productId) return result;
 
@@ -135,6 +157,13 @@ export const ProductEdit: React.FC = () => {
       >
         <Form.Item label={translate("products.fields.name")} name="name" rules={[{ required: true }]}>
           <Input />
+        </Form.Item>
+        <Form.Item
+          label={translate("products.fields.sku")}
+          name="sku"
+          rules={skuRules}
+        >
+          <Input onBlur={handleSkuBlur} />
         </Form.Item>
         <Form.Item label={translate("products.fields.slug")} name="slug" rules={[{ required: true }]}>
           <Input />

@@ -9,13 +9,14 @@ const mocks = vi.hoisted(() => {
   const remove = vi.fn();
   const storageFrom = vi.fn(() => ({ remove }));
   const orderItemsEq = vi.fn();
+  const orderItemsSelect = vi.fn(() => ({
+    eq: orderItemsEq,
+  }));
   const bannerSelectEq = vi.fn();
   const from = vi.fn((table: string) => {
-    if (table === "order_items") {
+    if (table === "admin_order_items") {
       return {
-        select: vi.fn(() => ({
-          eq: orderItemsEq,
-        })),
+        select: orderItemsSelect,
       };
     }
 
@@ -35,6 +36,7 @@ const mocks = vi.hoisted(() => {
     remove,
     storageFrom,
     orderItemsEq,
+    orderItemsSelect,
     bannerSelectEq,
     from,
   };
@@ -72,6 +74,7 @@ describe("dataProvider custom deletes", () => {
     mocks.storageFrom.mockClear();
     mocks.from.mockClear();
     mocks.orderItemsEq.mockReset();
+    mocks.orderItemsSelect.mockClear();
     mocks.bannerSelectEq.mockReset();
 
     mocks.getList.mockResolvedValue({ data: [], total: 0 });
@@ -130,6 +133,125 @@ describe("dataProvider custom deletes", () => {
     });
   });
 
+  it("routes product list reads through admin_products and normalizes view fields", async () => {
+    const getListMethod = dataProvider.getList;
+
+    expect(getListMethod).toBeTypeOf("function");
+
+    if (!getListMethod) {
+      throw new Error("getList is not implemented");
+    }
+
+    mocks.getList.mockResolvedValueOnce({
+      data: [
+        {
+          id: "product-1",
+          name: "Vitamin C",
+          sku: "SUPP-VITAMIN-C-1000-AB12",
+          images: [{ id: "image-1", url: "products/vitamin-c.png", sort_order: 0 }],
+          category_name: "Supplements",
+          category_slug: "supplements",
+        },
+      ],
+      total: 1,
+    });
+
+    const params = {
+      resource: "products",
+      pagination: { current: 1, pageSize: 10 },
+      sorters: [],
+      filters: [],
+      meta: { select: "*, product_images(*), categories(name)" },
+    };
+
+    const result = await getListMethod(params);
+
+    expect(mocks.getList).toHaveBeenCalledWith({
+      ...params,
+      resource: "admin_products",
+      meta: { select: "*" },
+    });
+    expect(result.data[0]).toMatchObject({
+      id: "product-1",
+      sku: "SUPP-VITAMIN-C-1000-AB12",
+      product_images: [{ id: "image-1", url: "products/vitamin-c.png", sort_order: 0 }],
+      categories: { name: "Supplements", slug: "supplements" },
+    });
+  });
+
+  it("routes product detail reads through admin_products", async () => {
+    const getOneMethod = dataProvider.getOne;
+
+    expect(getOneMethod).toBeTypeOf("function");
+
+    if (!getOneMethod) {
+      throw new Error("getOne is not implemented");
+    }
+
+    mocks.getOne.mockResolvedValueOnce({
+      data: {
+        id: "product-1",
+        name: "Vitamin C",
+        sku: "SUPP-VITAMIN-C-1000-AB12",
+        images: [],
+        category_name: null,
+      },
+    });
+
+    const params = {
+      resource: "products",
+      id: "product-1",
+      meta: { select: "id, product_images(url)" },
+    };
+
+    const result = await getOneMethod(params);
+
+    expect(mocks.getOne).toHaveBeenCalledWith({
+      ...params,
+      resource: "admin_products",
+      meta: { select: "*" },
+    });
+    expect(result.data).toMatchObject({
+      id: "product-1",
+      sku: "SUPP-VITAMIN-C-1000-AB12",
+      product_images: [],
+      categories: null,
+    });
+  });
+
+  it("routes product batch reads through admin_products", async () => {
+    const getManyMethod = dataProvider.getMany;
+
+    expect(getManyMethod).toBeTypeOf("function");
+
+    if (!getManyMethod) {
+      throw new Error("getMany is not implemented");
+    }
+
+    mocks.getMany.mockResolvedValueOnce({
+      data: [{ id: "product-1", images: [], category_name: "Supplements" }],
+    });
+
+    const params = {
+      resource: "products",
+      ids: ["product-1"],
+      meta: { select: "id, sku" },
+    };
+
+    const result = await getManyMethod(params);
+
+    expect(mocks.getMany).toHaveBeenCalledWith({
+      ...params,
+      resource: "admin_products",
+      meta: { select: "*" },
+    });
+    expect(result.data[0]).toMatchObject({
+      id: "product-1",
+      product_images: [],
+      categories: { name: "Supplements" },
+    });
+  });
+
   it("hydrates order detail from order_read_model and merges order_items", async () => {
     const getOneMethod = dataProvider.getOne;
 
@@ -152,7 +274,8 @@ describe("dataProvider custom deletes", () => {
           id: "item-1",
           order_id: "order-1",
           quantity: 2,
-          products: { name: "Paracetamol" },
+          product_sku_at_purchase: "PRC-001",
+          product_name: "Paracetamol",
         },
       ],
       error: null,
@@ -169,7 +292,10 @@ describe("dataProvider custom deletes", () => {
       id: "order-1",
       meta: { select: "*" },
     });
-    expect(mocks.from).toHaveBeenCalledWith("order_items");
+    expect(mocks.from).toHaveBeenCalledWith("admin_order_items");
+    expect(mocks.orderItemsSelect).toHaveBeenCalledWith(
+      "id, order_id, product_id, product_name, quantity, price_at_purchase, product_sku_at_purchase, created_at"
+    );
     expect(mocks.orderItemsEq).toHaveBeenCalledWith("order_id", "order-1");
     expect(result).toEqual({
       data: {
@@ -181,6 +307,8 @@ describe("dataProvider custom deletes", () => {
             id: "item-1",
             order_id: "order-1",
             quantity: 2,
+            product_sku_at_purchase: "PRC-001",
+            product_name: "Paracetamol",
             products: { name: "Paracetamol" },
           },
         ],
@@ -188,7 +316,7 @@ describe("dataProvider custom deletes", () => {
     });
   });
 
-  it("keeps non-order reads on their original resources", async () => {
+  it("keeps non-order and non-product reads on their original resources", async () => {
     const getOneMethod = dataProvider.getOne;
 
     expect(getOneMethod).toBeTypeOf("function");
@@ -278,7 +406,7 @@ describe("dataProvider custom deletes", () => {
     expect(mocks.getMany).toHaveBeenCalledWith({
       resource: "products",
       ids: ["product-1", "product-2"],
-      meta: { select: "*, product_images(*)" },
+      meta: { select: "id, product_images(url)" },
     });
     expect(mocks.remove).toHaveBeenCalledWith(["products/a.png"]);
     expect(mocks.remove).toHaveBeenCalledWith(["products/b.png"]);
@@ -311,7 +439,7 @@ describe("dataProvider custom deletes", () => {
     expect(mocks.getOne).toHaveBeenCalledWith({
       resource: "products",
       id: "product-1",
-      meta: { select: "*, product_images(*)" },
+      meta: { select: "id, product_images(url)" },
     });
     expect(mocks.remove).toHaveBeenCalledWith(["products/main.png"]);
     expect(mocks.remove).toHaveBeenCalledWith(["products/gallery.png"]);

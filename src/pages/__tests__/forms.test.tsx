@@ -1,6 +1,6 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Settings from "../settings";
 import { Profile } from "../profile";
@@ -25,9 +25,42 @@ const mocks = vi.hoisted(() => {
   const messageSuccess = vi.fn();
   const setFieldValue = vi.fn();
   const setFieldsValue = vi.fn();
+  const setFields = vi.fn();
   const resetFields = vi.fn();
   const getFieldValue = vi.fn((field: string) => (field === "enabled_couriers" ? "jne:reg,grab:instant" : undefined));
   const courierModalConfirm = vi.fn();
+  const duplicateSkuRows = { current: [] as Array<{ id: string }> };
+  const nextSubmitValues = { current: undefined as Record<string, unknown> | undefined };
+  const lastOnValuesChange = {
+    current: undefined as
+      | ((changed: Record<string, unknown>, all: Record<string, unknown>) => void)
+      | undefined,
+  };
+  const productQueries: Array<{
+    select: ReturnType<typeof vi.fn>;
+    eq: ReturnType<typeof vi.fn>;
+    neq: ReturnType<typeof vi.fn>;
+    limit: ReturnType<typeof vi.fn>;
+  }> = [];
+  const productImagesInsert = vi.fn(() => Promise.resolve({ error: null }));
+  const supabaseFrom = vi.fn((table: string) => {
+    if (table === "admin_products") {
+      const query = {
+        select: vi.fn(() => query),
+        eq: vi.fn(() => query),
+        neq: vi.fn(() => query),
+        limit: vi.fn(() => Promise.resolve({ data: duplicateSkuRows.current, error: null })),
+      };
+      productQueries.push(query);
+      return query;
+    }
+
+    if (table === "product_images") {
+      return { insert: productImagesInsert };
+    }
+
+    return {};
+  });
 
   return {
     translate,
@@ -40,9 +73,16 @@ const mocks = vi.hoisted(() => {
     messageSuccess,
     setFieldValue,
     setFieldsValue,
+    setFields,
     resetFields,
     getFieldValue,
     courierModalConfirm,
+    duplicateSkuRows,
+    nextSubmitValues,
+    lastOnValuesChange,
+    productQueries,
+    productImagesInsert,
+    supabaseFrom,
   };
 });
 
@@ -98,16 +138,29 @@ vi.mock("../../hooks/useBiteshipCouriers", () => ({
 }));
 
 vi.mock("antd", () => {
-  const FormComponent = ({ children, onFinish }: { children: React.ReactNode; onFinish?: (values: Record<string, unknown>) => void }) => (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        onFinish?.({ password: "secret123", confirmPassword: "different" });
-      }}
-    >
-      {children}
-    </form>
-  );
+  const FormComponent = ({
+    children,
+    onFinish,
+    onValuesChange,
+  }: {
+    children: React.ReactNode;
+    onFinish?: (values: Record<string, unknown>) => void | Promise<unknown>;
+    onValuesChange?: (changed: Record<string, unknown>, all: Record<string, unknown>) => void;
+  }) => {
+    mocks.lastOnValuesChange.current = onValuesChange;
+
+    return (
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          const values = mocks.nextSubmitValues.current ?? { password: "secret123", confirmPassword: "different" };
+          void Promise.resolve(onFinish?.(values)).catch(() => undefined);
+        }}
+      >
+        {children}
+      </form>
+    );
+  };
 
   const Form = Object.assign(FormComponent, {
     Item: ({ children, label }: { children: React.ReactNode; label?: React.ReactNode }) => <div><div>{label}</div>{children}</div>,
@@ -116,13 +169,31 @@ vi.mock("antd", () => {
         resetFields: mocks.resetFields,
         setFieldValue: mocks.setFieldValue,
         setFieldsValue: mocks.setFieldsValue,
+        setFields: mocks.setFields,
         getFieldValue: mocks.getFieldValue,
       },
     ],
   });
 
   const Input = Object.assign(
-    ({ placeholder, readOnly }: { placeholder?: string; readOnly?: boolean }) => <input aria-label={placeholder ?? "input"} readOnly={readOnly} />,
+    ({
+      onBlur,
+      onChange,
+      placeholder,
+      readOnly,
+    }: {
+      onBlur?: (event: React.FocusEvent<HTMLInputElement>) => void;
+      onChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+      placeholder?: string;
+      readOnly?: boolean;
+    }) => (
+      <input
+        aria-label={placeholder ?? "input"}
+        onBlur={onBlur}
+        onChange={onChange}
+        readOnly={readOnly}
+      />
+    ),
     {
       TextArea: ({
         placeholder,
@@ -211,6 +282,15 @@ vi.mock("@ant-design/icons", () => ({
   InfoCircleOutlined: () => <span>info</span>,
 }));
 
+vi.mock("../../providers/supabase-client", () => ({
+  supabaseClient: {
+    from: mocks.supabaseFrom,
+    storage: {
+      from: () => ({ remove: vi.fn(() => Promise.resolve({ error: null })) }),
+    },
+  },
+}));
+
 describe("form pages", () => {
   function renderWithQueryClient(ui: React.ReactElement) {
     const queryClient = new QueryClient({
@@ -239,36 +319,274 @@ describe("form pages", () => {
     mocks.messageSuccess.mockReset();
     mocks.setFieldValue.mockReset();
     mocks.setFieldsValue.mockReset();
+    mocks.setFields.mockReset();
     mocks.resetFields.mockReset();
     mocks.getFieldValue.mockReset();
     mocks.getFieldValue.mockImplementation((field: string) => (field === "enabled_couriers" ? "jne:reg,grab:instant" : undefined));
     mocks.courierModalConfirm.mockReset();
+    mocks.duplicateSkuRows.current = [];
+    mocks.nextSubmitValues.current = undefined;
+    mocks.lastOnValuesChange.current = undefined;
+    mocks.productQueries.length = 0;
+    mocks.productImagesInsert.mockClear();
+    mocks.supabaseFrom.mockClear();
   });
 
   it("renders product create and edit forms with image upload wiring", () => {
     mocks.useForm
-      .mockReturnValueOnce({ formProps: {}, saveButtonProps: {}, form: { setFieldValue: mocks.setFieldValue } })
+      .mockReturnValueOnce({ formProps: {}, saveButtonProps: {}, form: { setFieldValue: mocks.setFieldValue, setFields: mocks.setFields } })
       .mockReturnValueOnce({
         formProps: {},
         saveButtonProps: {},
-        form: { setFieldValue: mocks.setFieldValue, setFieldsValue: mocks.setFieldsValue },
-        query: { data: { data: { product_images: [{ id: "img-1", url: "https://example.com/one.png", sort_order: 0 }] } } },
+        form: { setFieldValue: mocks.setFieldValue, setFieldsValue: mocks.setFieldsValue, setFields: mocks.setFields },
+        query: { data: { data: { id: "prod-1", product_images: [{ id: "img-1", url: "https://example.com/one.png", sort_order: 0 }] } } },
       });
 
     const { rerender } = render(<ProductCreate />);
     expect(screen.getByText("ProductImageUpload")).not.toBeNull();
+    expect(screen.getByText("products.fields.sku")).not.toBeNull();
 
     rerender(<ProductEdit />);
     expect(mocks.setFieldsValue).toHaveBeenCalledWith({ images: ["https://example.com/one.png"] });
+    expect(screen.getAllByText("products.fields.sku").length).toBeGreaterThan(0);
+  });
+
+  it("auto-generates product create SKU while SKU is untouched", () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: { setFieldValue: mocks.setFieldValue, setFields: mocks.setFields },
+    });
+
+    render(<ProductCreate />);
+
+    mocks.lastOnValuesChange.current?.(
+      { name: "Vitamin C 1000" },
+      { name: "Vitamin C 1000", category_id: "cat-1" }
+    );
+
+    expect(mocks.setFieldValue).toHaveBeenCalledWith("slug", "vitamin-c-1000");
+    expect(mocks.setFieldValue).toHaveBeenCalledWith(
+      "sku",
+      expect.stringMatching(/^CATEGORY-VITAMIN-C-1000-[A-Z0-9]{4}$/)
+    );
+  });
+
+  it("stops product create SKU auto-generation after the SKU field is touched", () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: { setFieldValue: mocks.setFieldValue, setFields: mocks.setFields },
+    });
+
+    render(<ProductCreate />);
+
+    mocks.lastOnValuesChange.current?.({ sku: "manual sku" }, { sku: "manual sku" });
+    mocks.setFieldValue.mockClear();
+    mocks.lastOnValuesChange.current?.(
+      { name: "Vitamin C 1000", category_id: "cat-1" },
+      { name: "Vitamin C 1000", category_id: "cat-1", sku: "manual sku" }
+    );
+
+    expect(mocks.setFieldValue).toHaveBeenCalledWith("slug", "vitamin-c-1000");
+    expect(mocks.setFieldValue).not.toHaveBeenCalledWith("sku", expect.any(String));
+  });
+
+  it("normalizes manual product create SKU on blur", () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: { setFieldValue: mocks.setFieldValue, setFields: mocks.setFields },
+    });
+
+    render(<ProductCreate />);
+
+    fireEvent.blur(screen.getAllByLabelText("input")[1], { target: { value: " manual sku 1 " } });
+
+    expect(mocks.setFieldValue).toHaveBeenCalledWith("sku", "MANUAL-SKU-1");
+  });
+
+  it("normalizes manual product create SKU before submit", async () => {
+    const onFinish = vi.fn(() => Promise.resolve({ data: { id: "prod-1" } }));
+    mocks.nextSubmitValues.current = {
+      name: "Vitamin C",
+      sku: "manual sku 1",
+      slug: "vitamin-c",
+      images: [],
+    };
+    mocks.useForm.mockReturnValue({
+      formProps: { onFinish },
+      saveButtonProps: {},
+      form: { setFieldValue: mocks.setFieldValue, setFields: mocks.setFields },
+    });
+
+    const { container } = render(<ProductCreate />);
+    fireEvent.submit(container.querySelector("form") as HTMLFormElement);
+
+    await waitFor(() => expect(onFinish).toHaveBeenCalledWith(expect.objectContaining({ sku: "MANUAL-SKU-1" })));
+    expect(mocks.supabaseFrom).toHaveBeenCalledWith("admin_products");
+    expect(mocks.productQueries[0].select).toHaveBeenCalledWith("id");
+    expect(mocks.productQueries[0].eq).toHaveBeenCalledWith("sku", "MANUAL-SKU-1");
+  });
+
+  it("sets a field error and prevents submit for duplicate product create SKU", async () => {
+    const onFinish = vi.fn();
+    mocks.duplicateSkuRows.current = [{ id: "prod-2" }];
+    mocks.nextSubmitValues.current = {
+      name: "Vitamin C",
+      sku: "duplicate sku",
+      slug: "vitamin-c",
+      images: [],
+    };
+    mocks.useForm.mockReturnValue({
+      formProps: { onFinish },
+      saveButtonProps: {},
+      form: { setFieldValue: mocks.setFieldValue, setFields: mocks.setFields },
+    });
+
+    const { container } = render(<ProductCreate />);
+    fireEvent.submit(container.querySelector("form") as HTMLFormElement);
+
+    await waitFor(() => expect(mocks.setFields).toHaveBeenCalledWith([
+      { name: "sku", errors: ["This SKU is already used by another product."] },
+    ]));
+    expect(mocks.supabaseFrom).toHaveBeenCalledWith("admin_products");
+    expect(onFinish).not.toHaveBeenCalled();
+  });
+
+  it("sets a field error and prevents submit for invalid product create SKU", async () => {
+    const onFinish = vi.fn();
+    mocks.nextSubmitValues.current = {
+      name: "Vitamin C",
+      sku: "bad",
+      slug: "vitamin-c",
+      images: [],
+    };
+    mocks.useForm.mockReturnValue({
+      formProps: { onFinish },
+      saveButtonProps: {},
+      form: { setFieldValue: mocks.setFieldValue, setFields: mocks.setFields },
+    });
+
+    const { container } = render(<ProductCreate />);
+    fireEvent.submit(container.querySelector("form") as HTMLFormElement);
+
+    await waitFor(() => expect(mocks.setFields).toHaveBeenCalledWith([
+      { name: "sku", errors: ["SKU must be 4-50 characters using uppercase letters, numbers, and hyphens."] },
+    ]));
+    expect(mocks.supabaseFrom).not.toHaveBeenCalledWith("admin_products");
+    expect(onFinish).not.toHaveBeenCalled();
+  });
+
+  it("checks duplicate product edit SKU through admin_products excluding the current product", async () => {
+    const onFinish = vi.fn(() => Promise.resolve({ data: { id: "prod-1" } }));
+    mocks.nextSubmitValues.current = {
+      name: "Vitamin C",
+      sku: "manual sku 1",
+      slug: "vitamin-c",
+      images: [],
+    };
+    mocks.useForm.mockReturnValue({
+      formProps: { onFinish },
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        setFieldsValue: mocks.setFieldsValue,
+        setFields: mocks.setFields,
+      },
+      query: { data: { data: { id: "prod-1", product_images: [] } } },
+    });
+
+    const { container } = render(<ProductEdit />);
+    fireEvent.submit(container.querySelector("form") as HTMLFormElement);
+
+    await waitFor(() => expect(onFinish).toHaveBeenCalledWith(expect.objectContaining({ sku: "MANUAL-SKU-1" })));
+    expect(mocks.supabaseFrom).toHaveBeenCalledWith("admin_products");
+    expect(mocks.productQueries[0].select).toHaveBeenCalledWith("id");
+    expect(mocks.productQueries[0].eq).toHaveBeenCalledWith("sku", "MANUAL-SKU-1");
+    expect(mocks.productQueries[0].neq).toHaveBeenCalledWith("id", "prod-1");
+  });
+
+  it("does not overwrite product edit SKU when name or category changes", () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        setFieldsValue: mocks.setFieldsValue,
+        setFields: mocks.setFields,
+      },
+      query: { data: { data: { id: "prod-1", sku: "EXISTING-SKU", product_images: [] } } },
+    });
+
+    render(<ProductEdit />);
+    mocks.setFieldValue.mockClear();
+
+    mocks.lastOnValuesChange.current?.(
+      { name: "Vitamin C 1000", category_id: "cat-1" },
+      { name: "Vitamin C 1000", category_id: "cat-1", sku: "EXISTING-SKU" }
+    );
+
+    expect(mocks.setFieldValue).toHaveBeenCalledWith("slug", "vitamin-c-1000");
+    expect(mocks.setFieldValue).not.toHaveBeenCalledWith("sku", expect.any(String));
+  });
+
+  it("normalizes manual product edit SKU on blur", () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        setFieldsValue: mocks.setFieldsValue,
+        setFields: mocks.setFields,
+      },
+      query: { data: { data: { id: "prod-1", product_images: [] } } },
+    });
+
+    render(<ProductEdit />);
+
+    fireEvent.blur(screen.getAllByLabelText("input")[1], { target: { value: " edited sku 2 " } });
+
+    expect(mocks.setFieldValue).toHaveBeenCalledWith("sku", "EDITED-SKU-2");
+  });
+
+  it("rejects duplicate product edit SKU from another product", async () => {
+    const onFinish = vi.fn();
+    mocks.duplicateSkuRows.current = [{ id: "prod-2" }];
+    mocks.nextSubmitValues.current = {
+      name: "Vitamin C",
+      sku: "other product sku",
+      slug: "vitamin-c",
+      images: [],
+    };
+    mocks.useForm.mockReturnValue({
+      formProps: { onFinish },
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        setFieldsValue: mocks.setFieldsValue,
+        setFields: mocks.setFields,
+      },
+      query: { data: { data: { id: "prod-1", product_images: [] } } },
+    });
+
+    const { container } = render(<ProductEdit />);
+    fireEvent.submit(container.querySelector("form") as HTMLFormElement);
+
+    await waitFor(() => expect(mocks.setFields).toHaveBeenCalledWith([
+      { name: "sku", errors: ["This SKU is already used by another product."] },
+    ]));
+    expect(mocks.productQueries[0].neq).toHaveBeenCalledWith("id", "prod-1");
+    expect(onFinish).not.toHaveBeenCalled();
   });
 
   it("renders product description with edit modal flow", () => {
     mocks.useForm
-      .mockReturnValueOnce({ formProps: {}, saveButtonProps: {}, form: { setFieldValue: mocks.setFieldValue } })
+      .mockReturnValueOnce({ formProps: {}, saveButtonProps: {}, form: { setFieldValue: mocks.setFieldValue, setFields: mocks.setFields } })
       .mockReturnValueOnce({
         formProps: {},
         saveButtonProps: {},
-        form: { setFieldValue: mocks.setFieldValue, setFieldsValue: mocks.setFieldsValue },
+        form: { setFieldValue: mocks.setFieldValue, setFieldsValue: mocks.setFieldsValue, setFields: mocks.setFields },
         query: { data: { data: { product_images: [] } } },
       });
 
