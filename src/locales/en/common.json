@@ -533,7 +533,12 @@
     },
     "mapLocationPicker": {
       "searchPlaceholder": "Search pharmacy, clinic, district, or location...",
-      "searchError": "Failed to search locations. Please try again.",
+      "missingApiKeyTitle": "Google Maps API key is not configured",
+      "missingApiKeyDescription": "Set VITE_GOOGLE_MAPS_API_KEY to enable store location picking.",
+      "searchError": "Failed to search Google Places. Please try again.",
+      "noPlacesFound": "No places found",
+      "placesUnavailable": "Google Places search is unavailable right now. You can still click the map or drag the pin.",
+      "missingGeometry": "Selected place does not include map coordinates. Please choose another result or click the map.",
       "interactionHint": "Or click the map or drag the pin to choose a more precise location.",
       "selectResultAria": "Select {{location}}",
       "closeResultsAria": "Close search results"

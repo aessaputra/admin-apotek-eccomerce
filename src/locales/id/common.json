@@ -533,7 +533,12 @@
     },
     "mapLocationPicker": {
       "searchPlaceholder": "Cari apotek, klinik, kecamatan, atau lokasi...",
-      "searchError": "Gagal mencari lokasi. Silakan coba lagi.",
+      "missingApiKeyTitle": "Kunci API Google Maps belum dikonfigurasi",
+      "missingApiKeyDescription": "Atur VITE_GOOGLE_MAPS_API_KEY untuk mengaktifkan pemilihan lokasi toko.",
+      "searchError": "Gagal mencari lokasi Google Places. Silakan coba lagi.",
+      "noPlacesFound": "Lokasi tidak ditemukan",
+      "placesUnavailable": "Pencarian Google Places belum tersedia. Anda tetap bisa klik peta atau seret pin.",
+      "missingGeometry": "Lokasi yang dipilih tidak memiliki koordinat peta. Pilih hasil lain atau klik peta.",
       "interactionHint": "Atau klik pada peta atau seret pin untuk memilih lokasi yang lebih presisi.",
       "selectResultAria": "Pilih {{location}}",
       "closeResultsAria": "Tutup hasil pencarian"
