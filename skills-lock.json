@@ -26,6 +26,11 @@
       "sourceType": "github",
       "computedHash": "06ece46912b5c4e8cf23400c7f73c0c355fcdf378336cd3d13f8da01466b7c72"
     },
+    "google-maps-api": {
+      "source": "tivojn/google-maps-api-skill",
+      "sourceType": "github",
+      "computedHash": "5e052e505bfac4945d2f19f32125242233d29428233c8c71f6ce08a827d8b681"
+    },
     "lint-and-validate": {
       "source": "sickn33/antigravity-awesome-skills",
       "sourceType": "github",
