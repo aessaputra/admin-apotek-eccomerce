@@ -1,32 +1,20 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Input, List, Typography, Space, message } from "antd";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { Alert, AutoComplete, Space, Spin, Typography, theme } from "antd";
 import { useTranslation } from "@refinedev/core";
-import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
-import { Icon, type LatLngExpression } from "leaflet";
-import "leaflet/dist/leaflet.css";
-import i18n from "../../i18n";
-
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
-
-const DefaultIcon = new Icon({
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-
-interface NominatimResult {
-  place_id: number;
-  display_name: string;
-  lat: string;
-  lon: string;
-  type: string;
-  class: string;
-  importance: number;
-}
+import {
+  APIProvider,
+  Map,
+  Marker,
+  type MapMouseEvent,
+  useMapsLibrary,
+} from "@vis.gl/react-google-maps";
 
 export interface MapLocationPickerProps {
   latitude?: string | number;
@@ -38,250 +26,364 @@ export interface MapLocationPickerProps {
 const DEFAULT_LAT = -6.2088;
 const DEFAULT_LNG = 106.8456;
 const DEFAULT_ZOOM = 13;
-const SEARCH_ZOOM = 16;
+const MIN_SEARCH_LENGTH = 3;
+const SEARCH_DEBOUNCE_MS = 400;
+const INDONESIA_REGION_CODE = "id";
 
-interface MapControllerProps {
-  targetPosition: { lat: number; lng: number } | null;
-  shouldFlyTo: boolean;
-  onFlyComplete: () => void;
-}
+type PlacesErrorKey = "missingGeometry" | "searchError" | null;
 
-const MapController: React.FC<MapControllerProps> = ({
-  targetPosition,
-  shouldFlyTo,
-  onFlyComplete,
-}) => {
-  const map = useMap();
-
-  useEffect(() => {
-    if (shouldFlyTo && targetPosition) {
-      map.flyTo([targetPosition.lat, targetPosition.lng], SEARCH_ZOOM, {
-        duration: 1.5,
-      });
-      onFlyComplete();
-    }
-  }, [map, targetPosition, shouldFlyTo, onFlyComplete]);
-
-  return null;
+type Coordinate = {
+  lat: number;
+  lng: number;
 };
 
-interface SearchSectionProps {
-  onLocationSelect: (lat: number, lng: number, displayName: string) => void;
+type GoogleLatLngValue = {
+  lat?: number | (() => number);
+  lng?: number | (() => number);
+};
+
+type AutocompleteSessionToken = object;
+
+type PlaceDetails = {
+  fetchFields?: (request: { fields: string[] }) => Promise<unknown>;
+  location?: GoogleLatLngValue | null;
+};
+
+type PlacePrediction = {
+  text?: string | { toString: () => string };
+  mainText?: string | { toString: () => string };
+  secondaryText?: string | { toString: () => string };
+  toPlace?: () => PlaceDetails;
+};
+
+type PlaceSuggestion = {
+  placePrediction?: PlacePrediction;
+};
+
+type PlacesAutocompleteRequest = {
+  input: string;
+  includedRegionCodes: string[];
+  sessionToken?: AutocompleteSessionToken;
+};
+
+type PlacesLibrary = {
+  AutocompleteSuggestion?: {
+    fetchAutocompleteSuggestions?: (
+      request: PlacesAutocompleteRequest,
+    ) => Promise<{ suggestions?: PlaceSuggestion[] }>;
+  };
+  AutocompleteSessionToken?: new () => AutocompleteSessionToken;
+};
+
+type PlaceAutocompleteOption = {
+  value: string;
+  label: ReactNode;
+  prediction: PlacePrediction;
+};
+
+type MarkerDragEvent = {
+  latLng?: {
+    lat: () => number;
+    lng: () => number;
+  } | null;
+};
+
+function toFiniteCoordinate(value: string | number | undefined): number | null {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const coordinate = typeof value === "number" ? value : Number(value);
+
+  return Number.isFinite(coordinate) ? coordinate : null;
 }
 
-const SearchSection: React.FC<SearchSectionProps> = ({ onLocationSelect }) => {
-  const { translate } = useTranslation();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<NominatimResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+function formatCoordinate(value: number): string {
+  return value.toFixed(6);
+}
 
-  const performSearch = useCallback(async (query: string) => {
-    if (!query.trim() || query.length < 3) {
-      setSearchResults([]);
-      setShowResults(false);
+function readPlacesText(value: PlacePrediction["text"]): string | null {
+  if (!value) {
+    return null;
+  }
+
+  return typeof value === "string" ? value : value.toString();
+}
+
+function hasValidCoordinates(coordinate: {
+  lat: number | null;
+  lng: number | null;
+}): coordinate is Coordinate {
+  return Number.isFinite(coordinate.lat) && Number.isFinite(coordinate.lng);
+}
+
+function getInitialPosition(
+  latitude: string | number | undefined,
+  longitude: string | number | undefined,
+): Coordinate {
+  const lat = toFiniteCoordinate(latitude);
+  const lng = toFiniteCoordinate(longitude);
+
+  const coordinate = { lat, lng };
+
+  if (hasValidCoordinates(coordinate)) {
+    return coordinate;
+  }
+
+  return { lat: DEFAULT_LAT, lng: DEFAULT_LNG };
+}
+
+function getGoogleEventCoordinates(event: MarkerDragEvent): Coordinate | null {
+  const latLng = event.latLng;
+
+  if (!latLng) {
+    return null;
+  }
+
+  const lat = latLng.lat();
+  const lng = latLng.lng();
+
+  const coordinate = { lat, lng };
+
+  return hasValidCoordinates(coordinate) ? coordinate : null;
+}
+
+function getMapEventCoordinates(event: MapMouseEvent): Coordinate | null {
+  const latLng = event.detail.latLng;
+
+  if (!latLng) {
+    return null;
+  }
+
+  const lat = toFiniteCoordinate(latLng.lat);
+  const lng = toFiniteCoordinate(latLng.lng);
+
+  const coordinate = { lat, lng };
+
+  return hasValidCoordinates(coordinate) ? coordinate : null;
+}
+
+function getPlaceCoordinates(place: PlaceDetails): Coordinate | null {
+  const latValue = place.location?.lat;
+  const lngValue = place.location?.lng;
+  const lat = typeof latValue === "function" ? latValue() : latValue;
+  const lng = typeof lngValue === "function" ? lngValue() : lngValue;
+  const coordinate = {
+    lat: toFiniteCoordinate(lat),
+    lng: toFiniteCoordinate(lng),
+  };
+
+  return hasValidCoordinates(coordinate) ? coordinate : null;
+}
+
+function getPredictionText(prediction: PlacePrediction): string {
+  return (
+    readPlacesText(prediction.text) ??
+    readPlacesText(prediction.mainText) ??
+    "Google Places result"
+  );
+}
+
+function renderPredictionLabel(prediction: PlacePrediction): ReactNode {
+  const mainText =
+    readPlacesText(prediction.mainText) ?? getPredictionText(prediction);
+  const secondaryText = readPlacesText(prediction.secondaryText);
+
+  return (
+    <Space direction="vertical" size={0}>
+      <Typography.Text>{mainText}</Typography.Text>
+      {secondaryText ? (
+        <Typography.Text type="secondary">{secondaryText}</Typography.Text>
+      ) : null}
+    </Space>
+  );
+}
+
+const PlacesAutocomplete: React.FC<{
+  onPlaceSelect: (coordinate: Coordinate | null) => void;
+}> = ({ onPlaceSelect }) => {
+  const { translate } = useTranslation();
+  const placesLibrary = useMapsLibrary("places") as PlacesLibrary | null;
+  const [searchText, setSearchText] = useState("");
+  const [options, setOptions] = useState<PlaceAutocompleteOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [errorKey, setErrorKey] = useState<PlacesErrorKey>(null);
+  const sessionTokenRef = useRef<AutocompleteSessionToken | null>(null);
+
+  const fetchAutocompleteSuggestions =
+    placesLibrary?.AutocompleteSuggestion?.fetchAutocompleteSuggestions;
+  const isPlacesReady = Boolean(fetchAutocompleteSuggestions);
+  const visibleErrorKey = isPlacesReady ? errorKey : "placesUnavailable";
+
+  const getSessionToken = useCallback(() => {
+    if (!placesLibrary?.AutocompleteSessionToken) {
+      return undefined;
+    }
+
+    if (!sessionTokenRef.current) {
+      sessionTokenRef.current = new placesLibrary.AutocompleteSessionToken();
+    }
+
+    return sessionTokenRef.current;
+  }, [placesLibrary]);
+
+  const resetSessionToken = useCallback(() => {
+    sessionTokenRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    const query = searchText.trim();
+
+    if (query.length < MIN_SEARCH_LENGTH || !fetchAutocompleteSuggestions) {
+      setOptions([]);
+      setLoading(false);
       return;
     }
 
-    setIsSearching(true);
-    try {
-      const activeLanguage = i18n.resolvedLanguage?.startsWith("en") ? "en" : "id";
+    let cancelled = false;
+    const timeoutId = setTimeout(() => {
+      setLoading(true);
 
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=ID&limit=5`,
-        {
-          headers: {
-            "User-Agent": "PharmacyAdminPanel/1.0",
-            "Accept-Language": activeLanguage,
-          },
-        }
-      );
+      void fetchAutocompleteSuggestions({
+        input: query,
+        includedRegionCodes: [INDONESIA_REGION_CODE],
+        sessionToken: getSessionToken(),
+      })
+        .then((response) => {
+          if (cancelled) {
+            return;
+          }
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+          const nextOptions = (response.suggestions ?? []).flatMap(
+            (suggestion, index): PlaceAutocompleteOption[] => {
+              const prediction = suggestion.placePrediction;
 
-      const data: NominatimResult[] = await response.json();
-      setSearchResults(data);
-      setShowResults(data.length > 0);
-    } catch (error) {
-      console.error("Nominatim search error:", error);
-      message.error(translate("settings.mapLocationPicker.searchError"));
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  }, [translate]);
+              if (!prediction) {
+                return [];
+              }
 
-  const handleSearchChange = (value: string) => {
-    setSearchQuery(value);
+              return [
+                {
+                  value: `${index}-${getPredictionText(prediction)}`,
+                  label: renderPredictionLabel(prediction),
+                  prediction,
+                },
+              ];
+            },
+          );
 
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
+          setOptions(nextOptions);
+          setErrorKey(null);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setOptions([]);
+            setErrorKey("searchError");
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setLoading(false);
+          }
+        });
+    }, SEARCH_DEBOUNCE_MS);
 
-    searchTimeoutRef.current = setTimeout(() => {
-      performSearch(value);
-    }, 500);
-  };
-
-  const handleSelectResult = (result: NominatimResult) => {
-    const lat = parseFloat(result.lat);
-    const lng = parseFloat(result.lon);
-    onLocationSelect(lat, lng, result.display_name);
-    setSearchQuery(result.display_name);
-    setShowResults(false);
-    setSearchResults([]);
-  };
-
-  useEffect(() => {
     return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
+      cancelled = true;
+      clearTimeout(timeoutId);
     };
-  }, []);
+  }, [fetchAutocompleteSuggestions, getSessionToken, searchText]);
+
+  const handleSearch = (value: string) => {
+    setSearchText(value);
+    setErrorKey(null);
+
+    if (value.trim().length < MIN_SEARCH_LENGTH) {
+      setOptions([]);
+    }
+  };
+
+  const handleSelect = async (
+    _value: string,
+    option: PlaceAutocompleteOption,
+  ) => {
+    const place = option.prediction.toPlace?.();
+
+    if (!place) {
+      setErrorKey("missingGeometry");
+      resetSessionToken();
+      return;
+    }
+
+    try {
+      await place.fetchFields?.({ fields: ["location"] });
+    } catch {
+      setErrorKey("searchError");
+      resetSessionToken();
+      return;
+    }
+
+    const nextCoordinate = getPlaceCoordinates(place);
+
+    if (!nextCoordinate) {
+      setErrorKey("missingGeometry");
+      resetSessionToken();
+      return;
+    }
+
+    setSearchText(getPredictionText(option.prediction));
+    setOptions([]);
+    setErrorKey(null);
+    resetSessionToken();
+    onPlaceSelect(nextCoordinate);
+  };
 
   return (
-    <div style={{ position: "relative", zIndex: 1000 }}>
-      <Input.Search
-        placeholder={translate("settings.mapLocationPicker.searchPlaceholder")}
-        value={searchQuery}
-        onChange={(e) => handleSearchChange(e.target.value)}
-        loading={isSearching}
-        allowClear
-        onFocus={() => {
-          if (searchResults.length > 0) setShowResults(true);
-        }}
+    <Space direction="vertical" style={{ width: "100%" }}>
+      <AutoComplete
+        value={searchText}
+        options={options}
+        onSearch={handleSearch}
+        onSelect={(value, option) =>
+          void handleSelect(value, option as PlaceAutocompleteOption)
+        }
+        placeholder={translate(
+          "settings.mapLocationPicker.searchPlaceholder",
+          {},
+          "Search pharmacy, clinic, district, or location...",
+        )}
+        notFoundContent={
+          loading ? (
+            <Spin size="small" />
+          ) : (
+            translate(
+              "settings.mapLocationPicker.noPlacesFound",
+              {},
+              "No places found",
+            )
+          )
+        }
+        disabled={!isPlacesReady}
+        filterOption={false}
+        style={{ width: "100%" }}
       />
-
-      {showResults && searchResults.length > 0 && (
-        <List
-          style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            right: 0,
-            maxHeight: "250px",
-            overflow: "auto",
-            backgroundColor: "white",
-            border: "1px solid #d9d9d9",
-            borderRadius: "6px",
-            marginTop: "4px",
-            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
-          }}
-          dataSource={searchResults}
-          renderItem={(item) => (
-            <List.Item
-              style={{
-                padding: "8px 12px",
-                cursor: "pointer",
-                borderBottom: "1px solid #f0f0f0",
-              }}
-              onClick={() => handleSelectResult(item)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  handleSelectResult(item);
-                }
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.backgroundColor = "#f5f5f5";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.backgroundColor = "white";
-              }}
-              tabIndex={0}
-              role="button"
-              aria-label={translate("settings.mapLocationPicker.selectResultAria", { location: item.display_name }, `Select ${item.display_name}`)}
-            >
-              <Typography.Text style={{ fontSize: "13px" }}>
-                {item.display_name}
-              </Typography.Text>
-            </List.Item>
+      {visibleErrorKey ? (
+        <Alert
+          type="warning"
+          showIcon
+          message={translate(
+            `settings.mapLocationPicker.${visibleErrorKey}`,
+            {},
+            visibleErrorKey === "missingGeometry"
+              ? "Selected place does not include map coordinates. Please choose another result or click the map."
+              : visibleErrorKey === "searchError"
+                ? "Failed to search Google Places. Please try again."
+                : "Google Places search is unavailable right now. You can still click the map or drag the pin.",
           )}
         />
-      )}
-
-      {showResults && (
-        <button
-          type="button"
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: -1,
-            opacity: 0,
-            cursor: "default",
-            border: "none",
-            padding: 0,
-            margin: 0,
-            background: "transparent",
-          }}
-          onClick={() => setShowResults(false)}
-          aria-label={translate("settings.mapLocationPicker.closeResultsAria")}
-        />
-      )}
-    </div>
+      ) : null}
+    </Space>
   );
-};
-
-interface DraggableMarkerProps {
-  position: { lat: number; lng: number };
-  onDragEnd: (lat: number, lng: number) => void;
-}
-
-const DraggableMarker: React.FC<DraggableMarkerProps> = ({
-  position,
-  onDragEnd,
-}) => {
-  const [dragPosition, setDragPosition] = useState(position);
-
-  useEffect(() => {
-    setDragPosition(position);
-  }, [position]);
-
-  const eventHandlers = {
-    dragend: (e: { target: { getLatLng: () => { lat: number; lng: number } } }) => {
-      const newPos = e.target.getLatLng();
-      setDragPosition({ lat: newPos.lat, lng: newPos.lng });
-      onDragEnd(newPos.lat, newPos.lng);
-    },
-  };
-
-  return (
-    <Marker
-      position={[dragPosition.lat, dragPosition.lng] as LatLngExpression}
-      icon={DefaultIcon}
-      draggable={true}
-      eventHandlers={eventHandlers}
-    />
-  );
-};
-
-interface MapClickHandlerProps {
-  onMapClick: (lat: number, lng: number) => void;
-}
-
-const MapClickHandler: React.FC<MapClickHandlerProps> = ({ onMapClick }) => {
-  const map = useMap();
-
-  useEffect(() => {
-    const handleClick = (e: { latlng: { lat: number; lng: number } }) => {
-      onMapClick(e.latlng.lat, e.latlng.lng);
-    };
-
-    map.on("click", handleClick);
-
-    return () => {
-      map.off("click", handleClick);
-    };
-  }, [map, onMapClick]);
-
-  return null;
 };
 
 export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
@@ -291,97 +393,106 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
   height = "300px",
 }) => {
   const { translate } = useTranslation();
-  const getInitialPosition = useCallback(() => {
-    const lat =
-      typeof latitude === "string"
-        ? parseFloat(latitude) || DEFAULT_LAT
-        : latitude ?? DEFAULT_LAT;
-    const lng =
-      typeof longitude === "string"
-        ? parseFloat(longitude) || DEFAULT_LNG
-        : longitude ?? DEFAULT_LNG;
-    return { lat, lng };
-  }, [latitude, longitude]);
-
-  const [position, setPosition] = useState(getInitialPosition);
-  const [flyToPosition, setFlyToPosition] = useState<{ lat: number; lng: number } | null>(null);
-  const [shouldFly, setShouldFly] = useState(false);
+  const { token } = theme.useToken();
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const initialPosition = useMemo(
+    () => getInitialPosition(latitude, longitude),
+    [latitude, longitude],
+  );
+  const [position, setPosition] = useState<Coordinate>(initialPosition);
 
   useEffect(() => {
-    const newPos = getInitialPosition();
-    setPosition(newPos);
-  }, [getInitialPosition]);
+    setPosition(initialPosition);
+  }, [initialPosition]);
+
+  const updateLocation = useCallback(
+    (nextPosition: Coordinate | null) => {
+      if (!nextPosition) {
+        return;
+      }
+
+      setPosition(nextPosition);
+      onLocationChange?.(
+        formatCoordinate(nextPosition.lat),
+        formatCoordinate(nextPosition.lng),
+      );
+    },
+    [onLocationChange],
+  );
 
   const handleMapClick = useCallback(
-    (lat: number, lng: number) => {
-      setPosition({ lat, lng });
-      onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
+    (event: MapMouseEvent) => {
+      updateLocation(getMapEventCoordinates(event));
     },
-    [onLocationChange]
+    [updateLocation],
   );
 
   const handleMarkerDragEnd = useCallback(
-    (lat: number, lng: number) => {
-      setPosition({ lat, lng });
-      onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
+    (event: MarkerDragEvent) => {
+      updateLocation(getGoogleEventCoordinates(event));
     },
-    [onLocationChange]
+    [updateLocation],
   );
 
-  const handleLocationSelect = useCallback(
-    (lat: number, lng: number) => {
-      setPosition({ lat, lng });
-      setFlyToPosition({ lat, lng });
-      setShouldFly(true);
-      onLocationChange?.(lat.toFixed(6), lng.toFixed(6));
-    },
-    [onLocationChange]
-  );
-
-  const handleFlyComplete = useCallback(() => {
-    setShouldFly(false);
-  }, []);
+  if (!apiKey) {
+    return (
+      <Alert
+        type="warning"
+        showIcon
+        message={translate(
+          "settings.mapLocationPicker.missingApiKeyTitle",
+          {},
+          "Google Maps API key is not configured",
+        )}
+        description={translate(
+          "settings.mapLocationPicker.missingApiKeyDescription",
+          {},
+          "Set VITE_GOOGLE_MAPS_API_KEY to enable store location picking.",
+        )}
+      />
+    );
+  }
 
   return (
     <div style={{ width: "100%" }}>
-      <Space direction="vertical" style={{ width: "100%", marginBottom: 12 }}>
-        <SearchSection onLocationSelect={handleLocationSelect} />
-        <Typography.Text type="secondary" style={{ fontSize: "12px" }}>
-          {translate("settings.mapLocationPicker.interactionHint")}
-        </Typography.Text>
-      </Space>
+      <APIProvider apiKey={apiKey} libraries={["places"]}>
+        <Space direction="vertical" style={{ width: "100%", marginBottom: token.marginSM }}>
+          <PlacesAutocomplete onPlaceSelect={updateLocation} />
+          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+            {translate(
+              "settings.mapLocationPicker.interactionHint",
+              {},
+              "Click on the map or drag the pin to choose a precise location.",
+            )}
+          </Typography.Text>
+        </Space>
 
-      <div
-        style={{
-          height,
-          width: "100%",
-          borderRadius: "8px",
-          overflow: "hidden",
-          border: "1px solid #d9d9d9",
-        }}
-      >
-        <MapContainer
-          center={[position.lat, position.lng] as LatLngExpression}
-          zoom={DEFAULT_ZOOM}
-          style={{ height: "100%", width: "100%" }}
-          scrollWheelZoom={true}
+        <div
+          style={{
+            height,
+            width: "100%",
+            borderRadius: token.borderRadiusLG,
+            overflow: "hidden",
+            border: `1px solid ${token.colorBorder}`,
+          }}
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-
-          <MapController
-            targetPosition={flyToPosition}
-            shouldFlyTo={shouldFly}
-            onFlyComplete={handleFlyComplete}
-          />
-
-          <MapClickHandler onMapClick={handleMapClick} />
-
-          <DraggableMarker position={position} onDragEnd={handleMarkerDragEnd} />
-        </MapContainer>
-      </div>
+          <Map
+            center={position}
+            defaultCenter={initialPosition}
+            zoom={DEFAULT_ZOOM}
+            defaultZoom={DEFAULT_ZOOM}
+            style={{ height: "100%", width: "100%" }}
+            gestureHandling="greedy"
+            onClick={handleMapClick}
+          >
+            <Marker
+              position={position}
+              draggable
+              onDragEnd={handleMarkerDragEnd}
+            />
+          </Map>
+        </div>
+      </APIProvider>
     </div>
   );
 };
