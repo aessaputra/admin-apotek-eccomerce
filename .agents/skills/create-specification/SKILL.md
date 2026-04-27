@@ -22,8 +22,9 @@ Before creating a Page:
    - Workspace/Wiki Page: the spec applies across projects or no single project is clear.
 2. Read before write where practical: list/retrieve relevant projects or existing work items/pages when needed to avoid ambiguity or duplicates.
 3. Use a concise Plane Pages title following this convention:
-   - `Spec: [High-level Purpose] - [Descriptive Subject]`
+   - `[SPEC] [High-level Purpose] - [Work Item ID] [Descriptive Subject]`
    - High-level purpose should be one of: `Schema`, `Tool`, `Data`, `Infrastructure`, `Process`, `Architecture`, or `Design`.
+   - Include the Plane work item ID when available. If no work item ID is available, omit that segment and use `[SPEC] [High-level Purpose] - [Descriptive Subject]`.
 4. Put the full specification body in the Plane Pages `description_html` field. Use semantic HTML generated from the Markdown structure below (`<h1>`, `<h2>`, `<ul>`, `<table>`, `<pre><code>`, etc.) so the Page renders correctly in Plane.
 5. After creation, report the Plane Pages ID/link returned by the tool, the scope used, and any assumptions.
 
@@ -145,7 +146,7 @@ Specification Pages must follow the template below, ensuring that all sections a
 - Load and follow `plane-operations` whenever Plane access is required.
 - Resolve whether to use a Project Page or Workspace/Wiki Page in Plane.so Pages.
 - Create the Plane.so Pages entry with:
-  - `name`: `Spec: [Purpose] - [Subject]`
+  - `name`: `[SPEC] [Purpose] - [Work Item ID] [Subject]`
   - `description_html`: the rendered HTML version of the completed specification
   - `project_id`: only for Project Pages
 - Do not write a local `/spec/*.md` file as the primary deliverable.
