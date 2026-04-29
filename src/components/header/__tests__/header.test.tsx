@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => {
   });
   const changeLocale = vi.fn();
   const setMode = vi.fn();
+  const adminOrderNotifications = vi.fn();
   const useGetIdentity = vi.fn((): IdentityResult => ({
     data: { id: "user-1", name: "Alice", avatar: "https://example.com/a.png" },
   }));
@@ -27,6 +28,7 @@ const mocks = vi.hoisted(() => {
     translate,
     changeLocale,
     setMode,
+    adminOrderNotifications,
     useGetIdentity,
   };
 });
@@ -93,6 +95,14 @@ vi.mock("@ant-design/icons", () => ({
   UserOutlined: () => <span>user</span>,
 }));
 
+vi.mock("../notifications/AdminOrderNotifications", () => ({
+  AdminOrderNotifications: ({ userId }: { userId?: string }) => {
+    mocks.adminOrderNotifications({ userId });
+
+    return <button type="button">Notifications {userId ?? "anonymous"}</button>;
+  },
+}));
+
 describe("Header", () => {
   it("renders user info and sticky styles when identity is available", () => {
     render(
@@ -104,6 +114,7 @@ describe("Header", () => {
     expect(screen.getByTestId("header").style.position).toBe("sticky");
     expect(screen.getByTestId("header").style.top).toBe("0px");
     expect(screen.getByText("Alice")).not.toBeNull();
+    expect(screen.getByText("Notifications user-1")).not.toBeNull();
     expect((screen.getByLabelText("language") as HTMLSelectElement).value).toBe("id");
   });
 
@@ -133,5 +144,6 @@ describe("Header", () => {
     );
 
     expect(screen.queryByText("Alice")).toBeNull();
+    expect(screen.getByText("Notifications anonymous")).not.toBeNull();
   });
 });

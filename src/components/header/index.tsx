@@ -16,6 +16,7 @@ import type { MenuProps } from "antd";
 import { DownOutlined, LogoutOutlined, UserOutlined } from "@ant-design/icons";
 import React, { useContext } from "react";
 import { ColorModeContext } from "../../contexts/color-mode";
+import { AdminOrderNotifications } from "./notifications/AdminOrderNotifications";
 
 const { useToken } = theme;
 
@@ -84,6 +85,7 @@ export const Header: React.FC<RefineThemedLayoutHeaderProps> = ({
           checked={mode === "dark"}
           onChange={() => setMode()}
         />
+        <AdminOrderNotifications userId={user?.id} />
         {user && (
           <Dropdown
             menu={{ items: menuItems }}
