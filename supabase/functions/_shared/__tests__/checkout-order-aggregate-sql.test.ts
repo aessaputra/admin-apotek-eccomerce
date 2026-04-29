@@ -22,6 +22,11 @@ const hardenedCheckoutRpcMigrationPath = resolve(
   "supabase/migrations/20260425064111_harden_sku_checkout_rpc.sql",
 );
 
+const selectedCheckoutRpcMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations/20260429142000_selected_cart_checkout_rpc.sql",
+);
+
 const securityInvokerAdminViewsMigrationPath = resolve(
   process.cwd(),
   "supabase/migrations/20260425065008_make_admin_sku_views_security_invoker.sql",
@@ -41,6 +46,10 @@ function readAdminViewPrivilegeMigrationSql() {
 
 function readHardenedCheckoutRpcMigrationSql() {
   return readFileSync(hardenedCheckoutRpcMigrationPath, "utf8");
+}
+
+function readSelectedCheckoutRpcMigrationSql() {
+  return readFileSync(selectedCheckoutRpcMigrationPath, "utf8");
 }
 
 function readSecurityInvokerAdminViewsMigrationSql() {
@@ -94,6 +103,77 @@ describe("checkout order aggregate SQL", () => {
     expect(normalizedSql).toContain("from public, anon, authenticated");
     expect(normalizedSql).toContain("grant execute on function public.create_checkout_order_aggregate");
     expect(normalizedSql).toContain("to service_role");
+  });
+
+  it("replaces checkout RPC with the selected cart item signature", () => {
+    const sql = readSelectedCheckoutRpcMigrationSql();
+    const normalizedSql = sql.toLowerCase();
+
+    expect(normalizedSql).toContain("drop function if exists public.create_checkout_order_aggregate");
+    expect(normalizedSql).toContain("p_selected_cart_item_ids uuid[]");
+    expect(normalizedSql).toMatch(
+      /create or replace function public\.create_checkout_order_aggregate\([\s\S]*p_shipping_etd text,[\s\S]*p_selected_cart_item_ids uuid\[\],[\s\S]*p_checkout_idempotency_key text/,
+    );
+    expect(normalizedSql).toMatch(
+      /comment on function public\.create_checkout_order_aggregate\([\s\S]*uuid\[\],[\s\S]*text[\s\S]*\) is/,
+    );
+  });
+
+  it("validates selected cart item IDs before creating a new checkout aggregate", () => {
+    const normalizedSql = readSelectedCheckoutRpcMigrationSql().toLowerCase();
+
+    expect(normalizedSql).toContain("p_selected_cart_item_ids is null");
+    expect(normalizedSql).toContain("array_length(p_selected_cart_item_ids, 1)");
+    expect(normalizedSql).toContain("array_position(p_selected_cart_item_ids, null)");
+    expect(normalizedSql).toContain("count(distinct selected.selected_id)");
+    expect(normalizedSql).toContain("v_selected_count <> v_distinct_selected_count");
+    expect(normalizedSql).toContain("v_selected_row_count <> v_selected_count");
+    expect(normalizedSql).toContain("pilih minimal satu produk sebelum melanjutkan pembayaran");
+    expect(normalizedSql).toContain("produk terpilih tidak valid");
+  });
+
+  it("locks and aggregates only selected cart rows in deterministic order", () => {
+    const normalizedSql = readSelectedCheckoutRpcMigrationSql().toLowerCase();
+
+    expect(normalizedSql).toContain("ci.id = any(p_selected_cart_item_ids)");
+    expect(normalizedSql).toMatch(
+      /from public\.cart_items ci\s+join public\.products p on p\.id = ci\.product_id\s+where ci\.cart_id = v_cart_id\s+and ci\.id = any\(p_selected_cart_item_ids\)\s+order by ci\.id asc\s+for update of ci, p/,
+    );
+    expect(normalizedSql).not.toMatch(
+      /from public\.cart_items ci\s+join public\.products p on p\.id = ci\.product_id\s+where ci\.cart_id = v_cart_id\s+order by/,
+    );
+  });
+
+  it("persists selected cart provenance on order items without deleting cart rows", () => {
+    const normalizedSql = readSelectedCheckoutRpcMigrationSql().toLowerCase();
+
+    expect(normalizedSql).toContain("add column if not exists source_cart_item_id uuid null");
+    expect(normalizedSql).toContain("order_items_source_cart_item_id_idx");
+    expect(normalizedSql).toContain("ci.id as source_cart_item_id");
+    expect(normalizedSql).toContain("'source_cart_item_id', v_line.source_cart_item_id");
+    expect(normalizedSql).toMatch(
+      /insert into public\.order_items \([\s\S]*product_sku_at_purchase,[\s\S]*source_cart_item_id[\s\S]*\)/,
+    );
+    expect(normalizedSql).toContain("snapshot.source_cart_item_id");
+    expect(normalizedSql).toContain("source_cart_item_id uuid");
+    expect(normalizedSql).not.toMatch(/delete\s+from\s+public\.cart_items/);
+  });
+
+  it("preserves SKU snapshots, idempotency lookup, and service-role grants", () => {
+    const sql = readSelectedCheckoutRpcMigrationSql();
+    const normalizedSql = sql.toLowerCase();
+
+    expect(normalizedSql).toContain("security definer");
+    expect(normalizedSql).toContain("set search_path = ''");
+    expect(sql).toContain("p.sku as product_sku");
+    expect(sql).toContain("'product_sku_at_purchase', v_line.product_sku");
+    expect(normalizedSql).toContain("where p.checkout_idempotency_key = p_checkout_idempotency_key");
+    expect(normalizedSql).toContain("if v_existing_order_id is not null then");
+    expect(normalizedSql).toContain("revoke all on function public.create_checkout_order_aggregate");
+    expect(normalizedSql).toContain("from public, anon, authenticated");
+    expect(normalizedSql).toContain("grant execute on function public.create_checkout_order_aggregate");
+    expect(normalizedSql).toContain("to service_role");
+    expect(normalizedSql).toMatch(/grant execute on function public\.create_checkout_order_aggregate\([\s\S]*uuid\[\],[\s\S]*text[\s\S]*\) to service_role/);
   });
 
   it("adds admin-only SKU read views and grants them only to authenticated users", () => {
