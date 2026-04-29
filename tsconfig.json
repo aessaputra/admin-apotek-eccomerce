@@ -18,5 +18,5 @@
     "noUncheckedSideEffectImports": true,
     "types": ["vitest/globals"],
   },
-  "include": ["src"]
+  "include": ["src", "supabase/functions/_shared/supabase.ts", "supabase/functions/**/*.d.ts"]
 }
