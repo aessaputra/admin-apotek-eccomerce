@@ -45,6 +45,15 @@ interface SideEffectTaskOrderRow {
   order_id: string | null;
 }
 
+interface OrderCartItemProvenanceRow {
+  source_cart_item_id: string | null;
+}
+
+interface SelectedCartItemOwnershipRow {
+  id: string | null;
+  carts?: { user_id?: string | null } | Array<{ user_id?: string | null }> | null;
+}
+
 interface SideEffectErrorClassification {
   code: string;
   permanent: boolean;
@@ -393,38 +402,85 @@ async function getOrderForSideEffects(
   };
 }
 
-async function clearOrderCart(
+async function clearSelectedOrderCartItems(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
   order: Order,
 ): Promise<void> {
   if (!order.user_id) {
-    return;
-  }
-
-  const { data: userCart, error: cartLookupError } = await adminClient
-    .from("carts")
-    .select("id")
-    .eq("user_id", order.user_id)
-    .maybeSingle();
-
-  if (cartLookupError) {
     throw new Error(
-      `Failed to look up cart for order ${order.id}: ${cartLookupError.message}`,
+      `Missing user for order ${order.id}. Cart cleanup requires order ownership validation.`,
     );
   }
 
-  if (!userCart?.id) {
-    return;
+  const { data, error: provenanceLookupError } = await adminClient
+    .from("order_items")
+    .select("source_cart_item_id")
+    .eq("order_id", order.id);
+
+  if (provenanceLookupError) {
+    throw new Error(
+      `Failed to load selected cart item provenance for order ${order.id}: ${provenanceLookupError.message}`,
+    );
+  }
+
+  const provenanceRows = (data ?? []) as OrderCartItemProvenanceRow[];
+  const hasMissingProvenance =
+    provenanceRows.length === 0 ||
+    provenanceRows.some(
+      (item) =>
+        typeof item.source_cart_item_id !== "string" ||
+        item.source_cart_item_id.trim().length === 0,
+    );
+
+  if (hasMissingProvenance) {
+    throw new Error(
+      `Missing selected cart item provenance for order ${order.id}. Cart cleanup requires every order item to include order_items.source_cart_item_id.`,
+    );
+  }
+
+  const selectedCartItemIds = Array.from(
+    new Set(
+      provenanceRows.map((item) => item.source_cart_item_id?.trim() ?? ""),
+    ),
+  );
+
+  if (selectedCartItemIds.length === 0) {
+    throw new Error(
+      `Missing selected cart item provenance for order ${order.id}. Cart cleanup requires order_items.source_cart_item_id.`,
+    );
+  }
+
+  const { data: existingCartItems, error: ownershipLookupError } = await adminClient
+    .from("cart_items")
+    .select("id, carts(user_id)")
+    .in("id", selectedCartItemIds);
+
+  if (ownershipLookupError) {
+    throw new Error(
+      `Failed to validate selected cart item ownership for order ${order.id}: ${ownershipLookupError.message}`,
+    );
+  }
+
+  const invalidOwnerCartItem = ((existingCartItems ?? []) as SelectedCartItemOwnershipRow[])
+    .find((cartItem) => {
+      const cart = Array.isArray(cartItem.carts) ? cartItem.carts[0] : cartItem.carts;
+      return cart?.user_id !== order.user_id;
+    });
+
+  if (invalidOwnerCartItem) {
+    throw new Error(
+      `Invalid selected cart item provenance for order ${order.id}. Cart item ${invalidOwnerCartItem.id ?? "unknown"} does not belong to the order user.`,
+    );
   }
 
   const { error: cartClearError } = await adminClient
     .from("cart_items")
     .delete()
-    .eq("cart_id", userCart.id);
+    .in("id", selectedCartItemIds);
 
   if (cartClearError) {
     throw new Error(
-      `Failed to clear cart for order ${order.id}: ${cartClearError.message}`,
+      `Failed to clear selected cart items for order ${order.id}: ${cartClearError.message}`,
     );
   }
 }
@@ -544,14 +600,18 @@ export async function processWebhookSideEffectTask(
     if (needsCartCleanup) {
       try {
         await renewSideEffectTaskLease(adminClient, orderId, leaseOwner);
-        await clearOrderCart(adminClient, order);
+        await clearSelectedOrderCartItems(adminClient, order);
         needsCartCleanup = false;
       } catch (cartCleanupError: unknown) {
+        const classification = classifySideEffectError(cartCleanupError);
         lastError =
           cartCleanupError instanceof Error
             ? cartCleanupError.message
-            : "Failed to clear cart after settlement";
-        lastErrorCode = "cart_cleanup_failed";
+            : "Failed to clear selected cart items after settlement";
+        lastErrorCode = classification.permanent
+          ? classification.code
+          : "cart_cleanup_failed";
+        permanentFailure = permanentFailure || classification.permanent;
       }
     }
 
@@ -651,7 +711,7 @@ export async function processWebhookSideEffectTask(
           const classification = classifySideEffectError(biteshipError);
           lastError = message;
           lastErrorCode = classification.code;
-          permanentFailure = classification.permanent;
+          permanentFailure = permanentFailure || classification.permanent;
 
           if (attempt === 2 || classification.permanent) {
             console.error(
@@ -732,11 +792,14 @@ export async function processWebhookSideEffectTask(
       permanentFailure,
     );
 
+    const needsRetry =
+      (needsCartCleanup && !permanentFailure) || needsStock || needsBiteship;
+
     return {
       processed: true,
-      needsRetry: needsStock || needsBiteship,
+      needsRetry,
       message:
-        needsStock || needsBiteship
+        needsRetry || permanentFailure
           ? lastError || "Fulfillment side effects need retry"
           : "Fulfillment side effects processed",
     };
