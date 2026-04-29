@@ -7,7 +7,8 @@ import { Dashboard } from "../dashboard";
 import { ProductShow } from "../products/show";
 
 const mocks = vi.hoisted(() => {
-  const translate = vi.fn((key: string) => key);
+  const translations: Record<string, string> = {};
+  const translate = vi.fn((key: string) => translations[key] ?? key);
   const useShow = vi.fn();
   const useList = vi.fn();
   const list = vi.fn();
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     translate,
+    translations,
     useShow,
     useList,
     list,
@@ -147,7 +149,25 @@ vi.mock("antd", async () => {
 });
 
 describe("detail and dashboard pages", () => {
+  const mockCustomerShow = (record: Record<string, unknown>) => {
+    mocks.useShow.mockReturnValue({
+      result: {
+        avatar_url: null,
+        full_name: "Alice",
+        phone_number: "08123",
+        role: "customer",
+        is_banned: false,
+        created_at: "2026-04-01",
+        ...record,
+      },
+      query: { isLoading: false },
+    });
+  };
+
   beforeEach(() => {
+    Object.keys(mocks.translations).forEach((key) => {
+      delete mocks.translations[key];
+    });
     mocks.translate.mockClear();
     mocks.useShow.mockReset();
     mocks.useList.mockReset();
@@ -164,6 +184,7 @@ describe("detail and dashboard pages", () => {
         avatar_url: null,
         full_name: "Alice",
         phone_number: "08123",
+        email: "alice@example.com",
         role: "customer",
         is_banned: false,
         created_at: "2026-04-01",
@@ -175,9 +196,33 @@ describe("detail and dashboard pages", () => {
 
     expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);
     expect(screen.getByText("08123")).not.toBeNull();
+    expect(screen.getByText("alice@example.com")).not.toBeNull();
     expect(screen.getByText("customer")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "customers.ban" }));
     expect(mocks.handleBan).toHaveBeenCalledWith({ id: "cust-1", full_name: "Alice" });
+  });
+
+  it.each([
+    ["null", null],
+    ["missing", undefined],
+    ["blank", "   "],
+  ])("renders the English missing-email fallback when customer email is %s", (_, email) => {
+    mocks.translations["customers.emailFallback"] = "Not provided";
+    const record = email === undefined ? {} : { email };
+    mockCustomerShow(record);
+
+    render(<CustomerShow />);
+
+    expect(screen.getByText("Not provided")).not.toBeNull();
+  });
+
+  it("renders the Indonesian missing-email fallback through the translation mock", () => {
+    mocks.translations["customers.emailFallback"] = "Belum tersedia";
+    mockCustomerShow({ email: null });
+
+    render(<CustomerShow />);
+
+    expect(screen.getByText("Belum tersedia")).not.toBeNull();
   });
 
   it("renders product detail content including images and status", () => {

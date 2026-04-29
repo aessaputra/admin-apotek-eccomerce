@@ -385,11 +385,20 @@
       "joined": "Joined",
       "profile": "Profile",
       "fullName": "Full Name",
+      "email": "Email",
       "role": "Role",
       "status": "Status"
     },
     "searchName": "Search name",
     "searchPhone": "Search phone",
+    "search": {
+      "placeholder": "Search customers by name, email, or phone",
+      "noResults": "No customers found",
+      "loading": "Loading customers",
+      "error": "Error loading customers",
+      "clear": "Clear customer search"
+    },
+    "emailFallback": "Not provided",
     "showDetail": "View detail",
     "statusBanned": "Banned",
     "statusActive": "Active",

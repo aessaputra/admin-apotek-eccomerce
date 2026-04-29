@@ -385,11 +385,20 @@
       "joined": "Bergabung",
       "profile": "Profil",
       "fullName": "Nama Lengkap",
+      "email": "Email",
       "role": "Peran",
       "status": "Status"
     },
     "searchName": "Cari nama",
     "searchPhone": "Cari nomor",
+    "search": {
+      "placeholder": "Cari pelanggan berdasarkan nama, email, atau telepon",
+      "noResults": "Tidak ada pelanggan ditemukan",
+      "loading": "Memuat pelanggan",
+      "error": "Gagal memuat pelanggan",
+      "clear": "Hapus pencarian pelanggan"
+    },
+    "emailFallback": "Belum tersedia",
     "showDetail": "Lihat detail",
     "statusBanned": "Diblokir",
     "statusActive": "Aktif",
