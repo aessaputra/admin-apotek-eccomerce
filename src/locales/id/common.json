@@ -434,7 +434,20 @@
   },
   "notifications": {
     "success": "Berhasil",
-    "error": "Error"
+    "error": "Error",
+    "orders": {
+      "new": {
+        "title": "Order baru",
+        "description": "Notifikasi admin terbaru untuk order masuk.",
+        "empty": "Belum ada notifikasi order baru",
+        "unread": "Belum dibaca",
+        "open": "Buka order {{orderId}}",
+        "customerUnavailable": "Pelanggan tidak tersedia",
+        "loadError": "Notifikasi order baru gagal dimuat. Silakan muat ulang halaman.",
+        "realtimeError": "Notifikasi order langsung sedang tidak tersedia. Silakan muat ulang halaman.",
+        "badgeLabel": "{{count}} notifikasi order belum dibaca"
+      }
+    }
   },
   "reports": {
     "sales": {

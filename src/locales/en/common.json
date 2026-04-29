@@ -434,7 +434,20 @@
   },
   "notifications": {
     "success": "Success",
-    "error": "Error"
+    "error": "Error",
+    "orders": {
+      "new": {
+        "title": "New orders",
+        "description": "Latest admin notifications for incoming orders.",
+        "empty": "No new order notifications",
+        "unread": "Unread",
+        "open": "Open order {{orderId}}",
+        "customerUnavailable": "Customer unavailable",
+        "loadError": "New order notifications could not be loaded. Please refresh the page.",
+        "realtimeError": "Live order notifications are temporarily unavailable. Please refresh the page.",
+        "badgeLabel": "{{count}} unread order notifications"
+      }
+    }
   },
   "reports": {
     "sales": {
