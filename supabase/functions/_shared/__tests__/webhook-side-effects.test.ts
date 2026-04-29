@@ -263,6 +263,30 @@ describe("processWebhookSideEffectTask cart cleanup", () => {
     expect(adminClient.completedTaskDeletes).toHaveLength(1);
   });
 
+  it("does not reintroduce full-cart cleanup when unselected cart items still exist", async () => {
+    const adminClient = new MockAdminClient();
+    adminClient.orderItemRows = [{ source_cart_item_id: "cart-selected-a" }];
+    adminClient.cartItemRows = [
+      { id: "cart-selected-a", carts: { user_id: "user-1" } },
+      { id: "cart-unselected", carts: { user_id: "user-1" } },
+    ];
+
+    const result = await processWebhookSideEffectTask(adminClient, orderId);
+
+    expect(result.needsRetry).toBe(false);
+    expect(adminClient.selectedCartItemOwnershipIds).toEqual(["cart-selected-a"]);
+    expect(adminClient.selectedCartItemDeleteIds).toEqual(["cart-selected-a"]);
+    expect(adminClient.selectedCartItemDeleteIds).not.toContain("cart-unselected");
+    expect(
+      adminClient.queries.some(
+        (query) =>
+          query.table === "cart_items" &&
+          query.action === "delete" &&
+          query.inFilters.length === 0,
+      ),
+    ).toBe(false);
+  });
+
   it("keeps selected cart cleanup idempotent when selected rows were already deleted", async () => {
     const adminClient = new MockAdminClient();
     adminClient.orderItemRows = [{ source_cart_item_id: "cart-selected-a" }];

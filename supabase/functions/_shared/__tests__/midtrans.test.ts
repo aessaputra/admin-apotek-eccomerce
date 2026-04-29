@@ -146,6 +146,45 @@ describe("buildSnapPayload", () => {
       last_name: "Customer",
     });
   });
+
+  it("uses persisted order gross amount instead of recomputing from current item rows", () => {
+    const payload = buildSnapPayload(
+      {
+        ...baseOrder,
+        gross_amount: 65000,
+        order_items: [
+          ...baseOrder.order_items!,
+          {
+            product_id: "unselected-product-left-in-cart",
+            quantity: 1,
+            price_at_purchase: 40000,
+            products: {
+              name: "Unselected Product",
+              categories: { name: "Healthcare" },
+            },
+          },
+        ],
+      },
+      authUser,
+    );
+
+    expect(payload.transaction_details.gross_amount).toBe(65000);
+    expect(calculateMidtransGrossAmount({
+      ...baseOrder,
+      order_items: [
+        ...baseOrder.order_items!,
+        {
+          product_id: "unselected-product-left-in-cart",
+          quantity: 1,
+          price_at_purchase: 40000,
+          products: {
+            name: "Unselected Product",
+            categories: { name: "Healthcare" },
+          },
+        },
+      ],
+    })).toBe(105000);
+  });
 });
 
 describe("isIgnorableMidtransNoop", () => {

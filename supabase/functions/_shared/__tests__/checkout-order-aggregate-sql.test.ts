@@ -144,6 +144,37 @@ describe("checkout order aggregate SQL", () => {
     );
   });
 
+  it("uses the selected-only aggregate for subtotal, item count, and payment gross amount", () => {
+    const normalizedSql = readSelectedCheckoutRpcMigrationSql().toLowerCase();
+
+    expect(normalizedSql).toContain("v_total_amount := v_total_amount + (v_line.price * v_line.quantity)");
+    expect(normalizedSql).toContain("v_item_count := v_item_count + v_line.quantity");
+    expect(normalizedSql).toMatch(/insert into public\.orders \([\s\S]*total_amount,[\s\S]*\)\s+values \([\s\S]*v_total_amount,/);
+    expect(normalizedSql).toMatch(/insert into public\.payments \([\s\S]*gross_amount,[\s\S]*\)\s+values \([\s\S]*v_total_amount \+ p_shipping_price,/);
+    expect(normalizedSql).toMatch(/return query[\s\S]*select[\s\S]*v_total_amount,[\s\S]*v_item_count,[\s\S]*p_checkout_idempotency_key/);
+    expect(normalizedSql).not.toMatch(/select[\s\S]*sum\(ci\.quantity \* p\.price\)[\s\S]*from public\.cart_items ci/);
+  });
+
+  it("builds order_items only from the selected cart snapshot and never from the full cart", () => {
+    const normalizedSql = readSelectedCheckoutRpcMigrationSql().toLowerCase();
+
+    expect(normalizedSql).toContain("v_cart_snapshot := v_cart_snapshot || pg_catalog.jsonb_build_array");
+    expect(normalizedSql).toContain("'source_cart_item_id', v_line.source_cart_item_id");
+    expect(normalizedSql).toMatch(/insert into public\.order_items \([\s\S]*source_cart_item_id[\s\S]*\)\s+select[\s\S]*from pg_catalog\.jsonb_to_recordset\(v_cart_snapshot\)/);
+    expect(normalizedSql).not.toMatch(/insert into public\.order_items[\s\S]*from public\.cart_items ci/);
+  });
+
+  it("rejects invalid selected rows while allowing invalid unselected cart rows to remain outside the aggregate", () => {
+    const normalizedSql = readSelectedCheckoutRpcMigrationSql().toLowerCase();
+
+    expect(normalizedSql).toMatch(/select pg_catalog\.count\(\*\)::integer[\s\S]*from public\.cart_items ci[\s\S]*where ci\.cart_id = v_cart_id[\s\S]*and ci\.id = any\(p_selected_cart_item_ids\)/);
+    expect(normalizedSql).toContain("if v_selected_row_count <> v_selected_count then");
+    expect(normalizedSql).toContain("raise exception 'produk terpilih tidak valid. silakan perbarui pilihan checkout.'");
+    expect(normalizedSql).toContain("if v_line.is_active = false then");
+    expect(normalizedSql).toContain("if v_line.quantity > v_line.stock then");
+    expect(normalizedSql).not.toMatch(/where ci\.cart_id = v_cart_id\s+order by ci\.id asc\s+for update of ci, p/);
+  });
+
   it("persists selected cart provenance on order items without deleting cart rows", () => {
     const normalizedSql = readSelectedCheckoutRpcMigrationSql().toLowerCase();
 
