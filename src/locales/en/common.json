@@ -48,18 +48,30 @@
     "productName": "Product",
     "currentStock": "Stock",
     "monthlyTrends": {
-      "title": "Monthly Trends",
+      "title": "Order trends",
       "revenue": "Revenue",
-      "orderCount": "Order Count",
-      "paidOrders": "Paid Orders",
-      "completedOrders": "Completed Orders",
+      "orderCount": "Incoming",
+      "paidOrders": "Paid",
+      "completedOrders": "Completed",
       "latest12Months": "Latest 12 months",
-      "loading": "Loading monthly trends...",
-      "emptyDescription": "No monthly trend data is available yet.",
-      "errorMessage": "Failed to load monthly trends.",
-      "zeroValueSummary": "All monthly trend metrics are zero.",
-      "chartAriaLabel": "Monthly count trends chart for orders, paid orders, and completed orders",
-      "chartDescription": "A line chart showing order count, paid orders, and completed orders over the latest 12 months. Revenue is shown separately as a statistic and summary."
+      "period": {
+        "day": "Last 30 days",
+        "week": "Last 12 weeks",
+        "month": "Last 12 months",
+        "year": "Last 5 years"
+      },
+      "granularity": {
+        "day": "Daily",
+        "week": "Weekly",
+        "month": "Monthly",
+        "year": "Yearly"
+      },
+      "loading": "Loading order trend data...",
+      "emptyDescription": "No order trend data is available yet.",
+      "errorMessage": "Failed to load order trends.",
+      "zeroValueSummary": "All order trend metrics are zero.",
+      "chartAriaLabel": "Order trend line chart: incoming, paid, and completed",
+      "chartDescription": "Incoming, paid, and completed orders for the selected period."
     }
   },
   "salesReports": {

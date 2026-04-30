@@ -48,18 +48,30 @@
     "productName": "Produk",
     "currentStock": "Stok",
     "monthlyTrends": {
-      "title": "Tren Bulanan",
+      "title": "Tren pesanan",
       "revenue": "Pendapatan",
-      "orderCount": "Jumlah Pesanan",
-      "paidOrders": "Pesanan Dibayar",
-      "completedOrders": "Pesanan Selesai",
+      "orderCount": "Masuk",
+      "paidOrders": "Dibayar",
+      "completedOrders": "Selesai",
       "latest12Months": "12 bulan terakhir",
-      "loading": "Memuat data tren bulanan...",
-      "emptyDescription": "Belum ada data tren bulanan untuk ditampilkan.",
-      "errorMessage": "Gagal memuat tren bulanan.",
-      "zeroValueSummary": "Semua metrik tren bulanan bernilai nol.",
-      "chartAriaLabel": "Grafik tren jumlah bulanan untuk pesanan, pesanan dibayar, dan pesanan selesai",
-      "chartDescription": "Grafik garis yang menampilkan jumlah pesanan, pesanan dibayar, dan pesanan selesai selama 12 bulan terakhir. Pendapatan ditampilkan terpisah sebagai statistik dan ringkasan."
+      "period": {
+        "day": "30 hari terakhir",
+        "week": "12 minggu terakhir",
+        "month": "12 bulan terakhir",
+        "year": "5 tahun terakhir"
+      },
+      "granularity": {
+        "day": "Harian",
+        "week": "Mingguan",
+        "month": "Bulanan",
+        "year": "Tahunan"
+      },
+      "loading": "Memuat data tren pesanan...",
+      "emptyDescription": "Belum ada data tren pesanan untuk ditampilkan.",
+      "errorMessage": "Gagal memuat tren pesanan.",
+      "zeroValueSummary": "Semua metrik tren pesanan bernilai nol.",
+      "chartAriaLabel": "Grafik garis tren pesanan: masuk, dibayar, dan selesai",
+      "chartDescription": "Pesanan masuk, dibayar, dan selesai sesuai periode yang dipilih."
     }
   },
   "salesReports": {
