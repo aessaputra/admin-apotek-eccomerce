@@ -1,6 +1,7 @@
-import { List, useTable, ShowButton, FilterDropdown, getDefaultFilter } from "@refinedev/antd";
+import { List, useTable, ShowButton, getDefaultFilter } from "@refinedev/antd";
 import { useTranslation } from "@refinedev/core";
-import { Table, Space, Tooltip, Select, Tag } from "antd";
+import { Button, Table, Space, Tooltip, Select, Tag } from "antd";
+import type { FilterDropdownProps } from "antd/es/table/interface";
 import { STATUS_COLORS, PAYMENT_COLORS, getStatusOptions, getPaymentOptions } from "../../constants/orders";
 import { getFallbackCourierOption } from "../../constants/couriers";
 
@@ -14,6 +15,60 @@ const formatDisplayLabel = (value: string | null | undefined) => {
     .filter(Boolean)
     .map((part) => (part.length <= 3 ? part.toUpperCase() : `${part.charAt(0).toUpperCase()}${part.slice(1)}`))
     .join(" ");
+};
+
+interface SelectFilterOption {
+  label: string;
+  value: string;
+}
+
+const normalizeFilterValue = (value: unknown): string[] | undefined => {
+  if (Array.isArray(value)) {
+    const values = value.filter((item): item is string => typeof item === "string");
+    return values.length > 0 ? values : undefined;
+  }
+
+  return typeof value === "string" ? [value] : undefined;
+};
+
+const getSelectedFilterValue = (value: unknown): string | undefined => {
+  return normalizeFilterValue(value)?.[0];
+};
+
+const createSelectFilterDropdown = (
+  options: SelectFilterOption[],
+  placeholder: string,
+  applyLabel: string,
+  resetLabel: string
+) => ({ selectedKeys, setSelectedKeys, confirm, clearFilters }: FilterDropdownProps) => {
+  const selectedValue = getSelectedFilterValue(selectedKeys);
+
+  return (
+    <Space direction="vertical" style={{ padding: 8, minWidth: 180 }}>
+      <Select
+        style={{ width: "100%" }}
+        placeholder={placeholder}
+        allowClear
+        value={selectedValue}
+        options={options}
+        onChange={(value) => setSelectedKeys(value ? [value] : [])}
+      />
+      <Space>
+        <Button type="primary" size="small" onClick={() => confirm()}>
+          {applyLabel}
+        </Button>
+        <Button
+          size="small"
+          onClick={() => {
+            clearFilters?.();
+            confirm();
+          }}
+        >
+          {resetLabel}
+        </Button>
+      </Space>
+    </Space>
+  );
 };
 
 export const OrderList: React.FC = () => {
@@ -44,26 +99,13 @@ export const OrderList: React.FC = () => {
           render={(v: string) => (
             <Tag color={STATUS_COLORS[v] ?? "default"}>{v ? translate(`orderStatus.${v}`, {}, formatDisplayLabel(v)) : "-"}</Tag>
           )}
-          filterDropdown={(props) => (
-            <FilterDropdown
-              {...props}
-              mapValue={(val, event) =>
-                event === "value"
-                  ? (Array.isArray(val) ? val[0] : val)
-                  : val
-                  ? [val]
-                  : []
-              }
-            >
-              <Select
-                style={{ minWidth: 120 }}
-                placeholder={translate("orders.filterStatus")}
-                allowClear
-                options={STATUS_OPTIONS}
-              />
-            </FilterDropdown>
+          filterDropdown={createSelectFilterDropdown(
+            STATUS_OPTIONS,
+            translate("orders.filterStatus"),
+            translate("buttons.filter", {}, "Filter"),
+            translate("buttons.reset", {}, "Reset")
           )}
-          defaultFilteredValue={getDefaultFilter("status", filters, "eq")}
+          defaultFilteredValue={normalizeFilterValue(getDefaultFilter("status", filters, "eq"))}
         />
         <Table.Column
           dataIndex="payment_status"
@@ -71,26 +113,13 @@ export const OrderList: React.FC = () => {
           render={(v: string) => (
             <Tag color={PAYMENT_COLORS[v] ?? "default"}>{v ? translate(`paymentStatus.${v}`, {}, formatDisplayLabel(v)) : "-"}</Tag>
           )}
-          filterDropdown={(props) => (
-            <FilterDropdown
-              {...props}
-              mapValue={(val, event) =>
-                event === "value"
-                  ? (Array.isArray(val) ? val[0] : val)
-                  : val
-                  ? [val]
-                  : []
-              }
-            >
-              <Select
-                style={{ minWidth: 120 }}
-                placeholder={translate("orders.filterPayment")}
-                allowClear
-                options={PAYMENT_OPTIONS}
-              />
-            </FilterDropdown>
+          filterDropdown={createSelectFilterDropdown(
+            PAYMENT_OPTIONS,
+            translate("orders.filterPayment"),
+            translate("buttons.filter", {}, "Filter"),
+            translate("buttons.reset", {}, "Reset")
           )}
-          defaultFilteredValue={getDefaultFilter("payment_status", filters, "eq")}
+          defaultFilteredValue={normalizeFilterValue(getDefaultFilter("payment_status", filters, "eq"))}
         />
         <Table.Column
           dataIndex="payment_type"
