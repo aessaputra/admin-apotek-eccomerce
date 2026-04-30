@@ -2,22 +2,38 @@ import { describe, expect, it } from "vitest";
 import {
   buildMonthlyOperationalTrendData,
   buildMonthlyOperationalTrendRows,
+  buildOperationalTrendData,
   computeMonthlyOperationalTrendTotals,
   formatCompletedOrderCountChartPoints,
   formatOrderCountChartPoints,
   formatPaidOrderCountChartPoints,
   formatRevenueChartPoints,
   getLatestTwelveJakartaMonthStarts,
+  getDefaultOperationalTrendRequest,
   isValidMonthStart,
   parseSupabaseCount,
   parseSupabaseNumber,
   type MonthlyOperationalMetricRow,
+  type OperationalMetricRow,
 } from "../monthlyOperationalTrends";
 
 const APRIL_2026_REFERENCE_DATE = new Date("2026-04-15T00:00:00.000Z");
 
 const createMetricRow = (monthStart: string, values: Partial<MonthlyOperationalMetricRow> = {}): MonthlyOperationalMetricRow => ({
   month_start: monthStart,
+  order_count: 0,
+  paid_order_count: 0,
+  completed_order_count: 0,
+  revenue: 0,
+  ...values,
+});
+
+const createOperationalMetricRow = (
+  bucketStart: string,
+  values: Partial<OperationalMetricRow> = {},
+): OperationalMetricRow => ({
+  bucket_start: bucketStart,
+  bucket_end: bucketStart,
   order_count: 0,
   paid_order_count: 0,
   completed_order_count: 0,
@@ -157,5 +173,62 @@ describe("monthly operational trends", () => {
 
     expect(rows.at(0)).toMatchObject({ monthStart: "2025-06-01", orderCount: 0, revenue: 0 });
     expect(rows.at(-1)).toMatchObject({ monthStart: "2026-05-01", orderCount: 1, paidOrderCount: 1, completedOrderCount: 0, revenue: 25000 });
+  });
+
+  it("builds default trend requests for each dashboard granularity", () => {
+    expect(getDefaultOperationalTrendRequest("day", APRIL_2026_REFERENCE_DATE)).toEqual({
+      granularity: "day",
+      startDate: "2026-03-17",
+      endDate: "2026-04-15",
+      bucketCount: 30,
+    });
+    expect(getDefaultOperationalTrendRequest("week", APRIL_2026_REFERENCE_DATE)).toEqual({
+      granularity: "week",
+      startDate: "2026-01-26",
+      endDate: "2026-04-19",
+      bucketCount: 12,
+    });
+    expect(getDefaultOperationalTrendRequest("month", APRIL_2026_REFERENCE_DATE)).toEqual({
+      granularity: "month",
+      startDate: "2025-05-01",
+      endDate: "2026-04-30",
+      bucketCount: 12,
+    });
+    expect(getDefaultOperationalTrendRequest("year", APRIL_2026_REFERENCE_DATE)).toEqual({
+      granularity: "year",
+      startDate: "2022-01-01",
+      endDate: "2026-12-31",
+      bucketCount: 5,
+    });
+  });
+
+  it("builds granularity-aware operational trend data from RPC bucket rows", () => {
+    const data = buildOperationalTrendData(
+      [
+        createOperationalMetricRow("2026-04-13", {
+          bucket_end: "2026-04-19",
+          order_count: "7",
+          paid_order_count: "5",
+          completed_order_count: "2",
+          revenue: "750000",
+        }),
+      ],
+      "week",
+    );
+
+    expect(data.rows).toHaveLength(1);
+    expect(data.rows[0]).toMatchObject({ orderCount: 7, paidOrderCount: 5, completedOrderCount: 2, revenue: 750000 });
+    expect(data.rows[0].monthLabel).toContain("13 Apr");
+    expect(data.rows[0].monthLabel).toContain("19 Apr");
+    expect(data.totals).toEqual({ orderCount: 7, paidOrderCount: 5, completedOrderCount: 2, revenue: 750000 });
+  });
+
+  it("formats bucket labels in Jakarta time instead of browser-local time", () => {
+    const data = buildOperationalTrendData(
+      [createOperationalMetricRow("2026-04-01", { bucket_end: "2026-04-01", order_count: 1 })],
+      "day",
+    );
+
+    expect(data.rows[0].monthLabel).toBe("01 Apr");
   });
 });
