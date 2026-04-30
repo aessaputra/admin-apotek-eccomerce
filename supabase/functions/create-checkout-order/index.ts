@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
 import { createCheckoutOrderHandler, HttpError } from "./handler.ts";
 import { getSupabaseAdminClient } from "../_shared/supabase.ts";
 
@@ -8,23 +9,6 @@ declare const Deno: {
     get: (key: string) => string | undefined;
   };
 };
-
-interface JoseJwtPayload {
-  sub?: string;
-  [key: string]: unknown;
-}
-
-interface JoseModule {
-  createRemoteJWKSet: (url: URL) => unknown;
-  jwtVerify: (
-    token: string,
-    key: unknown,
-    options?: { issuer?: string; audience?: string },
-  ) => Promise<{ payload: JoseJwtPayload }>;
-}
-
-const JOSE_MODULE_SPECIFIER = "npm:jose@5";
-const { createRemoteJWKSet, jwtVerify } = (await import(JOSE_MODULE_SPECIFIER)) as JoseModule;
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 
