@@ -24,7 +24,7 @@ const hardenedCheckoutRpcMigrationPath = resolve(
 
 const selectedCheckoutRpcMigrationPath = resolve(
   process.cwd(),
-  "supabase/migrations/20260429142000_selected_cart_checkout_rpc.sql",
+  "supabase/migrations/20260430042418_selected_cart_checkout_rpc.sql",
 );
 
 const securityInvokerAdminViewsMigrationPath = resolve(
