@@ -7,7 +7,6 @@ import {
   AuthPage,
   ErrorComponent,
   ThemedLayout,
-  ThemedSider,
   useNotificationProvider,
 } from "@refinedev/antd";
 import "@refinedev/antd/dist/reset.css";
@@ -36,6 +35,7 @@ import { BrowserRouter, Outlet, Route, Routes } from "react-router";
 import { useTranslation } from "react-i18next";
 import { ColorModeContextProvider } from "./contexts/color-mode";
 import { Header } from "./components/header";
+import { AppSider } from "./components/layout/app-sider";
 import { AuthTitle } from "./components/layout/auth-title";
 import { Title } from "./components/layout/title";
 import { ORDER_READ_RESOURCE } from "./constants/resources";
@@ -171,11 +171,11 @@ function App() {
                         key="protected"
                         fallback={<CatchAllNavigate to="/login" />}
                       >
-                        <ThemedLayout
-                          Header={Header}
-                          Title={Title}
-                          Sider={({ Title }) => <ThemedSider Title={Title} render={({ items }) => <>{items}</>} />}
-                        >
+                          <ThemedLayout
+                            Header={Header}
+                            Title={Title}
+                            Sider={({ Title }) => <AppSider Title={Title} />}
+                          >
                           <Outlet />
                         </ThemedLayout>
                       </Authenticated>
