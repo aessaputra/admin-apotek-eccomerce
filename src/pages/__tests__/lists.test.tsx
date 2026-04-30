@@ -1,13 +1,25 @@
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CategoryList } from "../categories/list";
 import { CustomerList } from "../customers/list";
 import { OrderList } from "../orders/list";
 import { ProductList } from "../products/list";
 
 const mocks = vi.hoisted(() => {
+  const translations: Record<string, string> = {
+    "customers.search.placeholder": "Search by name, email, or phone",
+    "customers.search.loading": "Loading customers...",
+    "customers.search.noResults": "No matching customers found",
+    "customers.search.error": "Unable to load customers",
+    "customers.search.clear": "Clear customer search",
+    "customers.emailFallback": "Not provided",
+  };
   const translate = vi.fn((key: string, paramsOrFallback?: Record<string, unknown> | string, fallback?: string) => {
+    if (translations[key]) {
+      return translations[key];
+    }
+
     if (key.startsWith("orderStatus.") || key.startsWith("paymentStatus.")) {
       return key;
     }
@@ -85,11 +97,24 @@ vi.mock("antd", async () => {
     return undefined;
   };
 
-  const Table = ({ dataSource = [], children }: { dataSource?: Record<string, unknown>[]; children: React.ReactNode }) => {
+  const Table = ({
+    dataSource = [],
+    children,
+    loading,
+    locale,
+  }: {
+    dataSource?: Record<string, unknown>[];
+    children: React.ReactNode;
+    loading?: boolean | { spinning?: boolean; tip?: React.ReactNode };
+    locale?: { emptyText?: React.ReactNode };
+  }) => {
     const columns = ReactModule.Children.toArray(children).filter(ReactModule.isValidElement);
+    const loadingTip = typeof loading === "object" && loading.spinning ? loading.tip : null;
 
     return (
       <div data-testid="table">
+        {loadingTip ? <div>{loadingTip}</div> : null}
+        {dataSource.length === 0 && locale?.emptyText ? <div>{locale.emptyText}</div> : null}
         {columns.map((column, columnIndex) => {
           const props = column.props as Record<string, unknown>;
           const columnKey = String(column.key ?? props.dataIndex ?? props.title ?? `column-${columnIndex}`);
@@ -127,7 +152,46 @@ vi.mock("antd", async () => {
     Table,
   Space: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   Avatar: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Input: ({ placeholder }: { placeholder?: string }) => <input placeholder={placeholder} readOnly />,
+  Input: ({
+    allowClear,
+    placeholder,
+    value = "",
+    onChange,
+    "aria-label": ariaLabel,
+  }: {
+    allowClear?: { clearIcon?: React.ReactNode };
+    placeholder?: string;
+    value?: string;
+    onChange?: React.ChangeEventHandler<HTMLInputElement>;
+    "aria-label"?: string;
+  }) => {
+    const clearIcon = allowClear?.clearIcon;
+    const clearLabel = ReactModule.isValidElement(clearIcon)
+      ? String((clearIcon.props as { "aria-label"?: string })["aria-label"] ?? "clear")
+      : "clear";
+
+    return (
+      <div>
+        <input
+          aria-label={ariaLabel}
+          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
+        />
+        {allowClear ? (
+          <button
+            type="button"
+            aria-label={clearLabel}
+            onClick={() =>
+              onChange?.({ target: { value: "" } } as React.ChangeEvent<HTMLInputElement>)
+            }
+          >
+            clear
+          </button>
+        ) : null}
+      </div>
+    );
+  },
   Tooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
   Button: ({ children, onClick, loading }: { children: React.ReactNode; onClick?: () => void; loading?: boolean }) => (
@@ -141,11 +205,77 @@ vi.mock("antd", async () => {
 });
 
 describe("list pages", () => {
+  const customerPermanentFilter = {
+    field: "role",
+    operator: "eq",
+    value: "customer",
+  };
+
+  const customerSearchFields = ["full_name", "phone_number", "email"];
+
+  const createCustomerSearchFilter = (value: string) => ({
+    operator: "or",
+    value: customerSearchFields.map((field) => ({
+      field,
+      operator: "contains",
+      value,
+    })),
+  });
+
+  const customerTableDefaults = ({
+    dataSource = [],
+    loading = false,
+    isError = false,
+    setFilters = vi.fn(),
+    setCurrentPage = vi.fn(),
+  }: {
+    dataSource?: Record<string, unknown>[];
+    loading?: boolean;
+    isError?: boolean;
+    setFilters?: ReturnType<typeof vi.fn>;
+    setCurrentPage?: ReturnType<typeof vi.fn>;
+  } = {}) => ({
+    tableProps: {
+      dataSource,
+      loading,
+    },
+    tableQuery: { isError },
+    sorters: [],
+    setFilters,
+    setCurrentPage,
+  });
+
+  const renderCustomerList = (tableConfig: ReturnType<typeof customerTableDefaults> = customerTableDefaults()) => {
+    mocks.useTable.mockReturnValue(tableConfig);
+
+    render(<CustomerList />);
+
+    return tableConfig;
+  };
+
+  const typeCustomerSearch = (searchText: string) => {
+    const input = screen.getByLabelText("Search by name, email, or phone");
+
+    fireEvent.change(input, { target: { value: searchText } });
+
+    return input;
+  };
+
+  const advanceCustomerSearchDebounce = (milliseconds = 400) => {
+    act(() => {
+      vi.advanceTimersByTime(milliseconds);
+    });
+  };
+
   beforeEach(() => {
     mocks.translate.mockClear();
     mocks.useTable.mockReset();
     mocks.handleBan.mockReset();
     mocks.handleUnban.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("renders customer rows and triggers ban/unban actions", () => {
@@ -157,6 +287,7 @@ describe("list pages", () => {
             full_name: "Alice",
             avatar_url: null,
             phone_number: "08123",
+            email: "alice@example.com",
             created_at: "2026-04-01",
             is_banned: false,
           },
@@ -165,6 +296,7 @@ describe("list pages", () => {
             full_name: "Bob",
             avatar_url: null,
             phone_number: "08234",
+            email: null,
             created_at: "2026-04-02",
             is_banned: true,
           },
@@ -177,8 +309,12 @@ describe("list pages", () => {
 
     expect(screen.getByText("Alice")).not.toBeNull();
     expect(screen.getByText("Bob")).not.toBeNull();
+    expect(screen.getByText("alice@example.com")).not.toBeNull();
+    expect(screen.getByText("Not provided")).not.toBeNull();
     expect(screen.getByText("customers.statusActive")).not.toBeNull();
     expect(screen.getByText("customers.statusBanned")).not.toBeNull();
+    expect(screen.getByText("show:profiles:cust-1")).not.toBeNull();
+    expect(screen.getByText("show:profiles:cust-2")).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "customers.ban" }));
     fireEvent.click(screen.getByRole("button", { name: "customers.unban" }));
@@ -189,6 +325,111 @@ describe("list pages", () => {
     expect(mocks.handleUnban).toHaveBeenCalledWith(
       expect.objectContaining({ id: "cust-2", full_name: "Bob" })
     );
+  });
+
+  it("renders customer search input and keeps the permanent customer-only role filter", () => {
+    renderCustomerList();
+
+    expect(screen.getByPlaceholderText("Search by name, email, or phone")).not.toBeNull();
+    expect(screen.getByLabelText("Search by name, email, or phone")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Clear customer search" })).not.toBeNull();
+    expect(mocks.useTable).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filters: {
+          permanent: [customerPermanentFilter],
+        },
+      })
+    );
+  });
+
+  it("debounces customer search for 400ms before replacing search filters", () => {
+    vi.useFakeTimers();
+    const setFilters = vi.fn();
+    const setCurrentPage = vi.fn();
+    renderCustomerList(customerTableDefaults({ setFilters, setCurrentPage }));
+    setFilters.mockClear();
+    setCurrentPage.mockClear();
+
+    typeCustomerSearch("Alice");
+    advanceCustomerSearchDebounce(399);
+
+    expect(setFilters).not.toHaveBeenCalled();
+    expect(setCurrentPage).not.toHaveBeenCalled();
+
+    advanceCustomerSearchDebounce(1);
+
+    expect(setCurrentPage).toHaveBeenCalledWith(1);
+    expect(setFilters).toHaveBeenCalledWith([createCustomerSearchFilter("Alice")], "replace");
+    expect(mocks.useTable).toHaveBeenCalledWith(
+      expect.objectContaining({ filters: { permanent: [customerPermanentFilter] } })
+    );
+  });
+
+  it.each([
+    ["name", "Alice"],
+    ["email", "alice@example.com"],
+    ["phone", "08123"],
+  ])("builds customer OR search filters for %s fragments", (_, searchText) => {
+    vi.useFakeTimers();
+    const setFilters = vi.fn();
+    const setCurrentPage = vi.fn();
+    renderCustomerList(customerTableDefaults({ setFilters, setCurrentPage }));
+    setFilters.mockClear();
+    setCurrentPage.mockClear();
+
+    typeCustomerSearch(searchText);
+    advanceCustomerSearchDebounce();
+
+    expect(setCurrentPage).toHaveBeenCalledWith(1);
+    expect(setFilters).toHaveBeenLastCalledWith([createCustomerSearchFilter(searchText)], "replace");
+  });
+
+  it("escapes special customer search characters before building the OR filter", () => {
+    vi.useFakeTimers();
+    const setFilters = vi.fn();
+    renderCustomerList(customerTableDefaults({ setFilters }));
+    setFilters.mockClear();
+
+    typeCustomerSearch("%_,()'\\\"");
+    advanceCustomerSearchDebounce();
+
+    expect(setFilters).toHaveBeenLastCalledWith(
+      [createCustomerSearchFilter("\\%\\_\\,\\(\\)\\'\\\\\\\"")],
+      "replace"
+    );
+  });
+
+  it("clears customer search by removing only the replaceable OR filter and resetting to page 1", () => {
+    vi.useFakeTimers();
+    const setFilters = vi.fn();
+    const setCurrentPage = vi.fn();
+    renderCustomerList(customerTableDefaults({ setFilters, setCurrentPage }));
+    setFilters.mockClear();
+    setCurrentPage.mockClear();
+
+    typeCustomerSearch("Alice");
+    advanceCustomerSearchDebounce();
+    setFilters.mockClear();
+    setCurrentPage.mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear customer search" }));
+    advanceCustomerSearchDebounce();
+
+    expect(setCurrentPage).toHaveBeenCalledWith(1);
+    expect(setFilters).toHaveBeenLastCalledWith([], "replace");
+    expect(mocks.useTable).toHaveBeenCalledWith(
+      expect.objectContaining({ filters: { permanent: [customerPermanentFilter] } })
+    );
+  });
+
+  it("renders customer loading, empty, and error states with localized text", () => {
+    renderCustomerList(customerTableDefaults({ loading: true }));
+    expect(screen.getByText("Loading customers...")).not.toBeNull();
+    expect(screen.getByText("No matching customers found")).not.toBeNull();
+
+    mocks.useTable.mockReset();
+    renderCustomerList(customerTableDefaults({ isError: true }));
+    expect(screen.getByText("Unable to load customers")).not.toBeNull();
   });
 
   it("renders product list values and row action buttons", () => {

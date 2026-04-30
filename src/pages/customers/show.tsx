@@ -12,6 +12,23 @@ const ROLE_COLORS: Record<string, string> = {
   customer: "blue",
 };
 
+interface CustomerRecord {
+  id: string;
+  full_name?: string | null;
+  phone_number?: string | null;
+  email?: string | null;
+  avatar_url?: string | null;
+  role?: string | null;
+  is_banned?: boolean | null;
+  created_at?: string | null;
+}
+
+const getDisplayEmail = (email: string | null | undefined, fallback: string) => {
+  const trimmedEmail = email?.trim();
+
+  return trimmedEmail || fallback;
+};
+
 export const CustomerShow: React.FC = () => {
   const { translate } = useTranslation();
   const { id } = useParams<{ id: string }>();
@@ -19,11 +36,14 @@ export const CustomerShow: React.FC = () => {
   const {
     result: record,
     query: { isLoading },
-  } = useShow({
+  } = useShow<CustomerRecord>({
     resource: "profiles",
     id: id ?? "",
   });
   const avatarUrl = resolveStoragePublicUrl(record?.avatar_url ?? null, MEDIA_BUCKET);
+  const emailFallback = translate("customers.emailFallback");
+  const customerName = record?.full_name ?? undefined;
+  const roleColor = record?.role ? ROLE_COLORS[record.role] ?? "default" : "default";
 
   return (
     <Show isLoading={isLoading}>
@@ -41,8 +61,11 @@ export const CustomerShow: React.FC = () => {
       <Title level={5}>{translate("customers.fields.phone")}</Title>
       <Text>{record?.phone_number || "-"}</Text>
 
+      <Title level={5}>{translate("customers.fields.email")}</Title>
+      <Text>{getDisplayEmail(record?.email, emailFallback)}</Text>
+
       <Title level={5}>{translate("customers.fields.role")}</Title>
-      <Tag color={ROLE_COLORS[record?.role] ?? "default"}>
+      <Tag color={roleColor}>
         {record?.role || "-"}
       </Tag>
 
@@ -57,7 +80,7 @@ export const CustomerShow: React.FC = () => {
               type="primary"
               size="small"
               loading={isPending}
-              onClick={() => handleUnban({ id, full_name: record?.full_name })}
+              onClick={() => handleUnban({ id, full_name: customerName })}
             >
               {translate("customers.unban")}
             </Button>
@@ -66,7 +89,7 @@ export const CustomerShow: React.FC = () => {
               danger
               size="small"
               loading={isPending}
-              onClick={() => handleBan({ id, full_name: record?.full_name })}
+              onClick={() => handleBan({ id, full_name: customerName })}
             >
               {translate("customers.ban")}
             </Button>
