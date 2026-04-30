@@ -46,7 +46,21 @@
     "orderTotal": "Total",
     "orderStatus": "Status",
     "productName": "Product",
-    "currentStock": "Stock"
+    "currentStock": "Stock",
+    "monthlyTrends": {
+      "title": "Monthly Trends",
+      "revenue": "Revenue",
+      "orderCount": "Order Count",
+      "paidOrders": "Paid Orders",
+      "completedOrders": "Completed Orders",
+      "latest12Months": "Latest 12 months",
+      "loading": "Loading monthly trends...",
+      "emptyDescription": "No monthly trend data is available yet.",
+      "errorMessage": "Failed to load monthly trends.",
+      "zeroValueSummary": "All monthly trend metrics are zero.",
+      "chartAriaLabel": "Monthly count trends chart for orders, paid orders, and completed orders",
+      "chartDescription": "A line chart showing order count, paid orders, and completed orders over the latest 12 months. Revenue is shown separately as a statistic and summary."
+    }
   },
   "salesReports": {
     "salesReports": "Sales Reports"
