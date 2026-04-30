@@ -8,8 +8,32 @@ import {
   WarningOutlined,
 } from "@ant-design/icons";
 import { STATUS_COLORS } from "../../constants/orders";
+import { MonthlyOperationalTrendCard } from "./MonthlyOperationalTrendCard";
+import {
+  buildMonthlyOperationalTrendData,
+  isValidMonthStart,
+  type MonthlyOperationalMetricRow,
+  type MonthlyOperationalTrendData,
+} from "./monthlyOperationalTrends";
 
 const { Text } = Typography;
+
+const emptyMonthlyOperationalTrendData: MonthlyOperationalTrendData = {
+  rows: [],
+  orderCountChartPoints: [],
+  paidOrderCountChartPoints: [],
+  completedOrderCountChartPoints: [],
+  revenueChartPoints: [],
+  totals: {
+    orderCount: 0,
+    paidOrderCount: 0,
+    completedOrderCount: 0,
+    revenue: 0,
+  },
+};
+
+const hasAggregateMetricRows = (rows: readonly MonthlyOperationalMetricRow[]): boolean =>
+  rows.some((row) => isValidMonthStart(row.month_start));
 
 export const Dashboard: React.FC = () => {
   const { translate } = useTranslation();
@@ -59,6 +83,14 @@ export const Dashboard: React.FC = () => {
     ],
   });
 
+  const { result: monthlyOperationalMetricsResult, query: monthlyOperationalMetricsQuery } =
+    useList<MonthlyOperationalMetricRow>({
+      resource: "admin_monthly_operational_metrics",
+      sorters: [{ field: "month_start", order: "desc" }],
+      pagination: { pageSize: 12 },
+      meta: { select: "month_start,order_count,paid_order_count,completed_order_count,revenue" },
+    });
+
   const totalOrders = ordersResult?.total ?? 0;
   const totalCustomers = customersResult?.total ?? 0;
   const totalProducts = productsResult?.total ?? 0;
@@ -80,6 +112,14 @@ export const Dashboard: React.FC = () => {
     name: string;
     stock: number;
   }[];
+
+  const monthlyOperationalMetricRows = monthlyOperationalMetricsResult?.data ?? [];
+  const monthlyOperationalTrendData = hasAggregateMetricRows(monthlyOperationalMetricRows)
+    ? buildMonthlyOperationalTrendData(monthlyOperationalMetricRows)
+    : emptyMonthlyOperationalTrendData;
+  const monthlyOperationalTrendError = monthlyOperationalMetricsQuery?.isError
+    ? monthlyOperationalMetricsQuery.error ?? true
+    : undefined;
 
   return (
     <>
@@ -121,6 +161,31 @@ export const Dashboard: React.FC = () => {
               formatter={(v) => `Rp ${Number(v).toLocaleString("id-ID")}`}
             />
           </Card>
+        </Col>
+      </Row>
+
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col span={24}>
+          <MonthlyOperationalTrendCard
+            data={monthlyOperationalTrendData}
+            totals={monthlyOperationalTrendData.totals}
+            loading={monthlyOperationalMetricsQuery?.isLoading ?? false}
+            error={monthlyOperationalTrendError}
+            labels={{
+              title: translate("dashboard.monthlyTrends.title"),
+              revenue: translate("dashboard.monthlyTrends.revenue"),
+              orderCount: translate("dashboard.monthlyTrends.orderCount"),
+              paidOrders: translate("dashboard.monthlyTrends.paidOrders"),
+              completedOrders: translate("dashboard.monthlyTrends.completedOrders"),
+              latest12Months: translate("dashboard.monthlyTrends.latest12Months"),
+              loading: translate("dashboard.monthlyTrends.loading"),
+              emptyDescription: translate("dashboard.monthlyTrends.emptyDescription"),
+              errorMessage: translate("dashboard.monthlyTrends.errorMessage"),
+              zeroValueSummary: translate("dashboard.monthlyTrends.zeroValueSummary"),
+              chartAriaLabel: translate("dashboard.monthlyTrends.chartAriaLabel"),
+              chartDescription: translate("dashboard.monthlyTrends.chartDescription"),
+            }}
+          />
         </Col>
       </Row>
 
