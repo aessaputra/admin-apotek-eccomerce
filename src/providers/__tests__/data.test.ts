@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => {
   const getMany = vi.fn();
   const deleteOne = vi.fn();
   const deleteMany = vi.fn();
+  const rpc = vi.fn();
   const remove = vi.fn();
   const storageFrom = vi.fn(() => ({ remove }));
   const orderItemsEq = vi.fn();
@@ -33,6 +34,7 @@ const mocks = vi.hoisted(() => {
     getMany,
     deleteOne,
     deleteMany,
+    rpc,
     remove,
     storageFrom,
     orderItemsEq,
@@ -55,6 +57,7 @@ vi.mock("@refinedev/supabase", () => ({
 vi.mock("../supabase-client", () => ({
     supabaseClient: {
       from: mocks.from,
+      rpc: mocks.rpc,
       storage: {
         from: mocks.storageFrom,
       },
@@ -70,6 +73,7 @@ describe("dataProvider custom deletes", () => {
     mocks.getMany.mockReset();
     mocks.deleteOne.mockReset();
     mocks.deleteMany.mockReset();
+    mocks.rpc.mockReset();
     mocks.remove.mockReset();
     mocks.storageFrom.mockClear();
     mocks.from.mockClear();
@@ -81,6 +85,7 @@ describe("dataProvider custom deletes", () => {
     mocks.deleteOne.mockResolvedValue({ data: { id: "1" } });
     mocks.deleteMany.mockResolvedValue({ data: [{ id: "1" }] });
     mocks.remove.mockResolvedValue({ data: [] });
+    mocks.rpc.mockResolvedValue({ data: [], error: null });
     mocks.orderItemsEq.mockResolvedValue({ data: [], error: null });
     mocks.bannerSelectEq.mockResolvedValue({ data: [], error: null });
   });
@@ -177,6 +182,80 @@ describe("dataProvider custom deletes", () => {
       product_images: [{ id: "image-1", url: "products/vitamin-c.png", sort_order: 0 }],
       categories: { name: "Supplements", slug: "supplements" },
     });
+  });
+
+  it("routes dashboard operational metrics through the aggregate RPC", async () => {
+    const getListMethod = dataProvider.getList;
+
+    expect(getListMethod).toBeTypeOf("function");
+
+    if (!getListMethod) {
+      throw new Error("getList is not implemented");
+    }
+
+    mocks.rpc.mockResolvedValueOnce({
+      data: [
+        {
+          bucket_start: "2026-04-01",
+          bucket_end: "2026-04-30",
+          order_count: 12n,
+          paid_order_count: "8",
+          completed_order_count: 4,
+          revenue: "1000000",
+        },
+      ],
+      error: null,
+    });
+
+    const result = await getListMethod({
+      resource: "admin_operational_metrics",
+      pagination: { currentPage: 1, pageSize: 12 },
+      sorters: [],
+      filters: [
+        { field: "granularity", operator: "eq", value: "month" },
+        { field: "start_date", operator: "eq", value: "2025-05-01" },
+        { field: "end_date", operator: "eq", value: "2026-04-30" },
+      ],
+    });
+
+    expect(mocks.rpc).toHaveBeenCalledWith("admin_operational_metrics", {
+      p_granularity: "month",
+      p_start_date: "2025-05-01",
+      p_end_date: "2026-04-30",
+    });
+    expect(result).toEqual({
+      data: [
+        {
+          id: "2026-04-01",
+          bucket_start: "2026-04-01",
+          bucket_end: "2026-04-30",
+          order_count: "12",
+          paid_order_count: "8",
+          completed_order_count: 4,
+          revenue: "1000000",
+        },
+      ],
+      total: 1,
+    });
+    expect(mocks.getList).not.toHaveBeenCalled();
+  });
+
+  it("requires all operational metrics RPC filters", async () => {
+    const getListMethod = dataProvider.getList;
+
+    if (!getListMethod) {
+      throw new Error("getList is not implemented");
+    }
+
+    await expect(
+      getListMethod({
+        resource: "admin_operational_metrics",
+        pagination: { currentPage: 1, pageSize: 12 },
+        sorters: [],
+        filters: [{ field: "granularity", operator: "eq", value: "month" }],
+      }),
+    ).rejects.toThrow("Missing required dashboard metrics filter: start_date");
+    expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
   it("routes product detail reads through admin_products", async () => {

@@ -13,6 +13,7 @@ import { getStoragePathFromReference, MEDIA_BUCKET } from "../utils/storage";
 
 const baseDataProvider = supabaseDataProvider(supabaseClient);
 const PRODUCT_READ_RESOURCE = "admin_products";
+const OPERATIONAL_METRICS_RESOURCE = "admin_operational_metrics";
 const PRODUCT_IMAGE_CLEANUP_SELECT = "id, product_images(url)";
 
 type DataProviderGetListParams = Parameters<NonNullable<DataProvider["getList"]>>[0];
@@ -28,6 +29,15 @@ interface AdminProductRecord extends BaseRecord {
 
 interface AdminOrderItemRecord {
   product_name?: string | null;
+}
+
+interface AdminOperationalMetricRecord extends BaseRecord {
+  bucket_start: string;
+  bucket_end: string;
+  order_count: string | number;
+  paid_order_count: string | number;
+  completed_order_count: string | number;
+  revenue: string | number;
 }
 
 function mapReadResource(resource: string): string {
@@ -71,6 +81,80 @@ function normalizeOrderItem(row: AdminOrderItemRecord) {
   return {
     ...row,
     products: { name: row.product_name ?? "" },
+  };
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getFilterValue(filters: DataProviderGetListParams["filters"], field: string): unknown {
+  return filters?.find((filter) => "field" in filter && filter.field === field)?.value;
+}
+
+function requireStringFilter(filters: DataProviderGetListParams["filters"], field: string): string {
+  const value = getFilterValue(filters, field);
+
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`Missing required dashboard metrics filter: ${field}`);
+  }
+
+  return value;
+}
+
+function normalizeOperationalMetricRecord(row: unknown): AdminOperationalMetricRecord {
+  if (!isObjectRecord(row)) {
+    throw new Error("Unexpected dashboard metrics response row");
+  }
+
+  const bucketStart = row.bucket_start;
+  const bucketEnd = row.bucket_end;
+
+  if (typeof bucketStart !== "string" || typeof bucketEnd !== "string") {
+    throw new Error("Dashboard metrics response is missing bucket dates");
+  }
+
+  return {
+    id: bucketStart,
+    bucket_start: bucketStart,
+    bucket_end: bucketEnd,
+    order_count: normalizeMetricNumber(row.order_count),
+    paid_order_count: normalizeMetricNumber(row.paid_order_count),
+    completed_order_count: normalizeMetricNumber(row.completed_order_count),
+    revenue: normalizeMetricNumber(row.revenue),
+  };
+}
+
+function normalizeMetricNumber(value: unknown): string | number {
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+
+  if (typeof value === "string" || typeof value === "number") {
+    return value;
+  }
+
+  return 0;
+}
+
+async function getAdminOperationalMetrics<TData extends BaseRecord = BaseRecord>(
+  params: DataProviderGetListParams,
+): Promise<GetListResponse<TData>> {
+  const { data, error } = await supabaseClient.rpc("admin_operational_metrics", {
+    p_granularity: requireStringFilter(params.filters, "granularity"),
+    p_start_date: requireStringFilter(params.filters, "start_date"),
+    p_end_date: requireStringFilter(params.filters, "end_date"),
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const rows = Array.isArray(data) ? data.map(normalizeOperationalMetricRecord) : [];
+
+  return {
+    data: rows.map((row) => row as unknown as TData),
+    total: rows.length,
   };
 }
 
@@ -138,6 +222,10 @@ export const dataProvider: DataProvider = {
   getList: async <TData extends BaseRecord = BaseRecord>(
     params: DataProviderGetListParams,
   ): Promise<GetListResponse<TData>> => {
+    if (params.resource === OPERATIONAL_METRICS_RESOURCE) {
+      return getAdminOperationalMetrics<TData>(params);
+    }
+
     // Keep admin-facing Refine resource names stable, while serving protected
     // order/product reads from admin-safe read models. Mutations still use base tables.
     const result = await baseDataProvider.getList<TData>({
