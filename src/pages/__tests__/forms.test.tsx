@@ -238,6 +238,8 @@ vi.mock("antd", () => {
     useToken: () => ({
       token: {
         colorBgContainer: "#ffffff",
+        colorFillAlter: "#fafafa",
+        colorBorder: "#d9d9d9",
         colorBorderSecondary: "#d9d9d9",
         borderRadius: 6,
         colorTextTertiary: "#8c8c8c",
@@ -249,10 +251,21 @@ vi.mock("antd", () => {
     }),
   };
 
+  const SpaceBase = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+  const Space = Object.assign(SpaceBase, {
+    Compact: ({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) => <div style={style}>{children}</div>,
+  });
+
   return {
     Form,
     Input,
-    InputNumber: ({ addonAfter }: { addonAfter?: React.ReactNode }) => <div>{addonAfter ?? "InputNumber"}</div>,
+    InputNumber: ({ value, onChange }: { value?: number | null; onChange?: (value: number | null) => void }) => (
+      <input
+        aria-label="InputNumber"
+        value={value ?? ""}
+        onChange={(event) => onChange?.(event.currentTarget.value === "" ? null : Number(event.currentTarget.value))}
+      />
+    ),
     Select: ({ options, placeholder }: { options?: Array<{ label: string; value: string | boolean }>; placeholder?: string }) => <div>{placeholder ?? options?.map((option) => String(option.label)).join(",")}</div>,
     Tabs: ({ items }: { items?: Array<{ label: React.ReactNode; children: React.ReactNode }> }) => <div>{items?.map((item) => <div key={String(item.label)}>{item.label}{item.children}</div>)}</div>,
     Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -262,7 +275,7 @@ vi.mock("antd", () => {
     Typography,
     theme,
     Button: ({ children, onClick, htmlType, type, size, icon }: { children?: React.ReactNode; onClick?: () => void; htmlType?: "submit" | "button"; type?: string; size?: string; icon?: React.ReactNode }) => <button type={htmlType ?? "button"} data-type={type} data-size={size} onClick={onClick}>{icon}{children}</button>,
-    Space: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Space,
     Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
     Divider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Modal: ({ children, open, title, footer }: { children: React.ReactNode; open?: boolean; title?: React.ReactNode; footer?: React.ReactNode }) => open ? <div role="dialog"><div>{title}</div>{children}{footer}</div> : null,

@@ -4,6 +4,7 @@ import { useTranslation } from "@refinedev/core";
 import { Form, Input, InputNumber, Select, message } from "antd";
 import { ProductImageUpload } from "../../components/product-image-upload";
 import { DescriptionEditorModal } from "../../components/description-editor-modal";
+import { ProductWeightInput } from "../../components/product-weight-input";
 import { useProductSkuField } from "../../hooks/useProductSkuField";
 import { slugify } from "../../utils/slugify";
 import { generateSkuCandidate } from "../../utils/sku";
@@ -113,6 +114,7 @@ export const ProductCreate: React.FC = () => {
     <Create saveButtonProps={saveButtonProps}>
       <Form
         {...formProps}
+        form={form}
         layout="vertical"
         onValuesChange={handleValuesChange}
         onFinish={handleFinish}
@@ -145,7 +147,7 @@ export const ProductCreate: React.FC = () => {
           rules={PRODUCT_WEIGHT_RULES}
           extra="Required for shipping rates and Biteship order creation."
         >
-          <InputNumber style={{ width: "100%" }} min={1} addonAfter="gram" />
+          <ProductWeightInput />
         </Form.Item>
         <Form.Item label={translate("products.fields.category")} name="category_id">
           <Select {...selectProps} />
