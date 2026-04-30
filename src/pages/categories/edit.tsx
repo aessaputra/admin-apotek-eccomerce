@@ -22,6 +22,7 @@ export const CategoryEdit: React.FC = () => {
     <Edit saveButtonProps={saveButtonProps}>
       <Form
         {...formProps}
+        form={form}
         layout="vertical"
         onValuesChange={handleValuesChange}
       >

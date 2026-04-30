@@ -22,6 +22,7 @@ export const CategoryCreate: React.FC = () => {
     <Create saveButtonProps={saveButtonProps}>
       <Form
         {...formProps}
+        form={form}
         layout="vertical"
         onValuesChange={handleValuesChange}
       >

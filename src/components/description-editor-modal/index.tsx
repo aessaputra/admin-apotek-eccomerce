@@ -163,7 +163,7 @@ export const DescriptionEditorModal: React.FC<DescriptionEditorModalProps> = ({
           </div>
         }
         width={720}
-        destroyOnClose
+        destroyOnHidden
       >
         <div style={{ marginBottom: 24 }}>
           <TextArea

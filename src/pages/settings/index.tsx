@@ -380,7 +380,7 @@ export const Settings: React.FC = () => {
         title={translate("settings.title", {}, "Settings")}
         breadcrumb={false}
       >
-        <Form {...formProps} layout="vertical">
+        <Form {...formProps} form={form} layout="vertical">
           <Tabs
             defaultActiveKey="storeProfile"
             items={tabItems}
