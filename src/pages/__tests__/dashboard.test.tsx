@@ -2,7 +2,7 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Dashboard } from "../dashboard";
-import type { MonthlyOperationalMetricRow } from "../dashboard/monthlyOperationalTrends";
+import type { OperationalMetricRow } from "../dashboard/monthlyOperationalTrends";
 
 interface LineMockDatum {
   monthLabel: string;
@@ -21,7 +21,7 @@ interface DashboardQueryState {
 }
 
 interface DashboardQueryOptions {
-  monthlyMetricRows?: MonthlyOperationalMetricRow[];
+  monthlyMetricRows?: OperationalMetricRow[];
   monthlyQuery?: Partial<DashboardQueryState>;
 }
 
@@ -43,19 +43,26 @@ const mocks = vi.hoisted(() => {
       "dashboard.currentStock": "Stock",
       "dashboard.noRecentOrders": "No orders yet",
       "dashboard.noLowStock": "All stock levels OK",
-      "dashboard.monthlyTrends.title": "Monthly Trends",
+      "dashboard.monthlyTrends.title": "Order trends",
       "dashboard.monthlyTrends.revenue": "Revenue",
-      "dashboard.monthlyTrends.orderCount": "Order Count",
-      "dashboard.monthlyTrends.paidOrders": "Paid Orders",
-      "dashboard.monthlyTrends.completedOrders": "Completed Orders",
+      "dashboard.monthlyTrends.orderCount": "Incoming",
+      "dashboard.monthlyTrends.paidOrders": "Paid",
+      "dashboard.monthlyTrends.completedOrders": "Completed",
       "dashboard.monthlyTrends.latest12Months": "Latest 12 months",
-      "dashboard.monthlyTrends.loading": "Loading monthly trends...",
-      "dashboard.monthlyTrends.emptyDescription": "No monthly trend data is available yet.",
-      "dashboard.monthlyTrends.errorMessage": "Failed to load monthly trends.",
-      "dashboard.monthlyTrends.zeroValueSummary": "All monthly trend metrics are zero.",
-      "dashboard.monthlyTrends.chartAriaLabel": "Monthly count trends chart for orders, paid orders, and completed orders",
-      "dashboard.monthlyTrends.chartDescription":
-        "A line chart showing order count, paid orders, and completed orders over the latest 12 months. Revenue is shown separately as a statistic and summary.",
+      "dashboard.monthlyTrends.period.day": "Last 30 days",
+      "dashboard.monthlyTrends.period.week": "Last 12 weeks",
+      "dashboard.monthlyTrends.period.month": "Last 12 months",
+      "dashboard.monthlyTrends.period.year": "Last 5 years",
+      "dashboard.monthlyTrends.granularity.day": "Daily",
+      "dashboard.monthlyTrends.granularity.week": "Weekly",
+      "dashboard.monthlyTrends.granularity.month": "Monthly",
+      "dashboard.monthlyTrends.granularity.year": "Yearly",
+      "dashboard.monthlyTrends.loading": "Loading order trend data...",
+      "dashboard.monthlyTrends.emptyDescription": "No order trend data is available yet.",
+      "dashboard.monthlyTrends.errorMessage": "Failed to load order trends.",
+      "dashboard.monthlyTrends.zeroValueSummary": "All order trend metrics are zero.",
+      "dashboard.monthlyTrends.chartAriaLabel": "Order trend line chart: incoming, paid, and completed",
+      "dashboard.monthlyTrends.chartDescription": "Incoming, paid, and completed orders for the selected period.",
       "orderStatus.shipped": "Handed to Courier",
     };
 
@@ -173,6 +180,30 @@ vi.mock("antd", async () => {
     ),
     Col: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
     Row: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    Radio: {
+      Group: ({
+        onChange,
+        options,
+        value,
+      }: {
+        onChange?: (event: { target: { value: string } }) => void;
+        options?: { label: string; value: string }[];
+        value?: string;
+      }) => (
+        <div>
+          {options?.map((option) => (
+            <button
+              aria-pressed={option.value === value}
+              key={option.value}
+              onClick={() => onChange?.({ target: { value: option.value } })}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ),
+    },
     Statistic: ({
       title,
       value,
@@ -218,10 +249,11 @@ const currencyFormatter = new Intl.NumberFormat("id-ID", {
 });
 
 const createMonthlyMetricRow = (
-  monthStart: string,
-  values: Partial<MonthlyOperationalMetricRow> = {},
-): MonthlyOperationalMetricRow => ({
-  month_start: monthStart,
+  bucketStart: string,
+  values: Partial<OperationalMetricRow> = {},
+): OperationalMetricRow => ({
+  bucket_start: bucketStart,
+  bucket_end: bucketStart,
   order_count: 0,
   paid_order_count: 0,
   completed_order_count: 0,
@@ -245,32 +277,55 @@ const populatedMonthlyMetricRows = [
 ];
 
 const setupDashboardQueries = ({ monthlyMetricRows = populatedMonthlyMetricRows, monthlyQuery = {} }: DashboardQueryOptions = {}) => {
-  mocks.useList
-    .mockReturnValueOnce({ result: { total: 1 } })
-    .mockReturnValueOnce({ result: { total: 2 } })
-    .mockReturnValueOnce({ result: { total: 3 } })
-    .mockReturnValueOnce({ result: { data: [{ total_amount: 10000 }] } })
-    .mockReturnValueOnce({
-      result: {
-        data: [
-          {
-            id: "order-1",
-            total_amount: 10000,
-            status: "shipped",
-            created_at: "2026-04-01T00:00:00.000Z",
-          },
-        ],
-      },
-      query: { isLoading: false },
-    })
-    .mockReturnValueOnce({
-      result: { data: [{ id: "product-1", name: "Bandage", stock: 4 }] },
-      query: { isLoading: false },
-    })
-    .mockReturnValueOnce({
-      result: { data: monthlyMetricRows },
-      query: { isLoading: false, isError: false, error: null, ...monthlyQuery },
-    });
+  mocks.useList.mockImplementation((params: { resource: string; meta?: Record<string, unknown>; pagination?: Record<string, unknown> }) => {
+    if (params.resource === "orders" && params.meta?.count === "exact") {
+      return { result: { total: 1 } };
+    }
+
+    if (params.resource === "profiles") {
+      return { result: { total: 2 } };
+    }
+
+    if (params.resource === "products" && params.meta?.count === "exact") {
+      return { result: { total: 3 } };
+    }
+
+    if (params.resource === "orders" && params.pagination?.mode === "off") {
+      return { result: { data: [{ total_amount: 10000 }] } };
+    }
+
+    if (params.resource === "orders") {
+      return {
+        result: {
+          data: [
+            {
+              id: "order-1",
+              total_amount: 10000,
+              status: "shipped",
+              created_at: "2026-04-01T00:00:00.000Z",
+            },
+          ],
+        },
+        query: { isLoading: false },
+      };
+    }
+
+    if (params.resource === "products") {
+      return {
+        result: { data: [{ id: "product-1", name: "Bandage", stock: 4 }] },
+        query: { isLoading: false },
+      };
+    }
+
+    if (params.resource === "admin_operational_metrics") {
+      return {
+        result: { data: monthlyMetricRows },
+        query: { isLoading: false, isError: false, error: null, ...monthlyQuery },
+      };
+    }
+
+    return { result: { data: [] }, query: { isLoading: false } };
+  });
 };
 
 describe("Dashboard", () => {
@@ -317,73 +372,88 @@ describe("Dashboard", () => {
     );
   });
 
-  it("queries monthly operational metrics from the aggregate view", () => {
+  it("queries operational metrics from the aggregate RPC resource", () => {
     setupDashboardQueries();
 
     render(<Dashboard />);
 
     expect(mocks.useList).toHaveBeenCalledWith({
-      resource: "admin_monthly_operational_metrics",
-      sorters: [{ field: "month_start", order: "desc" }],
+      resource: "admin_operational_metrics",
       pagination: { pageSize: 12 },
-      meta: { select: "month_start,order_count,paid_order_count,completed_order_count,revenue" },
+      filters: [
+        { field: "granularity", operator: "eq", value: "month" },
+        { field: "start_date", operator: "eq", value: "2025-05-01" },
+        { field: "end_date", operator: "eq", value: "2026-04-30" },
+      ],
     });
   });
 
-  it("renders populated monthly trends with month labels and the translated summary", () => {
+  it("updates operational metric filters when a new granularity is selected", () => {
+    setupDashboardQueries();
+
+    render(<Dashboard />);
+    fireEvent.click(screen.getByRole("button", { name: "Daily" }));
+
+    expect(mocks.useList).toHaveBeenLastCalledWith({
+      resource: "admin_operational_metrics",
+      pagination: { pageSize: 30 },
+      filters: [
+        { field: "granularity", operator: "eq", value: "day" },
+        { field: "start_date", operator: "eq", value: "2026-03-17" },
+        { field: "end_date", operator: "eq", value: "2026-04-15" },
+      ],
+    });
+  });
+
+  it("renders populated order trends with labels and the translated summary", () => {
     setupDashboardQueries();
 
     render(<Dashboard />);
 
     const pageText = document.body.textContent ?? "";
 
-    expect(screen.getByText("Monthly Trends")).not.toBeNull();
-    expect(screen.getByRole("img", { name: "Monthly count trends chart for orders, paid orders, and completed orders" })).not.toBeNull();
-    expect(
-      screen.getByText(
-        "A line chart showing order count, paid orders, and completed orders over the latest 12 months. Revenue is shown separately as a statistic and summary.",
-      ),
-    ).not.toBeNull();
-    expect(pageText).toContain("2026-03");
-    expect(pageText).toContain("2026-04");
-    expect(pageText).toContain(`Revenue: ${currencyFormatter.format(125000)}`);
-    expect(pageText).toContain("Order Count: 5");
-    expect(pageText).toContain("Paid Orders: 3");
-    expect(pageText).toContain("Completed Orders: 2");
+    expect(screen.getByText("Order trends")).not.toBeNull();
+    expect(screen.getByRole("img", { name: "Order trend line chart: incoming, paid, and completed" })).not.toBeNull();
+    expect(screen.getByText("Incoming, paid, and completed orders for the selected period.")).not.toBeNull();
+    expect(pageText).toContain("Monthly");
+    expect(pageText).toContain(currencyFormatter.format(125000));
+    expect(pageText).toContain("Incoming: 5");
+    expect(pageText).toContain("Paid: 3");
+    expect(pageText).toContain("Completed: 2");
   });
 
-  it("renders the monthly trend loading state while the aggregate query is pending", () => {
+  it("renders the order trend loading state while the aggregate query is pending", () => {
     setupDashboardQueries({ monthlyQuery: { isLoading: true } });
 
     render(<Dashboard />);
 
-    expect(screen.getByText("Monthly Trends")).not.toBeNull();
+    expect(screen.getByText("Order trends")).not.toBeNull();
     expect(screen.getByTestId("monthly-trend-skeleton")).not.toBeNull();
-    expect(screen.getByText("Loading monthly trends...")).not.toBeNull();
+    expect(screen.getByText("Loading order trend data...")).not.toBeNull();
     expect(mocks.line).not.toHaveBeenCalled();
   });
 
-  it("renders the monthly trend empty state when no aggregate rows are returned", () => {
+  it("renders the order trend empty state when no aggregate rows are returned", () => {
     setupDashboardQueries({ monthlyMetricRows: [] });
 
     render(<Dashboard />);
 
-    expect(screen.getByText("No monthly trend data is available yet.")).not.toBeNull();
+    expect(screen.getByText("No order trend data is available yet.")).not.toBeNull();
     expect(screen.queryByTestId("monthly-trend-line")).toBeNull();
     expect(mocks.line).not.toHaveBeenCalled();
   });
 
-  it("renders the monthly trend empty state when aggregate rows only have malformed month starts", () => {
+  it("renders the order trend empty state when aggregate rows only have malformed bucket starts", () => {
     setupDashboardQueries({ monthlyMetricRows: [createMonthlyMetricRow("bad-date", { order_count: 5, paid_order_count: 4, completed_order_count: 3, revenue: 250000 })] });
 
     render(<Dashboard />);
 
-    expect(screen.getByText("No monthly trend data is available yet.")).not.toBeNull();
+    expect(screen.getByText("No order trend data is available yet.")).not.toBeNull();
     expect(screen.queryByTestId("monthly-trend-line")).toBeNull();
     expect(mocks.line).not.toHaveBeenCalled();
   });
 
-  it("renders the monthly trend error state without exposing failed query details", () => {
+  it("renders the order trend error state without exposing failed query details", () => {
     setupDashboardQueries({
       monthlyMetricRows: [],
       monthlyQuery: { isError: true, error: new Error("database host leaked") },
@@ -391,7 +461,7 @@ describe("Dashboard", () => {
 
     render(<Dashboard />);
 
-    expect(screen.getByRole("alert").textContent).toBe("Failed to load monthly trends.");
+    expect(screen.getByRole("alert").textContent).toBe("Failed to load order trends.");
     expect(screen.queryByText("database host leaked")).toBeNull();
     expect(mocks.line).not.toHaveBeenCalled();
   });
@@ -403,10 +473,10 @@ describe("Dashboard", () => {
 
     const pageText = document.body.textContent ?? "";
 
-    expect(screen.getByRole("alert").textContent).toBe("All monthly trend metrics are zero.");
-    expect(screen.queryByText("No monthly trend data is available yet.")).toBeNull();
+    expect(screen.getByRole("alert").textContent).toBe("All order trend metrics are zero.");
+    expect(screen.queryByText("No order trend data is available yet.")).toBeNull();
     expect(screen.getByTestId("monthly-trend-line")).not.toBeNull();
-    expect(pageText).toContain(`Revenue: ${currencyFormatter.format(0)}`);
+    expect(pageText).toContain(currencyFormatter.format(0));
     expect(mocks.line.mock.calls[0]?.[0].data.every((point) => point.value === 0)).toBe(true);
   });
 

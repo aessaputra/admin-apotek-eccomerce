@@ -1,5 +1,6 @@
 import { useList, useTranslation, useNavigation } from "@refinedev/core";
 import { Card, Col, Row, Statistic, Table, Tag, Typography, Button, Empty } from "antd";
+import { useMemo, useState } from "react";
 import {
   ShoppingCartOutlined,
   UserOutlined,
@@ -10,10 +11,12 @@ import {
 import { STATUS_COLORS } from "../../constants/orders";
 import { MonthlyOperationalTrendCard } from "./MonthlyOperationalTrendCard";
 import {
-  buildMonthlyOperationalTrendData,
-  isValidMonthStart,
-  type MonthlyOperationalMetricRow,
+  buildOperationalTrendData,
+  getDefaultOperationalTrendRequest,
+  isValidBucketStart,
   type MonthlyOperationalTrendData,
+  type OperationalMetricRow,
+  type OperationalTrendGranularity,
 } from "./monthlyOperationalTrends";
 
 const { Text } = Typography;
@@ -32,12 +35,23 @@ const emptyMonthlyOperationalTrendData: MonthlyOperationalTrendData = {
   },
 };
 
-const hasAggregateMetricRows = (rows: readonly MonthlyOperationalMetricRow[]): boolean =>
-  rows.some((row) => isValidMonthStart(row.month_start));
+const hasOperationalMetricRows = (rows: readonly OperationalMetricRow[]): boolean =>
+  rows.some((row) => isValidBucketStart(row.bucket_start));
 
 export const Dashboard: React.FC = () => {
   const { translate } = useTranslation();
   const { list: navigateList } = useNavigation();
+  const [trendGranularity, setTrendGranularity] = useState<OperationalTrendGranularity>("month");
+  const trendRequest = useMemo(() => getDefaultOperationalTrendRequest(trendGranularity), [trendGranularity]);
+  const trendGranularityOptions = useMemo(
+    () => [
+      { label: translate("dashboard.monthlyTrends.granularity.day"), value: "day" as const },
+      { label: translate("dashboard.monthlyTrends.granularity.week"), value: "week" as const },
+      { label: translate("dashboard.monthlyTrends.granularity.month"), value: "month" as const },
+      { label: translate("dashboard.monthlyTrends.granularity.year"), value: "year" as const },
+    ],
+    [translate],
+  );
 
   // Count-only queries (fetch 1 row, get exact count)
   const { result: ordersResult } = useList({
@@ -83,13 +97,15 @@ export const Dashboard: React.FC = () => {
     ],
   });
 
-  const { result: monthlyOperationalMetricsResult, query: monthlyOperationalMetricsQuery } =
-    useList<MonthlyOperationalMetricRow>({
-      resource: "admin_monthly_operational_metrics",
-      sorters: [{ field: "month_start", order: "desc" }],
-      pagination: { pageSize: 12 },
-      meta: { select: "month_start,order_count,paid_order_count,completed_order_count,revenue" },
-    });
+  const { result: operationalMetricsResult, query: operationalMetricsQuery } = useList<OperationalMetricRow>({
+    resource: "admin_operational_metrics",
+    pagination: { pageSize: trendRequest.bucketCount },
+    filters: [
+      { field: "granularity", operator: "eq", value: trendRequest.granularity },
+      { field: "start_date", operator: "eq", value: trendRequest.startDate },
+      { field: "end_date", operator: "eq", value: trendRequest.endDate },
+    ],
+  });
 
   const totalOrders = ordersResult?.total ?? 0;
   const totalCustomers = customersResult?.total ?? 0;
@@ -113,12 +129,12 @@ export const Dashboard: React.FC = () => {
     stock: number;
   }[];
 
-  const monthlyOperationalMetricRows = monthlyOperationalMetricsResult?.data ?? [];
-  const monthlyOperationalTrendData = hasAggregateMetricRows(monthlyOperationalMetricRows)
-    ? buildMonthlyOperationalTrendData(monthlyOperationalMetricRows)
+  const operationalMetricRows = operationalMetricsResult?.data ?? [];
+  const monthlyOperationalTrendData = hasOperationalMetricRows(operationalMetricRows)
+    ? buildOperationalTrendData(operationalMetricRows, trendGranularity)
     : emptyMonthlyOperationalTrendData;
-  const monthlyOperationalTrendError = monthlyOperationalMetricsQuery?.isError
-    ? monthlyOperationalMetricsQuery.error ?? true
+  const monthlyOperationalTrendError = operationalMetricsQuery?.isError
+    ? operationalMetricsQuery.error ?? true
     : undefined;
 
   return (
@@ -169,15 +185,18 @@ export const Dashboard: React.FC = () => {
           <MonthlyOperationalTrendCard
             data={monthlyOperationalTrendData}
             totals={monthlyOperationalTrendData.totals}
-            loading={monthlyOperationalMetricsQuery?.isLoading ?? false}
+            loading={operationalMetricsQuery?.isLoading ?? false}
             error={monthlyOperationalTrendError}
+            granularity={trendGranularity}
+            granularityOptions={trendGranularityOptions}
+            onGranularityChange={setTrendGranularity}
             labels={{
               title: translate("dashboard.monthlyTrends.title"),
               revenue: translate("dashboard.monthlyTrends.revenue"),
               orderCount: translate("dashboard.monthlyTrends.orderCount"),
               paidOrders: translate("dashboard.monthlyTrends.paidOrders"),
               completedOrders: translate("dashboard.monthlyTrends.completedOrders"),
-              latest12Months: translate("dashboard.monthlyTrends.latest12Months"),
+              periodLabel: translate(`dashboard.monthlyTrends.period.${trendGranularity}`),
               loading: translate("dashboard.monthlyTrends.loading"),
               emptyDescription: translate("dashboard.monthlyTrends.emptyDescription"),
               errorMessage: translate("dashboard.monthlyTrends.errorMessage"),

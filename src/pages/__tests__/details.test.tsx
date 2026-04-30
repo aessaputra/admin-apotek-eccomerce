@@ -59,6 +59,10 @@ vi.mock("@refinedev/antd", async () => ({
   NumberField: ({ value }: { value?: number | string }) => <span>{String(value ?? 0)}</span>,
 }));
 
+vi.mock("@ant-design/charts", () => ({
+  Line: () => <div data-testid="line-chart" />,
+}));
+
 vi.mock("antd", async () => {
   const ReactModule = await import("react");
 
@@ -140,9 +144,23 @@ vi.mock("antd", async () => {
     ),
     Col: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Row: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Radio: {
+      Group: ({ options, value }: { options?: { label: string; value: string }[]; value?: string }) => (
+        <div>
+          {options?.map((option) => (
+            <button aria-pressed={option.value === value} key={option.value} type="button">
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ),
+    },
     Statistic: ({ title, value }: { title: React.ReactNode; value: React.ReactNode }) => (
       <div>{title}:{String(value)}</div>
     ),
+    Tooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Alert: ({ message }: { message?: React.ReactNode }) => <div role="alert">{message}</div>,
+    Skeleton: () => <div data-testid="skeleton" />,
     Table,
     Empty: ({ description }: { description: React.ReactNode }) => <div>{description}</div>,
   };
@@ -321,6 +339,23 @@ describe("detail and dashboard pages", () => {
           result: {
             data: [
               { id: "order-1", total_amount: 25000, status: "pending", created_at: "2026-04-01T00:00:00.000Z" },
+            ],
+          },
+          query: { isLoading: false },
+        };
+      }
+      if (args.resource === "admin_operational_metrics") {
+        return {
+          result: {
+            data: [
+              {
+                bucket_start: "2026-04-01",
+                bucket_end: "2026-04-30",
+                order_count: 1,
+                paid_order_count: 1,
+                completed_order_count: 0,
+                revenue: 25000,
+              },
             ],
           },
           query: { isLoading: false },
