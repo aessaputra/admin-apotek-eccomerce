@@ -46,7 +46,21 @@
     "orderTotal": "Total",
     "orderStatus": "Status",
     "productName": "Produk",
-    "currentStock": "Stok"
+    "currentStock": "Stok",
+    "monthlyTrends": {
+      "title": "Tren Bulanan",
+      "revenue": "Pendapatan",
+      "orderCount": "Jumlah Pesanan",
+      "paidOrders": "Pesanan Dibayar",
+      "completedOrders": "Pesanan Selesai",
+      "latest12Months": "12 bulan terakhir",
+      "loading": "Memuat data tren bulanan...",
+      "emptyDescription": "Belum ada data tren bulanan untuk ditampilkan.",
+      "errorMessage": "Gagal memuat tren bulanan.",
+      "zeroValueSummary": "Semua metrik tren bulanan bernilai nol.",
+      "chartAriaLabel": "Grafik tren jumlah bulanan untuk pesanan, pesanan dibayar, dan pesanan selesai",
+      "chartDescription": "Grafik garis yang menampilkan jumlah pesanan, pesanan dibayar, dan pesanan selesai selama 12 bulan terakhir. Pendapatan ditampilkan terpisah sebagai statistik dan ringkasan."
+    }
   },
   "salesReports": {
     "salesReports": "Laporan Penjualan"
