@@ -533,12 +533,8 @@ export const buildSnapPayload = (order: Order, user: AuthUser): SnapPayload => {
     ? Math.round(Number(order.gross_amount))
     : null;
 
-  if (
-    persistedGrossAmount != null &&
-    Number.isFinite(persistedGrossAmount) &&
-    persistedGrossAmount !== calculatedGrossAmount
-  ) {
-    throw new Error("Order gross_amount does not match itemized total");
+  if (persistedGrossAmount != null && !Number.isFinite(persistedGrossAmount)) {
+    throw new Error("Order gross_amount is invalid");
   }
 
   const itemDetails: SnapItemDetail[] = (order.order_items || []).map(
