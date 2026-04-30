@@ -1,10 +1,12 @@
 import { Line } from "@ant-design/charts";
-import { Alert, Card, Col, Empty, Row, Skeleton, Space, Statistic, Tooltip, Typography } from "antd";
+import { Alert, Card, Col, Empty, Radio, Row, Skeleton, Space, Statistic, Tooltip, Typography } from "antd";
+import type { RadioChangeEvent } from "antd";
 import { useId, useMemo } from "react";
 import type {
   MonthlyOperationalTrendChartPoint,
   MonthlyOperationalTrendData,
   MonthlyOperationalTrendTotals,
+  OperationalTrendGranularity,
 } from "./monthlyOperationalTrends";
 
 type CountMetricKey = "orderCount" | "paidOrderCount" | "completedOrderCount";
@@ -23,7 +25,7 @@ export interface MonthlyOperationalTrendCardLabels {
   orderCount: string;
   paidOrders: string;
   completedOrders: string;
-  latest12Months: string;
+  periodLabel: string;
   loading: string;
   emptyDescription: string;
   errorMessage: string;
@@ -32,12 +34,20 @@ export interface MonthlyOperationalTrendCardLabels {
   chartDescription: string;
 }
 
+export interface MonthlyOperationalTrendGranularityOption {
+  label: string;
+  value: OperationalTrendGranularity;
+}
+
 export interface MonthlyOperationalTrendCardProps {
   data: MonthlyOperationalTrendData;
   totals: MonthlyOperationalTrendTotals;
   loading: boolean;
   error?: unknown;
   labels: MonthlyOperationalTrendCardLabels;
+  granularity: OperationalTrendGranularity;
+  granularityOptions: readonly MonthlyOperationalTrendGranularityOption[];
+  onGranularityChange: (granularity: OperationalTrendGranularity) => void;
 }
 
 const currencyFormatter = new Intl.NumberFormat("id-ID", {
@@ -46,19 +56,33 @@ const currencyFormatter = new Intl.NumberFormat("id-ID", {
   maximumFractionDigits: 0,
 });
 
+const compactNumberFormatter = new Intl.NumberFormat("id-ID", {
+  maximumFractionDigits: 1,
+  notation: "compact",
+});
+
+const compactMonthFormatter = new Intl.DateTimeFormat("id-ID", {
+  month: "short",
+  timeZone: "Asia/Jakarta",
+  year: "2-digit",
+});
+
 export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardProps> = ({
   data,
   totals,
   loading,
   error,
   labels,
+  granularity,
+  granularityOptions,
+  onGranularityChange,
 }) => {
   const chartDescriptionId = useId();
   const formattedRevenue = useMemo(() => currencyFormatter.format(totals.revenue), [totals.revenue]);
   const revenueSummary = useMemo(
     () =>
       [
-        labels.latest12Months,
+        labels.periodLabel,
         `${labels.revenue}: ${formattedRevenue}`,
         `${labels.orderCount}: ${totals.orderCount}`,
         `${labels.paidOrders}: ${totals.paidOrderCount}`,
@@ -67,10 +91,26 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
     [
       formattedRevenue,
       labels.completedOrders,
-      labels.latest12Months,
       labels.orderCount,
       labels.paidOrders,
+      labels.periodLabel,
       labels.revenue,
+      totals.completedOrderCount,
+      totals.orderCount,
+      totals.paidOrderCount,
+    ],
+  );
+  const countSummary = useMemo(
+    () =>
+      [
+        `${labels.orderCount}: ${totals.orderCount}`,
+        `${labels.paidOrders}: ${totals.paidOrderCount}`,
+        `${labels.completedOrders}: ${totals.completedOrderCount}`,
+      ].join(" · "),
+    [
+      labels.completedOrders,
+      labels.orderCount,
+      labels.paidOrders,
       totals.completedOrderCount,
       totals.orderCount,
       totals.paidOrderCount,
@@ -101,8 +141,13 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
       height: 280,
       autoFit: true,
       axis: {
-        x: { title: labels.latest12Months },
-        y: { title: labels.orderCount },
+        x: {
+          labelFormatter: formatCompactMonthTick,
+          tickCount: 6,
+        },
+        y: {
+          labelFormatter: formatCompactCountTick,
+        },
       },
       legend: {
         color: {
@@ -113,7 +158,7 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
         title: "monthLabel",
       },
     }),
-    [countChartData, labels.latest12Months, labels.orderCount],
+    [countChartData],
   );
   const hasRows = data.rows.length > 0;
   const hasOnlyZeroValues =
@@ -122,8 +167,24 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
     totals.completedOrderCount === 0 &&
     totals.revenue === 0;
 
+  const handleGranularityChange = (event: RadioChangeEvent): void => {
+    onGranularityChange(event.target.value as OperationalTrendGranularity);
+  };
+
   return (
-    <Card title={labels.title}>
+    <Card
+      title={labels.title}
+      extra={
+        <Radio.Group
+          optionType="button"
+          buttonStyle="solid"
+          size="small"
+          value={granularity}
+          options={granularityOptions.map((option) => ({ label: option.label, value: option.value }))}
+          onChange={handleGranularityChange}
+        />
+      }
+    >
       {loading ? (
         <Space direction="vertical" size="middle" style={{ width: "100%" }}>
           <Skeleton active paragraph={{ rows: 4 }} title={false} />
@@ -145,23 +206,11 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
               <Typography.Paragraph id={chartDescriptionId} style={{ marginBottom: 8 }}>
                 {labels.chartDescription}
               </Typography.Paragraph>
-              <Typography.Text>{revenueSummary}</Typography.Text>
+              <Typography.Text>{countSummary}</Typography.Text>
             </Col>
           </Row>
 
           {hasOnlyZeroValues ? <Alert type="info" showIcon message={labels.zeroValueSummary} /> : null}
-
-          <ul style={{ margin: 0, paddingInlineStart: 20 }}>
-            <li>
-              {labels.orderCount}: {totals.orderCount}
-            </li>
-            <li>
-              {labels.paidOrders}: {totals.paidOrderCount}
-            </li>
-            <li>
-              {labels.completedOrders}: {totals.completedOrderCount}
-            </li>
-          </ul>
 
           <div role="img" aria-label={labels.chartAriaLabel} aria-describedby={chartDescriptionId}>
             <Line {...chartConfig} />
@@ -184,3 +233,21 @@ const mapCountPoints = (
     seriesLabel,
     value,
   }));
+
+const formatCompactMonthTick = (monthLabel: string): string => {
+  const [year, month] = monthLabel.split("-");
+  const yearNumber = Number(year);
+  const monthIndex = Number(month) - 1;
+
+  if (!Number.isInteger(yearNumber) || !Number.isInteger(monthIndex) || monthIndex < 0 || monthIndex > 11) {
+    return monthLabel;
+  }
+
+  return compactMonthFormatter.format(new Date(Date.UTC(yearNumber, monthIndex, 1)));
+};
+
+const formatCompactCountTick = (value: number | string): string => {
+  const numericValue = typeof value === "number" ? value : Number(value);
+
+  return Number.isFinite(numericValue) ? compactNumberFormatter.format(numericValue) : String(value);
+};

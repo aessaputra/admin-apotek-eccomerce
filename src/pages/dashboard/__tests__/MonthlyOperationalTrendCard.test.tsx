@@ -21,6 +21,15 @@ interface LineMockProps {
   yField: string;
   colorField: string;
   seriesField: string;
+  axis?: {
+    x?: {
+      tickCount?: number;
+      labelFormatter?: (value: string) => string;
+    };
+    y?: {
+      labelFormatter?: (value: number | string) => string;
+    };
+  };
 }
 
 const chartMocks = vi.hoisted(() => ({
@@ -51,15 +60,27 @@ vi.mock("@ant-design/charts", async () => {
 
 vi.mock("antd", () => ({
   Alert: ({ message }: { message?: React.ReactNode }) => <div role="alert">{message}</div>,
-  Card: ({ title, children }: { title?: React.ReactNode; children?: React.ReactNode }) => (
+  Card: ({ title, extra, children }: { title?: React.ReactNode; extra?: React.ReactNode; children?: React.ReactNode }) => (
     <section>
       <h2>{title}</h2>
+      <div>{extra}</div>
       {children}
     </section>
   ),
   Col: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Empty: ({ description }: { description?: React.ReactNode }) => <div>{description}</div>,
   Row: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  Radio: {
+    Group: ({ options, value }: { options?: { label: string; value: string }[]; value?: string }) => (
+      <div data-testid="granularity-control">
+        {options?.map((option) => (
+          <button aria-pressed={option.value === value} key={option.value} type="button">
+            {option.label}
+          </button>
+        ))}
+      </div>
+    ),
+  },
   Skeleton: () => <div data-testid="trend-skeleton" />,
   Space: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Statistic: ({
@@ -85,20 +106,25 @@ vi.mock("antd", () => ({
 
 const REFERENCE_DATE = new Date("2026-04-15T00:00:00.000Z");
 const labels = {
-  title: "Monthly Trends",
+  title: "Order trends",
   revenue: "Revenue",
-  orderCount: "Order Count",
-  paidOrders: "Paid Orders",
-  completedOrders: "Completed Orders",
-  latest12Months: "Latest 12 months",
-  loading: "Loading monthly trends...",
-  emptyDescription: "No monthly trend data is available yet.",
-  errorMessage: "Failed to load monthly trends.",
-  zeroValueSummary: "All monthly trend metrics are zero.",
-  chartAriaLabel: "Monthly count trends chart for orders, paid orders, and completed orders",
-  chartDescription:
-    "A line chart showing order count, paid orders, and completed orders over the latest 12 months. Revenue is shown separately as a statistic and summary.",
+  orderCount: "Incoming",
+  paidOrders: "Paid",
+  completedOrders: "Completed",
+  periodLabel: "Last 12 months",
+  loading: "Loading order trend data...",
+  emptyDescription: "No order trend data is available yet.",
+  errorMessage: "Failed to load order trends.",
+  zeroValueSummary: "All order trend metrics are zero.",
+  chartAriaLabel: "Order trend line chart: incoming, paid, and completed",
+  chartDescription: "Incoming, paid, and completed orders for the selected period.",
 };
+const granularityOptions = [
+  { label: "Daily", value: "day" as const },
+  { label: "Weekly", value: "week" as const },
+  { label: "Monthly", value: "month" as const },
+  { label: "Yearly", value: "year" as const },
+];
 const currencyFormatter = new Intl.NumberFormat("id-ID", {
   style: "currency",
   currency: "IDR",
@@ -142,6 +168,9 @@ const renderCard = (props: Partial<MonthlyOperationalTrendCardProps> = {}) => {
       loading={props.loading ?? false}
       error={props.error}
       labels={props.labels ?? labels}
+      granularity={props.granularity ?? "month"}
+      granularityOptions={props.granularityOptions ?? granularityOptions}
+      onGranularityChange={props.onGranularityChange ?? vi.fn()}
     />,
   );
 };
@@ -180,6 +209,7 @@ describe("MonthlyOperationalTrendCard", () => {
 
     expect(screen.getByText(labels.title)).not.toBeNull();
     expect(document.body.textContent).toContain(currencyFormatter.format(populatedTrendData.totals.revenue));
+    expect(screen.getByTestId("granularity-control").textContent).toContain("Monthly");
     expect(screen.getByRole("img", { name: labels.chartAriaLabel })).not.toBeNull();
     expect(screen.getByText(labels.chartDescription)).not.toBeNull();
 
@@ -189,6 +219,9 @@ describe("MonthlyOperationalTrendCard", () => {
     expect(lineProps.yField).toBe("value");
     expect(lineProps.colorField).toBe("seriesLabel");
     expect(lineProps.seriesField).toBe("seriesLabel");
+    expect(lineProps.axis?.x?.tickCount).toBe(6);
+    expect(lineProps.axis?.x?.labelFormatter?.("2026-04")).toBe("Apr 26");
+    expect(lineProps.axis?.y?.labelFormatter?.(12500).replace(/\u00a0/g, " ")).toBe("12,5 rb");
     expect(lineProps.data).toHaveLength(36);
     expect(lineProps.data.some((point) => point.metric === "revenue")).toBe(false);
     expect(new Set(lineProps.data.map((point) => point.seriesLabel))).toEqual(
