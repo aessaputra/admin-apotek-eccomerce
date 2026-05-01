@@ -43,6 +43,7 @@ const mocks = vi.hoisted(() => {
     limit: ReturnType<typeof vi.fn>;
   }> = [];
   const productImagesInsert = vi.fn(() => Promise.resolve({ error: null }));
+  const mfaListFactors = vi.fn(() => Promise.resolve({ data: { all: [] }, error: null }));
   const supabaseFrom = vi.fn((table: string) => {
     if (table === "admin_products") {
       const query = {
@@ -82,6 +83,7 @@ const mocks = vi.hoisted(() => {
     lastOnValuesChange,
     productQueries,
     productImagesInsert,
+    mfaListFactors,
     supabaseFrom,
   };
 });
@@ -230,6 +232,7 @@ vi.mock("antd", () => {
   );
 
   const Typography = {
+    Title: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
     Text: ({ children, type }: { children: React.ReactNode; type?: string }) => <span data-type={type}>{children}</span>,
     Paragraph: ({ children, ellipsis, style }: { children: React.ReactNode; ellipsis?: { rows: number; expandable: boolean }; style?: React.CSSProperties }) => <p data-ellipsis={ellipsis ? "true" : "false"} style={style}>{children}</p>,
   };
@@ -269,6 +272,18 @@ vi.mock("antd", () => {
     Select: ({ options, placeholder }: { options?: Array<{ label: string; value: string | boolean }>; placeholder?: string }) => <div>{placeholder ?? options?.map((option) => String(option.label)).join(",")}</div>,
     Tabs: ({ items }: { items?: Array<{ label: React.ReactNode; children: React.ReactNode }> }) => <div>{items?.map((item) => <div key={String(item.label)}>{item.label}{item.children}</div>)}</div>,
     Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Alert: ({ message, description }: { message: React.ReactNode; description?: React.ReactNode }) => <div role="alert">{message}{description}</div>,
+    List: Object.assign(
+      ({ dataSource = [], renderItem, locale }: { dataSource?: Array<{ id: string }>; renderItem?: (item: { id: string }, index: number) => React.ReactNode; locale?: { emptyText?: React.ReactNode } }) => (
+        <div>{dataSource.length > 0 ? dataSource.map((item, index) => <div key={item.id}>{renderItem?.(item, index)}</div>) : locale?.emptyText}</div>
+      ),
+      {
+        Item: Object.assign(
+          ({ children, actions }: { children: React.ReactNode; actions?: React.ReactNode[] }) => <div>{children}{actions}</div>,
+          { Meta: ({ title, description }: { title: React.ReactNode; description?: React.ReactNode }) => <div>{title}{description}</div> }
+        ),
+      }
+    ),
     Row: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Col: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Upload: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -278,7 +293,10 @@ vi.mock("antd", () => {
     Space,
     Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
     Divider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Modal: ({ children, open, title, footer }: { children: React.ReactNode; open?: boolean; title?: React.ReactNode; footer?: React.ReactNode }) => open ? <div role="dialog"><div>{title}</div>{children}{footer}</div> : null,
+    Modal: Object.assign(
+      ({ children, open, title, footer }: { children: React.ReactNode; open?: boolean; title?: React.ReactNode; footer?: React.ReactNode }) => open ? <div role="dialog"><div>{title}</div>{children}{footer}</div> : null,
+      { confirm: vi.fn() }
+    ),
     message: {
       error: mocks.messageError,
       success: mocks.messageSuccess,
@@ -297,6 +315,17 @@ vi.mock("@ant-design/icons", () => ({
 
 vi.mock("../../providers/supabase-client", () => ({
   supabaseClient: {
+    auth: {
+      refreshSession: vi.fn(() => Promise.resolve({ data: {}, error: null })),
+      mfa: {
+        enroll: vi.fn(() => Promise.resolve({ data: null, error: null })),
+        challenge: vi.fn(() => Promise.resolve({ data: null, error: null })),
+        verify: vi.fn(() => Promise.resolve({ data: null, error: null })),
+        listFactors: mocks.mfaListFactors,
+        unenroll: vi.fn(() => Promise.resolve({ data: null, error: null })),
+        getAuthenticatorAssuranceLevel: vi.fn(() => Promise.resolve({ data: { currentLevel: "aal2", nextLevel: "aal2" }, error: null })),
+      },
+    },
     from: mocks.supabaseFrom,
     storage: {
       from: () => ({ remove: vi.fn(() => Promise.resolve({ error: null })) }),
@@ -342,6 +371,7 @@ describe("form pages", () => {
     mocks.lastOnValuesChange.current = undefined;
     mocks.productQueries.length = 0;
     mocks.productImagesInsert.mockClear();
+    mocks.mfaListFactors.mockClear();
     mocks.supabaseFrom.mockClear();
   });
 
@@ -662,14 +692,15 @@ describe("form pages", () => {
     expect(mocks.setFieldValue).toHaveBeenCalledWith("enabled_couriers", "jne:reg");
   });
 
-  it("renders nothing for profile without identity and shows password mismatch feedback when loaded", () => {
-    mocks.useGetIdentity.mockReturnValueOnce({ data: null }).mockReturnValueOnce({ data: { id: "user-1" } });
+  it("renders nothing for profile without identity and shows password mismatch feedback when loaded", async () => {
+    mocks.useGetIdentity.mockReturnValue({ data: { id: "user-1" } }).mockReturnValueOnce({ data: null });
     mocks.useForm.mockReturnValue({ formProps: {}, saveButtonProps: {} });
 
     const { container, rerender } = render(<Profile />);
     expect(container.textContent).toBe("");
 
     rerender(<Profile />);
+    await waitFor(() => expect(mocks.mfaListFactors).toHaveBeenCalledTimes(1));
     expect(screen.getByText("AvatarUpload")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "profile.changePassword" }));
     expect(mocks.messageError).toHaveBeenCalledWith("profile.passwordMismatch");
