@@ -342,6 +342,16 @@ describe("list pages", () => {
     );
   });
 
+  it("does not rewrite customer URL-synced pagination or filters before search input changes", () => {
+    const setFilters = vi.fn();
+    const setCurrentPage = vi.fn();
+
+    renderCustomerList(customerTableDefaults({ setFilters, setCurrentPage }));
+
+    expect(setFilters).not.toHaveBeenCalled();
+    expect(setCurrentPage).not.toHaveBeenCalled();
+  });
+
   it("debounces customer search for 400ms before replacing search filters", () => {
     vi.useFakeTimers();
     const setFilters = vi.fn();

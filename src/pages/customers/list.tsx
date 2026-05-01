@@ -6,7 +6,7 @@ import {
   getDefaultSortOrder,
 } from "@refinedev/antd";
 import { useTranslation } from "@refinedev/core";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Table, Space, Avatar, Input, Tooltip, Tag, Button } from "antd";
 import { useBanToggle } from "../../hooks/useBanToggle";
 import { buildCustomerSearchFilter } from "../../utils/customerSearch";
@@ -25,6 +25,7 @@ export const CustomerList: React.FC = () => {
   const { handleBan, handleUnban, isPending } = useBanToggle();
   const [searchText, setSearchText] = useState("");
   const [debouncedSearchText, setDebouncedSearchText] = useState("");
+  const hasSearchInputChangedRef = useRef(false);
 
   const { tableProps, tableQuery, sorters, setFilters, setCurrentPage } = useTable({
     syncWithLocation: true,
@@ -43,6 +44,10 @@ export const CustomerList: React.FC = () => {
   }, [searchText]);
 
   useEffect(() => {
+    if (!hasSearchInputChangedRef.current) {
+      return;
+    }
+
     const searchFilter = buildCustomerSearchFilter(debouncedSearchText);
 
     if (typeof setCurrentPage === "function") {
@@ -53,6 +58,11 @@ export const CustomerList: React.FC = () => {
       setFilters(searchFilter ? [searchFilter] : [], "replace");
     }
   }, [debouncedSearchText, setCurrentPage, setFilters]);
+
+  const handleSearchTextChange = (value: string) => {
+    hasSearchInputChangedRef.current = true;
+    setSearchText(value);
+  };
 
   const emailFallback = translate("customers.emailFallback");
   const searchPlaceholder = translate("customers.search.placeholder");
@@ -69,7 +79,7 @@ export const CustomerList: React.FC = () => {
           aria-label={searchPlaceholder}
           placeholder={searchPlaceholder}
           value={searchText}
-          onChange={(event) => setSearchText(event.target.value)}
+          onChange={(event) => handleSearchTextChange(event.target.value)}
         />
         <Table
           {...tableProps}
