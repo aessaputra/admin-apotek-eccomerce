@@ -1,98 +1,65 @@
 # Providers Module
 
-**Purpose:** Core infrastructure for authentication, data operations, and Supabase client configuration.
+**Purpose:** Frontend infrastructure for Supabase auth, Refine data access, and browser client configuration.
 
-## Files
+## FILES
 
 | File | Role |
 |------|------|
-| `auth.ts` | Supabase auth provider with admin-only access control |
-| `data.ts` | Data provider with storage cleanup on delete |
-| `supabase-client.ts` | Supabase browser client initialization |
-| `constants.ts` | Storage bucket names and configuration |
+| `auth.ts` | Refine `authProvider`; password login, admin role gate, MFA handling |
+| `data.ts` | Refine Supabase `dataProvider` wrapper; read models, RPC metrics, media cleanup |
+| `supabase-client.ts` | Browser Supabase client with public schema and persistent auth |
+| `constants.ts` | Required `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY` validation |
+| `__tests__/` | Provider unit tests for auth and data cleanup behavior |
 
-## Authentication Flow (auth.ts)
+## AUTH FLOW (`auth.ts`)
 
-```
-Login → Supabase signInWithPassword → Check profiles.role === 'admin'
-  ↓
-Non-admin? → Sign out → Reject ("Access denied")
-  ↓
-Admin? → Return success → Redirect to "/"
-```
-
-### Key Functions
-
-| Function | Purpose |
-|----------|---------|
-| `getProfileRole(userId)` | Fetch user role from profiles table |
-| `getProfileIdentity(userId)` | Get full_name, avatar_url for identity |
-| `rejectNonAdmin()` | Standard rejection response for non-admins |
-| `toAuthError(error)` | Normalize Supabase errors to AuthProvider format |
-
-### Admin-Only Pattern
-
-```typescript
-// Login checks admin role
-const role = await getProfileRole(data.user.id);
-if (role !== ADMIN_ROLE) {
-  await supabaseClient.auth.signOut();
-  return rejectNonAdmin();
-}
+```text
+login
+  -> supabase.auth.signInWithPassword
+  -> getProfileRole(user.id)
+  -> non-admin: signOut + reject
+  -> MFA required: store pending MFA state + redirect /mfa-verify
+  -> admin: success
 ```
 
-## Data Provider (data.ts)
+Key symbols:
 
-Extends `@refinedev/supabase` dataProvider with **automatic storage cleanup**:
+| Symbol | Role |
+|--------|------|
+| `ADMIN_ROLE` | Literal role gate: `admin` |
+| `getProfileRole(userId)` | Reads `profiles.role` |
+| `rejectNonAdmin()` | Standard denial result |
+| `isMfaRequired()` | Checks Supabase AAL response |
+| `authProvider.check()` | Revalidates session, admin role, MFA state |
 
-### Delete Flow
+## DATA FLOW (`data.ts`)
 
-```
-deleteOne("categories", id)
-  → Get category → Extract logo_url
-  → Delete from storage bucket
-  → Delete from database
+- `mapReadResource()` redirects admin-facing resources to protected read models where required.
+- `withProductReadMeta()` injects select metadata for product read resources.
+- `getAdminOperationalMetrics()` calls the `admin_operational_metrics` RPC; date/granularity filters are required.
+- `getOne("orders")` stitches order rows with `order_items` from the read model path.
+- `deleteOne` / `deleteMany` clean media for categories, products, and home banners before delegating DB deletion.
+- Banner media is removed only when no remaining banner row references the same `media_path`.
 
-deleteOne("products", id)
-  → Get product with product_images
-  → Delete all images from storage
-  → Delete from database
-```
+## CONVENTIONS
 
-### Storage Buckets
+- Keep Supabase browser keys limited to `VITE_SUPABASE_URL` and `VITE_SUPABASE_KEY`; other publishable frontend keys (for example Google Maps) belong outside this provider.
+- Return Refine-compatible auth results: `{ success, redirectTo, error, logout }`.
+- Normalize unknown errors with typed `Error` objects; do not leak privileged details.
+- For new protected read resources, add mapping/normalization here instead of scattering Supabase selects across pages.
+- If delete cleanup changes, update `src/providers/__tests__/data.test.ts` and storage utility tests.
 
-| Bucket | Used For |
-|--------|----------|
-| `category-logos` | Category logo images |
-| `product-images` | Product gallery images |
+## ANTI-PATTERNS
 
-### Import Pattern
+- **NEVER** use `SUPABASE_SERVICE_ROLE_KEY` here; service role belongs only in Edge Functions/server-side jobs.
+- **NEVER** bypass `authProvider.check` in route protection.
+- **NEVER** trust client metadata for admin authorization; use `profiles.role` or backend checks.
+- **NEVER** silently ignore storage cleanup failures unless the calling flow intentionally tolerates best-effort cleanup.
 
-```typescript
-import { dataProvider } from "./data";
-import { supabaseClient } from "./supabase-client";
-import authProvider from "./auth";
-```
+## RELATED
 
-## Supabase Client (supabase-client.ts)
-
-Creates browser-side Supabase client using environment variables:
-
-```typescript
-export const supabaseClient = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
-```
-
-## Anti-Patterns
-
-- **NEVER** use `SUPABASE_SERVICE_ROLE_KEY` here - that's for Edge Functions only
-- **NEVER** bypass `authProvider.check` - all pages require authentication
-- **NEVER** expose error details to non-admin users
-
-## Related
-
-- **Storage utilities:** `src/utils/storage.ts` - Path extraction, file validation
-- **Upload hooks:** `src/hooks/useSupabaseUpload.ts` - Reusable upload component logic
-- **Edge Functions:** `supabase/functions/` - Server-side logic with service role key
+- Upload path validation: `src/utils/storage.ts`
+- Upload hook: `src/hooks/useSupabaseUpload.ts`
+- Auth UI: `src/pages/auth/`, `src/pages/profile/`
+- Server-side privileged code: `supabase/functions/`
