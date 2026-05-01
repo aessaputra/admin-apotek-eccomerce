@@ -46,6 +46,12 @@
       "sourceType": "github",
       "computedHash": "5e052e505bfac4945d2f19f32125242233d29428233c8c71f6ce08a827d8b681"
     },
+    "information-architecture": {
+      "source": "julianoczkowski/designer-skills",
+      "sourceType": "github",
+      "skillPath": "information-architecture/SKILL.md",
+      "computedHash": "42b3b96103c0c910ff73841b9c843c8be8111c3d1fdc0746c07d911a23335191"
+    },
     "lint-and-validate": {
       "source": "sickn33/antigravity-awesome-skills",
       "sourceType": "github",
