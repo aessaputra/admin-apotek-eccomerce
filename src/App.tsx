@@ -3,12 +3,7 @@ import { Authenticated, GitHubBanner, Refine } from "@refinedev/core";
 import { DevtoolsPanel, DevtoolsProvider } from "@refinedev/devtools";
 import { RefineKbar, RefineKbarProvider } from "@refinedev/kbar";
 
-import {
-  AuthPage,
-  ErrorComponent,
-  ThemedLayout,
-  useNotificationProvider,
-} from "@refinedev/antd";
+import { AuthPage, ErrorComponent, ThemedLayout, useNotificationProvider } from "@refinedev/antd";
 import "@refinedev/antd/dist/reset.css";
 
 import {
@@ -63,6 +58,8 @@ import { HomeBannerList } from "./pages/home-banners/list";
 import { HomeBannerCreate } from "./pages/home-banners/create";
 import { HomeBannerEdit } from "./pages/home-banners/edit";
 import { HomeBannerShow } from "./pages/home-banners/show";
+import { MfaVerify } from "./pages/auth/mfa-verify";
+import { Login } from "./pages/auth/login";
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -165,6 +162,7 @@ function App() {
                 }}
               >
                 <Routes>
+                  <Route path="/mfa-verify" element={<MfaVerify />} />
                   <Route
                     element={
                       <Authenticated
@@ -222,7 +220,7 @@ function App() {
                       </Authenticated>
                     }
                   >
-                    <Route path="/login" element={<AuthPage type="login" title={<AuthTitle />} providers={[]} registerLink={false} />} />
+                    <Route path="/login" element={<Login />} />
                     <Route path="/forgot-password" element={<AuthPage type="forgotPassword" title={<AuthTitle />} />} />
                     <Route path="/update-password" element={<AuthPage type="updatePassword" title={<AuthTitle />} />} />
                   </Route>

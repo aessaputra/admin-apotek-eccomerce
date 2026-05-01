@@ -6,7 +6,8 @@ import App from "../App";
 const captured: {
   refineProps?: Record<string, unknown>;
   documentTitleHandler?: ((params: { resource?: { name?: string }; action?: string; params?: { id?: string } }) => string) | undefined;
-} = {};
+  routes: Array<{ path?: string; elementName?: string }>;
+} = { routes: [] };
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -23,7 +24,13 @@ vi.mock("react-i18next", () => ({
 vi.mock("react-router", () => ({
   BrowserRouter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   Routes: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Route: ({ element, children }: { element?: React.ReactNode; children?: React.ReactNode }) => <div>{element}{children}</div>,
+  Route: ({ element, children, path }: { element?: React.ReactNode; children?: React.ReactNode; path?: string }) => {
+    captured.routes.push({
+      path,
+      elementName: React.isValidElement(element) && typeof element.type === "function" ? element.type.name : undefined,
+    });
+    return <div>{element}{children}</div>;
+  },
   Outlet: () => <div>outlet</div>,
 }));
 
@@ -83,6 +90,8 @@ vi.mock("../contexts/color-mode", () => ({
 vi.mock("../components/header", () => ({ Header: () => <div>Header</div> }));
 vi.mock("../components/layout/auth-title", () => ({ AuthTitle: () => <div>AuthTitle</div> }));
 vi.mock("../components/layout/title", () => ({ Title: () => <div>Title</div> }));
+vi.mock("../pages/auth/login", () => ({ Login: () => <div>Login</div> }));
+vi.mock("../pages/auth/mfa-verify", () => ({ MfaVerify: () => <div>MfaVerify</div> }));
 vi.mock("../providers/auth", () => ({ default: { auth: true } }));
 vi.mock("../providers/data", () => ({ dataProvider: { data: true } }));
 vi.mock("../providers/supabase-client", () => ({ supabaseClient: { client: true } }));
@@ -109,6 +118,7 @@ vi.mock("../pages/home-banners/show", () => ({ HomeBannerShow: () => <div>HomeBa
 
 describe("App", () => {
   it("registers core Refine resources and document title behavior", () => {
+    captured.routes = [];
     render(<App />);
 
     const resources = (captured.refineProps?.resources as Array<{ name: string }>) ?? [];
@@ -139,6 +149,10 @@ describe("App", () => {
       syncWithLocation: true,
       warnWhenUnsavedChanges: true,
     });
+    expect(captured.routes[0]).toEqual(expect.objectContaining({ path: "/mfa-verify", elementName: "MfaVerify" }));
+    expect(captured.routes.find((route) => route.path === "/login")).toEqual(
+      expect.objectContaining({ path: "/login", elementName: "Login" }),
+    );
     expect(screen.getByText("DocumentTitleHandler")).not.toBeNull();
     expect(screen.getByText("UnsavedChangesNotifier")).not.toBeNull();
     expect(screen.getByText("RefineKbar")).not.toBeNull();
