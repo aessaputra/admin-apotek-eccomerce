@@ -1,5 +1,13 @@
 import { AuthProvider } from "@refinedev/core";
 import i18n from "../i18n";
+import {
+  clearAllPendingMfaState,
+  clearPendingMfaStateForUser,
+  getPendingMfaStateForUser,
+  MFA_VERIFY_ROUTE,
+  sanitizeMfaReturnTo,
+  setPendingMfaState,
+} from "../utils/mfa";
 import { supabaseClient } from "./supabase-client";
 import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../utils/storage";
 
@@ -46,9 +54,26 @@ function rejectNonAdmin() {
   };
 }
 
+function getCurrentPath(): string {
+  return typeof window === "undefined" ? "/" : window.location.pathname;
+}
+
+function getCurrentReturnTo(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+
+  return sanitizeMfaReturnTo(`${window.location.pathname}${window.location.search}${window.location.hash}`);
+}
+
+function isMfaRequired(assuranceLevel: { currentLevel?: string | null; nextLevel?: string | null } | null | undefined): boolean {
+  return assuranceLevel?.currentLevel === "aal1" && assuranceLevel?.nextLevel === "aal2";
+}
+
 const authProvider: AuthProvider = {
-  login: async ({ email, password, providerName }) => {
+  login: async (params) => {
     try {
+      const { email, password, providerName } = params;
+      const returnTo = sanitizeMfaReturnTo((params as { to?: unknown }).to);
+
       if (providerName) {
         return {
           success: false,
@@ -74,6 +99,31 @@ const authProvider: AuthProvider = {
           await supabaseClient.auth.signOut();
           return rejectNonAdmin();
         }
+
+        const { data: assuranceLevel, error: assuranceLevelError } =
+          await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
+
+        if (assuranceLevelError) {
+          await supabaseClient.auth.signOut();
+          return {
+            success: false,
+            error: {
+              message: i18n.t("auth.checkFailed"),
+              name: "Unauthorized",
+            },
+          };
+        }
+
+        if (isMfaRequired(assuranceLevel)) {
+          setPendingMfaState({
+            userId: data.user.id,
+            email: data.user.email ?? undefined,
+            returnTo,
+          });
+          return { success: true, redirectTo: MFA_VERIFY_ROUTE };
+        }
+
+        clearPendingMfaStateForUser(data.user.id);
         return { success: true, redirectTo: "/" };
       }
     } catch (error) {
@@ -165,6 +215,7 @@ const authProvider: AuthProvider = {
   },
 
   logout: async () => {
+    clearAllPendingMfaState();
     const { error } = await supabaseClient.auth.signOut();
     if (error) {
       return { success: false, error };
@@ -173,7 +224,6 @@ const authProvider: AuthProvider = {
   },
 
   onError: async (error) => {
-    if (import.meta.env.DEV) console.error(error);
     return { error };
   },
 
@@ -205,6 +255,52 @@ const authProvider: AuthProvider = {
           logout: true,
           redirectTo: "/login",
         };
+      }
+
+      const pendingMfaState = getPendingMfaStateForUser(userData.user.id);
+      if (pendingMfaState && getCurrentPath() !== MFA_VERIFY_ROUTE) {
+        return {
+          authenticated: false,
+          error: {
+            name: "MfaRequired",
+            message: i18n.t("auth.mfa.required"),
+          },
+          logout: false,
+          redirectTo: MFA_VERIFY_ROUTE,
+        };
+      }
+
+      if (getCurrentPath() !== MFA_VERIFY_ROUTE) {
+        const { data: assuranceLevel, error: assuranceLevelError } = await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
+
+        if (assuranceLevelError) {
+          return {
+            authenticated: false,
+            error: {
+              message: i18n.t("auth.checkFailed"),
+              name: "Unauthorized",
+            },
+            logout: true,
+            redirectTo: "/login",
+          };
+        }
+
+        if (isMfaRequired(assuranceLevel)) {
+          setPendingMfaState({
+            userId: userData.user.id,
+            email: userData.user.email ?? undefined,
+            returnTo: getCurrentReturnTo(),
+          });
+          return {
+            authenticated: false,
+            error: {
+              name: "MfaRequired",
+              message: i18n.t("auth.mfa.required"),
+            },
+            logout: false,
+            redirectTo: MFA_VERIFY_ROUTE,
+          };
+        }
       }
     } catch (error) {
       return {
