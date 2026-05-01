@@ -2,14 +2,10 @@ import React, { useContext } from "react";
 import {
   CanAccess,
   type TreeMenuItem,
-  useIsExistAuthentication,
   useLink,
-  useLogout,
   useMenu,
-  useTranslate,
-  useWarnAboutChange,
 } from "@refinedev/core";
-import { LogoutOutlined, UnorderedListOutlined } from "@ant-design/icons";
+import { UnorderedListOutlined } from "@ant-design/icons";
 import { Button, ConfigProvider, Drawer, Grid, Layout, Menu, theme } from "antd";
 import type { MenuProps } from "antd";
 import { useThemedLayoutContext } from "@refinedev/antd";
@@ -37,30 +33,10 @@ export const AppSider: React.FC<AppSiderProps> = ({ Title }) => {
     setMobileSiderOpen,
   } = useThemedLayoutContext();
   const { menuItems, selectedKey, defaultOpenKeys } = useMenu();
-  const isExistAuthentication = useIsExistAuthentication();
   const Link = useLink();
-  const translate = useTranslate();
-  const { warnWhen, setWarnWhen } = useWarnAboutChange();
-  const { mutate: mutateLogout } = useLogout();
   const breakpoint = Grid.useBreakpoint();
   const direction = useContext(ConfigProvider.ConfigContext)?.direction;
   const isMobile = typeof breakpoint.lg === "undefined" ? false : !breakpoint.lg;
-
-  const handleLogout = () => {
-    if (warnWhen) {
-      const confirmed = window.confirm(
-        translate(
-          "warnWhenUnsavedChanges",
-          "Are you sure you want to leave? You have unsaved changes."
-        )
-      );
-
-      if (!confirmed) return;
-      setWarnWhen(false);
-    }
-
-    mutateLogout();
-  };
 
   const buildMenuItems = (tree: TreeMenuItem[]): MenuItem[] => {
     return tree.map((item) => {
@@ -93,18 +69,7 @@ export const AppSider: React.FC<AppSiderProps> = ({ Title }) => {
     });
   };
 
-  const logoutItem: MenuItem | null = isExistAuthentication
-    ? {
-        key: "logout",
-        icon: <LogoutOutlined />,
-        label: translate("buttons.logout", "Logout"),
-        onClick: handleLogout,
-      }
-    : null;
-
-  const items: MenuProps["items"] = logoutItem
-    ? [...buildMenuItems(menuItems), logoutItem]
-    : buildMenuItems(menuItems);
+  const items: MenuProps["items"] = buildMenuItems(menuItems);
 
   const renderTitle = (collapsed: boolean) => (Title ? <Title collapsed={collapsed} /> : null);
   const titleContainerStyle = (collapsed: boolean): React.CSSProperties => ({
