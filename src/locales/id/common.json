@@ -577,8 +577,7 @@
     "title": "Pengaturan",
     "tabs": {
       "storeProfile": "Profil Toko",
-      "shippingSettings": "Pengaturan Pengiriman",
-      "branding": "Branding & Logo"
+      "shippingSettings": "Pengaturan Pengiriman"
     },
     "fields": {
       "storeName": "Nama Toko",
@@ -607,9 +606,7 @@
       "storeAddress": "Alamat Toko",
       "storeAddressPlaceholder": "Masukkan alamat lengkap toko",
       "primaryLogo": "Logo Utama",
-      "primaryLogoPlaceholder": "Unggah Logo",
-      "appIcon": "Ikon Aplikasi",
-      "appIconPlaceholder": "Unggah Ikon"
+      "primaryLogoPlaceholder": "Unggah Logo"
     },
     "validation": {
       "storeNameRequired": "Nama toko wajib diisi",

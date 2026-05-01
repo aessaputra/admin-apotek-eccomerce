@@ -577,8 +577,7 @@
     "title": "Settings",
     "tabs": {
       "storeProfile": "Store Profile",
-      "shippingSettings": "Shipping Settings",
-      "branding": "Branding & Logos"
+      "shippingSettings": "Shipping Settings"
     },
     "fields": {
       "storeName": "Store Name",
@@ -607,9 +606,7 @@
       "storeAddress": "Full Store Address",
       "storeAddressPlaceholder": "Enter full store address",
       "primaryLogo": "Primary Logo",
-      "primaryLogoPlaceholder": "Upload Logo",
-      "appIcon": "App Icon",
-      "appIconPlaceholder": "Upload Icon"
+      "primaryLogoPlaceholder": "Upload Logo"
     },
     "validation": {
       "storeNameRequired": "Store name is required",

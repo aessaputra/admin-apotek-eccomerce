@@ -30,7 +30,6 @@ interface SettingsFormValues {
   origin_area_id: string;
   store_address: string;
   primary_logo_url: string;
-  app_icon_url: string;
   enabled_couriers: string | null;
 }
 
@@ -223,6 +222,14 @@ export const Settings: React.FC = () => {
           >
             <Input placeholder={translate("settings.fields.emailPlaceholder", {}, "Enter email")} />
           </Form.Item>
+          <Form.Item
+            label={translate("settings.fields.primaryLogo", {}, "Primary Logo")}
+            name="primary_logo_url"
+          >
+            <LogoUpload
+              placeholder={translate("settings.fields.primaryLogoPlaceholder", {}, "+ Upload Logo")}
+            />
+          </Form.Item>
         </Card>
       ),
     },
@@ -344,30 +351,6 @@ export const Settings: React.FC = () => {
               </Form.Item>
             </Col>
           </Row>
-        </Card>
-      ),
-    },
-    {
-      key: "branding",
-      label: translate("settings.tabs.branding", {}, "Branding & Logos"),
-      children: (
-        <Card>
-          <Form.Item
-            label={translate("settings.fields.primaryLogo", {}, "Primary Logo")}
-            name="primary_logo_url"
-          >
-            <LogoUpload
-              placeholder={translate("settings.fields.primaryLogoPlaceholder", {}, "+ Upload Logo")}
-            />
-          </Form.Item>
-          <Form.Item
-            label={translate("settings.fields.appIcon", {}, "App Icon")}
-            name="app_icon_url"
-          >
-            <LogoUpload
-              placeholder={translate("settings.fields.appIconPlaceholder", {}, "+ Upload Icon")}
-            />
-          </Form.Item>
         </Card>
       ),
     },
