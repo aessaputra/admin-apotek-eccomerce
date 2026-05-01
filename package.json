@@ -44,9 +44,9 @@
     "vitest": "^4.0.18"
   },
   "scripts": {
-    "dev": "refine dev",
-    "build": "tsc && refine build",
-    "start": "refine start",
+    "dev": "vite dev",
+    "build": "tsc && vite build",
+    "start": "vite preview",
     "refine": "refine",
     "test": "vitest run"
   },
