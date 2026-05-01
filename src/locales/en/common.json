@@ -78,7 +78,11 @@
     "salesReports": "Sales Reports"
   },
   "profiles": {
-    "profiles": "Customers"
+    "profiles": "Customers",
+    "titles": {
+      "list": "Customers",
+      "show": "Customer Details"
+    }
   },
   "stores": {
     "stores": "Stores"
@@ -267,6 +271,10 @@
   },
   "orders": {
     "orders": "Orders",
+    "titles": {
+      "list": "Orders",
+      "show": "Order Details"
+    },
     "fields": {
       "id": "ID",
       "total": "Total",
