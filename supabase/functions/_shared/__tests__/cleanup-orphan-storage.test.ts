@@ -116,13 +116,12 @@ describe("collectReferencedMediaPaths", () => {
           });
         }
 
-        if (columns === "id, primary_logo_url, app_icon_url") {
+        if (columns === "id, primary_logo_url") {
           return Promise.resolve({
             data: [
               {
                 id: 1,
                 primary_logo_url: "https://demo.supabase.co/storage/v1/object/public/media/settings/logo.webp",
-                app_icon_url: null,
               },
             ],
             error: null,

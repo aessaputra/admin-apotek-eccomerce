@@ -16,7 +16,7 @@ export const MEDIA_REFERENCE_SOURCES = [
   { table: "categories", idColumn: "id", columns: ["logo_url"] },
   { table: "profiles", idColumn: "id", columns: ["avatar_url"] },
   { table: "home_banners", idColumn: "id", columns: ["media_path"] },
-  { table: "settings", idColumn: "id", columns: ["primary_logo_url", "app_icon_url"] },
+  { table: "settings", idColumn: "id", columns: ["primary_logo_url"] },
 ] as const;
 
 type ReferenceRow = Record<string, unknown>;
