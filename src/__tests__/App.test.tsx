@@ -134,6 +134,7 @@ describe("App", () => {
       "home_banners",
       "report_daily_sales",
       "report_product_sales",
+      "report_sold_products",
       "report_customer_sales",
     ]);
 

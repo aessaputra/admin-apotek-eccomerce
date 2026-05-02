@@ -154,6 +154,7 @@ function App() {
                   },
                   { name: "report_daily_sales" },
                   { name: "report_product_sales" },
+                  { name: "report_sold_products" },
                   { name: "report_customer_sales" },
                 ]}
                 options={{
