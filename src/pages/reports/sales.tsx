@@ -19,6 +19,16 @@ type ProductSalesRecord = {
   total_revenue: string | number;
 };
 
+type SoldProductsRecord = {
+  id: string;
+  order_created_at: string;
+  sale_date: string;
+  product_name: string | null;
+  quantity: number;
+  unit_price: string | number;
+  subtotal: string | number;
+};
+
 type CustomerSalesRecord = {
   user_id: string;
   full_name: string | null;
@@ -83,6 +93,17 @@ export const SalesReport: React.FC = () => {
     }),
   });
 
+  const { result: soldProductsResult, query: soldProductsQuery } = useList<SoldProductsRecord>({
+    resource: "report_sold_products",
+    filters: dailyFilters,
+    pagination: { pageSize: 10 },
+    errorNotification: (error) => ({
+      message: translate("reports.sales.load_error_sold_products", "Gagal memuat data produk terjual"),
+      description: (error instanceof Error ? error.message : undefined) ?? translate("notifications.error"),
+      type: "error",
+    }),
+  });
+
   const { result: customerSalesResult, query: customerQuery } = useList<CustomerSalesRecord>({
     resource: "report_customer_sales",
     pagination: { pageSize: 20 },
@@ -95,6 +116,7 @@ export const SalesReport: React.FC = () => {
 
   const dailySales = dailySalesResult?.data ?? [];
   const productSales = productSalesResult?.data ?? [];
+  const soldProducts = soldProductsResult?.data ?? [];
   const customerSales = customerSalesResult?.data ?? [];
 
   return (
@@ -205,6 +227,55 @@ export const SalesReport: React.FC = () => {
       </Col>
 
       <Col xs={24} lg={12}>
+        <Card title={translate("reports.sales.sold_products", "Product Terjual")}>
+          <Table<SoldProductsRecord>
+            rowKey={(record) => record.id}
+            dataSource={soldProducts}
+            loading={soldProductsQuery.isLoading}
+            pagination={{ pageSize: 10 }}
+            size="small"
+            columns={[
+              {
+                title: translate("reports.sales.product_name", "Produk"),
+                dataIndex: "product_name",
+                render: (value: string | null) =>
+                  value?.trim() || translate("reports.sales.product_unavailable", "Produk tidak tersedia"),
+              },
+              {
+                title: translate("reports.sales.quantity", "Jumlah"),
+                dataIndex: "quantity",
+                align: "right",
+                render: (value: number) => Number(value ?? 0).toLocaleString(locale),
+              },
+              {
+                title: translate("reports.sales.unit_price", "Harga Satuan"),
+                dataIndex: "unit_price",
+                align: "right",
+                render: (value: string | number) =>
+                  currencyFormatter.format(Number(value ?? 0)),
+              },
+              {
+                title: translate("reports.sales.subtotal", "Subtotal"),
+                dataIndex: "subtotal",
+                align: "right",
+                render: (value: string | number) => (
+                  <Typography.Text strong>
+                    {currencyFormatter.format(Number(value ?? 0))}
+                  </Typography.Text>
+                ),
+              },
+            ]}
+            locale={{
+              emptyText: translate(
+                "reports.sales.empty_sold_products",
+                "Belum ada data produk terjual",
+              ),
+            }}
+          />
+        </Card>
+      </Col>
+
+      <Col xs={24} lg={12}>
         <Card title={translate("reports.sales.top_customers", "Customer Terbesar")}>
           <Table<CustomerSalesRecord>
             rowKey={(record) => record.user_id}
@@ -245,4 +316,3 @@ export const SalesReport: React.FC = () => {
     </Row>
   );
 };
-
