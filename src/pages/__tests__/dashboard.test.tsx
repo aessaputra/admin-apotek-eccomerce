@@ -44,21 +44,21 @@ const mocks = vi.hoisted(() => {
       "dashboard.kpis.orders30d": "Incoming Orders",
       "dashboard.kpis.paymentSuccessRate": "Payment Rate",
       "dashboard.kpis.averageOrderValue": "Average Order",
-      "dashboard.kpis.fulfillmentRisk": "Needs Processing",
+      "dashboard.kpis.fulfillmentRisk": "Paid, Not Completed",
       "dashboard.kpis.lowStockSkus": "Low-Stock SKUs",
-      "dashboard.alerts.title": "Needs Attention",
+      "dashboard.alerts.title": "Follow-up Queue",
       "dashboard.alerts.metricsError.message": "Metrics unavailable",
       "dashboard.alerts.metricsError.description": "Some metrics could not be loaded. Review the trend panel and retry shortly.",
       "dashboard.alerts.lowStockError.message": "Couldn’t load low-stock data",
       "dashboard.alerts.lowStockError.description": "Refresh the dashboard or check your connection.",
-      "dashboard.alerts.fulfillmentRisk.message": "{{count}} paid orders need processing",
-      "dashboard.alerts.fulfillmentRisk.description": "Prioritize paid orders that have not reached delivery yet.",
+      "dashboard.alerts.fulfillmentRisk.message": "{{count}} paid orders are not completed yet",
+      "dashboard.alerts.fulfillmentRisk.description": "Open the orders list to continue fulfillment, shipping, or completion confirmation for paid orders.",
       "dashboard.alerts.lowStockRisk.message": "{{count}} active low-stock SKUs",
       "dashboard.alerts.lowStockRisk.description": "Active products below 10 units need restock review. Check the low-stock table for the most urgent SKUs.",
-      "dashboard.alerts.noRisk.message": "Nothing urgent needs attention",
+      "dashboard.alerts.noRisk.message": "No urgent queue items",
       "dashboard.alerts.noRisk.description": "Metrics loaded successfully, with no orders or stock items requiring immediate follow-up.",
-      "dashboard.alerts.loading.message": "Checking items that need attention",
-      "dashboard.alerts.loading.description": "Metrics and stock counts are still loading. Attention status will update shortly.",
+      "dashboard.alerts.loading.message": "Checking the follow-up queue",
+      "dashboard.alerts.loading.description": "Metrics and stock counts are still loading. Queue status will update shortly.",
       "dashboard.recentOrders": "Recent Orders",
       "dashboard.viewAll": "View All",
       "dashboard.orderTotal": "Total",
@@ -561,7 +561,7 @@ describe("Dashboard", () => {
     expect(screen.getAllByText("Incoming Orders").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Payment Rate")).not.toBeNull();
     expect(screen.getByText("Average Order")).not.toBeNull();
-    expect(screen.getByText("Needs Processing")).not.toBeNull();
+    expect(screen.getByText("Paid, Not Completed")).not.toBeNull();
     expect(screen.getByText("Low-Stock SKUs")).not.toBeNull();
     expect(pageText).toContain(currencyFormatter.format(125000));
     expect(pageText).toContain("60%");
@@ -594,8 +594,8 @@ describe("Dashboard", () => {
 
       render(<Dashboard />);
 
-      expect(screen.getByText("Needs Attention")).not.toBeNull();
-      expect(screen.getByText("Nothing urgent needs attention")).not.toBeNull();
+      expect(screen.getByText("Follow-up Queue")).not.toBeNull();
+      expect(screen.getByText("No urgent queue items")).not.toBeNull();
       expect(screen.queryByText("Metrics loaded successfully, with no orders or stock items requiring immediate follow-up.")).toBeNull();
       expect(screen.queryByText("Paid orders need fulfillment")).toBeNull();
       expect(screen.queryByText("Active low-stock SKUs")).toBeNull();
@@ -612,9 +612,9 @@ describe("Dashboard", () => {
 
       render(<Dashboard />);
 
-      expect(screen.getByText("Checking items that need attention")).not.toBeNull();
-      expect(screen.queryByText("Metrics and stock counts are still loading. Attention status will update shortly.")).toBeNull();
-      expect(screen.queryByText("Nothing urgent needs attention")).toBeNull();
+      expect(screen.getByText("Checking the follow-up queue")).not.toBeNull();
+      expect(screen.queryByText("Metrics and stock counts are still loading. Queue status will update shortly.")).toBeNull();
+      expect(screen.queryByText("No urgent queue items")).toBeNull();
       expect(screen.queryByText("Metrics loaded successfully, with no orders or stock items requiring immediate follow-up.")).toBeNull();
     });
 
@@ -649,9 +649,9 @@ describe("Dashboard", () => {
 
       render(<Dashboard />);
 
-      expect(screen.getByText("2 paid orders need processing")).not.toBeNull();
-      expect(screen.getByText("Prioritize paid orders that have not reached delivery yet.")).not.toBeNull();
-      expect(screen.queryByText("Nothing urgent needs attention")).toBeNull();
+      expect(screen.getByText("2 paid orders are not completed yet")).not.toBeNull();
+      expect(screen.getByText("Open the orders list to continue fulfillment, shipping, or completion confirmation for paid orders.")).not.toBeNull();
+      expect(screen.queryByText("No urgent queue items")).toBeNull();
     });
 
     it("renders a low-stock data error when the stock query fails", () => {
@@ -665,7 +665,7 @@ describe("Dashboard", () => {
 
       expect(screen.getByText("Couldn’t load low-stock data")).not.toBeNull();
       expect(screen.getByText("Refresh the dashboard or check your connection.")).not.toBeNull();
-      expect(screen.queryByText("Nothing urgent needs attention")).toBeNull();
+      expect(screen.queryByText("No urgent queue items")).toBeNull();
       expect(document.body.textContent).not.toContain("stock table leaked");
     });
 
@@ -676,7 +676,7 @@ describe("Dashboard", () => {
 
       expect(screen.getByText("2 active low-stock SKUs")).not.toBeNull();
       expect(screen.getByText("Active products below 10 units need restock review. Check the low-stock table for the most urgent SKUs.")).not.toBeNull();
-      expect(screen.queryByText("Nothing urgent needs attention")).toBeNull();
+      expect(screen.queryByText("No urgent queue items")).toBeNull();
     });
 
     it("preserves recent order and low-stock query contracts plus View All navigation", () => {
@@ -792,7 +792,7 @@ describe("Dashboard", () => {
     expect(screen.getAllByText("Incoming Orders").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Payment Rate")).not.toBeNull();
     expect(screen.getByText("Average Order")).not.toBeNull();
-    expect(screen.getByText("Needs Processing")).not.toBeNull();
+    expect(screen.getByText("Paid, Not Completed")).not.toBeNull();
     expect(screen.getByText("Low-Stock SKUs")).not.toBeNull();
     expect(screen.getByText("Recent Orders")).not.toBeNull();
     expect(screen.getByText("Handed to Courier")).not.toBeNull();
