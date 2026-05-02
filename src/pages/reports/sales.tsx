@@ -120,36 +120,36 @@ export const SalesReport: React.FC = () => {
   const customerSales = customerSalesResult?.data ?? [];
 
   return (
-    <Row gutter={[16, 16]}>
-      <Col span={24}>
-        <Row justify="space-between" align="middle" gutter={[16, 16]}>
-          <Col>
-            <Typography.Title level={3}>
-              {translate("reports.sales.title", "Laporan Penjualan")}
-            </Typography.Title>
-          </Col>
-          <Col>
-            <DatePicker.RangePicker
-              allowClear
-              style={{ minWidth: 260 }}
-              value={dateRange}
-              onChange={(value) => setDateRange(value)}
-              placeholder={[
-                translate("reports.sales.date_from", "Dari tanggal"),
-                translate("reports.sales.date_to", "Sampai tanggal"),
-              ]}
-            />
-          </Col>
-        </Row>
-      </Col>
+    <>
+      <Row justify="space-between" align="middle" gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={24} lg={14}>
+          <Typography.Title level={2} style={{ margin: 0 }}>
+            {translate("reports.sales.title", "Laporan Penjualan")}
+          </Typography.Title>
+        </Col>
+        <Col xs={24} lg={10}>
+          <DatePicker.RangePicker
+            allowClear
+            style={{ width: "100%" }}
+            value={dateRange}
+            onChange={(value) => setDateRange(value)}
+            placeholder={[
+              translate("reports.sales.date_from", "Dari tanggal"),
+              translate("reports.sales.date_to", "Sampai tanggal"),
+            ]}
+          />
+        </Col>
+      </Row>
 
-      <Col span={24}>
+      <Row gutter={[20, 20]}>
+        <Col span={24}>
         <Card title={translate("reports.sales.daily", "Ringkasan Penjualan Harian")}>
           <Table<DailySalesRecord>
             rowKey={(record) => record.sale_date}
             dataSource={dailySales}
             loading={dailyQuery.isLoading}
             pagination={{ pageSize: 30 }}
+            scroll={{ x: 760 }}
             columns={[
               {
                 title: translate("reports.sales.date", "Tanggal"),
@@ -187,53 +187,15 @@ export const SalesReport: React.FC = () => {
         </Card>
       </Col>
 
-      <Col xs={24} lg={12}>
-        <Card title={translate("reports.sales.top_products", "Produk Terlaris")}>
-          <Table<ProductSalesRecord>
-            rowKey={(record) => record.product_id}
-            dataSource={productSales}
-            loading={productQuery.isLoading}
-            pagination={{ pageSize: 20 }}
-            columns={[
-              {
-                title: translate("reports.sales.product_name", "Produk"),
-                dataIndex: "product_name",
-              },
-              {
-                title: translate("reports.sales.category_name", "Kategori"),
-                dataIndex: "category_name",
-              },
-              {
-                title: translate("reports.sales.total_qty_sold", "Qty Terjual"),
-                dataIndex: "total_qty_sold",
-                align: "right",
-              },
-              {
-                title: translate("reports.sales.total_revenue", "Total Omzet"),
-                dataIndex: "total_revenue",
-                align: "right",
-                render: (value: string | number) =>
-                  currencyFormatter.format(Number(value)),
-              },
-            ]}
-            locale={{
-              emptyText: translate(
-                "reports.sales.empty_products",
-                "Belum ada data penjualan produk",
-              ),
-            }}
-          />
-        </Card>
-      </Col>
-
-      <Col xs={24} lg={12}>
+      <Col span={24}>
         <Card title={translate("reports.sales.sold_products", "Product Terjual")}>
           <Table<SoldProductsRecord>
             rowKey={(record) => record.id}
             dataSource={soldProducts}
             loading={soldProductsQuery.isLoading}
             pagination={{ pageSize: 10 }}
-            size="small"
+            size="middle"
+            scroll={{ x: 860 }}
             columns={[
               {
                 title: translate("reports.sales.product_name", "Produk"),
@@ -276,12 +238,55 @@ export const SalesReport: React.FC = () => {
       </Col>
 
       <Col xs={24} lg={12}>
+        <Card title={translate("reports.sales.top_products", "Produk Terlaris")}>
+          <Table<ProductSalesRecord>
+            rowKey={(record) => record.product_id}
+            dataSource={productSales}
+            loading={productQuery.isLoading}
+            pagination={{ pageSize: 20 }}
+            size="small"
+            scroll={{ x: 640 }}
+            columns={[
+              {
+                title: translate("reports.sales.product_name", "Produk"),
+                dataIndex: "product_name",
+              },
+              {
+                title: translate("reports.sales.category_name", "Kategori"),
+                dataIndex: "category_name",
+              },
+              {
+                title: translate("reports.sales.total_qty_sold", "Qty Terjual"),
+                dataIndex: "total_qty_sold",
+                align: "right",
+              },
+              {
+                title: translate("reports.sales.total_revenue", "Total Omzet"),
+                dataIndex: "total_revenue",
+                align: "right",
+                render: (value: string | number) =>
+                  currencyFormatter.format(Number(value)),
+              },
+            ]}
+            locale={{
+              emptyText: translate(
+                "reports.sales.empty_products",
+                "Belum ada data penjualan produk",
+              ),
+            }}
+          />
+        </Card>
+      </Col>
+
+      <Col xs={24} lg={12}>
         <Card title={translate("reports.sales.top_customers", "Customer Terbesar")}>
           <Table<CustomerSalesRecord>
             rowKey={(record) => record.user_id}
             dataSource={customerSales}
             loading={customerQuery.isLoading}
             pagination={{ pageSize: 20 }}
+            size="small"
+            scroll={{ x: 640 }}
             columns={[
               {
                 title: translate("reports.sales.customer_name", "Nama"),
@@ -313,6 +318,7 @@ export const SalesReport: React.FC = () => {
           />
         </Card>
       </Col>
-    </Row>
+      </Row>
+    </>
   );
 };
