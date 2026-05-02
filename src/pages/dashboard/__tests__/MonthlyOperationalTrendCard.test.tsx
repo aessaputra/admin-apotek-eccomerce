@@ -102,13 +102,27 @@ vi.mock("antd", () => ({
     Paragraph: ({ children, id }: { children?: React.ReactNode; id?: string }) => <p id={id}>{children}</p>,
     Text: ({ children }: { children?: React.ReactNode }) => <span>{children}</span>,
   },
+  theme: {
+    useToken: () => ({
+      token: {
+        borderRadiusLG: 8,
+        colorBorderSecondary: "#d9d9d9",
+        colorFillAlter: "#fafafa",
+        fontSizeLG: 16,
+        fontSizeSM: 12,
+        fontWeightStrong: 600,
+        marginMD: 16,
+        paddingSM: 12,
+      },
+    }),
+  },
 }));
 
 const REFERENCE_DATE = new Date("2026-04-15T00:00:00.000Z");
 const labels = {
-  title: "Order trends",
-  revenue: "Revenue",
-  orderCount: "Incoming",
+  title: "Operational Trends",
+  revenue: "Sales Value",
+  orderCount: "Incoming Orders",
   paidOrders: "Paid",
   completedOrders: "Completed",
   periodLabel: "Last 12 months",
@@ -210,7 +224,11 @@ describe("MonthlyOperationalTrendCard", () => {
     expect(screen.getByText(labels.title)).not.toBeNull();
     expect(document.body.textContent).toContain(currencyFormatter.format(populatedTrendData.totals.revenue));
     expect(screen.getByTestId("granularity-control").textContent).toContain("Monthly");
-    expect(screen.getByRole("img", { name: labels.chartAriaLabel })).not.toBeNull();
+    const chartWrapper = screen.getByRole("img", { name: labels.chartAriaLabel });
+    const chartDescriptionId = chartWrapper.getAttribute("aria-describedby");
+    expect(chartWrapper).not.toBeNull();
+    expect(chartDescriptionId).toBeTruthy();
+    expect(document.getElementById(chartDescriptionId ?? "")?.textContent).toContain(labels.chartDescription);
     expect(screen.getByText(labels.chartDescription)).not.toBeNull();
 
     const lineProps = getLineProps();
@@ -227,6 +245,20 @@ describe("MonthlyOperationalTrendCard", () => {
     expect(new Set(lineProps.data.map((point) => point.seriesLabel))).toEqual(
       new Set([labels.orderCount, labels.paidOrders, labels.completedOrders]),
     );
+  });
+
+  it("surfaces the 30-day operational context for daily granularity without changing selectable periods", () => {
+    const dailyLabels = { ...labels, periodLabel: "Last 30 days" };
+
+    renderCard({ granularity: "day", labels: dailyLabels });
+
+    expect(screen.getByText(dailyLabels.periodLabel)).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Daily" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Weekly" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Monthly" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Yearly" })).not.toBeNull();
+    expect(chartMocks.line).toHaveBeenCalledTimes(1);
+    expect(getLineProps().data.some((point) => point.metric === "revenue")).toBe(false);
   });
 
   it("renders a deterministic loading state before chart content", () => {

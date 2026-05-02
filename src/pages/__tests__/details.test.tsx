@@ -163,6 +163,27 @@ vi.mock("antd", async () => {
     Skeleton: () => <div data-testid="skeleton" />,
     Table,
     Empty: ({ description }: { description: React.ReactNode }) => <div>{description}</div>,
+    theme: {
+      useToken: () => ({
+        token: {
+          borderRadiusLG: 8,
+          colorBorderSecondary: "#d9d9d9",
+          colorFillAlter: "#fafafa",
+          colorWarning: "#faad14",
+          fontSizeHeading3: 24,
+          fontSizeHeading4: 20,
+          fontSizeLG: 16,
+          fontSizeSM: 12,
+          fontWeightStrong: 600,
+          marginLG: 24,
+          marginMD: 16,
+          marginSM: 12,
+          marginXS: 8,
+          marginXXS: 4,
+          paddingSM: 12,
+        },
+      }),
+    },
   };
 });
 
@@ -329,7 +350,13 @@ describe("detail and dashboard pages", () => {
         return { result: { total: 5 } };
       }
       if (args.resource === "products" && args.meta?.count === "exact") {
-        return { result: { total: 8 } };
+        return {
+          result: {
+            data: [{ id: "prod-1", name: "Vitamin C", stock: 2 }],
+            total: 8,
+          },
+          query: { isLoading: false },
+        };
       }
       if (args.resource === "orders" && args.pagination?.mode === "off") {
         return { result: { data: [{ total_amount: 10000 }, { total_amount: 15000 }] } };
@@ -371,10 +398,13 @@ describe("detail and dashboard pages", () => {
 
     render(<Dashboard />);
 
-    expect(screen.getByText("dashboard.totalOrders:10")).not.toBeNull();
-    expect(screen.getByText("dashboard.totalCustomers:5")).not.toBeNull();
-    expect(screen.getByText("dashboard.totalProducts:8")).not.toBeNull();
-    expect(screen.getByText("dashboard.totalRevenue:25000")).not.toBeNull();
+    expect(screen.getByText("dashboard.overview.title")).not.toBeNull();
+    expect(screen.getByText("dashboard.kpis.revenue30d:25000")).not.toBeNull();
+    expect(screen.getByText("dashboard.kpis.orders30d:1")).not.toBeNull();
+    expect(screen.getByText("dashboard.kpis.paymentSuccessRate:100")).not.toBeNull();
+    expect(screen.getByText("dashboard.kpis.averageOrderValue:25000")).not.toBeNull();
+    expect(screen.getByText("dashboard.kpis.fulfillmentRisk:1")).not.toBeNull();
+    expect(screen.getByText("dashboard.kpis.lowStockSkus:8")).not.toBeNull();
     expect(screen.getByText("order-1")).not.toBeNull();
     expect(screen.getByText("Vitamin C")).not.toBeNull();
 

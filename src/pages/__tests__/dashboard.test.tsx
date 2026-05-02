@@ -21,31 +21,57 @@ interface DashboardQueryState {
 }
 
 interface DashboardQueryOptions {
+  kpiMetricRows?: OperationalMetricRow[];
+  kpiQuery?: Partial<DashboardQueryState>;
+  lowStockQuery?: Partial<DashboardQueryState>;
+  lowStockProducts?: { id: string; name: string; stock: number }[];
   monthlyMetricRows?: OperationalMetricRow[];
   monthlyQuery?: Partial<DashboardQueryState>;
+  lowStockTotal?: number;
 }
 
 const mocks = vi.hoisted(() => {
   const useList = vi.fn();
-  const translate = vi.fn((key: string) => {
+  const translate = vi.fn((key: string, params?: Record<string, unknown>, fallback?: string) => {
     const translations: Record<string, string> = {
       "dashboard.totalOrders": "Total Orders",
       "dashboard.totalCustomers": "Total Customers",
       "dashboard.totalProducts": "Total Products",
       "dashboard.totalRevenue": "Total Revenue",
+      "dashboard.overview.title": "Operations Overview",
+      "dashboard.overview.subtitle": "Monitor orders, sales, stock, and key items from the last 30 days.",
+      "dashboard.kpis.revenue30d": "Sales Value",
+      "dashboard.kpis.orders30d": "Incoming Orders",
+      "dashboard.kpis.paymentSuccessRate": "Payment Rate",
+      "dashboard.kpis.averageOrderValue": "Average Order",
+      "dashboard.kpis.fulfillmentRisk": "Needs Processing",
+      "dashboard.kpis.lowStockSkus": "Low-Stock SKUs",
+      "dashboard.alerts.title": "Needs Attention",
+      "dashboard.alerts.metricsError.message": "Metrics unavailable",
+      "dashboard.alerts.metricsError.description": "Some metrics could not be loaded. Review the trend panel and retry shortly.",
+      "dashboard.alerts.lowStockError.message": "Couldn’t load low-stock data",
+      "dashboard.alerts.lowStockError.description": "Refresh the dashboard or check your connection.",
+      "dashboard.alerts.fulfillmentRisk.message": "{{count}} paid orders need processing",
+      "dashboard.alerts.fulfillmentRisk.description": "Prioritize paid orders that have not reached delivery yet.",
+      "dashboard.alerts.lowStockRisk.message": "{{count}} active low-stock SKUs",
+      "dashboard.alerts.lowStockRisk.description": "Active products below 10 units need restock review. Check the low-stock table for the most urgent SKUs.",
+      "dashboard.alerts.noRisk.message": "Nothing urgent needs attention",
+      "dashboard.alerts.noRisk.description": "Metrics loaded successfully, with no orders or stock items requiring immediate follow-up.",
+      "dashboard.alerts.loading.message": "Checking items that need attention",
+      "dashboard.alerts.loading.description": "Metrics and stock counts are still loading. Attention status will update shortly.",
       "dashboard.recentOrders": "Recent Orders",
       "dashboard.viewAll": "View All",
       "dashboard.orderTotal": "Total",
       "dashboard.orderStatus": "Status",
       "dashboard.orderDate": "Date",
-      "dashboard.lowStockAlerts": "Low Stock",
+      "dashboard.lowStockAlerts": "Stock to Replenish",
       "dashboard.productName": "Product",
       "dashboard.currentStock": "Stock",
       "dashboard.noRecentOrders": "No orders yet",
       "dashboard.noLowStock": "All stock levels OK",
-      "dashboard.monthlyTrends.title": "Order trends",
-      "dashboard.monthlyTrends.revenue": "Revenue",
-      "dashboard.monthlyTrends.orderCount": "Incoming",
+      "dashboard.monthlyTrends.title": "Operational Trends",
+      "dashboard.monthlyTrends.revenue": "Sales Value",
+      "dashboard.monthlyTrends.orderCount": "Incoming Orders",
       "dashboard.monthlyTrends.paidOrders": "Paid",
       "dashboard.monthlyTrends.completedOrders": "Completed",
       "dashboard.monthlyTrends.latest12Months": "Latest 12 months",
@@ -66,7 +92,9 @@ const mocks = vi.hoisted(() => {
       "orderStatus.shipped": "Handed to Courier",
     };
 
-    return translations[key] ?? key;
+    const translated = translations[key] ?? fallback ?? key;
+
+    return params?.count !== undefined ? translated.replace(/\{\{count\}\}/g, String(params.count)) : translated;
   });
   const navigateList = vi.fn();
   const line = vi.fn<(props: LineMockProps) => void>();
@@ -170,7 +198,12 @@ vi.mock("antd", async () => {
   const Table = Object.assign(TableComponent, { Column });
 
   return {
-    Alert: ({ message }: { message?: React.ReactNode }) => <div role="alert">{message}</div>,
+    Alert: ({ description, message, type }: { description?: React.ReactNode; message?: React.ReactNode; type?: string }) => (
+      <div data-alert-type={type} role="alert">
+        <div>{message}</div>
+        {description ? <div>{description}</div> : null}
+      </div>
+    ),
     Card: ({ title, extra, children }: { title?: React.ReactNode; extra?: React.ReactNode; children?: React.ReactNode }) => (
       <section>
         <div>{title}</div>
@@ -207,15 +240,17 @@ vi.mock("antd", async () => {
     Statistic: ({
       title,
       value,
+      suffix,
       formatter,
     }: {
       title?: React.ReactNode;
       value?: React.ReactNode;
+      suffix?: React.ReactNode;
       formatter?: (value?: React.ReactNode) => React.ReactNode;
     }) => (
       <div>
         <span>{title}</span>
-        <span>{formatter ? formatter(value) : value}</span>
+        <span>{formatter ? formatter(value) : value}{suffix}</span>
       </div>
     ),
     Table,
@@ -223,6 +258,7 @@ vi.mock("antd", async () => {
     Typography: {
       Paragraph: ({ children, id }: { children?: React.ReactNode; id?: string }) => <p id={id}>{children}</p>,
       Text: ({ children }: { children?: React.ReactNode }) => <span>{children}</span>,
+      Title: ({ children }: { children?: React.ReactNode }) => <h3>{children}</h3>,
     },
     Button: ({ children, onClick }: { children?: React.ReactNode; onClick?: () => void }) => (
       <button type="button" onClick={onClick}>{children}</button>
@@ -231,14 +267,38 @@ vi.mock("antd", async () => {
     Skeleton: () => <div data-testid="monthly-trend-skeleton" />,
     Space: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
     Tooltip: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    theme: {
+      useToken: () => ({
+        token: {
+          borderRadiusLG: 8,
+          colorBorderSecondary: "#d9d9d9",
+          colorFillAlter: "#fafafa",
+          colorWarning: "#faad14",
+          fontSizeHeading3: 24,
+          fontSizeHeading4: 20,
+          fontSizeLG: 16,
+          fontSizeSM: 12,
+          fontWeightStrong: 600,
+          marginLG: 24,
+          marginMD: 16,
+          marginSM: 12,
+          marginXS: 8,
+          marginXXS: 4,
+          paddingSM: 12,
+        },
+      }),
+    },
   };
 });
 
 vi.mock("@ant-design/icons", () => ({
+  CheckCircleOutlined: () => <span>check-circle</span>,
+  ClockCircleOutlined: () => <span>clock-circle</span>,
   ShoppingCartOutlined: () => <span>cart</span>,
   UserOutlined: () => <span>user</span>,
   InboxOutlined: () => <span>inbox</span>,
   DollarOutlined: () => <span>dollar</span>,
+  PercentageOutlined: () => <span>percentage</span>,
   WarningOutlined: () => <span>warning</span>,
 }));
 
@@ -276,18 +336,35 @@ const populatedMonthlyMetricRows = [
   }),
 ];
 
-const setupDashboardQueries = ({ monthlyMetricRows = populatedMonthlyMetricRows, monthlyQuery = {} }: DashboardQueryOptions = {}) => {
-  mocks.useList.mockImplementation((params: { resource: string; meta?: Record<string, unknown>; pagination?: Record<string, unknown> }) => {
+const healthyMonthlyMetricRows = [
+  createMonthlyMetricRow("2026-04-15", {
+    order_count: 1,
+    paid_order_count: 1,
+    completed_order_count: 1,
+    revenue: 10000,
+  }),
+];
+
+const setupDashboardQueries = ({
+  kpiMetricRows,
+  kpiQuery = {},
+  lowStockQuery = {},
+  lowStockProducts,
+  monthlyMetricRows = populatedMonthlyMetricRows,
+  monthlyQuery = {},
+  lowStockTotal = 1,
+}: DashboardQueryOptions = {}) => {
+  const lowStockRows = lowStockProducts ?? (lowStockTotal > 0 ? [{ id: "product-1", name: "Bandage", stock: 4 }] : []);
+  const kpiRows = kpiMetricRows ?? monthlyMetricRows;
+  let dayOperationalMetricsCallCount = 0;
+
+  mocks.useList.mockImplementation((params: { resource: string; meta?: Record<string, unknown>; pagination?: Record<string, unknown>; filters?: { field: string; value?: unknown }[] }) => {
     if (params.resource === "orders" && params.meta?.count === "exact") {
       return { result: { total: 1 } };
     }
 
     if (params.resource === "profiles") {
       return { result: { total: 2 } };
-    }
-
-    if (params.resource === "products" && params.meta?.count === "exact") {
-      return { result: { total: 3 } };
     }
 
     if (params.resource === "orders" && params.pagination?.mode === "off") {
@@ -312,12 +389,25 @@ const setupDashboardQueries = ({ monthlyMetricRows = populatedMonthlyMetricRows,
 
     if (params.resource === "products") {
       return {
-        result: { data: [{ id: "product-1", name: "Bandage", stock: 4 }] },
-        query: { isLoading: false },
+        result: { data: lowStockRows, total: lowStockTotal },
+        query: { isLoading: false, isError: false, error: null, ...lowStockQuery },
       };
     }
 
     if (params.resource === "admin_operational_metrics") {
+      const granularity = params.filters?.find((filter) => filter.field === "granularity")?.value;
+
+      if (granularity === "day") {
+        dayOperationalMetricsCallCount += 1;
+
+        if (dayOperationalMetricsCallCount % 2 === 1) {
+          return {
+            result: { data: kpiRows },
+            query: { isLoading: false, isError: false, error: null, ...kpiQuery },
+          };
+        }
+      }
+
       return {
         result: { data: monthlyMetricRows },
         query: { isLoading: false, isError: false, error: null, ...monthlyQuery },
@@ -351,23 +441,28 @@ describe("Dashboard", () => {
     expect(screen.queryByText("shipped")).toBeNull();
   });
 
-  it("queries revenue using settled payment status", () => {
+  it("queries low-stock SKUs with an exact active product count", () => {
     setupDashboardQueries();
 
     render(<Dashboard />);
 
     expect(mocks.useList).toHaveBeenCalledWith(
       expect.objectContaining({
-        resource: "orders",
-        pagination: { mode: "off" },
+        resource: "products",
+        pagination: { currentPage: 1, pageSize: 10 },
         filters: expect.arrayContaining([
           expect.objectContaining({
-            field: "payment_status",
+            field: "stock",
+            operator: "lt",
+            value: 10,
+          }),
+          expect.objectContaining({
+            field: "is_active",
             operator: "eq",
-            value: "settlement",
+            value: true,
           }),
         ]),
-        meta: { select: "total_amount" },
+        meta: { count: "exact" },
       }),
     );
   });
@@ -379,11 +474,11 @@ describe("Dashboard", () => {
 
     expect(mocks.useList).toHaveBeenCalledWith({
       resource: "admin_operational_metrics",
-      pagination: { pageSize: 12 },
+      pagination: { pageSize: 30 },
       filters: [
-        { field: "granularity", operator: "eq", value: "month" },
-        { field: "start_date", operator: "eq", value: "2025-05-01" },
-        { field: "end_date", operator: "eq", value: "2026-04-30" },
+        { field: "granularity", operator: "eq", value: "day" },
+        { field: "start_date", operator: "eq", value: "2026-03-17" },
+        { field: "end_date", operator: "eq", value: "2026-04-15" },
       ],
     });
   });
@@ -392,9 +487,48 @@ describe("Dashboard", () => {
     setupDashboardQueries();
 
     render(<Dashboard />);
-    fireEvent.click(screen.getByRole("button", { name: "Daily" }));
+    fireEvent.click(screen.getByRole("button", { name: "Weekly" }));
 
     expect(mocks.useList).toHaveBeenLastCalledWith({
+      resource: "admin_operational_metrics",
+      pagination: { pageSize: 12 },
+      filters: [
+        { field: "granularity", operator: "eq", value: "week" },
+        { field: "start_date", operator: "eq", value: "2026-01-26" },
+        { field: "end_date", operator: "eq", value: "2026-04-19" },
+      ],
+    });
+  });
+
+  it("keeps headline KPI cards on the fixed 30-day window when trend granularity changes", () => {
+    setupDashboardQueries({
+      kpiMetricRows: [
+        createMonthlyMetricRow("2026-04-15", {
+          order_count: 1,
+          paid_order_count: 1,
+          completed_order_count: 1,
+          revenue: 10000,
+        }),
+      ],
+      monthlyMetricRows: [
+        createMonthlyMetricRow("2026-04-14", {
+          order_count: 9,
+          paid_order_count: 9,
+          completed_order_count: 9,
+          revenue: 900000,
+        }),
+      ],
+      lowStockTotal: 0,
+    });
+
+    render(<Dashboard />);
+    fireEvent.click(screen.getByRole("button", { name: "Weekly" }));
+
+    const pageText = document.body.textContent ?? "";
+
+    expect(pageText).toContain(`Sales Value${currencyFormatter.format(10000)}`);
+    expect(pageText).toContain("Incoming Orders1");
+    expect(mocks.useList).toHaveBeenCalledWith({
       resource: "admin_operational_metrics",
       pagination: { pageSize: 30 },
       filters: [
@@ -402,6 +536,174 @@ describe("Dashboard", () => {
         { field: "start_date", operator: "eq", value: "2026-03-17" },
         { field: "end_date", operator: "eq", value: "2026-04-15" },
       ],
+    });
+    expect(mocks.useList).toHaveBeenLastCalledWith({
+      resource: "admin_operational_metrics",
+      pagination: { pageSize: 12 },
+      filters: [
+        { field: "granularity", operator: "eq", value: "week" },
+        { field: "start_date", operator: "eq", value: "2026-01-26" },
+        { field: "end_date", operator: "eq", value: "2026-04-19" },
+      ],
+    });
+  });
+
+  it("renders dashboard KPI values from operational totals and exact low-stock count", () => {
+    setupDashboardQueries();
+
+    render(<Dashboard />);
+
+    const pageText = document.body.textContent ?? "";
+
+    expect(screen.getByText("Operations Overview")).not.toBeNull();
+    expect(screen.getByText("Monitor orders, sales, stock, and key items from the last 30 days.")).not.toBeNull();
+    expect(screen.getAllByText("Sales Value").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Incoming Orders").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Payment Rate")).not.toBeNull();
+    expect(screen.getByText("Average Order")).not.toBeNull();
+    expect(screen.getByText("Needs Processing")).not.toBeNull();
+    expect(screen.getByText("Low-Stock SKUs")).not.toBeNull();
+    expect(pageText).toContain(currencyFormatter.format(125000));
+    expect(pageText).toContain("60%");
+    expect(pageText).toContain(currencyFormatter.format(125000 / 3));
+    expect(pageText).toContain("1");
+    expect(screen.queryByText("Total Orders")).toBeNull();
+    expect(screen.queryByText("Total Customers")).toBeNull();
+    expect(screen.queryByText("Total Products")).toBeNull();
+    expect(screen.queryByText("Total Revenue")).toBeNull();
+    expect(screen.queryByText("dashboard.overview.title")).toBeNull();
+    expect(screen.queryByText("dashboard.alerts.title")).toBeNull();
+  });
+
+  it("renders zero-denominator KPI values without NaN or Infinity", () => {
+    setupDashboardQueries({ monthlyMetricRows: [createMonthlyMetricRow("2026-04-15")], lowStockTotal: 0 });
+
+    render(<Dashboard />);
+
+    const pageText = document.body.textContent ?? "";
+
+    expect(pageText).toContain("Payment Rate0%");
+    expect(pageText).toContain(`Average Order${currencyFormatter.format(0)}`);
+    expect(pageText).not.toContain("NaN");
+    expect(pageText).not.toContain("Infinity");
+  });
+
+  describe("operational alerts", () => {
+    it("renders a no-risk state when KPI risks are clear and queries succeed", () => {
+      setupDashboardQueries({ monthlyMetricRows: healthyMonthlyMetricRows, lowStockTotal: 0 });
+
+      render(<Dashboard />);
+
+      expect(screen.getByText("Needs Attention")).not.toBeNull();
+      expect(screen.getByText("Nothing urgent needs attention")).not.toBeNull();
+      expect(screen.queryByText("Metrics loaded successfully, with no orders or stock items requiring immediate follow-up.")).toBeNull();
+      expect(screen.queryByText("Paid orders need fulfillment")).toBeNull();
+      expect(screen.queryByText("Active low-stock SKUs")).toBeNull();
+      expect(screen.queryByText("Metrics unavailable")).toBeNull();
+    });
+
+    it("renders a neutral loading alert instead of no-risk while risk queries are pending", () => {
+      setupDashboardQueries({
+        monthlyMetricRows: healthyMonthlyMetricRows,
+        monthlyQuery: { isLoading: true },
+        lowStockQuery: { isLoading: true },
+        lowStockTotal: 0,
+      });
+
+      render(<Dashboard />);
+
+      expect(screen.getByText("Checking items that need attention")).not.toBeNull();
+      expect(screen.queryByText("Metrics and stock counts are still loading. Attention status will update shortly.")).toBeNull();
+      expect(screen.queryByText("Nothing urgent needs attention")).toBeNull();
+      expect(screen.queryByText("Metrics loaded successfully, with no orders or stock items requiring immediate follow-up.")).toBeNull();
+    });
+
+    it("renders a generic metrics-error alert without raw thrown details", () => {
+      setupDashboardQueries({
+        monthlyMetricRows: healthyMonthlyMetricRows,
+        kpiQuery: { isError: true, error: new Error("database host leaked") },
+        lowStockTotal: 0,
+      });
+
+      render(<Dashboard />);
+
+      expect(screen.getByText("Metrics unavailable")).not.toBeNull();
+      expect(screen.getByText("Some metrics could not be loaded. Review the trend panel and retry shortly.")).not.toBeNull();
+      expect(screen.queryByText("Failed to load order trends.")).toBeNull();
+      expect(screen.queryByText("database host leaked")).toBeNull();
+      expect(document.body.textContent).not.toContain("database host leaked");
+    });
+
+    it("renders a paid-not-fulfilled warning when paid orders exceed completed orders", () => {
+      setupDashboardQueries({
+        monthlyMetricRows: [
+          createMonthlyMetricRow("2026-04-15", {
+            order_count: 4,
+            paid_order_count: 3,
+            completed_order_count: 1,
+            revenue: 30000,
+          }),
+        ],
+        lowStockTotal: 0,
+      });
+
+      render(<Dashboard />);
+
+      expect(screen.getByText("2 paid orders need processing")).not.toBeNull();
+      expect(screen.getByText("Prioritize paid orders that have not reached delivery yet.")).not.toBeNull();
+      expect(screen.queryByText("Nothing urgent needs attention")).toBeNull();
+    });
+
+    it("renders a low-stock data error when the stock query fails", () => {
+      setupDashboardQueries({
+        monthlyMetricRows: healthyMonthlyMetricRows,
+        lowStockQuery: { isError: true, error: new Error("stock table leaked") },
+        lowStockTotal: 0,
+      });
+
+      render(<Dashboard />);
+
+      expect(screen.getByText("Couldn’t load low-stock data")).not.toBeNull();
+      expect(screen.getByText("Refresh the dashboard or check your connection.")).not.toBeNull();
+      expect(screen.queryByText("Nothing urgent needs attention")).toBeNull();
+      expect(document.body.textContent).not.toContain("stock table leaked");
+    });
+
+    it("renders a low-stock warning when active SKU count is above zero", () => {
+      setupDashboardQueries({ monthlyMetricRows: healthyMonthlyMetricRows, lowStockTotal: 2 });
+
+      render(<Dashboard />);
+
+      expect(screen.getByText("2 active low-stock SKUs")).not.toBeNull();
+      expect(screen.getByText("Active products below 10 units need restock review. Check the low-stock table for the most urgent SKUs.")).not.toBeNull();
+      expect(screen.queryByText("Nothing urgent needs attention")).toBeNull();
+    });
+
+    it("preserves recent order and low-stock query contracts plus View All navigation", () => {
+      setupDashboardQueries();
+
+      render(<Dashboard />);
+
+      expect(mocks.useList).toHaveBeenCalledWith({
+        resource: "orders",
+        pagination: { currentPage: 1, pageSize: 5 },
+        sorters: [{ field: "created_at", order: "desc" }],
+      });
+      expect(mocks.useList).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resource: "products",
+          pagination: { currentPage: 1, pageSize: 10 },
+          sorters: [{ field: "stock", order: "asc" }],
+          meta: { count: "exact" },
+        }),
+      );
+
+      const viewAllButtons = screen.getAllByRole("button", { name: "View All" });
+      fireEvent.click(viewAllButtons[0]);
+      fireEvent.click(viewAllButtons[1]);
+
+      expect(mocks.navigateList).toHaveBeenCalledWith("orders");
+      expect(mocks.navigateList).toHaveBeenCalledWith("products");
     });
   });
 
@@ -412,14 +714,14 @@ describe("Dashboard", () => {
 
     const pageText = document.body.textContent ?? "";
 
-    expect(screen.getByText("Order trends")).not.toBeNull();
+    expect(screen.getByText("Operational Trends")).not.toBeNull();
     expect(screen.getByRole("img", { name: "Order trend line chart: incoming, paid, and completed" })).not.toBeNull();
     expect(screen.getByText("Incoming, paid, and completed orders for the selected period.")).not.toBeNull();
-    expect(pageText).toContain("Monthly");
+    expect(pageText).toContain("Daily");
     expect(pageText).toContain(currencyFormatter.format(125000));
-    expect(pageText).toContain("Incoming: 5");
-    expect(pageText).toContain("Paid: 3");
-    expect(pageText).toContain("Completed: 2");
+    expect(pageText).toContain("Incoming Orders5");
+    expect(pageText).toContain("Paid3");
+    expect(pageText).toContain("Completed2");
   });
 
   it("renders the order trend loading state while the aggregate query is pending", () => {
@@ -427,7 +729,7 @@ describe("Dashboard", () => {
 
     render(<Dashboard />);
 
-    expect(screen.getByText("Order trends")).not.toBeNull();
+    expect(screen.getByText("Operational Trends")).not.toBeNull();
     expect(screen.getByTestId("monthly-trend-skeleton")).not.toBeNull();
     expect(screen.getByText("Loading order trend data...")).not.toBeNull();
     expect(mocks.line).not.toHaveBeenCalled();
@@ -461,7 +763,8 @@ describe("Dashboard", () => {
 
     render(<Dashboard />);
 
-    expect(screen.getByRole("alert").textContent).toBe("Failed to load order trends.");
+    expect(screen.getByText("Metrics unavailable")).not.toBeNull();
+    expect(screen.getAllByRole("alert").some((alert) => alert.textContent === "Failed to load order trends.")).toBe(true);
     expect(screen.queryByText("database host leaked")).toBeNull();
     expect(mocks.line).not.toHaveBeenCalled();
   });
@@ -473,7 +776,7 @@ describe("Dashboard", () => {
 
     const pageText = document.body.textContent ?? "";
 
-    expect(screen.getByRole("alert").textContent).toBe("All order trend metrics are zero.");
+    expect(screen.getByText("All order trend metrics are zero.")).not.toBeNull();
     expect(screen.queryByText("No order trend data is available yet.")).toBeNull();
     expect(screen.getByTestId("monthly-trend-line")).not.toBeNull();
     expect(pageText).toContain(currencyFormatter.format(0));
@@ -485,13 +788,15 @@ describe("Dashboard", () => {
 
     render(<Dashboard />);
 
-    expect(screen.getByText("Total Orders")).not.toBeNull();
-    expect(screen.getByText("Total Customers")).not.toBeNull();
-    expect(screen.getByText("Total Products")).not.toBeNull();
-    expect(screen.getByText("Total Revenue")).not.toBeNull();
+    expect(screen.getAllByText("Sales Value").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Incoming Orders").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Payment Rate")).not.toBeNull();
+    expect(screen.getByText("Average Order")).not.toBeNull();
+    expect(screen.getByText("Needs Processing")).not.toBeNull();
+    expect(screen.getByText("Low-Stock SKUs")).not.toBeNull();
     expect(screen.getByText("Recent Orders")).not.toBeNull();
     expect(screen.getByText("Handed to Courier")).not.toBeNull();
-    expect(screen.getByText("Low Stock")).not.toBeNull();
+    expect(screen.getByText("Stock to Replenish")).not.toBeNull();
     expect(screen.getByText("Bandage")).not.toBeNull();
 
     const viewAllButtons = screen.getAllByRole("button", { name: "View All" });
