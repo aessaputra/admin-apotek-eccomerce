@@ -33,12 +33,51 @@
   },
   "dashboard": {
     "dashboard": "Dashboard",
+    "overview": {
+      "title": "Operations Overview",
+      "subtitle": "Monitor orders, sales, stock, and key items from the last 30 days."
+    },
+    "kpis": {
+      "revenue30d": "Sales Value",
+      "orders30d": "Incoming Orders",
+      "paymentSuccessRate": "Payment Rate",
+      "averageOrderValue": "Average Order",
+      "fulfillmentRisk": "Needs Processing",
+      "lowStockSkus": "Low-Stock SKUs"
+    },
+    "alerts": {
+      "title": "Needs Attention",
+      "metricsError": {
+        "message": "Metrics unavailable",
+        "description": "Some metrics could not be loaded. Review the trend panel and retry shortly."
+      },
+      "lowStockError": {
+        "message": "Couldn’t load low-stock data",
+        "description": "Refresh the dashboard or check your connection."
+      },
+      "fulfillmentRisk": {
+        "message": "{{count}} paid orders need processing",
+        "description": "Prioritize paid orders that have not reached delivery yet."
+      },
+      "lowStockRisk": {
+        "message": "{{count}} active low-stock SKUs",
+        "description": "Active products below 10 units need restock review. Check the low-stock table for the most urgent SKUs."
+      },
+      "noRisk": {
+        "message": "Nothing urgent needs attention",
+        "description": "Metrics loaded successfully, with no orders or stock items requiring immediate follow-up."
+      },
+      "loading": {
+        "message": "Checking items that need attention",
+        "description": "Metrics and stock counts are still loading. Attention status will update shortly."
+      }
+    },
     "totalOrders": "Total Orders",
     "totalCustomers": "Total Customers",
     "totalProducts": "Total Products",
     "totalRevenue": "Total Revenue",
     "recentOrders": "Recent Orders",
-    "lowStockAlerts": "Low Stock Alerts",
+    "lowStockAlerts": "Stock to Replenish",
     "noRecentOrders": "No orders yet",
     "noLowStock": "All stock levels OK",
     "viewAll": "View All",
@@ -48,9 +87,9 @@
     "productName": "Product",
     "currentStock": "Stock",
     "monthlyTrends": {
-      "title": "Order trends",
-      "revenue": "Revenue",
-      "orderCount": "Incoming",
+      "title": "Operational Trends",
+      "revenue": "Sales Value",
+      "orderCount": "Incoming Orders",
       "paidOrders": "Paid",
       "completedOrders": "Completed",
       "latest12Months": "Latest 12 months",

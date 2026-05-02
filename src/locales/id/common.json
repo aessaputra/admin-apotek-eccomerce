@@ -33,12 +33,51 @@
   },
   "dashboard": {
     "dashboard": "Dashboard",
+    "overview": {
+      "title": "Ringkasan Operasional",
+      "subtitle": "Pantau pesanan, penjualan, stok, dan perhatian utama dalam 30 hari terakhir."
+    },
+    "kpis": {
+      "revenue30d": "Nilai Penjualan",
+      "orders30d": "Pesanan Masuk",
+      "paymentSuccessRate": "Tingkat Pembayaran",
+      "averageOrderValue": "Rata-rata Pesanan",
+      "fulfillmentRisk": "Perlu Diproses",
+      "lowStockSkus": "SKU Stok Rendah"
+    },
+    "alerts": {
+      "title": "Perlu Perhatian",
+      "metricsError": {
+        "message": "Metrik tidak tersedia",
+        "description": "Beberapa metrik belum bisa dimuat. Tinjau panel tren dan coba lagi sebentar lagi."
+      },
+      "lowStockError": {
+        "message": "Gagal memuat data stok menipis",
+        "description": "Muat ulang dashboard atau periksa koneksi."
+      },
+      "fulfillmentRisk": {
+        "message": "{{count}} pesanan dibayar perlu diproses",
+        "description": "Prioritaskan pesanan dibayar yang belum sampai tahap pengiriman atau diterima pelanggan."
+      },
+      "lowStockRisk": {
+        "message": "{{count}} SKU aktif stok menipis",
+        "description": "Produk aktif dengan stok di bawah 10 unit perlu ditinjau untuk restok. Periksa tabel stok rendah untuk SKU yang paling mendesak."
+      },
+      "noRisk": {
+        "message": "Tidak ada perhatian mendesak",
+        "description": "Metrik berhasil dimuat dan tidak ada pesanan atau stok yang perlu ditindaklanjuti segera."
+      },
+      "loading": {
+        "message": "Memeriksa hal yang perlu perhatian",
+        "description": "Metrik dan jumlah stok masih dimuat. Status perhatian akan diperbarui sebentar lagi."
+      }
+    },
     "totalOrders": "Total Pesanan",
     "totalCustomers": "Total Pelanggan",
     "totalProducts": "Total Produk",
     "totalRevenue": "Total Pendapatan",
     "recentOrders": "Pesanan Terbaru",
-    "lowStockAlerts": "Stok Menipis",
+    "lowStockAlerts": "Stok Perlu Diisi Ulang",
     "noRecentOrders": "Belum ada pesanan",
     "noLowStock": "Semua stok aman",
     "viewAll": "Lihat Semua",
@@ -48,10 +87,10 @@
     "productName": "Produk",
     "currentStock": "Stok",
     "monthlyTrends": {
-      "title": "Tren pesanan",
-      "revenue": "Pendapatan",
-      "orderCount": "Masuk",
-      "paidOrders": "Dibayar",
+      "title": "Tren Operasional",
+      "revenue": "Nilai Penjualan",
+      "orderCount": "Pesanan Masuk",
+      "paidOrders": "Terbayar",
       "completedOrders": "Selesai",
       "latest12Months": "12 bulan terakhir",
       "period": {
@@ -71,7 +110,7 @@
       "errorMessage": "Gagal memuat tren pesanan.",
       "zeroValueSummary": "Semua metrik tren pesanan bernilai nol.",
       "chartAriaLabel": "Grafik garis tren pesanan: masuk, dibayar, dan selesai",
-      "chartDescription": "Pesanan masuk, dibayar, dan selesai sesuai periode yang dipilih."
+      "chartDescription": "Pesanan masuk, terbayar, dan selesai sesuai periode yang dipilih."
     }
   },
   "salesReports": {

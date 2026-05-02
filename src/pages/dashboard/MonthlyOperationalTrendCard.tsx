@@ -1,7 +1,7 @@
 import { Line } from "@ant-design/charts";
-import { Alert, Card, Col, Empty, Radio, Row, Skeleton, Space, Statistic, Tooltip, Typography } from "antd";
+import { Alert, Card, Col, Empty, Radio, Row, Skeleton, Space, Statistic, Tooltip, Typography, theme } from "antd";
 import type { RadioChangeEvent } from "antd";
-import { useId, useMemo } from "react";
+import { useId, useMemo, type CSSProperties } from "react";
 import type {
   MonthlyOperationalTrendChartPoint,
   MonthlyOperationalTrendData,
@@ -77,6 +77,7 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
   granularityOptions,
   onGranularityChange,
 }) => {
+  const { token } = theme.useToken();
   const chartDescriptionId = useId();
   const formattedRevenue = useMemo(() => currencyFormatter.format(totals.revenue), [totals.revenue]);
   const revenueSummary = useMemo(
@@ -171,20 +172,41 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
     onGranularityChange(event.target.value as OperationalTrendGranularity);
   };
 
+  const statTileStyle: CSSProperties = {
+    height: "100%",
+    padding: token.paddingSM,
+    border: `1px solid ${token.colorBorderSecondary}`,
+    borderRadius: token.borderRadiusLG,
+    backgroundColor: token.colorFillAlter,
+  };
+  const statValueStyle: CSSProperties = {
+    fontSize: token.fontSizeLG,
+    fontWeight: token.fontWeightStrong,
+  };
+
   return (
-    <Card
-      title={labels.title}
-      extra={
-        <Radio.Group
-          optionType="button"
-          buttonStyle="solid"
-          size="small"
-          value={granularity}
-          options={granularityOptions.map((option) => ({ label: option.label, value: option.value }))}
-          onChange={handleGranularityChange}
-        />
-      }
-    >
+    <Card>
+      <Row gutter={[16, 12]} align="middle" justify="space-between" style={{ marginBottom: token.marginMD }}>
+        <Col xs={24} md={12}>
+          <Space direction="vertical" size={0}>
+            <Typography.Text strong style={{ fontSize: token.fontSizeLG }}>
+              {labels.title}
+            </Typography.Text>
+            <Typography.Text type="secondary">{labels.periodLabel}</Typography.Text>
+          </Space>
+        </Col>
+        <Col xs={24} md={12} style={{ display: "flex", justifyContent: "flex-end" }}>
+          <Radio.Group
+            optionType="button"
+            buttonStyle="solid"
+            size="small"
+            value={granularity}
+            options={granularityOptions.map((option) => ({ label: option.label, value: option.value }))}
+            onChange={handleGranularityChange}
+          />
+        </Col>
+      </Row>
+
       {loading ? (
         <Space direction="vertical" size="middle" style={{ width: "100%" }}>
           <Skeleton active paragraph={{ rows: 4 }} title={false} />
@@ -196,19 +218,49 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
         <Empty description={labels.emptyDescription} />
       ) : (
         <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-          <Row gutter={[16, 16]} align="middle">
-            <Col xs={24} md={8}>
+          <Row gutter={[12, 12]}>
+            <Col xs={12} lg={6}>
               <Tooltip title={revenueSummary}>
-                <Statistic title={labels.revenue} value={totals.revenue} formatter={() => formattedRevenue} />
+                <div style={statTileStyle}>
+                  <Statistic
+                    title={labels.revenue}
+                    value={totals.revenue}
+                    formatter={() => formattedRevenue}
+                    valueStyle={statValueStyle}
+                  />
+                </div>
               </Tooltip>
             </Col>
-            <Col xs={24} md={16}>
-              <Typography.Paragraph id={chartDescriptionId} style={{ marginBottom: 8 }}>
-                {labels.chartDescription}
-              </Typography.Paragraph>
-              <Typography.Text>{countSummary}</Typography.Text>
+            <Col xs={12} lg={6}>
+              <Tooltip title={countSummary}>
+                <div style={statTileStyle}>
+                  <Statistic title={labels.orderCount} value={totals.orderCount} valueStyle={statValueStyle} />
+                </div>
+              </Tooltip>
+            </Col>
+            <Col xs={12} lg={6}>
+              <Tooltip title={countSummary}>
+                <div style={statTileStyle}>
+                  <Statistic title={labels.paidOrders} value={totals.paidOrderCount} valueStyle={statValueStyle} />
+                </div>
+              </Tooltip>
+            </Col>
+            <Col xs={12} lg={6}>
+              <Tooltip title={countSummary}>
+                <div style={statTileStyle}>
+                  <Statistic title={labels.completedOrders} value={totals.completedOrderCount} valueStyle={statValueStyle} />
+                </div>
+              </Tooltip>
             </Col>
           </Row>
+
+          <Typography.Paragraph
+            id={chartDescriptionId}
+            type="secondary"
+            style={{ marginBottom: 0, fontSize: token.fontSizeSM }}
+          >
+            {labels.chartDescription}
+          </Typography.Paragraph>
 
           {hasOnlyZeroValues ? <Alert type="info" showIcon message={labels.zeroValueSummary} /> : null}
 
