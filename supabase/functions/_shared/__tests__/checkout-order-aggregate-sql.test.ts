@@ -32,6 +32,11 @@ const securityInvokerAdminViewsMigrationPath = resolve(
   "supabase/migrations/20260425065008_make_admin_sku_views_security_invoker.sql",
 );
 
+const orderBackendLintContractsMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations/20260502070142_fix_order_backend_lint_contracts.sql",
+);
+
 function readMigrationSql() {
   return readFileSync(migrationPath, "utf8");
 }
@@ -54,6 +59,10 @@ function readSelectedCheckoutRpcMigrationSql() {
 
 function readSecurityInvokerAdminViewsMigrationSql() {
   return readFileSync(securityInvokerAdminViewsMigrationPath, "utf8");
+}
+
+function readOrderBackendLintContractsMigrationSql() {
+  return readFileSync(orderBackendLintContractsMigrationPath, "utf8");
 }
 
 describe("checkout order aggregate SQL", () => {
@@ -205,6 +214,16 @@ describe("checkout order aggregate SQL", () => {
     expect(normalizedSql).toContain("grant execute on function public.create_checkout_order_aggregate");
     expect(normalizedSql).toContain("to service_role");
     expect(normalizedSql).toMatch(/grant execute on function public\.create_checkout_order_aggregate\([\s\S]*uuid\[\],[\s\S]*text[\s\S]*\) to service_role/);
+  });
+
+  it("keeps checkout coalesce syntax valid in the lint-fix migration", () => {
+    const normalizedSql = readOrderBackendLintContractsMigrationSql().toLowerCase();
+
+    expect(normalizedSql).toContain(
+      "coalesce(pg_catalog.array_length(p_selected_cart_item_ids, 1), 0::integer) = 0",
+    );
+    expect(normalizedSql).toContain("select pg_catalog.sum(oi.quantity)::integer");
+    expect(normalizedSql).not.toContain("pg_catalog.coalesce");
   });
 
   it("adds admin-only SKU read views and grants them only to authenticated users", () => {
