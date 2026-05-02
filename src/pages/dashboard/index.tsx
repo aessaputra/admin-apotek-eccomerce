@@ -208,7 +208,6 @@ export const Dashboard: React.FC = () => {
   };
   const secondaryKpiCardStyle: CSSProperties = {
     height: "100%",
-    backgroundColor: token.colorFillAlter,
     borderColor: token.colorBorderSecondary,
   };
   const primaryKpiValueStyle: CSSProperties = {
@@ -313,6 +312,28 @@ export const Dashboard: React.FC = () => {
 
         <Col xs={24} xl={8}>
           <Space direction="vertical" size={token.marginMD} style={{ width: "100%" }}>
+            <Card title={attentionCardTitle}>
+              <Space direction="vertical" size={token.marginSM} style={{ width: "100%" }}>
+                {shouldShowOperationalAlertsLoading ? (
+                  <Alert showIcon type="info" message={translate("dashboard.alerts.loading.message")} />
+                ) : null}
+                {operationalAlerts.map((alert) => {
+                  const labels = getOperationalAlertLabels(alert, translate);
+                  const compactAlert = alert.kind === "no-risk";
+
+                  return (
+                    <Alert
+                      showIcon
+                      key={alert.kind}
+                      type={alert.severity}
+                      message={labels.message}
+                      description={compactAlert ? undefined : labels.description}
+                    />
+                  );
+                })}
+              </Space>
+            </Card>
+
             <Row gutter={[16, 16]}>
               <Col xs={24} sm={12} xl={24}>
                 <Card style={secondaryKpiCardStyle}>
@@ -335,28 +356,6 @@ export const Dashboard: React.FC = () => {
                 </Card>
               </Col>
             </Row>
-
-            <Card title={attentionCardTitle}>
-              <Space direction="vertical" size={token.marginSM} style={{ width: "100%" }}>
-                {shouldShowOperationalAlertsLoading ? (
-                  <Alert showIcon type="info" message={translate("dashboard.alerts.loading.message")} />
-                ) : null}
-                {operationalAlerts.map((alert) => {
-                  const labels = getOperationalAlertLabels(alert, translate);
-                  const compactAlert = alert.kind === "no-risk";
-
-                  return (
-                    <Alert
-                      showIcon
-                      key={alert.kind}
-                      type={alert.severity}
-                      message={labels.message}
-                      description={compactAlert ? undefined : labels.description}
-                    />
-                  );
-                })}
-              </Space>
-            </Card>
           </Space>
         </Col>
       </Row>
