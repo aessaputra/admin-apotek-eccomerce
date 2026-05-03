@@ -42,11 +42,11 @@
       "orders30d": "Pesanan Masuk",
       "paymentSuccessRate": "Tingkat Pembayaran",
       "averageOrderValue": "Rata-rata Pesanan",
-      "fulfillmentRisk": "Dibayar Belum Selesai",
-      "lowStockSkus": "SKU Stok Rendah"
+      "fulfillmentRisk": "Pesanan Belum Selesai",
+      "lowStockSkus": "Stok Menipis"
     },
     "alerts": {
-      "title": "Antrean Tindak Lanjut",
+      "title": "Perlu Tindakan",
       "metricsError": {
         "message": "Metrik tidak tersedia",
         "description": "Beberapa metrik belum bisa dimuat. Tinjau panel tren dan coba lagi sebentar lagi."
@@ -77,7 +77,7 @@
     "totalProducts": "Total Produk",
     "totalRevenue": "Total Pendapatan",
     "recentOrders": "Pesanan Terbaru",
-    "lowStockAlerts": "Stok Perlu Diisi Ulang",
+    "lowStockAlerts": "Stok Menipis",
     "noRecentOrders": "Belum ada pesanan",
     "noLowStock": "Semua stok aman",
     "viewAll": "Lihat Semua",

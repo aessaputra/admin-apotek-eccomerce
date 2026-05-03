@@ -42,11 +42,11 @@
       "orders30d": "Incoming Orders",
       "paymentSuccessRate": "Payment Rate",
       "averageOrderValue": "Average Order",
-      "fulfillmentRisk": "Paid, Not Completed",
-      "lowStockSkus": "Low-Stock SKUs"
+      "fulfillmentRisk": "Pending Completion",
+      "lowStockSkus": "Low Stock"
     },
     "alerts": {
-      "title": "Follow-up Queue",
+      "title": "Action Required",
       "metricsError": {
         "message": "Metrics unavailable",
         "description": "Some metrics could not be loaded. Review the trend panel and retry shortly."
@@ -77,7 +77,7 @@
     "totalProducts": "Total Products",
     "totalRevenue": "Total Revenue",
     "recentOrders": "Recent Orders",
-    "lowStockAlerts": "Stock to Replenish",
+    "lowStockAlerts": "Low Stock",
     "noRecentOrders": "No orders yet",
     "noLowStock": "All stock levels OK",
     "viewAll": "View All",
