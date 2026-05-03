@@ -114,7 +114,29 @@
     }
   },
   "salesReports": {
-    "salesReports": "Sales Reports"
+    "salesReports": "Sales Reports",
+    "exportButtonText": "Export PDF",
+    "exportDialogTitle": "Choose report sections",
+    "exportDialogDescription": "Choose which sections to include in the PDF. Data follows the active date period.",
+    "confirmExportText": "Download PDF",
+    "cancelText": "Cancel",
+    "noSectionValidationDisabledText": "Select at least one section to export",
+    "exportLoadingDisabledText": "Exporting...",
+    "pdfTitle": "Pharmacy Sales Report",
+    "generatedAtLabel": "Generated at",
+    "periodLabel": "Period",
+    "sectionTitleDailySummary": "Daily Summary",
+    "sectionTitleSoldProducts": "Sold Products",
+    "sectionTitleTopProducts": "Top Products",
+    "sectionTitleTopCustomers": "Top Customers",
+    "emptyValueText": "-",
+    "emptyReportText": "No data",
+    "pageLabel": "Page",
+    "headerSaleDate": "Sale Date",
+    "headerOrderTime": "Order Time",
+    "headerQtySold": "Qty Sold",
+    "exportPdfSuccess": "Report PDF downloaded successfully",
+    "exportPdfError": "Failed to download report PDF"
   },
   "profiles": {
     "profiles": "Customers",

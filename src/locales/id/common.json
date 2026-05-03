@@ -114,7 +114,29 @@
     }
   },
   "salesReports": {
-    "salesReports": "Laporan Penjualan"
+    "salesReports": "Laporan Penjualan",
+    "exportButtonText": "Ekspor PDF",
+    "exportDialogTitle": "Pilih bagian laporan",
+    "exportDialogDescription": "Pilih bagian yang ingin dimasukkan ke PDF. Data mengikuti periode tanggal yang sedang aktif.",
+    "confirmExportText": "Unduh PDF",
+    "cancelText": "Batal",
+    "noSectionValidationDisabledText": "Pilih setidaknya satu bagian untuk diekspor",
+    "exportLoadingDisabledText": "Mengekspor...",
+    "pdfTitle": "Laporan Penjualan Apotek",
+    "generatedAtLabel": "Dibuat pada",
+    "periodLabel": "Periode",
+    "sectionTitleDailySummary": "Ringkasan Harian",
+    "sectionTitleSoldProducts": "Produk Terjual",
+    "sectionTitleTopProducts": "Produk Terlaris",
+    "sectionTitleTopCustomers": "Pelanggan Terbesar",
+    "emptyValueText": "-",
+    "emptyReportText": "Tidak ada data",
+    "pageLabel": "Halaman",
+    "headerSaleDate": "Tanggal Penjualan",
+    "headerOrderTime": "Waktu Order",
+    "headerQtySold": "Qty Terjual",
+    "exportPdfSuccess": "PDF laporan berhasil diunduh",
+    "exportPdfError": "PDF laporan gagal diunduh"
   },
   "profiles": {
     "profiles": "Pelanggan",
