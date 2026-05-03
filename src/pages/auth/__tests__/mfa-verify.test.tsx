@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearAllPendingMfaState, setPendingMfaState } from "../../../utils/mfa";
 import { MfaVerify } from "../mfa-verify";
@@ -106,10 +106,10 @@ vi.mock("antd", () => {
     onFinish?: (values: { code: string }) => void | Promise<void>;
   }) => (
     <form
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
-        void Promise.resolve(onFinish?.({ code: String(formData.get("code") ?? "") })).catch(() => undefined);
+        await Promise.resolve(onFinish?.({ code: String(formData.get("code") ?? "") })).catch(() => undefined);
       }}
     >
       {children}
@@ -246,12 +246,15 @@ function arrangeMfaSession({
 
 async function enterCodeAndSubmit(code = "123456") {
   fireEvent.change(await screen.findByLabelText("6-digit code"), { target: { value: code } });
-  fireEvent.click(screen.getByRole("button", { name: "Verify" }));
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Verify" }));
+  });
 }
 
 describe("MfaVerify", () => {
   beforeEach(() => {
     clearAllPendingMfaState();
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
     mocks.navigate.mockReset();
     mocks.translate.mockClear();
     mocks.getUser.mockReset();
@@ -261,6 +264,10 @@ describe("MfaVerify", () => {
     mocks.verify.mockReset();
     mocks.refreshSession.mockReset();
     mocks.signOut.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("verifies a single verified TOTP factor, clears pending MFA state, and navigates to the stored return destination", async () => {

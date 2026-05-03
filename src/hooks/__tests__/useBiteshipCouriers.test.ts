@@ -20,6 +20,7 @@ describe("useBiteshipCouriers", () => {
   beforeEach(() => {
     mocks.getSession.mockReset();
     vi.restoreAllMocks();
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
   });
 
   it("uses fallback couriers when there is no authenticated session token", async () => {

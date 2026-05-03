@@ -43,6 +43,14 @@ function createPushClientMock(options?: {
 }
 
 describe("createPushHandler", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("skips admin dashboard notifications before profile lookup or Expo access", async () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
