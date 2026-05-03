@@ -185,7 +185,7 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
   };
 
   return (
-    <Card>
+    <Card style={{ height: "100%" }}>
       <Row gutter={[16, 12]} align="middle" justify="space-between" style={{ marginBottom: token.marginMD }}>
         <Col xs={24} md={12}>
           <Space direction="vertical" size={0}>

@@ -283,7 +283,7 @@ export const Dashboard: React.FC = () => {
         </Col>
       </Row>
 
-      <Row gutter={[16, 16]} style={{ marginTop: token.marginLG }}>
+      <Row gutter={[16, 16]} style={{ marginTop: token.marginLG }} align="stretch">
         <Col xs={24} xl={16}>
           <MonthlyOperationalTrendCard
             data={monthlyOperationalTrendData}
@@ -311,7 +311,14 @@ export const Dashboard: React.FC = () => {
         </Col>
 
         <Col xs={24} xl={8}>
-          <Space direction="vertical" size={token.marginMD} style={{ width: "100%" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: token.marginMD,
+              height: "100%",
+            }}
+          >
             <Card title={attentionCardTitle}>
               <Space direction="vertical" size={token.marginSM} style={{ width: "100%" }}>
                 {shouldShowOperationalAlertsLoading ? (
@@ -334,9 +341,9 @@ export const Dashboard: React.FC = () => {
               </Space>
             </Card>
 
-            <Row gutter={[16, 16]}>
-              <Col xs={24} sm={12} xl={24}>
-                <Card style={secondaryKpiCardStyle}>
+            <Row gutter={[16, 16]} style={{ flex: 1 }} align="stretch">
+              <Col xs={24} sm={12} xl={24} style={{ display: "flex" }}>
+                <Card style={{ ...secondaryKpiCardStyle, flex: 1, width: "100%" }}>
                   <Statistic
                     title={translate("dashboard.kpis.fulfillmentRisk")}
                     value={dashboardKpis.fulfillmentRisk}
@@ -345,8 +352,8 @@ export const Dashboard: React.FC = () => {
                   />
                 </Card>
               </Col>
-              <Col xs={24} sm={12} xl={24}>
-                <Card style={secondaryKpiCardStyle}>
+              <Col xs={24} sm={12} xl={24} style={{ display: "flex" }}>
+                <Card style={{ ...secondaryKpiCardStyle, flex: 1, width: "100%" }}>
                   <Statistic
                     title={translate("dashboard.kpis.lowStockSkus")}
                     value={dashboardKpis.lowStockRisk}
@@ -356,7 +363,7 @@ export const Dashboard: React.FC = () => {
                 </Card>
               </Col>
             </Row>
-          </Space>
+          </div>
         </Col>
       </Row>
 
