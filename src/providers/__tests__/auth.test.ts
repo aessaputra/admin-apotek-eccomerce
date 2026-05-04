@@ -6,6 +6,14 @@ const translations: Record<string, string> = {
   "auth.oauthNotAllowed": "Panel admin hanya mendukung login dengan email dan password.",
   "auth.registerDisabled": "Registrasi tidak tersedia. Hubungi administrator.",
   "auth.checkFailed": "Akses ditolak. Hanya admin yang dapat mengakses panel ini.",
+  "auth.sessionNotFound": "Sesi tidak ditemukan",
+  "auth.unexpectedError": "Terjadi kesalahan yang tidak terduga",
+  "auth.loginFailed": "Login gagal",
+  "auth.invalidEmailOrPassword": "Email atau kata sandi tidak valid",
+  "auth.forgotPasswordFailed": "Gagal mengirim instruksi reset kata sandi",
+  "auth.invalidEmail": "Email tidak valid",
+  "auth.updatePasswordFailed": "Gagal memperbarui kata sandi",
+  "auth.invalidPassword": "Kata sandi tidak valid",
 };
 
 type ProfileRoleResult = { data: { role?: string | null } | null; error: unknown };
@@ -343,8 +351,8 @@ describe("authProvider", () => {
     expect(result).toEqual({
       authenticated: false,
       error: {
-        message: "Check failed",
-        name: "Session not found",
+        message: translations["auth.sessionNotFound"],
+        name: "SessionNotFound",
       },
       logout: true,
       redirectTo: "/login",

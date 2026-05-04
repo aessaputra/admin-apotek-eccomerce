@@ -579,7 +579,20 @@
     "oauthNotAllowed": "Admin panel only supports email and password login.",
     "registerDisabled": "Registration is not available. Contact administrator.",
     "checkFailed": "Access denied. Only admins can access this panel.",
+    "sessionNotFound": "Session not found",
+    "email": "Email",
+    "password": "Password",
+    "loginFailed": "Login failed",
+    "unexpectedError": "An unexpected error occurred",
+    "invalidEmailOrPassword": "Invalid email or password",
+    "forgotPasswordFailed": "Forgot password failed",
+    "invalidEmail": "Invalid email",
+    "updatePasswordFailed": "Update password failed",
+    "invalidPassword": "Invalid password",
     "login": {
+      "title": "Sign in",
+      "description": "Use your email and password to access the admin panel.",
+      "submit": "Login",
       "forgotPassword": "Forgot password?"
     },
     "mfa": {
@@ -735,5 +748,45 @@
     "noCouriersFound": "No couriers available",
     "saveSuccess": "Settings saved successfully",
     "saveError": "Failed to save settings"
+  },
+  "pages": {
+    "login": {
+      "signin": "Sign in"
+    },
+    "register": {
+      "buttons": {
+        "haveAccount": "Have an account? "
+      }
+    },
+    "forgotPassword": {
+      "title": "Forgot your password?",
+      "fields": {
+        "email": "Email"
+      },
+      "errors": {
+        "requiredEmail": "Email is required",
+        "validEmail": "Invalid email address"
+      },
+      "buttons": {
+        "haveAccount": "Have an account? ",
+        "submit": "Send reset instructions"
+      },
+      "signin": "Sign in"
+    },
+    "updatePassword": {
+      "title": "Set New Password",
+      "fields": {
+        "password": "New Password",
+        "confirmPassword": "Confirm New Password"
+      },
+      "errors": {
+        "requiredPassword": "Password is required",
+        "requiredConfirmPassword": "Confirm password is required",
+        "confirmPasswordNotMatch": "Passwords do not match"
+      },
+      "buttons": {
+        "submit": "Update"
+      }
+    }
   }
 }

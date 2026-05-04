@@ -21,7 +21,7 @@ function toAuthError(error: unknown): { name: string; message: string } {
       message: String(err.message),
     };
   }
-  return { name: "AuthError", message: "An unexpected error occurred" };
+  return { name: "AuthError", message: i18n.t("auth.unexpectedError") };
 }
 
 async function getProfileRole(userId: string): Promise<string | null> {
@@ -136,8 +136,8 @@ const authProvider: AuthProvider = {
     return {
       success: false,
       error: {
-        message: "Login failed",
-        name: "Invalid email or password",
+        message: i18n.t("auth.loginFailed"),
+        name: "AuthError",
       },
     };
   },
@@ -158,7 +158,13 @@ const authProvider: AuthProvider = {
       );
 
       if (error) {
-        return { success: false, error };
+        return {
+          success: false,
+          error: {
+            message: i18n.t("auth.forgotPasswordFailed"),
+            name: "AuthError",
+          },
+        };
       }
 
       if (data) {
@@ -174,8 +180,8 @@ const authProvider: AuthProvider = {
     return {
       success: false,
       error: {
-        message: "Forgot password failed",
-        name: "Invalid email",
+        message: i18n.t("auth.forgotPasswordFailed"),
+        name: "AuthError",
       },
     };
   },
@@ -187,7 +193,13 @@ const authProvider: AuthProvider = {
       });
 
       if (error) {
-        return { success: false, error };
+        return {
+          success: false,
+          error: {
+            message: i18n.t("auth.updatePasswordFailed"),
+            name: "AuthError",
+          },
+        };
       }
 
       if (data?.user) {
@@ -208,8 +220,8 @@ const authProvider: AuthProvider = {
     return {
       success: false,
       error: {
-        message: "Update password failed",
-        name: "Invalid password",
+        message: i18n.t("auth.updatePasswordFailed"),
+        name: "AuthError",
       },
     };
   },
@@ -217,9 +229,15 @@ const authProvider: AuthProvider = {
   logout: async () => {
     clearAllPendingMfaState();
     const { error } = await supabaseClient.auth.signOut();
-    if (error) {
-      return { success: false, error };
-    }
+      if (error) {
+        return {
+          success: false,
+          error: {
+            message: i18n.t("auth.invalidEmailOrPassword"),
+            name: "AuthError",
+          },
+        };
+      }
     return { success: true, redirectTo: "/" };
   },
 
@@ -235,8 +253,8 @@ const authProvider: AuthProvider = {
         return {
           authenticated: false,
           error: {
-            message: "Check failed",
-            name: "Session not found",
+            message: i18n.t("auth.sessionNotFound"),
+            name: "SessionNotFound",
           },
           logout: true,
           redirectTo: "/login",

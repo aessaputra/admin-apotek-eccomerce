@@ -579,8 +579,21 @@
     "oauthNotAllowed": "Panel admin hanya mendukung login dengan email dan password.",
     "registerDisabled": "Registrasi tidak tersedia. Hubungi administrator.",
     "checkFailed": "Akses ditolak. Hanya admin yang dapat mengakses panel ini.",
+    "sessionNotFound": "Sesi tidak ditemukan",
+    "email": "Email",
+    "password": "Kata Sandi",
+    "loginFailed": "Login gagal",
+    "unexpectedError": "Terjadi kesalahan yang tidak terduga",
+    "invalidEmailOrPassword": "Email atau kata sandi tidak valid",
+    "forgotPasswordFailed": "Gagal mengirim instruksi reset kata sandi",
+    "invalidEmail": "Email tidak valid",
+    "updatePasswordFailed": "Gagal memperbarui kata sandi",
+    "invalidPassword": "Kata sandi tidak valid",
     "login": {
-      "forgotPassword": "Lupa password?"
+      "title": "Masuk",
+      "description": "Gunakan email dan kata sandi Anda untuk mengakses panel admin.",
+      "submit": "Masuk",
+      "forgotPassword": "Lupa kata sandi?"
     },
     "mfa": {
       "required": "Autentikasi multi-faktor wajib digunakan untuk melanjutkan.",
@@ -735,5 +748,45 @@
     "noCouriersFound": "Tidak ada kurir tersedia",
     "saveSuccess": "Pengaturan berhasil disimpan",
     "saveError": "Gagal menyimpan pengaturan"
+  },
+  "pages": {
+    "login": {
+      "signin": "Masuk"
+    },
+    "register": {
+      "buttons": {
+        "haveAccount": "Sudah punya akun? "
+      }
+    },
+    "forgotPassword": {
+      "title": "Lupa kata sandi?",
+      "fields": {
+        "email": "Email"
+      },
+      "errors": {
+        "requiredEmail": "Email wajib diisi",
+        "validEmail": "Format email tidak valid"
+      },
+      "buttons": {
+        "haveAccount": "Sudah punya akun? ",
+        "submit": "Kirim instruksi reset"
+      },
+      "signin": "Masuk"
+    },
+    "updatePassword": {
+      "title": "Atur Kata Sandi Baru",
+      "fields": {
+        "password": "Kata Sandi Baru",
+        "confirmPassword": "Konfirmasi Kata Sandi Baru"
+      },
+      "errors": {
+        "requiredPassword": "Kata sandi wajib diisi",
+        "requiredConfirmPassword": "Konfirmasi kata sandi wajib diisi",
+        "confirmPasswordNotMatch": "Kata sandi tidak cocok"
+      },
+      "buttons": {
+        "submit": "Perbarui"
+      }
+    }
   }
 }

@@ -19,7 +19,16 @@ vi.mock("react-router", () => ({
 
 vi.mock("@refinedev/core", () => ({
   useTranslation: () => ({
-    translate: (key: string, _options?: Record<string, unknown>, fallback?: string) => fallback ?? key,
+    translate: (key: string, _options?: Record<string, unknown>, fallback?: string) => {
+      const indonesian: Record<string, string> = {
+        "auth.email": "Email",
+        "auth.password": "Kata Sandi",
+        "auth.login.submit": "Masuk",
+        "auth.login.forgotPassword": "Lupa kata sandi?",
+        "auth.loginFailed": "Login gagal",
+      };
+      return indonesian[key] ?? fallback ?? key;
+    },
   }),
 }));
 
@@ -45,8 +54,8 @@ describe("Login", () => {
     render(<Login />);
 
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "admin@example.com" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "secret" } });
-    fireEvent.click(screen.getByRole("button", { name: "Login" }));
+    fireEvent.change(screen.getByLabelText("Kata Sandi"), { target: { value: "secret" } });
+    fireEvent.click(screen.getByRole("button", { name: "Masuk" }));
 
     await waitFor(() => expect(mocks.login).toHaveBeenCalledWith({ email: "admin@example.com", password: "secret", to: "/products" }));
     expect(mocks.navigate).toHaveBeenCalledWith(MFA_VERIFY_ROUTE, { replace: true });
@@ -59,8 +68,8 @@ describe("Login", () => {
     render(<Login />);
 
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "admin@example.com" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "secret" } });
-    fireEvent.click(screen.getByRole("button", { name: "Login" }));
+    fireEvent.change(screen.getByLabelText("Kata Sandi"), { target: { value: "secret" } });
+    fireEvent.click(screen.getByRole("button", { name: "Masuk" }));
 
     await waitFor(() => expect(mocks.login).toHaveBeenCalledWith({ email: "admin@example.com", password: "secret", to: "/products" }));
     expect(mocks.navigate).toHaveBeenCalledWith("/products", { replace: true });
@@ -69,6 +78,6 @@ describe("Login", () => {
   it("links to the forgot password route", () => {
     render(<Login />);
 
-    expect(screen.getByRole("link", { name: "Forgot password?" }).getAttribute("href")).toBe("/forgot-password");
+    expect(screen.getByRole("link", { name: "Lupa kata sandi?" }).getAttribute("href")).toBe("/forgot-password");
   });
 });
