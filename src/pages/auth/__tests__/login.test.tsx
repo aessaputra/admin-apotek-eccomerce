@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Login } from "../login";
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("react-router", () => ({
+  Link: ({ children, to }: { children: ReactNode; to: string }) => <a href={to}>{children}</a>,
   useNavigate: () => mocks.navigate,
   useSearchParams: () => [new URLSearchParams("to=%2Fproducts")],
 }));
@@ -62,5 +64,11 @@ describe("Login", () => {
 
     await waitFor(() => expect(mocks.login).toHaveBeenCalledWith({ email: "admin@example.com", password: "secret", to: "/products" }));
     expect(mocks.navigate).toHaveBeenCalledWith("/products", { replace: true });
+  });
+
+  it("links to the forgot password route", () => {
+    render(<Login />);
+
+    expect(screen.getByRole("link", { name: "Forgot password?" }).getAttribute("href")).toBe("/forgot-password");
   });
 });

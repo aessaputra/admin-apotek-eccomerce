@@ -579,6 +579,9 @@
     "oauthNotAllowed": "Admin panel only supports email and password login.",
     "registerDisabled": "Registration is not available. Contact administrator.",
     "checkFailed": "Access denied. Only admins can access this panel.",
+    "login": {
+      "forgotPassword": "Forgot password?"
+    },
     "mfa": {
       "required": "Multi-factor authentication is required to continue.",
       "title": "Verify your sign-in",

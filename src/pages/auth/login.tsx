@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "@refinedev/core";
-import { useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { Alert, Button, Card, Input, Space, Typography } from "antd";
 import { AuthTitle } from "../../components/layout/auth-title";
 import authProvider from "../../providers/auth";
@@ -54,12 +54,12 @@ export function Login() {
 
           {error && <Alert type="error" showIcon message={error} />}
 
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void handleSubmit();
-              }}
-            >
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleSubmit();
+            }}
+          >
             <Space direction="vertical" size={16} style={{ width: "100%" }}>
               <label>
                 <span>{translate("auth.email", {}, "Email")}</span>
@@ -87,6 +87,10 @@ export function Login() {
               <Button htmlType="submit" type="primary" loading={loading}>
                 {translate("auth.login.submit", {}, "Login")}
               </Button>
+
+              <div style={{ textAlign: "right" }}>
+                <Link to="/forgot-password">{translate("auth.login.forgotPassword", {}, "Forgot password?")}</Link>
+              </div>
             </Space>
           </form>
         </Space>

@@ -579,6 +579,9 @@
     "oauthNotAllowed": "Panel admin hanya mendukung login dengan email dan password.",
     "registerDisabled": "Registrasi tidak tersedia. Hubungi administrator.",
     "checkFailed": "Akses ditolak. Hanya admin yang dapat mengakses panel ini.",
+    "login": {
+      "forgotPassword": "Lupa password?"
+    },
     "mfa": {
       "required": "Autentikasi multi-faktor wajib digunakan untuk melanjutkan.",
       "title": "Verifikasi masuk Anda",
