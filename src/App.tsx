@@ -26,6 +26,7 @@ import routerProvider, {
 } from "@refinedev/react-router";
 import { liveProvider } from "@refinedev/supabase";
 import { App as AntdApp } from "antd";
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router";
 import { useTranslation } from "react-i18next";
 import { ColorModeContextProvider } from "./contexts/color-mode";
@@ -38,28 +39,28 @@ import authProvider from "./providers/auth";
 import { dataProvider } from "./providers/data";
 import { supabaseClient } from "./providers/supabase-client";
 
-import { Dashboard } from "./pages/dashboard";
-import { OrderList } from "./pages/orders/list";
-import { OrderShow } from "./pages/orders/show";
-import { CustomerList } from "./pages/customers/list";
-import { CustomerShow } from "./pages/customers/show";
-import { ProductList } from "./pages/products/list";
-import { ProductCreate } from "./pages/products/create";
-import { ProductEdit } from "./pages/products/edit";
-import { ProductShow } from "./pages/products/show";
-import { CategoryList } from "./pages/categories/list";
-import { CategoryCreate } from "./pages/categories/create";
-import { CategoryEdit } from "./pages/categories/edit";
-import { CategoryShow } from "./pages/categories/show";
-import { Profile } from "./pages/profile";
-import { SalesReport } from "./pages/reports/sales";
-import { Settings } from "./pages/settings";
-import { HomeBannerList } from "./pages/home-banners/list";
-import { HomeBannerCreate } from "./pages/home-banners/create";
-import { HomeBannerEdit } from "./pages/home-banners/edit";
-import { HomeBannerShow } from "./pages/home-banners/show";
-import { MfaVerify } from "./pages/auth/mfa-verify";
-import { Login } from "./pages/auth/login";
+const Dashboard = lazy(() => import("./pages/dashboard").then(({ Dashboard }) => ({ default: Dashboard })));
+const OrderList = lazy(() => import("./pages/orders/list").then(({ OrderList }) => ({ default: OrderList })));
+const OrderShow = lazy(() => import("./pages/orders/show").then(({ OrderShow }) => ({ default: OrderShow })));
+const CustomerList = lazy(() => import("./pages/customers/list").then(({ CustomerList }) => ({ default: CustomerList })));
+const CustomerShow = lazy(() => import("./pages/customers/show").then(({ CustomerShow }) => ({ default: CustomerShow })));
+const ProductList = lazy(() => import("./pages/products/list").then(({ ProductList }) => ({ default: ProductList })));
+const ProductCreate = lazy(() => import("./pages/products/create").then(({ ProductCreate }) => ({ default: ProductCreate })));
+const ProductEdit = lazy(() => import("./pages/products/edit").then(({ ProductEdit }) => ({ default: ProductEdit })));
+const ProductShow = lazy(() => import("./pages/products/show").then(({ ProductShow }) => ({ default: ProductShow })));
+const CategoryList = lazy(() => import("./pages/categories/list").then(({ CategoryList }) => ({ default: CategoryList })));
+const CategoryCreate = lazy(() => import("./pages/categories/create").then(({ CategoryCreate }) => ({ default: CategoryCreate })));
+const CategoryEdit = lazy(() => import("./pages/categories/edit").then(({ CategoryEdit }) => ({ default: CategoryEdit })));
+const CategoryShow = lazy(() => import("./pages/categories/show").then(({ CategoryShow }) => ({ default: CategoryShow })));
+const Profile = lazy(() => import("./pages/profile").then(({ Profile }) => ({ default: Profile })));
+const SalesReport = lazy(() => import("./pages/reports/sales").then(({ SalesReport }) => ({ default: SalesReport })));
+const Settings = lazy(() => import("./pages/settings").then(({ Settings }) => ({ default: Settings })));
+const HomeBannerList = lazy(() => import("./pages/home-banners/list").then(({ HomeBannerList }) => ({ default: HomeBannerList })));
+const HomeBannerCreate = lazy(() => import("./pages/home-banners/create").then(({ HomeBannerCreate }) => ({ default: HomeBannerCreate })));
+const HomeBannerEdit = lazy(() => import("./pages/home-banners/edit").then(({ HomeBannerEdit }) => ({ default: HomeBannerEdit })));
+const HomeBannerShow = lazy(() => import("./pages/home-banners/show").then(({ HomeBannerShow }) => ({ default: HomeBannerShow })));
+const MfaVerify = lazy(() => import("./pages/auth/mfa-verify").then(({ MfaVerify }) => ({ default: MfaVerify })));
+const Login = lazy(() => import("./pages/auth/login").then(({ Login }) => ({ default: Login })));
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -162,6 +163,7 @@ function App() {
                   warnWhenUnsavedChanges: true,
                 }}
               >
+                <Suspense fallback={null}>
                 <Routes>
                   <Route path="/mfa-verify" element={<MfaVerify />} />
                   <Route
@@ -226,6 +228,7 @@ function App() {
                     <Route path="/update-password" element={<AuthPage type="updatePassword" title={<AuthTitle />} />} />
                   </Route>
                 </Routes>
+                </Suspense>
                 <RefineKbar />
                 <UnsavedChangesNotifier />
                 <DocumentTitleHandler
