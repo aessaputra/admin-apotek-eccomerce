@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
-import { useGetIdentity, useInvalidate, useUpdatePassword, useTranslation } from "@refinedev/core";
+import { useQueryClient } from "@tanstack/react-query";
+import { useGetIdentity, useUpdatePassword, useTranslation } from "@refinedev/core";
 import { Edit, useForm } from "@refinedev/antd";
 import { Alert, Button, Card, Divider, Form, Input, List, Modal, Space, Tag, Typography, message, theme } from "antd";
 import { LockOutlined } from "@ant-design/icons";
@@ -104,16 +105,23 @@ const MfaManagementCard: React.FC<MfaManagementCardProps> = ({ contentMaxWidth }
 
   const setupTitle = translate("profile.mfa.setupDialogTitle", {}, "Set up verification");
 
-  const setupCardStyle: CSSProperties = {
-    maxWidth: contentMaxWidth,
-  };
+  const setupCardStyle = useMemo<CSSProperties>(
+    () => ({
+      maxWidth: contentMaxWidth,
+      width: "100%",
+    }),
+    [contentMaxWidth],
+  );
 
-  const setupSecretStyle: CSSProperties = {
-    padding: token.paddingSM,
-    borderRadius: token.borderRadius,
-    border: `1px solid ${token.colorBorderSecondary}`,
-    backgroundColor: token.colorFillAlter,
-  };
+  const setupSecretStyle = useMemo<CSSProperties>(
+    () => ({
+      padding: token.paddingSM,
+      borderRadius: token.borderRadius,
+      border: `1px solid ${token.colorBorderSecondary}`,
+      backgroundColor: token.colorFillAlter,
+    }),
+    [token],
+  );
 
   const clearEnrollmentState = useCallback(() => {
     setupForm.resetFields();
@@ -307,18 +315,19 @@ const MfaManagementCard: React.FC<MfaManagementCardProps> = ({ contentMaxWidth }
         open={setupOpen}
         title={setupTitle}
         onCancel={() => void closeSetupDialog()}
-        width={640}
+        width="90%"
+        style={{ maxWidth: 640 }}
         destroyOnHidden
         maskClosable={false}
         footer={
-          <Space style={{ width: "100%", justifyContent: "flex-end" }}>
-            <Button onClick={() => void closeSetupDialog()} loading={resettingEnrollment} disabled={enrolling}>
+          <Space wrap style={{ width: "100%", justifyContent: "flex-end" }}>
+            <Button style={{ minHeight: 44 }} onClick={() => void closeSetupDialog()} loading={resettingEnrollment} disabled={enrolling}>
               {translate("profile.mfa.cancel", {}, "Cancel")}
             </Button>
-            <Button onClick={() => void restartEnrollment()} loading={resettingEnrollment || enrolling} disabled={!enrollment.factorId || enrolling}>
+            <Button style={{ minHeight: 44 }} onClick={() => void restartEnrollment()} loading={resettingEnrollment || enrolling} disabled={!enrollment.factorId || enrolling}>
               {translate("profile.mfa.restartAction", {}, "Restart setup")}
             </Button>
-            <Button type="primary" onClick={() => setupForm.submit()} loading={verifying} disabled={!enrollment.factorId || enrolling}>
+            <Button style={{ minHeight: 44 }} type="primary" onClick={() => setupForm.submit()} loading={verifying} disabled={!enrollment.factorId || enrolling}>
               {translate("profile.mfa.verifyAction", {}, "Verify setup")}
             </Button>
           </Space>
@@ -339,7 +348,9 @@ const MfaManagementCard: React.FC<MfaManagementCardProps> = ({ contentMaxWidth }
                 <img
                   alt={translate("profile.mfa.qrAlt", {}, "Verification setup QR code")}
                   src={getQrCodeSrc(enrollment.qrCode)}
-                  style={{ maxWidth: "100%" }}
+                  width={256}
+                  height={256}
+                  style={{ maxWidth: "100%", height: "auto" }}
                 />
               </div>
               <div style={setupSecretStyle}>
@@ -385,11 +396,12 @@ const MfaManagementCard: React.FC<MfaManagementCardProps> = ({ contentMaxWidth }
         title={translate("profile.mfa.manageDialogTitle", {}, "Manage verification apps")}
         onCancel={() => setManageOpen(false)}
         footer={
-          <Button onClick={() => setManageOpen(false)}>
+          <Button style={{ minHeight: 44 }} onClick={() => setManageOpen(false)}>
             {translate("profile.mfa.close", {}, "Close")}
           </Button>
         }
-        width={640}
+        width="90%"
+        style={{ maxWidth: 640 }}
         destroyOnHidden
       >
         <List
@@ -401,7 +413,7 @@ const MfaManagementCard: React.FC<MfaManagementCardProps> = ({ contentMaxWidth }
                 <Button
                   key="remove"
                   danger
-                  size="small"
+                  style={{ minHeight: 44 }}
                   loading={unenrollingFactorId === factor.id}
                   onClick={() => removeFactor(factor, index)}
                 >
@@ -418,7 +430,7 @@ const MfaManagementCard: React.FC<MfaManagementCardProps> = ({ contentMaxWidth }
                         ? translate("profile.mfa.status.verified", {}, "Verified")
                         : translate("profile.mfa.status.unverified", {}, "Unverified")}
                     </Tag>
-                    <Typography.Text type="secondary">{factor.id}</Typography.Text>
+                    <Typography.Text type="secondary" style={{ wordBreak: "break-all" }}>{factor.id}</Typography.Text>
                   </Space>
                 }
               />
@@ -432,7 +444,7 @@ const MfaManagementCard: React.FC<MfaManagementCardProps> = ({ contentMaxWidth }
 
 const ProfileForms: React.FC<{ userId: string }> = ({ userId }) => {
   const { translate } = useTranslation();
-  const invalidate = useInvalidate();
+  const queryClient = useQueryClient();
   const [passwordForm] = Form.useForm();
   const { token } = theme.useToken();
   const { mutate: updatePassword, isPending: isPasswordLoading } = useUpdatePassword();
@@ -443,8 +455,9 @@ const ProfileForms: React.FC<{ userId: string }> = ({ userId }) => {
     id: userId,
     redirect: false,
     mutationMode: "pessimistic",
+    invalidates: ["detail"],
     onMutationSuccess: () => {
-      invalidate({ invalidates: ["all"] });
+      void queryClient.invalidateQueries({ queryKey: ["auth", "identity"] });
     },
   });
 
@@ -496,7 +509,7 @@ const ProfileForms: React.FC<{ userId: string }> = ({ userId }) => {
         layout="vertical"
         onFinish={onPasswordFinish}
         requiredMark={false}
-        style={{ maxWidth: token.screenXS }}
+        style={{ maxWidth: token.screenXS, width: "100%" }}
       >
         <Form.Item
           label={translate("profile.newPassword")}
