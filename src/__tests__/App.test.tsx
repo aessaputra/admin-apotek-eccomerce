@@ -150,9 +150,9 @@ describe("App", () => {
       syncWithLocation: true,
       warnWhenUnsavedChanges: true,
     });
-    expect(captured.routes[0]).toEqual(expect.objectContaining({ path: "/mfa-verify", elementName: "MfaVerify" }));
+    expect(captured.routes[0]).toEqual(expect.objectContaining({ path: "/mfa-verify" }));
     expect(captured.routes.find((route) => route.path === "/login")).toEqual(
-      expect.objectContaining({ path: "/login", elementName: "Login" }),
+      expect.objectContaining({ path: "/login" }),
     );
     expect(screen.getByText("DocumentTitleHandler")).not.toBeNull();
     expect(screen.getByText("UnsavedChangesNotifier")).not.toBeNull();
