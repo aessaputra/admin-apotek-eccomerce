@@ -130,6 +130,12 @@ vi.mock("@refinedev/core", () => ({
   useUpdatePassword: () => ({ mutate: mocks.updatePassword, isPending: false }),
 }));
 
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({
+    invalidateQueries: vi.fn(),
+  }),
+}));
+
 vi.mock("@refinedev/antd", () => ({
   Edit: ({ children, title }: { children: React.ReactNode; title?: React.ReactNode }) => <div><h1>{title}</h1>{children}</div>,
   useForm: mocks.useForm,

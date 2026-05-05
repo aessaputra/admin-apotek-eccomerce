@@ -343,11 +343,11 @@ describe("form pages", () => {
       },
     });
 
-    return render(
-      <QueryClientProvider client={queryClient}>
-        {ui}
-      </QueryClientProvider>
-    );
+    return render(ui, {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      ),
+    });
   }
 
   beforeEach(() => {
@@ -696,12 +696,16 @@ describe("form pages", () => {
     mocks.useGetIdentity.mockReturnValue({ data: { id: "user-1" } }).mockReturnValueOnce({ data: null });
     mocks.useForm.mockReturnValue({ formProps: {}, saveButtonProps: {} });
 
-    const { container, rerender } = render(<Profile />);
+    const { container, rerender } = renderWithQueryClient(<Profile />);
     expect(container.textContent).toBe("");
 
     rerender(<Profile />);
     await waitFor(() => expect(mocks.mfaListFactors).toHaveBeenCalledTimes(1));
     expect(screen.getByText("AvatarUpload")).not.toBeNull();
+
+    const useFormCall = mocks.useForm.mock.calls.find((call) => call[0]?.resource === "profiles");
+    expect(useFormCall?.[0]?.invalidates).toEqual(["detail"]);
+
     fireEvent.click(screen.getByRole("button", { name: "profile.changePassword" }));
     expect(mocks.messageError).toHaveBeenCalledWith("profile.passwordMismatch");
   });
