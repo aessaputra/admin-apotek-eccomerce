@@ -26,6 +26,10 @@ vi.mock("../../hooks/useSupabaseUpload", () => ({
   })),
 }));
 
+vi.mock("@refinedev/core", () => ({
+  useTranslation: () => ({ translate: (key: string) => key }),
+}));
+
 vi.mock("antd", () => ({
   Upload: (props: {
     children?: React.ReactNode;
@@ -63,6 +67,9 @@ describe("upload components", () => {
     expect(screen.getByTestId("upload-max-count").textContent).toBe("1");
     expect(screen.getByTestId("upload-file-count").textContent).toBe("1");
     expect(screen.queryByText("+ Upload")).toBeNull();
+
+    const lastProps = mocks.uploadProps[mocks.uploadProps.length - 1] as Record<string, unknown>;
+    expect(lastProps["aria-label"]).toBe("profile.fields.avatarUpload");
   });
 
   it("delegates avatar removal to the upload hook", () => {
@@ -77,6 +84,16 @@ describe("upload components", () => {
     expect(mocks.handleRemove).toHaveBeenCalledWith(
       "https://demo.supabase.co/storage/v1/object/public/media/avatars/user.png"
     );
+  });
+
+  it("renders AvatarUpload empty state with accessible label", () => {
+    render(<AvatarUpload />);
+
+    expect(screen.getByTestId("upload-file-count").textContent).toBe("0");
+    expect(screen.getByText("profile.fields.avatarUploadButton")).not.toBeNull();
+
+    const lastProps = mocks.uploadProps[mocks.uploadProps.length - 1] as Record<string, unknown>;
+    expect(lastProps["aria-label"]).toBe("profile.fields.avatarUpload");
   });
 
   it("renders CategoryLogoUpload empty state when there is no logo", () => {

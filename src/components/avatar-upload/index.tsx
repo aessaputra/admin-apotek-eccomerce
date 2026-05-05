@@ -1,3 +1,4 @@
+import { useTranslation } from "@refinedev/core";
 import { Upload } from "antd";
 import { useSupabaseUpload } from "../../hooks/useSupabaseUpload";
 import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
@@ -11,6 +12,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
   value,
   onChange,
 }) => {
+  const { translate } = useTranslation();
   const fileList = value
     ? [{ uid: "-1", name: "avatar", url: resolveStoragePublicUrl(value, MEDIA_BUCKET) ?? value, status: "done" as const }]
     : [];
@@ -29,6 +31,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
 
   return (
     <Upload
+      aria-label={translate("profile.fields.avatarUpload", {}, "Upload avatar")}
       listType="picture-card"
       maxCount={1}
       accept="image/jpeg,image/png,image/webp,image/gif"
@@ -37,7 +40,7 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
       onRemove={() => handleRemove(value!)}
       customRequest={customRequest}
     >
-      {fileList.length === 0 ? "+ Upload" : null}
+      {fileList.length === 0 ? translate("profile.fields.avatarUploadButton", {}, "+ Upload") : null}
     </Upload>
   );
 };
