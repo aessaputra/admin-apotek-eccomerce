@@ -12,6 +12,9 @@ interface LineMockDatum {
 
 interface LineMockProps {
   data: LineMockDatum[];
+  point?: Record<string, unknown>;
+  scale?: { color?: { domain?: string[]; range?: string[] } };
+  style?: Record<string, unknown>;
 }
 
 interface DashboardQueryState {
@@ -36,27 +39,30 @@ const mocks = vi.hoisted(() => {
   const translate = vi.fn((key: string, params?: Record<string, unknown>, fallback?: string) => {
     const translations: Record<string, string> = {
       "dashboard.overview.title": "Operations Overview",
-      "dashboard.overview.subtitle": "Monitor orders, sales, stock, and key items from the last 30 days.",
-      "dashboard.kpis.revenue30d": "Sales Value",
-      "dashboard.kpis.orders30d": "Incoming Orders",
-      "dashboard.kpis.paymentSuccessRate": "Payment Rate",
-      "dashboard.kpis.averageOrderValue": "Average Order",
-      "dashboard.kpis.fulfillmentRisk": "Pending Completion",
-      "dashboard.kpis.lowStockSkus": "Low Stock",
-      "dashboard.kpis.periodNote": "KPIs use the last 30 days. The trend chart follows the selected period.",
-      "dashboard.alerts.title": "Action Required",
-      "dashboard.alerts.metricsError.message": "Metrics unavailable",
-      "dashboard.alerts.metricsError.description": "Some metrics could not be loaded. Review the trend panel and retry shortly.",
+      "dashboard.overview.subtitle": "Monitor orders, sales, stock, and follow-up queues from the last 30 days.",
+      "dashboard.kpis.revenue30d": "30-Day Sales",
+      "dashboard.kpis.orders30d": "30-Day Orders",
+      "dashboard.kpis.paymentSuccessRate": "Paid Orders",
+      "dashboard.kpis.averageOrderValue": "Average Order Value",
+      "dashboard.kpis.fulfillmentRisk": "Paid Orders Not Completed",
+      "dashboard.kpis.lowStockSkus": "Low-Stock Products",
+      "dashboard.kpis.unavailable": "Unavailable",
+      "dashboard.kpis.periodNote": "Summary figures use the last 30 days. The trend chart follows the selected period.",
+      "dashboard.alerts.title": "Needs Follow-Up",
+      "dashboard.alerts.metricsError.message": "Summary unavailable",
+      "dashboard.alerts.metricsError.description": "Some summary figures could not be loaded. Check the trend panel or retry shortly.",
       "dashboard.alerts.lowStockError.message": "Couldn’t load low-stock data",
-      "dashboard.alerts.lowStockError.description": "Refresh the dashboard or check your connection.",
-      "dashboard.alerts.fulfillmentRisk.message": "{{count}} paid orders are not completed yet",
-      "dashboard.alerts.fulfillmentRisk.description": "Open the orders list to continue fulfillment, shipping, or completion confirmation for paid orders.",
-      "dashboard.alerts.lowStockRisk.message": "{{count}} active low-stock SKUs",
-      "dashboard.alerts.lowStockRisk.description": "Active products below 10 units need restock review. Check the low-stock table for the most urgent SKUs.",
+      "dashboard.alerts.lowStockError.description": "Refresh the page or check your connection.",
+      "dashboard.alerts.recentOrdersError.message": "Couldn’t load recent orders",
+      "dashboard.alerts.recentOrdersError.description": "The order list has not loaded. Refresh before treating the queue as empty.",
+      "dashboard.alerts.fulfillmentRisk.message": "{{count}} paid orders are not completed",
+      "dashboard.alerts.fulfillmentRisk.description": "Open the orders list to continue processing, shipping, or completion confirmation.",
+      "dashboard.alerts.lowStockRisk.message": "{{count}} active products are low on stock",
+      "dashboard.alerts.lowStockRisk.description": "Active products below 10 units need restock review.",
       "dashboard.alerts.noRisk.message": "No urgent queue items",
-      "dashboard.alerts.noRisk.description": "Metrics loaded successfully, with no orders or stock items requiring immediate follow-up.",
+      "dashboard.alerts.noRisk.description": "Summary data loaded successfully, with no orders or stock items needing immediate follow-up.",
       "dashboard.alerts.loading.message": "Checking the follow-up queue",
-      "dashboard.alerts.loading.description": "Metrics and stock counts are still loading. Queue status will update shortly.",
+      "dashboard.alerts.loading.description": "Summary and stock counts are still loading. Queue status will update shortly.",
       "dashboard.recentOrders": "Recent Orders",
       "dashboard.viewAll": "View All",
       "dashboard.viewAllOrders": "View all orders",
@@ -73,17 +79,17 @@ const mocks = vi.hoisted(() => {
       "dashboard.tables.lowStockAriaLabel": "Low stock products table",
       "dashboard.orderId": "Order ID",
       "dashboard.fullOrderId": "Full order ID",
-      "dashboard.monthlyTrends.title": "Operational Trends",
-      "dashboard.monthlyTrends.revenue": "Sales Value",
+      "dashboard.monthlyTrends.title": "Order Trends",
+      "dashboard.monthlyTrends.revenue": "Sales",
       "dashboard.monthlyTrends.orderCount": "Incoming Orders",
-      "dashboard.monthlyTrends.paidOrders": "Paid",
+      "dashboard.monthlyTrends.paidOrders": "Paid Orders",
       "dashboard.monthlyTrends.completedOrders": "Completed",
       "dashboard.monthlyTrends.dataTableLabel": "Order trend data table",
       "dashboard.monthlyTrends.periodColumn": "Period",
       "dashboard.monthlyTrends.incomingColumn": "Incoming",
       "dashboard.monthlyTrends.paidColumn": "Paid",
       "dashboard.monthlyTrends.completedColumn": "Completed",
-      "dashboard.monthlyTrends.revenueColumn": "Revenue",
+      "dashboard.monthlyTrends.revenueColumn": "Sales",
       "dashboard.monthlyTrends.latest12Months": "Latest 12 months",
       "dashboard.monthlyTrends.period.day": "Last 30 days",
       "dashboard.monthlyTrends.period.week": "Last 12 weeks",
@@ -93,13 +99,13 @@ const mocks = vi.hoisted(() => {
       "dashboard.monthlyTrends.granularity.week": "Weekly",
       "dashboard.monthlyTrends.granularity.month": "Monthly",
       "dashboard.monthlyTrends.granularity.year": "Yearly",
-      "dashboard.monthlyTrends.granularityAriaLabel": "Choose operational trend period",
-      "dashboard.monthlyTrends.loading": "Loading order trend data...",
-      "dashboard.monthlyTrends.emptyDescription": "No order trend data is available yet.",
+      "dashboard.monthlyTrends.granularityAriaLabel": "Choose order trend period",
+      "dashboard.monthlyTrends.loading": "Loading order trends...",
+      "dashboard.monthlyTrends.emptyDescription": "No order trends are available yet.",
       "dashboard.monthlyTrends.errorMessage": "Failed to load order trends.",
-      "dashboard.monthlyTrends.zeroValueSummary": "All order trend metrics are zero.",
-      "dashboard.monthlyTrends.chartAriaLabel": "Order trend line chart: incoming, paid, and completed",
-      "dashboard.monthlyTrends.chartDescription": "Incoming, paid, and completed orders for the selected period.",
+      "dashboard.monthlyTrends.zeroValueSummary": "All order trend figures are still zero.",
+      "dashboard.monthlyTrends.chartAriaLabel": "Order trend line chart: incoming, paid, and completed orders",
+      "dashboard.monthlyTrends.chartDescription": "Incoming, paid, and completed order counts for the selected period.",
       "orderStatus.shipped": "Handed to Courier",
     };
 
@@ -121,6 +127,7 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@refinedev/core", () => ({
+  useGetLocale: () => () => "id",
   useList: mocks.useList,
   useTranslation: () => ({ translate: mocks.translate }),
   useNavigation: () => ({ list: mocks.navigateList }),
@@ -257,6 +264,7 @@ vi.mock("antd", async () => {
       ),
     },
     Statistic: ({
+      prefix,
       title,
       value,
       suffix,
@@ -264,12 +272,14 @@ vi.mock("antd", async () => {
       loading,
     }: {
       title?: React.ReactNode;
+      prefix?: React.ReactNode;
       value?: React.ReactNode;
       suffix?: React.ReactNode;
       formatter?: (value?: React.ReactNode) => React.ReactNode;
       loading?: boolean;
     }) => (
       <div>
+        {prefix}
         <span>{title}</span>
         {loading ? (
           <span data-testid="statistic-loading">Loading statistic</span>
@@ -331,14 +341,14 @@ vi.mock("antd", async () => {
 });
 
 vi.mock("@ant-design/icons", () => ({
-  CheckCircleOutlined: () => <span>check-circle</span>,
-  BankOutlined: () => <span>bank</span>,
-  ClockCircleOutlined: () => <span>clock-circle</span>,
-  ShoppingCartOutlined: () => <span>cart</span>,
-  UserOutlined: () => <span>user</span>,
-  InboxOutlined: () => <span>inbox</span>,
-  PercentageOutlined: () => <span>percentage</span>,
-  WarningOutlined: () => <span>warning</span>,
+  CheckCircleOutlined: () => <span aria-hidden="true" data-testid="check-circle-icon" />,
+  BankOutlined: () => <span aria-hidden="true" data-testid="bank-icon" />,
+  ClockCircleOutlined: () => <span aria-hidden="true" data-testid="clock-circle-icon" />,
+  ShoppingCartOutlined: () => <span aria-hidden="true" data-testid="cart-icon" />,
+  UserOutlined: () => <span aria-hidden="true" data-testid="user-icon" />,
+  InboxOutlined: () => <span aria-hidden="true" data-testid="inbox-icon" />,
+  PercentageOutlined: () => <span aria-hidden="true" data-testid="percentage-icon" />,
+  WarningOutlined: () => <span aria-hidden="true" data-testid="warning-icon" />,
 }));
 
 const currencyFormatter = new Intl.NumberFormat("id-ID", {
@@ -522,10 +532,10 @@ describe("Dashboard", () => {
 
     render(<Dashboard />);
 
-    expect(screen.getByText("Sales Value")).not.toBeNull();
-    expect(screen.getByText("Incoming Orders")).not.toBeNull();
-    expect(screen.getByText("Payment Rate")).not.toBeNull();
-    expect(screen.getByText("Average Order")).not.toBeNull();
+    expect(screen.getByText("30-Day Sales")).not.toBeNull();
+    expect(screen.getByText("30-Day Orders")).not.toBeNull();
+    expect(screen.getAllByText("Paid Orders").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Average Order Value")).not.toBeNull();
     expect(screen.getAllByTestId("statistic-loading").length).toBeGreaterThanOrEqual(4);
     expect(document.body.textContent).not.toContain(currencyFormatter.format(0));
   });
@@ -627,8 +637,8 @@ describe("Dashboard", () => {
 
     const pageText = document.body.textContent ?? "";
 
-    expect(pageText).toContain(`Sales Value${currencyFormatter.format(10000)}`);
-    expect(pageText).toContain("Incoming Orders1");
+    expect(pageText).toContain(`30-Day Sales${currencyFormatter.format(10000)}`);
+    expect(pageText).toContain("30-Day Orders1");
     expect(mocks.useList).toHaveBeenCalledWith({
       resource: "admin_operational_metrics",
       pagination: { pageSize: 30 },
@@ -678,8 +688,8 @@ describe("Dashboard", () => {
 
     const pageText = document.body.textContent ?? "";
 
-    expect(pageText).toContain(`Sales Value${currencyFormatter.format(10000)}`);
-    expect(pageText).toContain("Incoming Orders1");
+    expect(pageText).toContain(`30-Day Sales${currencyFormatter.format(10000)}`);
+    expect(pageText).toContain("30-Day Orders1");
     expect(mocks.useList).toHaveBeenCalledWith({
       resource: "admin_operational_metrics",
       pagination: { pageSize: 30 },
@@ -710,14 +720,14 @@ describe("Dashboard", () => {
     const pageText = document.body.textContent ?? "";
 
     expect(screen.getByText("Operations Overview")).not.toBeNull();
-    expect(screen.getByText("Monitor orders, sales, stock, and key items from the last 30 days.")).not.toBeNull();
-    expect(screen.getAllByText("Sales Value").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Incoming Orders").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Payment Rate")).not.toBeNull();
-    expect(screen.getByText("Average Order")).not.toBeNull();
-    expect(screen.getByText("Pending Completion")).not.toBeNull();
-    expect(screen.getAllByText("Low Stock").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("KPIs use the last 30 days. The trend chart follows the selected period.")).not.toBeNull();
+    expect(screen.getByText("Monitor orders, sales, stock, and follow-up queues from the last 30 days.")).not.toBeNull();
+    expect(screen.getAllByText("30-Day Sales").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("30-Day Orders").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Paid Orders").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Average Order Value")).not.toBeNull();
+    expect(screen.getByText("Paid Orders Not Completed")).not.toBeNull();
+    expect(screen.getAllByText("Low-Stock Products").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Summary figures use the last 30 days. The trend chart follows the selected period.")).not.toBeNull();
     expect(pageText).toContain(currencyFormatter.format(125000));
     expect(pageText).toContain("60%");
     expect(pageText).toContain(currencyFormatter.format(125000 / 3));
@@ -737,8 +747,8 @@ describe("Dashboard", () => {
 
     const pageText = document.body.textContent ?? "";
 
-    expect(pageText).toContain("Payment Rate0%");
-    expect(pageText).toContain(`Average Order${currencyFormatter.format(0)}`);
+    expect(pageText).toContain("Paid Orders0%");
+    expect(pageText).toContain(`Average Order Value${currencyFormatter.format(0)}`);
     expect(pageText).not.toContain("NaN");
     expect(pageText).not.toContain("Infinity");
   });
@@ -749,12 +759,12 @@ describe("Dashboard", () => {
 
       render(<Dashboard />);
 
-      expect(screen.getByText("Action Required")).not.toBeNull();
+      expect(screen.getByText("Needs Follow-Up")).not.toBeNull();
       expect(screen.getByText("No urgent queue items")).not.toBeNull();
-      expect(screen.queryByText("Metrics loaded successfully, with no orders or stock items requiring immediate follow-up.")).toBeNull();
+      expect(screen.queryByText("Summary data loaded successfully, with no orders or stock items needing immediate follow-up.")).toBeNull();
       expect(screen.queryByText("Paid orders need fulfillment")).toBeNull();
       expect(screen.queryByText("Active low-stock SKUs")).toBeNull();
-      expect(screen.queryByText("Metrics unavailable")).toBeNull();
+      expect(screen.queryByText("Summary unavailable")).toBeNull();
     });
 
     it("renders a neutral loading alert instead of no-risk while risk queries are pending", () => {
@@ -768,9 +778,9 @@ describe("Dashboard", () => {
       render(<Dashboard />);
 
       expect(screen.getByText("Checking the follow-up queue")).not.toBeNull();
-      expect(screen.queryByText("Metrics and stock counts are still loading. Queue status will update shortly.")).toBeNull();
+      expect(screen.queryByText("Summary and stock counts are still loading. Queue status will update shortly.")).toBeNull();
       expect(screen.queryByText("No urgent queue items")).toBeNull();
-      expect(screen.queryByText("Metrics loaded successfully, with no orders or stock items requiring immediate follow-up.")).toBeNull();
+      expect(screen.queryByText("Summary data loaded successfully, with no orders or stock items needing immediate follow-up.")).toBeNull();
     });
 
     it("renders a generic metrics-error alert without raw thrown details", () => {
@@ -782,11 +792,53 @@ describe("Dashboard", () => {
 
       render(<Dashboard />);
 
-      expect(screen.getByText("Metrics unavailable")).not.toBeNull();
-      expect(screen.getByText("Some metrics could not be loaded. Review the trend panel and retry shortly.")).not.toBeNull();
+      expect(screen.getByText("Summary unavailable")).not.toBeNull();
+      expect(screen.getByText("Some summary figures could not be loaded. Check the trend panel or retry shortly.")).not.toBeNull();
       expect(screen.getAllByRole("alert").some((alert) => alert.textContent === "Failed to load order trends.")).toBe(true);
+      expect(screen.getAllByText("Unavailable").length).toBeGreaterThanOrEqual(4);
       expect(screen.queryByText("database host leaked")).toBeNull();
       expect(document.body.textContent).not.toContain("database host leaked");
+      expect(document.body.textContent).not.toContain("Paid Orders0%");
+    });
+
+    it("shows table error states instead of healthy empty copy when dashboard tables fail", () => {
+      setupDashboardQueries({
+        monthlyMetricRows: healthyMonthlyMetricRows,
+        recentOrders: [],
+        lowStockProducts: [],
+        lowStockTotal: 0,
+        lowStockQuery: { isError: true, error: new Error("stock table leaked") },
+      });
+      mocks.useList.mockImplementation((params: { resource: string }) => {
+        if (params.resource === "orders") {
+          return {
+            result: { data: [] },
+            query: { isLoading: false, isError: true, error: new Error("orders table leaked") },
+          };
+        }
+
+        if (params.resource === "products") {
+          return {
+            result: { data: [], total: 0 },
+            query: { isLoading: false, isError: true, error: new Error("stock table leaked") },
+          };
+        }
+
+        return {
+          result: { data: healthyMonthlyMetricRows },
+          query: { isLoading: false, isError: false, error: null },
+        };
+      });
+
+      render(<Dashboard />);
+
+      expect(screen.getByText("Couldn’t load recent orders")).not.toBeNull();
+      expect(screen.getByText("The order list has not loaded. Refresh before treating the queue as empty.")).not.toBeNull();
+      expect(screen.getAllByText("Couldn’t load low-stock data").length).toBeGreaterThanOrEqual(1);
+      expect(screen.queryByText("No orders yet")).toBeNull();
+      expect(screen.queryByText("All stock levels OK")).toBeNull();
+      expect(document.body.textContent).not.toContain("orders table leaked");
+      expect(document.body.textContent).not.toContain("stock table leaked");
     });
 
     it("renders a paid-not-fulfilled warning when paid orders exceed completed orders", () => {
@@ -804,8 +856,8 @@ describe("Dashboard", () => {
 
       render(<Dashboard />);
 
-      expect(screen.getByText("2 paid orders are not completed yet")).not.toBeNull();
-      expect(screen.getByText("Open the orders list to continue fulfillment, shipping, or completion confirmation for paid orders.")).not.toBeNull();
+      expect(screen.getByText("2 paid orders are not completed")).not.toBeNull();
+      expect(screen.getByText("Open the orders list to continue processing, shipping, or completion confirmation.")).not.toBeNull();
       expect(screen.queryByText("No urgent queue items")).toBeNull();
     });
 
@@ -818,8 +870,8 @@ describe("Dashboard", () => {
 
       render(<Dashboard />);
 
-      expect(screen.getByText("Couldn’t load low-stock data")).not.toBeNull();
-      expect(screen.getByText("Refresh the dashboard or check your connection.")).not.toBeNull();
+      expect(screen.getAllByText("Couldn’t load low-stock data").length).toBeGreaterThanOrEqual(2);
+      expect(screen.getAllByText("Refresh the page or check your connection.").length).toBeGreaterThanOrEqual(2);
       expect(screen.queryByText("No urgent queue items")).toBeNull();
       expect(document.body.textContent).not.toContain("stock table leaked");
     });
@@ -829,8 +881,8 @@ describe("Dashboard", () => {
 
       render(<Dashboard />);
 
-      expect(screen.getByText("2 active low-stock SKUs")).not.toBeNull();
-      expect(screen.getByText("Active products below 10 units need restock review. Check the low-stock table for the most urgent SKUs.")).not.toBeNull();
+      expect(screen.getByText("2 active products are low on stock")).not.toBeNull();
+      expect(screen.getByText("Active products below 10 units need restock review.")).not.toBeNull();
       expect(screen.queryByText("No urgent queue items")).toBeNull();
     });
 
@@ -869,14 +921,14 @@ describe("Dashboard", () => {
 
     const pageText = document.body.textContent ?? "";
 
-    expect(screen.getByText("Operational Trends")).not.toBeNull();
-    expect(screen.getByRole("radiogroup", { name: "Choose operational trend period" })).not.toBeNull();
-    expect(screen.getByRole("img", { name: "Order trend line chart: incoming, paid, and completed" })).not.toBeNull();
-    expect(screen.getByText("Incoming, paid, and completed orders for the selected period.")).not.toBeNull();
+    expect(screen.getByText("Order Trends")).not.toBeNull();
+    expect(screen.getByRole("radiogroup", { name: "Choose order trend period" })).not.toBeNull();
+    expect(screen.getByRole("img", { name: "Order trend line chart: incoming, paid, and completed orders" })).not.toBeNull();
+    expect(screen.getByText("Incoming, paid, and completed order counts for the selected period.")).not.toBeNull();
     expect(pageText).toContain("Daily");
     expect(pageText).toContain(currencyFormatter.format(125000));
     expect(pageText).toContain("Incoming Orders5");
-    expect(pageText).toContain("Paid3");
+    expect(pageText).toContain("Paid Orders3");
     expect(pageText).toContain("Completed2");
   });
 
@@ -885,9 +937,9 @@ describe("Dashboard", () => {
 
     render(<Dashboard />);
 
-    expect(screen.getByText("Operational Trends")).not.toBeNull();
+    expect(screen.getByText("Order Trends")).not.toBeNull();
     expect(screen.getByTestId("monthly-trend-skeleton")).not.toBeNull();
-    expect(screen.getByText("Loading order trend data...")).not.toBeNull();
+    expect(screen.getByText("Loading order trends...")).not.toBeNull();
     expect(mocks.line).not.toHaveBeenCalled();
   });
 
@@ -896,7 +948,7 @@ describe("Dashboard", () => {
 
     render(<Dashboard />);
 
-    expect(screen.getByText("No order trend data is available yet.")).not.toBeNull();
+    expect(screen.getByText("No order trends are available yet.")).not.toBeNull();
     expect(screen.queryByTestId("monthly-trend-line")).toBeNull();
     expect(mocks.line).not.toHaveBeenCalled();
   });
@@ -906,7 +958,7 @@ describe("Dashboard", () => {
 
     render(<Dashboard />);
 
-    expect(screen.getByText("No order trend data is available yet.")).not.toBeNull();
+    expect(screen.getByText("No order trends are available yet.")).not.toBeNull();
     expect(screen.queryByTestId("monthly-trend-line")).toBeNull();
     expect(mocks.line).not.toHaveBeenCalled();
   });
@@ -919,7 +971,7 @@ describe("Dashboard", () => {
 
     render(<Dashboard />);
 
-    expect(screen.getByText("Metrics unavailable")).not.toBeNull();
+    expect(screen.getByText("Summary unavailable")).not.toBeNull();
     expect(screen.getAllByRole("alert").some((alert) => alert.textContent === "Failed to load order trends.")).toBe(true);
     expect(screen.queryByText("database host leaked")).toBeNull();
     expect(mocks.line).not.toHaveBeenCalled();
@@ -932,8 +984,8 @@ describe("Dashboard", () => {
 
     const pageText = document.body.textContent ?? "";
 
-    expect(screen.getByText("All order trend metrics are zero.")).not.toBeNull();
-    expect(screen.queryByText("No order trend data is available yet.")).toBeNull();
+    expect(screen.getByText("All order trend figures are still zero.")).not.toBeNull();
+    expect(screen.queryByText("No order trends are available yet.")).toBeNull();
     expect(screen.getByTestId("monthly-trend-line")).not.toBeNull();
     expect(pageText).toContain(currencyFormatter.format(0));
     expect(mocks.line.mock.calls[0]?.[0].data.every((point) => point.value === 0)).toBe(true);
@@ -944,15 +996,16 @@ describe("Dashboard", () => {
 
     render(<Dashboard />);
 
-    expect(screen.getAllByText("Sales Value").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Incoming Orders").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Payment Rate")).not.toBeNull();
-    expect(screen.getByText("Average Order")).not.toBeNull();
-    expect(screen.getByText("Pending Completion")).not.toBeNull();
-    expect(screen.getAllByText("Low Stock").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("30-Day Sales").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("30-Day Orders").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Paid Orders").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Average Order Value")).not.toBeNull();
+    expect(screen.getByText("Paid Orders Not Completed")).not.toBeNull();
+    expect(screen.getAllByText("Low-Stock Products").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Recent Orders")).not.toBeNull();
     expect(screen.getByText("Handed to Courier")).not.toBeNull();
-    expect(screen.getAllByText("Low Stock").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("Low-Stock Products").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Low Stock").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Bandage")).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "View all orders" }));

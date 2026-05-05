@@ -1,4 +1,4 @@
-import { useList, useTranslation, useNavigation } from "@refinedev/core";
+import { useGetLocale, useList, useTranslation, useNavigation } from "@refinedev/core";
 import { Alert, Button, Card, Col, Row, Space, Statistic, Table, Tag, Tooltip, Typography, theme } from "antd";
 import { useMemo, useState } from "react";
 import {
@@ -11,10 +11,10 @@ import {
   WarningOutlined,
 } from "@ant-design/icons";
 import { STATUS_COLORS } from "../../constants/orders";
-import { currencyFormatter } from "../../utils/formatters";
 import { buildDashboardKpiViewModel, type DashboardKpiAlert, type DashboardKpiAlertKind } from "./dashboardKpis";
 import { MonthlyOperationalTrendCard } from "./MonthlyOperationalTrendCard";
 import {
+  JAKARTA_TIME_ZONE,
   buildOperationalTrendData,
   getDefaultOperationalTrendRequest,
   isValidBucketStart,
@@ -75,9 +75,9 @@ const getOperationalAlertLabels = (
   }
 };
 
-const decimalFormatter = new Intl.NumberFormat("id-ID", {
-  maximumFractionDigits: 1,
-});
+const getDashboardLocale = (language: string | undefined): string => (language?.startsWith("en") ? "en-US" : "id-ID");
+
+const unavailableMetricValue = "-";
 
 const formatDashboardOrderId = (orderId: string): string => {
   if (orderId.length <= 12) {
@@ -108,9 +108,31 @@ const hasOperationalMetricRows = (rows: readonly OperationalMetricRow[]): boolea
 
 export const Dashboard: React.FC = () => {
   const { translate } = useTranslation();
+  const getLocale = useGetLocale();
   const { list: navigateList } = useNavigation();
   const { token } = theme.useToken();
   const [trendGranularity, setTrendGranularity] = useState<OperationalTrendGranularity>("day");
+  const locale = getDashboardLocale(getLocale());
+  const currencyFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat(locale, {
+        style: "currency",
+        currency: "IDR",
+        maximumFractionDigits: 0,
+      }),
+    [locale],
+  );
+  const decimalFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat(locale, {
+        maximumFractionDigits: 1,
+      }),
+    [locale],
+  );
+  const dashboardDateFormatter = useMemo(
+    () => new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short", timeZone: JAKARTA_TIME_ZONE, year: "numeric" }),
+    [locale],
+  );
   const isDailyTrend = trendGranularity === "day";
   const kpiRequest = useMemo(() => getDefaultOperationalTrendRequest("day"), []);
   const trendRequest = useMemo(() => getDefaultOperationalTrendRequest(trendGranularity), [trendGranularity]);
@@ -184,16 +206,17 @@ export const Dashboard: React.FC = () => {
   const activeTrendMetricsQuery = isDailyTrend ? kpiMetricsQuery : operationalMetricsQuery;
   const operationalMetricRows = activeTrendMetricsResult?.data ?? [];
   const monthlyOperationalTrendData = hasOperationalMetricRows(operationalMetricRows)
-    ? buildOperationalTrendData(operationalMetricRows, trendGranularity)
+    ? buildOperationalTrendData(operationalMetricRows, trendGranularity, locale)
     : emptyMonthlyOperationalTrendData;
   const kpiMetricRows = kpiMetricsResult?.data ?? [];
+  const hasKpiMetricsError = Boolean(kpiMetricsQuery?.isError);
   const dashboardKpiTrendData = hasOperationalMetricRows(kpiMetricRows)
-    ? buildOperationalTrendData(kpiMetricRows, "day")
+    ? buildOperationalTrendData(kpiMetricRows, "day", locale)
     : emptyMonthlyOperationalTrendData;
   const dashboardKpis = buildDashboardKpiViewModel(dashboardKpiTrendData.totals, {
     lowStockErrorCount: lowStockQuery?.isError ? 1 : 0,
     lowStockProductCount: lowStockResult?.total ?? 0,
-    metricsErrorCount: Number(Boolean(kpiMetricsQuery?.isError)) + (isDailyTrend ? 0 : Number(Boolean(operationalMetricsQuery?.isError))),
+    metricsErrorCount: Number(hasKpiMetricsError) + (isDailyTrend ? 0 : Number(Boolean(operationalMetricsQuery?.isError))),
   });
   const operationalAlertsLoading = Boolean(
     kpiMetricsQuery?.isLoading || activeTrendMetricsQuery?.isLoading || lowStockQuery?.isLoading,
@@ -220,10 +243,28 @@ export const Dashboard: React.FC = () => {
   const secondaryKpiValueStyle = getDashboardSecondaryKpiValueStyle(token);
   const attentionCardTitle = (
     <Space size={token.marginXS}>
-      <WarningOutlined style={{ color: token.colorWarning }} />
+      <WarningOutlined aria-hidden="true" style={{ color: token.colorWarning }} />
       {translate("dashboard.alerts.title")}
     </Space>
   );
+  const metricsUnavailableText = translate("dashboard.kpis.unavailable");
+  const renderUnavailableMetric = (): string => metricsUnavailableText || unavailableMetricValue;
+  const recentOrdersEmptyText = recentOrdersQuery?.isError ? (
+    <Alert
+      type="error"
+      showIcon
+      message={translate("dashboard.alerts.recentOrdersError.message")}
+      description={translate("dashboard.alerts.recentOrdersError.description")}
+    />
+  ) : translate("dashboard.noRecentOrders");
+  const lowStockEmptyText = lowStockQuery?.isError ? (
+    <Alert
+      type="error"
+      showIcon
+      message={translate("dashboard.alerts.lowStockError.message")}
+      description={translate("dashboard.alerts.lowStockError.description")}
+    />
+  ) : translate("dashboard.noLowStock");
 
   return (
     <>
@@ -267,7 +308,7 @@ export const Dashboard: React.FC = () => {
                     title={translate("dashboard.kpis.fulfillmentRisk")}
                     value={dashboardKpis.fulfillmentRisk}
                     loading={isKpiMetricsLoading}
-                    prefix={<ClockCircleOutlined style={{ color: token.colorWarning }} />}
+                    prefix={<ClockCircleOutlined aria-hidden="true" style={{ color: token.colorWarning }} />}
                     valueStyle={secondaryKpiValueStyle}
                   />
                 </Card>
@@ -278,7 +319,7 @@ export const Dashboard: React.FC = () => {
                     title={translate("dashboard.kpis.lowStockSkus")}
                     value={dashboardKpis.lowStockRisk}
                     loading={isLowStockLoading}
-                    prefix={<InboxOutlined style={{ color: token.colorWarning }} />}
+                    prefix={<InboxOutlined aria-hidden="true" style={{ color: token.colorWarning }} />}
                     valueStyle={secondaryKpiValueStyle}
                   />
                 </Card>
@@ -297,9 +338,9 @@ export const Dashboard: React.FC = () => {
               title={translate("dashboard.kpis.revenue30d")}
               value={dashboardKpis.revenue}
               loading={isKpiMetricsLoading}
-              prefix={<BankOutlined style={{ color: token.colorSuccess }} />}
+              prefix={<BankOutlined aria-hidden="true" style={{ color: token.colorSuccess }} />}
               valueStyle={primaryKpiValueStyle}
-              formatter={(value) => currencyFormatter.format(Number(value ?? 0))}
+              formatter={hasKpiMetricsError ? renderUnavailableMetric : (value) => currencyFormatter.format(Number(value ?? 0))}
             />
           </Card>
         </Col>
@@ -309,8 +350,9 @@ export const Dashboard: React.FC = () => {
               title={translate("dashboard.kpis.orders30d")}
               value={dashboardKpis.orderCount}
               loading={isKpiMetricsLoading}
-              prefix={<ShoppingCartOutlined style={{ color: token.colorPrimary }} />}
+              prefix={<ShoppingCartOutlined aria-hidden="true" style={{ color: token.colorPrimary }} />}
               valueStyle={primaryKpiValueStyle}
+              formatter={hasKpiMetricsError ? renderUnavailableMetric : undefined}
             />
           </Card>
         </Col>
@@ -320,10 +362,10 @@ export const Dashboard: React.FC = () => {
               title={translate("dashboard.kpis.paymentSuccessRate")}
               value={dashboardKpis.paymentSuccessRate}
               loading={isKpiMetricsLoading}
-              prefix={<PercentageOutlined style={{ color: token.colorInfo }} />}
-              suffix="%"
+              prefix={<PercentageOutlined aria-hidden="true" style={{ color: token.colorInfo }} />}
+              suffix={hasKpiMetricsError ? undefined : "%"}
               valueStyle={primaryKpiValueStyle}
-              formatter={(value) => decimalFormatter.format(Number(value ?? 0))}
+              formatter={hasKpiMetricsError ? renderUnavailableMetric : (value) => decimalFormatter.format(Number(value ?? 0))}
             />
           </Card>
         </Col>
@@ -333,9 +375,9 @@ export const Dashboard: React.FC = () => {
               title={translate("dashboard.kpis.averageOrderValue")}
               value={dashboardKpis.averageOrderValue}
               loading={isKpiMetricsLoading}
-              prefix={<CheckCircleOutlined style={{ color: token.colorSuccess }} />}
+              prefix={<CheckCircleOutlined aria-hidden="true" style={{ color: token.colorSuccess }} />}
               valueStyle={primaryKpiValueStyle}
-              formatter={(value) => currencyFormatter.format(Number(value ?? 0))}
+              formatter={hasKpiMetricsError ? renderUnavailableMetric : (value) => currencyFormatter.format(Number(value ?? 0))}
             />
           </Card>
         </Col>
@@ -352,6 +394,7 @@ export const Dashboard: React.FC = () => {
             granularity={trendGranularity}
             granularityOptions={trendGranularityOptions}
             onGranularityChange={setTrendGranularity}
+            locale={locale}
             labels={{
               title: translate("dashboard.monthlyTrends.title"),
               revenue: translate("dashboard.monthlyTrends.revenue"),
@@ -395,7 +438,7 @@ export const Dashboard: React.FC = () => {
               size="small"
               scroll={{ x: "max-content" }}
               loading={recentOrdersQuery?.isLoading}
-              locale={{ emptyText: translate("dashboard.noRecentOrders") }}
+              locale={{ emptyText: recentOrdersEmptyText }}
               aria-label={translate("dashboard.tables.recentOrdersAriaLabel")}
             >
               <Table.Column
@@ -433,7 +476,7 @@ export const Dashboard: React.FC = () => {
                 dataIndex="created_at"
                 title={translate("dashboard.orderDate")}
                 responsive={["md"]}
-                render={(v) => (v ? new Date(v).toLocaleDateString("id-ID") : "-")}
+                render={(v) => (v ? dashboardDateFormatter.format(new Date(v)) : "-")}
               />
             </Table>
           </Card>
@@ -442,7 +485,7 @@ export const Dashboard: React.FC = () => {
           <Card
             title={
               <>
-                <WarningOutlined style={{ color: token.colorWarning, marginRight: token.marginXS }} />
+                <WarningOutlined aria-hidden="true" style={{ color: token.colorWarning, marginRight: token.marginXS }} />
                 {translate("dashboard.lowStockAlerts")}
               </>
             }
@@ -459,10 +502,10 @@ export const Dashboard: React.FC = () => {
               size="small"
               scroll={{ x: "max-content" }}
               loading={lowStockQuery?.isLoading}
-              locale={{ emptyText: translate("dashboard.noLowStock") }}
+              locale={{ emptyText: lowStockEmptyText }}
               aria-label={translate("dashboard.tables.lowStockAriaLabel")}
             >
-              <Table.Column dataIndex="name" title={translate("dashboard.productName")} />
+              <Table.Column dataIndex="name" title={translate("dashboard.productName")} render={(value: string) => <Text ellipsis={{ tooltip: value }}>{value}</Text>} />
               <Table.Column
                 dataIndex="stock"
                 title={translate("dashboard.currentStock")}

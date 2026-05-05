@@ -33,6 +33,7 @@ vi.mock("react-router", () => ({
 }));
 
 vi.mock("@refinedev/core", () => ({
+  useGetLocale: () => () => "id",
   useTranslation: () => ({ translate: mocks.translate }),
   useShow: mocks.useShow,
   useList: mocks.useList,
@@ -408,8 +409,8 @@ describe("detail and dashboard pages", () => {
     expect(screen.getByText("order-1")).not.toBeNull();
     expect(screen.getByText("Vitamin C")).not.toBeNull();
 
-    fireEvent.click(screen.getAllByRole("button", { name: "dashboard.viewAll" })[0]);
-    fireEvent.click(screen.getAllByRole("button", { name: "dashboard.viewAll" })[1]);
+    fireEvent.click(screen.getByRole("button", { name: "dashboard.viewAllOrders" }));
+    fireEvent.click(screen.getByRole("button", { name: "dashboard.viewAllProducts" }));
 
     expect(mocks.list).toHaveBeenCalledWith("orders");
     expect(mocks.list).toHaveBeenCalledWith("products");
