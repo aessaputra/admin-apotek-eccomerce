@@ -71,8 +71,8 @@ vi.mock("antd", () => ({
   Empty: ({ description }: { description?: React.ReactNode }) => <div>{description}</div>,
   Row: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Radio: {
-    Group: ({ options, value }: { options?: { label: string; value: string }[]; value?: string }) => (
-      <div data-testid="granularity-control">
+    Group: ({ "aria-label": ariaLabel, options, value }: { "aria-label"?: string; options?: { label: string; value: string }[]; value?: string }) => (
+      <div aria-label={ariaLabel} data-testid="granularity-control" role="radiogroup">
         {options?.map((option) => (
           <button aria-pressed={option.value === value} key={option.value} type="button">
             {option.label}
@@ -138,6 +138,7 @@ const labels = {
   paidColumn: "Paid",
   completedColumn: "Completed",
   revenueColumn: "Revenue",
+  granularityAriaLabel: "Choose operational trend period",
 };
 const granularityOptions = [
   { label: "Daily", value: "day" as const },
@@ -230,6 +231,7 @@ describe("MonthlyOperationalTrendCard", () => {
     expect(screen.getByText(labels.title)).not.toBeNull();
     expect(document.body.textContent).toContain(currencyFormatter.format(populatedTrendData.totals.revenue));
     expect(screen.getByTestId("granularity-control").textContent).toContain("Monthly");
+    expect(screen.getByRole("radiogroup", { name: labels.granularityAriaLabel })).not.toBeNull();
     const chartWrapper = screen.getByRole("img", { name: labels.chartAriaLabel });
     const chartDescriptionId = chartWrapper.getAttribute("aria-describedby");
     expect(chartWrapper).not.toBeNull();

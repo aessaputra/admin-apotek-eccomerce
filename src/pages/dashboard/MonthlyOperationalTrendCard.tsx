@@ -44,6 +44,7 @@ export interface MonthlyOperationalTrendCardLabels {
   paidColumn: string;
   completedColumn: string;
   revenueColumn: string;
+  granularityAriaLabel: string;
 }
 
 export interface MonthlyOperationalTrendGranularityOption {
@@ -194,6 +195,7 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
         </Col>
         <Col xs={24} md={12} style={{ display: "flex", justifyContent: "flex-end" }}>
           <Radio.Group
+            aria-label={labels.granularityAriaLabel}
             optionType="button"
             buttonStyle="solid"
             size="small"
@@ -216,7 +218,7 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
       ) : (
         <Space direction="vertical" size="middle" style={{ width: "100%" }}>
           <Row gutter={[12, 12]}>
-            <Col xs={12} lg={6}>
+            <Col xs={24} sm={12} lg={6}>
               <Tooltip title={revenueSummary}>
                 <div style={statTileStyle}>
                   <Statistic
@@ -228,21 +230,21 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
                 </div>
               </Tooltip>
             </Col>
-            <Col xs={12} lg={6}>
+            <Col xs={24} sm={12} lg={6}>
               <Tooltip title={countSummary}>
                 <div style={statTileStyle}>
                   <Statistic title={labels.orderCount} value={totals.orderCount} valueStyle={statValueStyle} />
                 </div>
               </Tooltip>
             </Col>
-            <Col xs={12} lg={6}>
+            <Col xs={24} sm={12} lg={6}>
               <Tooltip title={countSummary}>
                 <div style={statTileStyle}>
                   <Statistic title={labels.paidOrders} value={totals.paidOrderCount} valueStyle={statValueStyle} />
                 </div>
               </Tooltip>
             </Col>
-            <Col xs={12} lg={6}>
+            <Col xs={24} sm={12} lg={6}>
               <Tooltip title={countSummary}>
                 <div style={statTileStyle}>
                   <Statistic title={labels.completedOrders} value={totals.completedOrderCount} valueStyle={statValueStyle} />
