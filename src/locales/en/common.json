@@ -531,6 +531,8 @@
     "fields": {
       "fullName": "Full Name",
       "avatar": "Avatar",
+      "avatarUpload": "Upload avatar",
+      "avatarUploadButton": "+ Upload",
       "fullNamePlaceholder": "Enter full name"
     },
     "changePassword": "Change Password",
@@ -679,7 +681,12 @@
       "load_error_daily": "Failed to load daily sales summary",
       "load_error_products": "Failed to load top products data",
       "load_error_sold_products": "Failed to load sold-products data",
-      "load_error_customers": "Failed to load customer sales data"
+      "load_error_customers": "Failed to load customer sales data",
+      "table_daily_aria_label": "Daily sales summary table",
+      "table_sold_products_aria_label": "Sold products table",
+      "table_top_products_aria_label": "Top products table",
+      "table_top_customers_aria_label": "Top customers table",
+      "export_sections_aria_label": "Select report sections to export"
     }
   },
   "settings": {

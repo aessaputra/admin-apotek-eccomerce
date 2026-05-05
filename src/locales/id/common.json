@@ -531,6 +531,8 @@
     "fields": {
       "fullName": "Nama Lengkap",
       "avatar": "Avatar",
+      "avatarUpload": "Unggah avatar",
+      "avatarUploadButton": "+ Unggah",
       "fullNamePlaceholder": "Masukkan nama lengkap"
     },
     "changePassword": "Ganti Kata Sandi",
@@ -661,7 +663,7 @@
       "total_revenue": "Total Omzet",
       "aov": "Rata-rata Nilai Order",
       "top_products": "Produk Terlaris",
-      "sold_products": "Product Terjual",
+      "sold_products": "Produk Terjual",
       "product_name": "Produk",
       "category_name": "Kategori",
       "total_qty_sold": "Qty Terjual",
@@ -679,7 +681,12 @@
       "load_error_daily": "Gagal memuat ringkasan harian",
       "load_error_products": "Gagal memuat data produk terlaris",
       "load_error_sold_products": "Gagal memuat data produk terjual",
-      "load_error_customers": "Gagal memuat data penjualan pelanggan"
+      "load_error_customers": "Gagal memuat data penjualan pelanggan",
+      "table_daily_aria_label": "Tabel ringkasan penjualan harian",
+      "table_sold_products_aria_label": "Tabel produk terjual",
+      "table_top_products_aria_label": "Tabel produk terlaris",
+      "table_top_customers_aria_label": "Tabel pelanggan terbesar",
+      "export_sections_aria_label": "Pilih bagian laporan untuk diekspor"
     }
   },
   "settings": {
