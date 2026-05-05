@@ -132,6 +132,12 @@ const labels = {
   zeroValueSummary: "All order trend metrics are zero.",
   chartAriaLabel: "Order trend line chart: incoming, paid, and completed",
   chartDescription: "Incoming, paid, and completed orders for the selected period.",
+  dataTableLabel: "Order trend data table",
+  periodColumn: "Period",
+  incomingColumn: "Incoming",
+  paidColumn: "Paid",
+  completedColumn: "Completed",
+  revenueColumn: "Revenue",
 };
 const granularityOptions = [
   { label: "Daily", value: "day" as const },
@@ -230,6 +236,8 @@ describe("MonthlyOperationalTrendCard", () => {
     expect(chartDescriptionId).toBeTruthy();
     expect(document.getElementById(chartDescriptionId ?? "")?.textContent).toContain(labels.chartDescription);
     expect(screen.getByText(labels.chartDescription)).not.toBeNull();
+    expect(screen.getByRole("table", { name: labels.dataTableLabel })).not.toBeNull();
+    expect(document.querySelector("caption")?.textContent).toBe(labels.dataTableLabel);
 
     const lineProps = getLineProps();
 
@@ -245,6 +253,20 @@ describe("MonthlyOperationalTrendCard", () => {
     expect(new Set(lineProps.data.map((point) => point.seriesLabel))).toEqual(
       new Set([labels.orderCount, labels.paidOrders, labels.completedOrders]),
     );
+  });
+
+  it("exposes a hidden data table with user-facing period labels for screen readers", () => {
+    renderCard();
+
+    const table = screen.getByRole("table", { name: labels.dataTableLabel });
+    expect(table).not.toBeNull();
+
+    const rowHeaders = table.querySelectorAll("tbody th[scope='row']");
+    expect(rowHeaders.length).toBe(populatedTrendData.rows.length);
+
+    populatedTrendData.rows.forEach((row, index) => {
+      expect(rowHeaders[index]?.textContent).toBe(row.monthLabel);
+    });
   });
 
   it("surfaces the 30-day operational context for daily granularity without changing selectable periods", () => {

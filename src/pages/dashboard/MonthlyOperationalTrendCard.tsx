@@ -1,13 +1,19 @@
 import { Line } from "@ant-design/charts";
 import { Alert, Card, Col, Empty, Radio, Row, Skeleton, Space, Statistic, Tooltip, Typography, theme } from "antd";
 import type { RadioChangeEvent } from "antd";
-import { useId, useMemo, type CSSProperties } from "react";
+import { useId, useMemo } from "react";
+import { currencyFormatter } from "../../utils/formatters";
 import type {
   MonthlyOperationalTrendChartPoint,
   MonthlyOperationalTrendData,
   MonthlyOperationalTrendTotals,
   OperationalTrendGranularity,
 } from "./monthlyOperationalTrends";
+import {
+  getDashboardTrendStatTileStyle,
+  getDashboardTrendStatValueStyle,
+  visuallyHiddenStyle,
+} from "./styles";
 
 type CountMetricKey = "orderCount" | "paidOrderCount" | "completedOrderCount";
 
@@ -32,6 +38,12 @@ export interface MonthlyOperationalTrendCardLabels {
   zeroValueSummary: string;
   chartAriaLabel: string;
   chartDescription: string;
+  dataTableLabel: string;
+  periodColumn: string;
+  incomingColumn: string;
+  paidColumn: string;
+  completedColumn: string;
+  revenueColumn: string;
 }
 
 export interface MonthlyOperationalTrendGranularityOption {
@@ -49,12 +61,6 @@ export interface MonthlyOperationalTrendCardProps {
   granularityOptions: readonly MonthlyOperationalTrendGranularityOption[];
   onGranularityChange: (granularity: OperationalTrendGranularity) => void;
 }
-
-const currencyFormatter = new Intl.NumberFormat("id-ID", {
-  style: "currency",
-  currency: "IDR",
-  maximumFractionDigits: 0,
-});
 
 const compactNumberFormatter = new Intl.NumberFormat("id-ID", {
   maximumFractionDigits: 1,
@@ -172,17 +178,8 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
     onGranularityChange(event.target.value as OperationalTrendGranularity);
   };
 
-  const statTileStyle: CSSProperties = {
-    height: "100%",
-    padding: token.paddingSM,
-    border: `1px solid ${token.colorBorderSecondary}`,
-    borderRadius: token.borderRadiusLG,
-    backgroundColor: token.colorFillAlter,
-  };
-  const statValueStyle: CSSProperties = {
-    fontSize: token.fontSizeLG,
-    fontWeight: token.fontWeightStrong,
-  };
+  const statTileStyle = getDashboardTrendStatTileStyle(token);
+  const statValueStyle = getDashboardTrendStatValueStyle(token);
 
   return (
     <Card style={{ height: "100%" }}>
@@ -266,6 +263,32 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
 
           <div role="img" aria-label={labels.chartAriaLabel} aria-describedby={chartDescriptionId}>
             <Line {...chartConfig} />
+          </div>
+
+          <div style={visuallyHiddenStyle}>
+            <table aria-label={labels.dataTableLabel}>
+              <caption>{labels.dataTableLabel}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">{labels.periodColumn}</th>
+                  <th scope="col">{labels.incomingColumn}</th>
+                  <th scope="col">{labels.paidColumn}</th>
+                  <th scope="col">{labels.completedColumn}</th>
+                  <th scope="col">{labels.revenueColumn}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map((row, index) => (
+                  <tr key={index}>
+                    <th scope="row">{row.monthLabel}</th>
+                    <td>{row.orderCount}</td>
+                    <td>{row.paidOrderCount}</td>
+                    <td>{row.completedOrderCount}</td>
+                    <td>{currencyFormatter.format(row.revenue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </Space>
       )}

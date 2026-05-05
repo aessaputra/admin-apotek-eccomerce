@@ -86,12 +86,22 @@
     "orderStatus": "Status",
     "productName": "Product",
     "currentStock": "Stock",
+    "tables": {
+      "recentOrdersAriaLabel": "Recent orders table",
+      "lowStockAriaLabel": "Low stock products table"
+    },
     "monthlyTrends": {
       "title": "Operational Trends",
       "revenue": "Sales Value",
       "orderCount": "Incoming Orders",
       "paidOrders": "Paid",
       "completedOrders": "Completed",
+      "dataTableLabel": "Order trend data table",
+      "periodColumn": "Period",
+      "incomingColumn": "Incoming",
+      "paidColumn": "Paid",
+      "completedColumn": "Completed",
+      "revenueColumn": "Revenue",
       "latest12Months": "Latest 12 months",
       "period": {
         "day": "Last 30 days",

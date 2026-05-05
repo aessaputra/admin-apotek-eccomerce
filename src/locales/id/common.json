@@ -86,12 +86,22 @@
     "orderStatus": "Status",
     "productName": "Produk",
     "currentStock": "Stok",
+    "tables": {
+      "recentOrdersAriaLabel": "Tabel pesanan terbaru",
+      "lowStockAriaLabel": "Tabel produk stok menipis"
+    },
     "monthlyTrends": {
       "title": "Tren Operasional",
       "revenue": "Nilai Penjualan",
       "orderCount": "Pesanan Masuk",
       "paidOrders": "Terbayar",
       "completedOrders": "Selesai",
+      "dataTableLabel": "Tabel data tren pesanan",
+      "periodColumn": "Periode",
+      "incomingColumn": "Masuk",
+      "paidColumn": "Terbayar",
+      "completedColumn": "Selesai",
+      "revenueColumn": "Penjualan",
       "latest12Months": "12 bulan terakhir",
       "period": {
         "day": "30 hari terakhir",
