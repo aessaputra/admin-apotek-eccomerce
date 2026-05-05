@@ -1,10 +1,10 @@
 import { useList, useTranslation, type CrudFilters } from "@refinedev/core";
 import { useTranslation as useI18nTranslation } from "react-i18next";
-import { Button, Card, Checkbox, Col, DatePicker, Modal, Row, Space, Table, Typography, message } from "antd";
+import { Button, Card, Checkbox, Col, DatePicker, Modal, Row, Space, Table, Typography, message, theme, type TableProps } from "antd";
 import type { Dayjs } from "dayjs";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type CSSProperties } from "react";
 import { supabaseClient } from "../../providers/supabase-client";
-import { buildSalesReportPdf, SALES_PDF_SECTION_KEYS, type SalesPdfSectionKey } from "./sales-pdf-export";
+import { SALES_PDF_SECTION_KEYS, type SalesPdfSectionKey } from "./sales-pdf-export";
 
 type DailySalesRecord = {
   sale_date: string;
@@ -49,6 +49,7 @@ const SECTION_OPTIONS: { key: SalesPdfSectionKey; labelKey: string }[] = [
 export const SalesReport: React.FC = () => {
   const { translate: t } = useTranslation();
   const { i18n } = useI18nTranslation();
+  const { token } = theme.useToken();
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [selectedSections, setSelectedSections] = useState<SalesPdfSectionKey[]>([...SALES_PDF_SECTION_KEYS]);
@@ -134,6 +135,152 @@ export const SalesReport: React.FC = () => {
 
   const isDataLoading = dailyQuery.isLoading || productQuery.isLoading || soldProductsQuery.isLoading || customerQuery.isLoading;
 
+  const headerRowStyle = useMemo<CSSProperties>(() => ({ marginBottom: token.marginMD }), [token.marginMD]);
+  const compactStyle = useMemo<CSSProperties>(() => ({ width: "100%" }), []);
+  const checkboxGroupStyle = useMemo<CSSProperties>(
+    () => ({ display: "flex", flexDirection: "column", gap: token.marginXS }),
+    [token.marginXS],
+  );
+
+  const dailySalesColumns = useMemo<TableProps<DailySalesRecord>["columns"]>(
+    () => [
+      {
+        title: t("reports.sales.date", "Tanggal"),
+        dataIndex: "sale_date",
+        render: (value: string) => new Date(value).toLocaleDateString(locale),
+      },
+      {
+        title: t("reports.sales.orders_count", "Jumlah Order"),
+        dataIndex: "orders_count",
+        align: "right",
+      },
+      {
+        title: t("reports.sales.total_revenue", "Total Omzet"),
+        dataIndex: "total_revenue",
+        align: "right",
+        render: (value: string | number) => currencyFormatter.format(Number(value)),
+      },
+      {
+        title: t("reports.sales.aov", "Rata-rata Nilai Order"),
+        dataIndex: "average_order_value",
+        align: "right",
+        render: (value: string | number) => currencyFormatter.format(Number(value)),
+      },
+    ],
+    [currencyFormatter, locale, t],
+  );
+
+  const dailySalesTableLocale = useMemo<TableProps<DailySalesRecord>["locale"]>(
+    () => ({
+      emptyText: t("reports.sales.empty_daily", "Tidak ada data pada rentang tanggal ini"),
+    }),
+    [t],
+  );
+
+  const soldProductsColumns = useMemo<TableProps<SoldProductsRecord>["columns"]>(
+    () => [
+      {
+        title: t("reports.sales.product_name", "Produk"),
+        dataIndex: "product_name",
+        render: (value: string | null) => value?.trim() || t("reports.sales.product_unavailable", "Produk tidak tersedia"),
+      },
+      {
+        title: t("reports.sales.quantity", "Jumlah"),
+        dataIndex: "quantity",
+        align: "right",
+        render: (value: number) => Number(value ?? 0).toLocaleString(locale),
+      },
+      {
+        title: t("reports.sales.unit_price", "Harga Satuan"),
+        dataIndex: "unit_price",
+        align: "right",
+        render: (value: string | number) => currencyFormatter.format(Number(value ?? 0)),
+      },
+      {
+        title: t("reports.sales.subtotal", "Subtotal"),
+        dataIndex: "subtotal",
+        align: "right",
+        render: (value: string | number) => (
+          <Typography.Text strong>
+            {currencyFormatter.format(Number(value ?? 0))}
+          </Typography.Text>
+        ),
+      },
+    ],
+    [currencyFormatter, locale, t],
+  );
+
+  const soldProductsTableLocale = useMemo<TableProps<SoldProductsRecord>["locale"]>(
+    () => ({
+      emptyText: t("reports.sales.empty_sold_products", "Belum ada data produk terjual"),
+    }),
+    [t],
+  );
+
+  const productSalesColumns = useMemo<TableProps<ProductSalesRecord>["columns"]>(
+    () => [
+      {
+        title: t("reports.sales.product_name", "Produk"),
+        dataIndex: "product_name",
+      },
+      {
+        title: t("reports.sales.category_name", "Kategori"),
+        dataIndex: "category_name",
+      },
+      {
+        title: t("reports.sales.total_qty_sold", "Qty Terjual"),
+        dataIndex: "total_qty_sold",
+        align: "right",
+      },
+      {
+        title: t("reports.sales.total_revenue", "Total Omzet"),
+        dataIndex: "total_revenue",
+        align: "right",
+        render: (value: string | number) => currencyFormatter.format(Number(value)),
+      },
+    ],
+    [currencyFormatter, t],
+  );
+
+  const productSalesTableLocale = useMemo<TableProps<ProductSalesRecord>["locale"]>(
+    () => ({
+      emptyText: t("reports.sales.empty_products", "Belum ada data penjualan produk"),
+    }),
+    [t],
+  );
+
+  const customerSalesColumns = useMemo<TableProps<CustomerSalesRecord>["columns"]>(
+    () => [
+      {
+        title: t("reports.sales.customer_name", "Nama"),
+        dataIndex: "full_name",
+      },
+      {
+        title: t("reports.sales.phone_number", "No. HP"),
+        dataIndex: "phone_number",
+      },
+      {
+        title: t("reports.sales.orders_count", "Jumlah Order"),
+        dataIndex: "orders_count",
+        align: "right",
+      },
+      {
+        title: t("reports.sales.total_revenue", "Total Omzet"),
+        dataIndex: "total_revenue",
+        align: "right",
+        render: (value: string | number) => currencyFormatter.format(Number(value)),
+      },
+    ],
+    [currencyFormatter, t],
+  );
+
+  const customerSalesTableLocale = useMemo<TableProps<CustomerSalesRecord>["locale"]>(
+    () => ({
+      emptyText: t("reports.sales.empty_customers", "Belum ada data penjualan per customer"),
+    }),
+    [t],
+  );
+
   const handleExportPdf = useCallback(async () => {
     const startDate = dateRange?.[0]?.startOf("day").toISOString() ?? null;
     const endDate = dateRange?.[1]?.endOf("day").toISOString() ?? null;
@@ -151,8 +298,9 @@ export const SalesReport: React.FC = () => {
       }
 
       const generatedAt = new Date().toISOString();
+      const { buildSalesReportPdf } = await import("./sales-pdf-export");
 
-      buildSalesReportPdf({
+      await buildSalesReportPdf({
         dailySales: rpcData?.dailySalesSummary ?? [],
         productSales: rpcData?.bestSellingProducts ?? [],
         soldProducts: rpcData?.soldProducts ?? [],
@@ -213,19 +361,19 @@ export const SalesReport: React.FC = () => {
     } finally {
       setExportLoading(false);
     }
-  }, [dateRange, selectedSections, t, messageApi]);
+  }, [dateRange, selectedSections, t, messageApi, locale]);
 
   return (
     <>
       {contextHolder}
-      <Row justify="space-between" align="middle" gutter={[16, 16]} style={{ marginBottom: 16 }}>
+      <Row justify="space-between" align="middle" gutter={[16, 16]} style={headerRowStyle}>
         <Col xs={24} lg={14}>
           <Typography.Title level={2} style={{ margin: 0 }}>
             {t("reports.sales.title", "Laporan Penjualan")}
           </Typography.Title>
         </Col>
         <Col xs={24} lg={10}>
-          <Space.Compact block style={{ width: "100%" }}>
+          <Space.Compact block style={compactStyle}>
             <DatePicker.RangePicker
               allowClear
               style={{ flex: 1, minWidth: 0 }}
@@ -264,9 +412,10 @@ export const SalesReport: React.FC = () => {
       >
         <p>{t("salesReports.exportDialogDescription", "Ekspor laporan penjualan untuk periode yang dipilih.")}</p>
         <Checkbox.Group
+          aria-label={t("reports.sales.export_sections_aria_label", "Pilih bagian laporan yang akan diekspor")}
           value={selectedSections}
           onChange={(values) => setSelectedSections(values as SalesPdfSectionKey[])}
-          style={{ display: "flex", flexDirection: "column", gap: 8 }}
+          style={checkboxGroupStyle}
         >
           {SECTION_OPTIONS.map((option) => (
             <Checkbox key={option.key} value={option.key}>
@@ -284,90 +433,26 @@ export const SalesReport: React.FC = () => {
             dataSource={dailySales}
             loading={dailyQuery.isLoading}
             pagination={{ pageSize: 30 }}
-            scroll={{ x: 760 }}
-            columns={[
-              {
-                title: t("reports.sales.date", "Tanggal"),
-                dataIndex: "sale_date",
-                render: (value: string) =>
-                  new Date(value).toLocaleDateString(locale),
-              },
-              {
-                title: t("reports.sales.orders_count", "Jumlah Order"),
-                dataIndex: "orders_count",
-                align: "right",
-              },
-              {
-                title: t("reports.sales.total_revenue", "Total Omzet"),
-                dataIndex: "total_revenue",
-                align: "right",
-                render: (value: string | number) =>
-                  currencyFormatter.format(Number(value)),
-              },
-              {
-                title: t("reports.sales.aov", "Rata-rata Nilai Order"),
-                dataIndex: "average_order_value",
-                align: "right",
-                render: (value: string | number) =>
-                  currencyFormatter.format(Number(value)),
-              },
-            ]}
-            locale={{
-              emptyText: t(
-                "reports.sales.empty_daily",
-                "Tidak ada data pada rentang tanggal ini",
-              ),
-            }}
+            scroll={{ x: "max-content" }}
+            columns={dailySalesColumns}
+            locale={dailySalesTableLocale}
+            aria-label={t("reports.sales.table_daily_aria_label", "Tabel ringkasan penjualan harian")}
           />
         </Card>
       </Col>
 
       <Col span={24}>
-        <Card title={t("reports.sales.sold_products", "Product Terjual")}>
+        <Card title={t("reports.sales.sold_products", "Produk Terjual")}>
           <Table<SoldProductsRecord>
             rowKey={(record) => record.id}
             dataSource={soldProducts}
             loading={soldProductsQuery.isLoading}
             pagination={{ pageSize: 10 }}
             size="middle"
-            scroll={{ x: 860 }}
-            columns={[
-              {
-                title: t("reports.sales.product_name", "Produk"),
-                dataIndex: "product_name",
-                render: (value: string | null) =>
-                  value?.trim() || t("reports.sales.product_unavailable", "Produk tidak tersedia"),
-              },
-              {
-                title: t("reports.sales.quantity", "Jumlah"),
-                dataIndex: "quantity",
-                align: "right",
-                render: (value: number) => Number(value ?? 0).toLocaleString(locale),
-              },
-              {
-                title: t("reports.sales.unit_price", "Harga Satuan"),
-                dataIndex: "unit_price",
-                align: "right",
-                render: (value: string | number) =>
-                  currencyFormatter.format(Number(value ?? 0)),
-              },
-              {
-                title: t("reports.sales.subtotal", "Subtotal"),
-                dataIndex: "subtotal",
-                align: "right",
-                render: (value: string | number) => (
-                  <Typography.Text strong>
-                    {currencyFormatter.format(Number(value ?? 0))}
-                  </Typography.Text>
-                ),
-              },
-            ]}
-            locale={{
-              emptyText: t(
-                "reports.sales.empty_sold_products",
-                "Belum ada data produk terjual",
-              ),
-            }}
+            scroll={{ x: "max-content" }}
+            columns={soldProductsColumns}
+            locale={soldProductsTableLocale}
+            aria-label={t("reports.sales.table_sold_products_aria_label", "Tabel produk terjual")}
           />
         </Card>
       </Col>
@@ -380,35 +465,10 @@ export const SalesReport: React.FC = () => {
             loading={productQuery.isLoading}
             pagination={{ pageSize: 20 }}
             size="small"
-            scroll={{ x: 640 }}
-            columns={[
-              {
-                title: t("reports.sales.product_name", "Produk"),
-                dataIndex: "product_name",
-              },
-              {
-                title: t("reports.sales.category_name", "Kategori"),
-                dataIndex: "category_name",
-              },
-              {
-                title: t("reports.sales.total_qty_sold", "Qty Terjual"),
-                dataIndex: "total_qty_sold",
-                align: "right",
-              },
-              {
-                title: t("reports.sales.total_revenue", "Total Omzet"),
-                dataIndex: "total_revenue",
-                align: "right",
-                render: (value: string | number) =>
-                  currencyFormatter.format(Number(value)),
-              },
-            ]}
-            locale={{
-              emptyText: t(
-                "reports.sales.empty_products",
-                "Belum ada data penjualan produk",
-              ),
-            }}
+            scroll={{ x: "max-content" }}
+            columns={productSalesColumns}
+            locale={productSalesTableLocale}
+            aria-label={t("reports.sales.table_top_products_aria_label", "Tabel produk terlaris")}
           />
         </Card>
       </Col>
@@ -421,35 +481,10 @@ export const SalesReport: React.FC = () => {
             loading={customerQuery.isLoading}
             pagination={{ pageSize: 20 }}
             size="small"
-            scroll={{ x: 640 }}
-            columns={[
-              {
-                title: t("reports.sales.customer_name", "Nama"),
-                dataIndex: "full_name",
-              },
-              {
-                title: t("reports.sales.phone_number", "No. HP"),
-                dataIndex: "phone_number",
-              },
-              {
-                title: t("reports.sales.orders_count", "Jumlah Order"),
-                dataIndex: "orders_count",
-                align: "right",
-              },
-              {
-                title: t("reports.sales.total_revenue", "Total Omzet"),
-                dataIndex: "total_revenue",
-                align: "right",
-                render: (value: string | number) =>
-                  currencyFormatter.format(Number(value)),
-              },
-            ]}
-            locale={{
-              emptyText: t(
-                "reports.sales.empty_customers",
-                "Belum ada data penjualan per customer",
-              ),
-            }}
+            scroll={{ x: "max-content" }}
+            columns={customerSalesColumns}
+            locale={customerSalesTableLocale}
+            aria-label={t("reports.sales.table_top_customers_aria_label", "Tabel pelanggan terbesar")}
           />
         </Card>
       </Col>

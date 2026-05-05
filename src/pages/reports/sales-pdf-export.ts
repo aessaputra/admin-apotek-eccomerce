@@ -1,6 +1,3 @@
-import { jsPDF } from "jspdf";
-import { autoTable } from "jspdf-autotable";
-
 export const SALES_PDF_SECTION_KEYS = [
   "dailySalesSummary",
   "soldProducts",
@@ -211,7 +208,12 @@ export const generateSalesPdfFilename = ({
     .concat(".pdf");
 };
 
-export const buildSalesReportPdf = (input: SalesPdfExportInput) => {
+export const buildSalesReportPdf = async (input: SalesPdfExportInput) => {
+  const [{ jsPDF }, { autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();

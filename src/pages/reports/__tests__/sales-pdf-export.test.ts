@@ -175,8 +175,8 @@ describe("buildSalesReportPdf", () => {
     pdfMocks.reset();
   });
 
-  it("builds a landscape A4 PDF and saves with the generated filename", () => {
-    buildSalesReportPdf(baseInput);
+  it("builds a landscape A4 PDF and saves with the generated filename", async () => {
+    await buildSalesReportPdf(baseInput);
 
     expect(pdfMocks.jsPDF).toHaveBeenCalledWith({ orientation: "landscape", unit: "mm", format: "a4" });
 
@@ -193,8 +193,8 @@ describe("buildSalesReportPdf", () => {
     );
   });
 
-  it("renders the report title only in the document header, not inside table page hooks", () => {
-    buildSalesReportPdf(baseInput);
+  it("renders the report title only in the document header, not inside table page hooks", async () => {
+    await buildSalesReportPdf(baseInput);
 
     const doc = pdfMocks.getLastDoc();
     const titleCalls = doc?.text.mock.calls.filter(([text]) => text === baseInput.localeLabels.reportTitle) ?? [];
@@ -203,8 +203,8 @@ describe("buildSalesReportPdf", () => {
     expect(titleCalls[0]).toEqual([baseInput.localeLabels.reportTitle, 14, 14]);
   });
 
-  it("uses localeLabels.emptyValueText for formatter fallbacks", () => {
-    buildSalesReportPdf({
+  it("uses localeLabels.emptyValueText for formatter fallbacks", async () => {
+    await buildSalesReportPdf({
       ...baseInput,
       dailySales: [
         {
@@ -251,8 +251,8 @@ describe("buildSalesReportPdf", () => {
     expect(pdfMocks.autoTableCalls[3]?.body).toEqual([["N/A", "N/A", "N/A", "N/A"]]);
   });
 
-  it("renders empty sections with the empty report text", () => {
-    buildSalesReportPdf({
+  it("renders empty sections with the empty report text", async () => {
+    await buildSalesReportPdf({
       ...baseInput,
       selectedSectionKeys: ["dailySalesSummary"],
       dailySales: [],

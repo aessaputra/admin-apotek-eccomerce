@@ -225,6 +225,9 @@ vi.mock("antd", () => {
       ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
       { Compact: ({ children }: { children: React.ReactNode }) => <div data-testid="date-export-toolbar">{children}</div> },
     ),
+    theme: {
+      useToken: () => ({ token: {} }),
+    },
     message: {
       useMessage: () => [mocks.messageApi, <ContextHolder key="holder">{null}</ContextHolder>],
     },
@@ -308,7 +311,7 @@ describe("SalesReport", () => {
     expect(screen.getByText("Laporan Penjualan")).not.toBeNull();
     expect(screen.getByText("Ringkasan Penjualan Harian")).not.toBeNull();
     expect(screen.getByText("Produk Terlaris")).not.toBeNull();
-    expect(screen.getByText("Product Terjual")).not.toBeNull();
+    expect(screen.getByText("Produk Terjual")).not.toBeNull();
     expect(screen.getByText("Customer Terbesar")).not.toBeNull();
     expect(screen.getAllByText("Produk").length).toBeGreaterThan(0);
     expect(screen.getByText("Jumlah")).not.toBeNull();
@@ -333,7 +336,7 @@ describe("SalesReport", () => {
 
     render(<SalesReport />);
 
-    expect(screen.getByText("Product Terjual")).not.toBeNull();
+    expect(screen.getByText("Produk Terjual")).not.toBeNull();
     expect(screen.getByText("Belum ada data produk terjual")).not.toBeNull();
     expect(screen.getByText("Ringkasan Penjualan Harian")).not.toBeNull();
     expect(screen.getByText("Produk Terlaris")).not.toBeNull();
