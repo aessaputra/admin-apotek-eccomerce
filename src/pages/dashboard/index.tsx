@@ -1,12 +1,12 @@
 import { useList, useTranslation, useNavigation } from "@refinedev/core";
-import { Alert, Button, Card, Col, Row, Space, Statistic, Table, Tag, Typography, theme } from "antd";
+import { Alert, Button, Card, Col, Row, Space, Statistic, Table, Tag, Tooltip, Typography, theme } from "antd";
 import { useMemo, useState } from "react";
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   ShoppingCartOutlined,
   InboxOutlined,
-  DollarOutlined,
+  BankOutlined,
   PercentageOutlined,
   WarningOutlined,
 } from "@ant-design/icons";
@@ -28,6 +28,7 @@ import {
   getDashboardPrimaryKpiValueStyle,
   getDashboardSecondaryKpiCardStyle,
   getDashboardSecondaryKpiValueStyle,
+  visuallyHiddenStyle,
 } from "./styles";
 
 const { Text, Title, Paragraph } = Typography;
@@ -100,6 +101,8 @@ const emptyMonthlyOperationalTrendData: MonthlyOperationalTrendData = {
   },
 };
 
+const DASHBOARD_QUERY_STALE_TIME_MS = 60_000;
+
 const hasOperationalMetricRows = (rows: readonly OperationalMetricRow[]): boolean =>
   rows.some((row) => isValidBucketStart(row.bucket_start));
 
@@ -126,6 +129,7 @@ export const Dashboard: React.FC = () => {
     resource: "orders",
     pagination: { currentPage: 1, pageSize: 5 },
     sorters: [{ field: "created_at", order: "desc" }],
+    queryOptions: { staleTime: DASHBOARD_QUERY_STALE_TIME_MS },
   });
 
   // Low stock products (stock < 10, active only)
@@ -138,6 +142,7 @@ export const Dashboard: React.FC = () => {
       { field: "is_active", operator: "eq", value: true },
     ],
     meta: { count: "exact" },
+    queryOptions: { staleTime: DASHBOARD_QUERY_STALE_TIME_MS },
   });
 
   const { result: kpiMetricsResult, query: kpiMetricsQuery } = useList<OperationalMetricRow>({
@@ -148,6 +153,7 @@ export const Dashboard: React.FC = () => {
       { field: "start_date", operator: "eq", value: kpiRequest.startDate },
       { field: "end_date", operator: "eq", value: kpiRequest.endDate },
     ],
+    queryOptions: { staleTime: DASHBOARD_QUERY_STALE_TIME_MS },
   });
 
   const { result: operationalMetricsResult, query: operationalMetricsQuery } = useList<OperationalMetricRow>({
@@ -158,7 +164,7 @@ export const Dashboard: React.FC = () => {
       { field: "start_date", operator: "eq", value: trendRequest.startDate },
       { field: "end_date", operator: "eq", value: trendRequest.endDate },
     ],
-    queryOptions: { enabled: !isDailyTrend },
+    queryOptions: { enabled: !isDailyTrend, staleTime: DASHBOARD_QUERY_STALE_TIME_MS },
   });
 
   const recentOrders = (recentOrdersResult?.data ?? []) as {
@@ -192,6 +198,8 @@ export const Dashboard: React.FC = () => {
   const operationalAlertsLoading = Boolean(
     kpiMetricsQuery?.isLoading || activeTrendMetricsQuery?.isLoading || lowStockQuery?.isLoading,
   );
+  const isKpiMetricsLoading = Boolean(kpiMetricsQuery?.isLoading);
+  const isLowStockLoading = Boolean(lowStockQuery?.isLoading);
   const operationalAlertsSucceeded =
     !operationalAlertsLoading &&
     !kpiMetricsQuery?.isError &&
@@ -228,13 +236,68 @@ export const Dashboard: React.FC = () => {
         </Paragraph>
       </Space>
 
-      <Row gutter={[16, 16]}>
+      <Card title={attentionCardTitle} style={{ marginBottom: token.marginLG }}>
+        <Row gutter={[16, 16]} align="stretch">
+          <Col xs={24} lg={14}>
+            <Space direction="vertical" size={token.marginSM} style={{ width: "100%" }}>
+              {shouldShowOperationalAlertsLoading ? (
+                <Alert showIcon type="info" message={translate("dashboard.alerts.loading.message")} />
+              ) : null}
+              {operationalAlerts.map((alert) => {
+                const labels = getOperationalAlertLabels(alert, translate);
+                const compactAlert = alert.kind === "no-risk";
+
+                return (
+                  <Alert
+                    showIcon
+                    key={alert.kind}
+                    type={alert.severity}
+                    message={labels.message}
+                    description={compactAlert ? undefined : labels.description}
+                  />
+                );
+              })}
+            </Space>
+          </Col>
+          <Col xs={24} lg={10}>
+            <Row gutter={[16, 16]} style={{ height: "100%" }} align="stretch">
+              <Col xs={24} sm={12} lg={24} xl={12} style={{ display: "flex" }}>
+                <Card style={{ ...secondaryKpiCardStyle, flex: 1, width: "100%" }}>
+                  <Statistic
+                    title={translate("dashboard.kpis.fulfillmentRisk")}
+                    value={dashboardKpis.fulfillmentRisk}
+                    loading={isKpiMetricsLoading}
+                    prefix={<ClockCircleOutlined style={{ color: token.colorWarning }} />}
+                    valueStyle={secondaryKpiValueStyle}
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} lg={24} xl={12} style={{ display: "flex" }}>
+                <Card style={{ ...secondaryKpiCardStyle, flex: 1, width: "100%" }}>
+                  <Statistic
+                    title={translate("dashboard.kpis.lowStockSkus")}
+                    value={dashboardKpis.lowStockRisk}
+                    loading={isLowStockLoading}
+                    prefix={<InboxOutlined style={{ color: token.colorWarning }} />}
+                    valueStyle={secondaryKpiValueStyle}
+                  />
+                </Card>
+              </Col>
+            </Row>
+          </Col>
+        </Row>
+      </Card>
+
+      <Space direction="vertical" size={token.marginXS} style={{ width: "100%" }}>
+        <Text type="secondary">{translate("dashboard.kpis.periodNote")}</Text>
+        <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} xl={6}>
           <Card style={primaryKpiCardStyle}>
             <Statistic
               title={translate("dashboard.kpis.revenue30d")}
               value={dashboardKpis.revenue}
-              prefix={<DollarOutlined />}
+              loading={isKpiMetricsLoading}
+              prefix={<BankOutlined style={{ color: token.colorSuccess }} />}
               valueStyle={primaryKpiValueStyle}
               formatter={(value) => currencyFormatter.format(Number(value ?? 0))}
             />
@@ -245,7 +308,8 @@ export const Dashboard: React.FC = () => {
             <Statistic
               title={translate("dashboard.kpis.orders30d")}
               value={dashboardKpis.orderCount}
-              prefix={<ShoppingCartOutlined />}
+              loading={isKpiMetricsLoading}
+              prefix={<ShoppingCartOutlined style={{ color: token.colorPrimary }} />}
               valueStyle={primaryKpiValueStyle}
             />
           </Card>
@@ -255,7 +319,8 @@ export const Dashboard: React.FC = () => {
             <Statistic
               title={translate("dashboard.kpis.paymentSuccessRate")}
               value={dashboardKpis.paymentSuccessRate}
-              prefix={<PercentageOutlined />}
+              loading={isKpiMetricsLoading}
+              prefix={<PercentageOutlined style={{ color: token.colorInfo }} />}
               suffix="%"
               valueStyle={primaryKpiValueStyle}
               formatter={(value) => decimalFormatter.format(Number(value ?? 0))}
@@ -267,16 +332,18 @@ export const Dashboard: React.FC = () => {
             <Statistic
               title={translate("dashboard.kpis.averageOrderValue")}
               value={dashboardKpis.averageOrderValue}
-              prefix={<CheckCircleOutlined />}
+              loading={isKpiMetricsLoading}
+              prefix={<CheckCircleOutlined style={{ color: token.colorSuccess }} />}
               valueStyle={primaryKpiValueStyle}
               formatter={(value) => currencyFormatter.format(Number(value ?? 0))}
             />
           </Card>
         </Col>
-      </Row>
+        </Row>
+      </Space>
 
       <Row gutter={[16, 16]} style={{ marginTop: token.marginLG }} align="stretch">
-        <Col xs={24} xl={16}>
+        <Col xs={24}>
           <MonthlyOperationalTrendCard
             data={monthlyOperationalTrendData}
             totals={monthlyOperationalTrendData.totals}
@@ -304,64 +371,9 @@ export const Dashboard: React.FC = () => {
               paidColumn: translate("dashboard.monthlyTrends.paidColumn"),
               completedColumn: translate("dashboard.monthlyTrends.completedColumn"),
               revenueColumn: translate("dashboard.monthlyTrends.revenueColumn"),
+              granularityAriaLabel: translate("dashboard.monthlyTrends.granularityAriaLabel"),
             }}
           />
-        </Col>
-
-        <Col xs={24} xl={8}>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: token.marginMD,
-              height: "100%",
-            }}
-          >
-            <Card title={attentionCardTitle}>
-              <Space direction="vertical" size={token.marginSM} style={{ width: "100%" }}>
-                {shouldShowOperationalAlertsLoading ? (
-                  <Alert showIcon type="info" message={translate("dashboard.alerts.loading.message")} />
-                ) : null}
-                {operationalAlerts.map((alert) => {
-                  const labels = getOperationalAlertLabels(alert, translate);
-                  const compactAlert = alert.kind === "no-risk";
-
-                  return (
-                    <Alert
-                      showIcon
-                      key={alert.kind}
-                      type={alert.severity}
-                      message={labels.message}
-                      description={compactAlert ? undefined : labels.description}
-                    />
-                  );
-                })}
-              </Space>
-            </Card>
-
-            <Row gutter={[16, 16]} style={{ flex: 1 }} align="stretch">
-              <Col xs={24} sm={12} xl={24} style={{ display: "flex" }}>
-                <Card style={{ ...secondaryKpiCardStyle, flex: 1, width: "100%" }}>
-                  <Statistic
-                    title={translate("dashboard.kpis.fulfillmentRisk")}
-                    value={dashboardKpis.fulfillmentRisk}
-                    prefix={<ClockCircleOutlined />}
-                    valueStyle={secondaryKpiValueStyle}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12} xl={24} style={{ display: "flex" }}>
-                <Card style={{ ...secondaryKpiCardStyle, flex: 1, width: "100%" }}>
-                  <Statistic
-                    title={translate("dashboard.kpis.lowStockSkus")}
-                    value={dashboardKpis.lowStockRisk}
-                    prefix={<InboxOutlined />}
-                    valueStyle={secondaryKpiValueStyle}
-                  />
-                </Card>
-              </Col>
-            </Row>
-          </div>
         </Col>
       </Row>
 
@@ -372,7 +384,7 @@ export const Dashboard: React.FC = () => {
             title={translate("dashboard.recentOrders")}
             extra={
               <Button type="link" size="small" onClick={() => navigateList("orders")}>
-                {translate("dashboard.viewAll")}
+                {translate("dashboard.viewAllOrders")}
               </Button>
             }
           >
@@ -388,9 +400,21 @@ export const Dashboard: React.FC = () => {
             >
               <Table.Column
                 dataIndex="id"
-                title="ID"
+                title={translate("dashboard.orderId")}
                 width={128}
-                render={(value: string) => <Text code>{formatDashboardOrderId(value)}</Text>}
+                render={(value: string) => {
+                  const formattedOrderId = formatDashboardOrderId(value);
+                  const isTruncated = formattedOrderId !== value;
+
+                  return (
+                    <Tooltip title={isTruncated ? value : undefined}>
+                      <Text code aria-label={isTruncated ? `${translate("dashboard.fullOrderId")}: ${value}` : undefined} title={isTruncated ? value : undefined}>
+                        {formattedOrderId}
+                      </Text>
+                      {isTruncated ? <span style={visuallyHiddenStyle}>{value}</span> : null}
+                    </Tooltip>
+                  );
+                }}
               />
               <Table.Column
                 dataIndex="total_amount"
@@ -424,7 +448,7 @@ export const Dashboard: React.FC = () => {
             }
             extra={
               <Button type="link" size="small" onClick={() => navigateList("products")}>
-                {translate("dashboard.viewAll")}
+                {translate("dashboard.viewAllProducts")}
               </Button>
             }
           >

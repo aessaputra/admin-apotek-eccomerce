@@ -21,6 +21,7 @@ interface DashboardQueryState {
 }
 
 interface DashboardQueryOptions {
+  recentOrders?: { id: string; total_amount: string | number; status: string; created_at: string }[];
   kpiMetricRows?: OperationalMetricRow[];
   kpiQuery?: Partial<DashboardQueryState>;
   lowStockQuery?: Partial<DashboardQueryState>;
@@ -34,19 +35,16 @@ const mocks = vi.hoisted(() => {
   const useList = vi.fn();
   const translate = vi.fn((key: string, params?: Record<string, unknown>, fallback?: string) => {
     const translations: Record<string, string> = {
-      "dashboard.totalOrders": "Total Orders",
-      "dashboard.totalCustomers": "Total Customers",
-      "dashboard.totalProducts": "Total Products",
-      "dashboard.totalRevenue": "Total Revenue",
       "dashboard.overview.title": "Operations Overview",
       "dashboard.overview.subtitle": "Monitor orders, sales, stock, and key items from the last 30 days.",
       "dashboard.kpis.revenue30d": "Sales Value",
       "dashboard.kpis.orders30d": "Incoming Orders",
       "dashboard.kpis.paymentSuccessRate": "Payment Rate",
       "dashboard.kpis.averageOrderValue": "Average Order",
-      "dashboard.kpis.fulfillmentRisk": "Paid, Not Completed",
-      "dashboard.kpis.lowStockSkus": "Low-Stock SKUs",
-      "dashboard.alerts.title": "Follow-up Queue",
+      "dashboard.kpis.fulfillmentRisk": "Pending Completion",
+      "dashboard.kpis.lowStockSkus": "Low Stock",
+      "dashboard.kpis.periodNote": "KPIs use the last 30 days. The trend chart follows the selected period.",
+      "dashboard.alerts.title": "Action Required",
       "dashboard.alerts.metricsError.message": "Metrics unavailable",
       "dashboard.alerts.metricsError.description": "Some metrics could not be loaded. Review the trend panel and retry shortly.",
       "dashboard.alerts.lowStockError.message": "Couldn’t load low-stock data",
@@ -61,16 +59,20 @@ const mocks = vi.hoisted(() => {
       "dashboard.alerts.loading.description": "Metrics and stock counts are still loading. Queue status will update shortly.",
       "dashboard.recentOrders": "Recent Orders",
       "dashboard.viewAll": "View All",
+      "dashboard.viewAllOrders": "View all orders",
+      "dashboard.viewAllProducts": "View all products",
       "dashboard.orderTotal": "Total",
       "dashboard.orderStatus": "Status",
       "dashboard.orderDate": "Date",
-      "dashboard.lowStockAlerts": "Stock to Replenish",
+      "dashboard.lowStockAlerts": "Low Stock",
       "dashboard.productName": "Product",
       "dashboard.currentStock": "Stock",
       "dashboard.noRecentOrders": "No orders yet",
       "dashboard.noLowStock": "All stock levels OK",
       "dashboard.tables.recentOrdersAriaLabel": "Recent orders table",
       "dashboard.tables.lowStockAriaLabel": "Low stock products table",
+      "dashboard.orderId": "Order ID",
+      "dashboard.fullOrderId": "Full order ID",
       "dashboard.monthlyTrends.title": "Operational Trends",
       "dashboard.monthlyTrends.revenue": "Sales Value",
       "dashboard.monthlyTrends.orderCount": "Incoming Orders",
@@ -91,6 +93,7 @@ const mocks = vi.hoisted(() => {
       "dashboard.monthlyTrends.granularity.week": "Weekly",
       "dashboard.monthlyTrends.granularity.month": "Monthly",
       "dashboard.monthlyTrends.granularity.year": "Yearly",
+      "dashboard.monthlyTrends.granularityAriaLabel": "Choose operational trend period",
       "dashboard.monthlyTrends.loading": "Loading order trend data...",
       "dashboard.monthlyTrends.emptyDescription": "No order trend data is available yet.",
       "dashboard.monthlyTrends.errorMessage": "Failed to load order trends.",
@@ -229,15 +232,17 @@ vi.mock("antd", async () => {
     Row: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
     Radio: {
       Group: ({
+        "aria-label": ariaLabel,
         onChange,
         options,
         value,
       }: {
+        "aria-label"?: string;
         onChange?: (event: { target: { value: string } }) => void;
         options?: { label: string; value: string }[];
         value?: string;
       }) => (
-        <div>
+        <div aria-label={ariaLabel} role="radiogroup">
           {options?.map((option) => (
             <button
               aria-pressed={option.value === value}
@@ -256,22 +261,39 @@ vi.mock("antd", async () => {
       value,
       suffix,
       formatter,
+      loading,
     }: {
       title?: React.ReactNode;
       value?: React.ReactNode;
       suffix?: React.ReactNode;
       formatter?: (value?: React.ReactNode) => React.ReactNode;
+      loading?: boolean;
     }) => (
       <div>
         <span>{title}</span>
-        <span>{formatter ? formatter(value) : value}{suffix}</span>
+        {loading ? (
+          <span data-testid="statistic-loading">Loading statistic</span>
+        ) : (
+          <span>
+            {formatter ? formatter(value) : value}
+            {suffix}
+          </span>
+        )}
       </div>
     ),
     Table,
     Tag: ({ children }: { children?: React.ReactNode }) => <span>{children}</span>,
     Typography: {
       Paragraph: ({ children, id }: { children?: React.ReactNode; id?: string }) => <p id={id}>{children}</p>,
-      Text: ({ children }: { children?: React.ReactNode }) => <span>{children}</span>,
+      Text: ({
+        "aria-label": ariaLabel,
+        children,
+        title,
+      }: {
+        "aria-label"?: string;
+        children?: React.ReactNode;
+        title?: string;
+      }) => <span aria-label={ariaLabel} title={title}>{children}</span>,
       Title: ({ children }: { children?: React.ReactNode }) => <h3>{children}</h3>,
     },
     Button: ({ children, onClick }: { children?: React.ReactNode; onClick?: () => void }) => (
@@ -280,13 +302,16 @@ vi.mock("antd", async () => {
     Empty: ({ description }: { description?: React.ReactNode }) => <div>{description}</div>,
     Skeleton: () => <div data-testid="monthly-trend-skeleton" />,
     Space: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
-    Tooltip: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    Tooltip: ({ children, title }: { children?: React.ReactNode; title?: React.ReactNode }) => <div title={typeof title === "string" ? title : undefined}>{children}</div>,
     theme: {
       useToken: () => ({
         token: {
           borderRadiusLG: 8,
           colorBorderSecondary: "#d9d9d9",
           colorFillAlter: "#fafafa",
+          colorInfo: "#13c2c2",
+          colorPrimary: "#1677ff",
+          colorSuccess: "#52c41a",
           colorWarning: "#faad14",
           fontSizeHeading3: 24,
           fontSizeHeading4: 20,
@@ -307,11 +332,11 @@ vi.mock("antd", async () => {
 
 vi.mock("@ant-design/icons", () => ({
   CheckCircleOutlined: () => <span>check-circle</span>,
+  BankOutlined: () => <span>bank</span>,
   ClockCircleOutlined: () => <span>clock-circle</span>,
   ShoppingCartOutlined: () => <span>cart</span>,
   UserOutlined: () => <span>user</span>,
   InboxOutlined: () => <span>inbox</span>,
-  DollarOutlined: () => <span>dollar</span>,
   PercentageOutlined: () => <span>percentage</span>,
   WarningOutlined: () => <span>warning</span>,
 }));
@@ -360,6 +385,7 @@ const healthyMonthlyMetricRows = [
 ];
 
 const setupDashboardQueries = ({
+  recentOrders,
   kpiMetricRows,
   kpiQuery = {},
   lowStockQuery = {},
@@ -371,7 +397,7 @@ const setupDashboardQueries = ({
   const lowStockRows = lowStockProducts ?? (lowStockTotal > 0 ? [{ id: "product-1", name: "Bandage", stock: 4 }] : []);
   const kpiRows = kpiMetricRows ?? monthlyMetricRows;
 
-  mocks.useList.mockImplementation((params: { resource: string; meta?: Record<string, unknown>; pagination?: Record<string, unknown>; filters?: { field: string; value?: unknown }[]; queryOptions?: { enabled?: boolean } }) => {
+  mocks.useList.mockImplementation((params: { resource: string; meta?: Record<string, unknown>; pagination?: Record<string, unknown>; filters?: { field: string; value?: unknown }[]; queryOptions?: { enabled?: boolean; staleTime?: number } }) => {
     if (params.resource === "orders" && params.meta?.count === "exact") {
       return { result: { total: 1 } };
     }
@@ -387,9 +413,9 @@ const setupDashboardQueries = ({
     if (params.resource === "orders") {
       return {
         result: {
-          data: [
+          data: recentOrders ?? [
             {
-              id: "order-1",
+              id: "order-1234567890",
               total_amount: 10000,
               status: "shipped",
               created_at: "2026-04-01T00:00:00.000Z",
@@ -465,8 +491,43 @@ describe("Dashboard", () => {
 
     expect(screen.getByRole("table", { name: "Recent orders table" })).not.toBeNull();
     expect(screen.getByRole("table", { name: "Low stock products table" })).not.toBeNull();
+    expect(screen.getByLabelText("Full order ID: order-1234567890")).not.toBeNull();
+    expect(screen.getByText("order-1234567890")).not.toBeNull();
     expect(mocks.tableColumn).toHaveBeenCalledWith({ dataIndex: "total_amount", responsive: ["sm"] });
     expect(mocks.tableColumn).toHaveBeenCalledWith({ dataIndex: "created_at", responsive: ["md"] });
+    expect(screen.getByText("Order ID")).not.toBeNull();
+  });
+
+  it("does not duplicate accessible text when an order ID is already short", () => {
+    setupDashboardQueries({
+      recentOrders: [
+        {
+          id: "order-1",
+          total_amount: 10000,
+          status: "shipped",
+          created_at: "2026-04-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    render(<Dashboard />);
+
+    expect(screen.getByText("order-1")).not.toBeNull();
+    expect(screen.queryByLabelText("Full order ID: order-1")).toBeNull();
+    expect(screen.queryAllByText("order-1")).toHaveLength(1);
+  });
+
+  it("keeps KPI cards honest while metric values are loading", () => {
+    setupDashboardQueries({ kpiQuery: { isLoading: true } });
+
+    render(<Dashboard />);
+
+    expect(screen.getByText("Sales Value")).not.toBeNull();
+    expect(screen.getByText("Incoming Orders")).not.toBeNull();
+    expect(screen.getByText("Payment Rate")).not.toBeNull();
+    expect(screen.getByText("Average Order")).not.toBeNull();
+    expect(screen.getAllByTestId("statistic-loading").length).toBeGreaterThanOrEqual(4);
+    expect(document.body.textContent).not.toContain(currencyFormatter.format(0));
   });
 
   it("queries low-stock SKUs with an exact active product count", () => {
@@ -508,6 +569,7 @@ describe("Dashboard", () => {
         { field: "start_date", operator: "eq", value: "2026-03-17" },
         { field: "end_date", operator: "eq", value: "2026-04-15" },
       ],
+      queryOptions: { staleTime: 60_000 },
     });
     expect(mocks.useList).toHaveBeenCalledWith({
       resource: "admin_operational_metrics",
@@ -517,7 +579,7 @@ describe("Dashboard", () => {
         { field: "start_date", operator: "eq", value: "2026-03-17" },
         { field: "end_date", operator: "eq", value: "2026-04-15" },
       ],
-      queryOptions: { enabled: false },
+      queryOptions: { enabled: false, staleTime: 60_000 },
     });
   });
 
@@ -535,7 +597,7 @@ describe("Dashboard", () => {
         { field: "start_date", operator: "eq", value: "2026-01-26" },
         { field: "end_date", operator: "eq", value: "2026-04-19" },
       ],
-      queryOptions: { enabled: true },
+      queryOptions: { enabled: true, staleTime: 60_000 },
     });
   });
 
@@ -575,6 +637,7 @@ describe("Dashboard", () => {
         { field: "start_date", operator: "eq", value: "2026-03-17" },
         { field: "end_date", operator: "eq", value: "2026-04-15" },
       ],
+      queryOptions: { staleTime: 60_000 },
     });
     expect(mocks.useList).toHaveBeenLastCalledWith({
       resource: "admin_operational_metrics",
@@ -584,7 +647,7 @@ describe("Dashboard", () => {
         { field: "start_date", operator: "eq", value: "2026-01-26" },
         { field: "end_date", operator: "eq", value: "2026-04-19" },
       ],
-      queryOptions: { enabled: true },
+      queryOptions: { enabled: true, staleTime: 60_000 },
     });
   });
 
@@ -625,6 +688,7 @@ describe("Dashboard", () => {
         { field: "start_date", operator: "eq", value: "2026-03-17" },
         { field: "end_date", operator: "eq", value: "2026-04-15" },
       ],
+      queryOptions: { staleTime: 60_000 },
     });
     expect(mocks.useList).toHaveBeenLastCalledWith({
       resource: "admin_operational_metrics",
@@ -634,7 +698,7 @@ describe("Dashboard", () => {
         { field: "start_date", operator: "eq", value: "2026-03-17" },
         { field: "end_date", operator: "eq", value: "2026-04-15" },
       ],
-      queryOptions: { enabled: false },
+      queryOptions: { enabled: false, staleTime: 60_000 },
     });
   });
 
@@ -651,8 +715,9 @@ describe("Dashboard", () => {
     expect(screen.getAllByText("Incoming Orders").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Payment Rate")).not.toBeNull();
     expect(screen.getByText("Average Order")).not.toBeNull();
-    expect(screen.getByText("Paid, Not Completed")).not.toBeNull();
-    expect(screen.getByText("Low-Stock SKUs")).not.toBeNull();
+    expect(screen.getByText("Pending Completion")).not.toBeNull();
+    expect(screen.getAllByText("Low Stock").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("KPIs use the last 30 days. The trend chart follows the selected period.")).not.toBeNull();
     expect(pageText).toContain(currencyFormatter.format(125000));
     expect(pageText).toContain("60%");
     expect(pageText).toContain(currencyFormatter.format(125000 / 3));
@@ -684,7 +749,7 @@ describe("Dashboard", () => {
 
       render(<Dashboard />);
 
-      expect(screen.getByText("Follow-up Queue")).not.toBeNull();
+      expect(screen.getByText("Action Required")).not.toBeNull();
       expect(screen.getByText("No urgent queue items")).not.toBeNull();
       expect(screen.queryByText("Metrics loaded successfully, with no orders or stock items requiring immediate follow-up.")).toBeNull();
       expect(screen.queryByText("Paid orders need fulfillment")).toBeNull();
@@ -778,6 +843,7 @@ describe("Dashboard", () => {
         resource: "orders",
         pagination: { currentPage: 1, pageSize: 5 },
         sorters: [{ field: "created_at", order: "desc" }],
+        queryOptions: { staleTime: 60_000 },
       });
       expect(mocks.useList).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -788,9 +854,8 @@ describe("Dashboard", () => {
         }),
       );
 
-      const viewAllButtons = screen.getAllByRole("button", { name: "View All" });
-      fireEvent.click(viewAllButtons[0]);
-      fireEvent.click(viewAllButtons[1]);
+      fireEvent.click(screen.getByRole("button", { name: "View all orders" }));
+      fireEvent.click(screen.getByRole("button", { name: "View all products" }));
 
       expect(mocks.navigateList).toHaveBeenCalledWith("orders");
       expect(mocks.navigateList).toHaveBeenCalledWith("products");
@@ -805,6 +870,7 @@ describe("Dashboard", () => {
     const pageText = document.body.textContent ?? "";
 
     expect(screen.getByText("Operational Trends")).not.toBeNull();
+    expect(screen.getByRole("radiogroup", { name: "Choose operational trend period" })).not.toBeNull();
     expect(screen.getByRole("img", { name: "Order trend line chart: incoming, paid, and completed" })).not.toBeNull();
     expect(screen.getByText("Incoming, paid, and completed orders for the selected period.")).not.toBeNull();
     expect(pageText).toContain("Daily");
@@ -882,16 +948,15 @@ describe("Dashboard", () => {
     expect(screen.getAllByText("Incoming Orders").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Payment Rate")).not.toBeNull();
     expect(screen.getByText("Average Order")).not.toBeNull();
-    expect(screen.getByText("Paid, Not Completed")).not.toBeNull();
-    expect(screen.getByText("Low-Stock SKUs")).not.toBeNull();
+    expect(screen.getByText("Pending Completion")).not.toBeNull();
+    expect(screen.getAllByText("Low Stock").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Recent Orders")).not.toBeNull();
     expect(screen.getByText("Handed to Courier")).not.toBeNull();
-    expect(screen.getByText("Stock to Replenish")).not.toBeNull();
+    expect(screen.getAllByText("Low Stock").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("Bandage")).not.toBeNull();
 
-    const viewAllButtons = screen.getAllByRole("button", { name: "View All" });
-    fireEvent.click(viewAllButtons[0]);
-    fireEvent.click(viewAllButtons[1]);
+    fireEvent.click(screen.getByRole("button", { name: "View all orders" }));
+    fireEvent.click(screen.getByRole("button", { name: "View all products" }));
 
     expect(mocks.navigateList).toHaveBeenCalledWith("orders");
     expect(mocks.navigateList).toHaveBeenCalledWith("products");

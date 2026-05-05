@@ -8,11 +8,13 @@ export const getDashboardPageHeaderStyle = (token: GlobalToken): CSSProperties =
 export const getDashboardPrimaryKpiCardStyle = (token: GlobalToken): CSSProperties => ({
   height: "100%",
   borderColor: token.colorBorderSecondary,
+  backgroundColor: token.colorBgContainer,
 });
 
 export const getDashboardSecondaryKpiCardStyle = (token: GlobalToken): CSSProperties => ({
   height: "100%",
   borderColor: token.colorBorderSecondary,
+  backgroundColor: token.colorFillAlter,
 });
 
 export const getDashboardPrimaryKpiValueStyle = (token: GlobalToken): CSSProperties => ({
@@ -27,6 +29,7 @@ export const getDashboardSecondaryKpiValueStyle = (token: GlobalToken): CSSPrope
 
 export const getDashboardTrendStatTileStyle = (token: GlobalToken): CSSProperties => ({
   height: "100%",
+  minHeight: 92,
   padding: token.paddingSM,
   border: `1px solid ${token.colorBorderSecondary}`,
   borderRadius: token.borderRadiusLG,
