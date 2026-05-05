@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-05T00:00:00.000Z",
+  "title": "Design System: Pharmacy Admin Panel",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Refine Operations Blue",
+        "canonical": "#1677ff",
+        "tonalRamp": ["#001d66", "#003eb3", "#0958d9", "#1677ff", "#4096ff", "#69b1ff", "#91caff", "#e6f4ff"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Admin Surface",
+        "canonical": "#fdfefe",
+        "tonalRamp": ["#11181c", "#262f36", "#3f4a52", "#8c959c", "#d9dee2", "#f0f4f7", "#fafcfd", "#fdfefe"]
+      },
+      "success": {
+        "role": "semantic",
+        "displayName": "Verified Green",
+        "canonical": "#52c41a",
+        "tonalRamp": ["#092b00", "#135200", "#237804", "#389e0d", "#52c41a", "#95de64", "#d9f7be", "#f6ffed"]
+      },
+      "warning": {
+        "role": "semantic",
+        "displayName": "Attention Amber",
+        "canonical": "#faad14",
+        "tonalRamp": ["#613400", "#874d00", "#ad6800", "#d48806", "#faad14", "#ffd666", "#fff1b8", "#fffbe6"]
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Critical Red",
+        "canonical": "#ff4d4f",
+        "tonalRamp": ["#5c0011", "#820014", "#a8071a", "#cf1322", "#ff4d4f", "#ff7875", "#ffccc7", "#fff1f0"]
+      }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Page Headline", "purpose": "Page titles and dashboard/report headings only." },
+      "title": { "displayName": "Operational Title", "purpose": "Cards, modal headings, courier groups, and section labels." },
+      "body": { "displayName": "Admin Body", "purpose": "Forms, buttons, table cells, helper copy, and ordinary UI text." },
+      "label": { "displayName": "Compact Metadata", "purpose": "Timestamps, tags, chart notes, descriptions, and secondary details." }
+    },
+    "shadows": [
+      { "name": "dropdown-elevation", "value": "token.boxShadowSecondary", "purpose": "Notification dropdowns and elevated overlays that must separate from the header." },
+      { "name": "focus-halo", "value": "0 0 0 2px token.colorPrimaryBg", "purpose": "Custom focus-like editor and input preview surfaces." },
+      { "name": "flat-selection", "value": "none", "purpose": "Courier cards, stat tiles, and persistent content surfaces remain border-led." }
+    ],
+    "motion": [
+      { "name": "state-transition", "value": "border-color 0.2s, box-shadow 0.2s", "purpose": "Custom editor hover and focus feedback." },
+      { "name": "antd-default-motion", "value": "Ant Design default component motion", "purpose": "Drawers, modals, dropdowns, switches, skeletons, and loading buttons." }
+    ],
+    "breakpoints": [
+      { "name": "lg-sidebar-break", "value": "AntD lg", "purpose": "Desktop sidebar collapses and mobile drawer takes over." },
+      { "name": "auth-card-max", "value": "480px", "purpose": "Login card maximum width." },
+      { "name": "mobile-drawer", "value": "200px", "purpose": "Mobile navigation drawer width." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Default AntD primary action for login, save, verify, filter confirmation, and status submit.",
+      "html": "<button class=\"ds-btn-primary\">Simpan</button>",
+      "css": ".ds-btn-primary { background: #1677ff; color: #fdfefe; border: 1px solid #1677ff; border-radius: 6px; height: 32px; padding: 4px 15px; font: 400 14px/1.5715 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; cursor: pointer; transition: background 0.2s, border-color 0.2s, box-shadow 0.2s; } .ds-btn-primary:hover { background: #4096ff; border-color: #4096ff; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px #e6f4ff; } .ds-btn-primary:active { background: #0958d9; border-color: #0958d9; }"
+    },
+    {
+      "name": "Operational Card",
+      "kind": "card",
+      "refersTo": "card-default",
+      "description": "Flat AntD content surface for dashboard KPIs, settings panels, forms, and reports.",
+      "html": "<section class=\"ds-card\"><h3>Perlu Tindakan</h3><p>Pesanan dibayar yang belum selesai.</p></section>",
+      "css": ".ds-card { background: #fdfefe; color: #11181c; border: 1px solid #d9d9d9; border-radius: 8px; padding: 24px; box-shadow: none; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; } .ds-card h3 { margin: 0 0 8px; font-size: 16px; line-height: 1.5; font-weight: 600; } .ds-card p { margin: 0; color: #595959; font-size: 14px; line-height: 1.5715; }"
+    },
+    {
+      "name": "Status Tag",
+      "kind": "chip",
+      "refersTo": "tag-status",
+      "description": "Text-first semantic status marker for order, payment, shipping, customer, and banner states.",
+      "html": "<span class=\"ds-tag-status\">Pesanan Diproses</span>",
+      "css": ".ds-tag-status { display: inline-flex; align-items: center; min-height: 22px; padding: 0 7px; border-radius: 4px; background: #e6f4ff; color: #0958d9; border: 1px solid #91caff; font: 400 12px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; white-space: nowrap; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-default",
+      "description": "Standard AntD form field for admin data entry, labels come from Form.Item.",
+      "html": "<label class=\"ds-field\"><span>Nama Produk</span><input class=\"ds-input\" value=\"Vitamin C\" /></label>",
+      "css": ".ds-field { display: grid; gap: 8px; color: #11181c; font: 400 14px/1.5715 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; } .ds-input { height: 32px; padding: 4px 11px; border: 1px solid #d9d9d9; border-radius: 6px; background: #fdfefe; color: #11181c; transition: border-color 0.2s, box-shadow 0.2s; } .ds-input:hover { border-color: #4096ff; } .ds-input:focus-visible { outline: none; border-color: #1677ff; box-shadow: 0 0 0 2px #e6f4ff; }"
+    },
+    {
+      "name": "Notification Row",
+      "kind": "custom",
+      "refersTo": "notification-row-unread",
+      "description": "Unread admin order notification with pale blue fill, leading queue marker, and accessible button behavior.",
+      "html": "<button class=\"ds-notification-row\" type=\"button\"><strong>Order baru</strong><span>Pelanggan menunggu proses pesanan.</span></button>",
+      "css": ".ds-notification-row { display: grid; gap: 4px; width: 100%; text-align: left; padding: 8px 16px; border: 0; border-left: 3px solid #1677ff; background: #e6f4ff; color: #11181c; cursor: pointer; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; transition: background 0.2s, box-shadow 0.2s; } .ds-notification-row strong { font-size: 14px; line-height: 1.5715; font-weight: 600; } .ds-notification-row span { color: #595959; font-size: 12px; line-height: 1.5; } .ds-notification-row:hover, .ds-notification-row:focus-visible { outline: none; background: #f0f7ff; box-shadow: inset 0 0 0 1px #91caff; }"
+    },
+    {
+      "name": "Map Frame",
+      "kind": "custom",
+      "refersTo": "map-location-frame",
+      "description": "Settings location picker frame with subtle border, rounded map viewport, and fallback-friendly container.",
+      "html": "<div class=\"ds-map-frame\"><span>Area peta apotek</span></div>",
+      "css": ".ds-map-frame { display: grid; place-items: center; width: 100%; height: 300px; border: 1px solid #d9d9d9; border-radius: 8px; overflow: hidden; background: #fafafa; color: #595959; font: 400 14px/1.5715 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Operations Desk",
+    "overview": "This system is a restrained Ant Design v5 and Refine Blue admin interface for pharmacy commerce work. It should feel like a dependable desk where paid orders, shipment exceptions, stock risks, and customer actions are easy to read without visual drama. Familiar controls are intentional: admins should recognize tables, forms, status tags, cards, and side navigation immediately.",
+    "keyCharacteristics": [
+      "Refine resource shell with a 64px sticky header, responsive sidebar, and predictable CRUD routes.",
+      "Restrained blue primary palette with semantic AntD status colors.",
+      "Dense but legible tables, cards, forms, and status tags for daily admin work.",
+      "Indonesian-first copy, IDR formatting, and WCAG AA contrast intent.",
+      "Minimal custom motion; state feedback comes from AntD loading, focus, hover, drawers, modals, and skeletons."
+    ],
+    "rules": [
+      { "name": "The Ten Percent Blue Rule", "body": "Blue is for action, current location, unread state, or selected state. If it appears as decoration, remove it.", "section": "colors" },
+      { "name": "The Label-Before-Color Rule", "body": "Every semantic color must travel with readable text. Tags may be orange, green, red, gold, cyan, purple, or volcano, but the status label is the meaning.", "section": "colors" },
+      { "name": "The Native Trust Rule", "body": "Use the system sans stack for all admin UI. Do not introduce display fonts into labels, buttons, tables, or data.", "section": "typography" },
+      { "name": "The Flat-Until-Temporary Rule", "body": "Cards are flat at rest. Shadows belong to dropdowns, drawers, modals, and focus feedback, not dashboard decoration.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use Refine resource conventions and AntD components as the default vocabulary for CRUD screens.",
+      "Do reserve Refine Operations Blue for primary actions, current state, selected state, focus, and unread queue emphasis.",
+      "Do keep status tags text-first and color-second, especially for payment, shipping, stock, customer ban, and banner activation states.",
+      "Do preserve Indonesian-first copy, IDR formatting, localized dates, postal-code constraints, and Biteship/Midtrans terminology."
+    ],
+    "donts": [
+      "Don't create generic SaaS dashboards with interchangeable metric cards, decorative charts, vague blue branding, and no operational priority.",
+      "Don't make admin screens feel like a consumer shopping app with storefront polish, promotional browsing, or campaign-first layout.",
+      "Don't turn home banners into a flashy CMS or campaign builder. Keep media constrained, previewable, and safe.",
+      "Don't hide risk behind color alone, vague labels, or optimistic actions for payment, shipping, stock, customer bans, or published content."
+    ]
+  }
+}
