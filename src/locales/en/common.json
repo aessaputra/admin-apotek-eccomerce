@@ -35,42 +35,47 @@
     "dashboard": "Dashboard",
     "overview": {
       "title": "Operations Overview",
-      "subtitle": "Monitor orders, sales, stock, and key items from the last 30 days."
+      "subtitle": "Monitor orders, sales, stock, and follow-up queues from the last 30 days."
     },
     "kpis": {
-      "revenue30d": "Sales Value",
-      "orders30d": "Incoming Orders",
-      "paymentSuccessRate": "Payment Rate",
-      "averageOrderValue": "Average Order",
-      "fulfillmentRisk": "Pending Completion",
-      "lowStockSkus": "Low Stock",
-      "periodNote": "KPIs use the last 30 days. The trend chart follows the selected period."
+      "revenue30d": "30-Day Sales",
+      "orders30d": "30-Day Orders",
+      "paymentSuccessRate": "Paid Orders",
+      "averageOrderValue": "Average Order Value",
+      "fulfillmentRisk": "Paid Orders Not Completed",
+      "lowStockSkus": "Low-Stock Products",
+      "unavailable": "Unavailable",
+      "periodNote": "Summary figures use the last 30 days. The trend chart follows the selected period."
     },
     "alerts": {
-      "title": "Action Required",
+      "title": "Needs Follow-Up",
       "metricsError": {
-        "message": "Metrics unavailable",
-        "description": "Some metrics could not be loaded. Review the trend panel and retry shortly."
+        "message": "Summary unavailable",
+        "description": "Some summary figures could not be loaded. Check the trend panel or retry shortly."
       },
       "lowStockError": {
         "message": "Couldn’t load low-stock data",
-        "description": "Refresh the dashboard or check your connection."
+        "description": "Refresh the page or check your connection."
+      },
+      "recentOrdersError": {
+        "message": "Couldn’t load recent orders",
+        "description": "The order list has not loaded. Refresh before treating the queue as empty."
       },
       "fulfillmentRisk": {
-        "message": "{{count}} paid orders are not completed yet",
-        "description": "Open the orders list to continue fulfillment, shipping, or completion confirmation for paid orders."
+        "message": "{{count}} paid orders are not completed",
+        "description": "Open the orders list to continue processing, shipping, or completion confirmation."
       },
       "lowStockRisk": {
-        "message": "{{count}} active low-stock SKUs",
-        "description": "Active products below 10 units need restock review. Check the low-stock table for the most urgent SKUs."
+        "message": "{{count}} active products are low on stock",
+        "description": "Active products below 10 units need restock review."
       },
       "noRisk": {
         "message": "No urgent queue items",
-        "description": "Metrics loaded successfully, with no orders or stock items requiring immediate follow-up."
+        "description": "Summary data loaded successfully, with no orders or stock items needing immediate follow-up."
       },
       "loading": {
         "message": "Checking the follow-up queue",
-        "description": "Metrics and stock counts are still loading. Queue status will update shortly."
+        "description": "Summary and stock counts are still loading. Queue status will update shortly."
       }
     },
     "recentOrders": "Recent Orders",
@@ -92,17 +97,17 @@
       "lowStockAriaLabel": "Low stock products table"
     },
     "monthlyTrends": {
-      "title": "Operational Trends",
-      "revenue": "Sales Value",
+      "title": "Order Trends",
+      "revenue": "Sales",
       "orderCount": "Incoming Orders",
-      "paidOrders": "Paid",
+      "paidOrders": "Paid Orders",
       "completedOrders": "Completed",
       "dataTableLabel": "Order trend data table",
       "periodColumn": "Period",
       "incomingColumn": "Incoming",
       "paidColumn": "Paid",
       "completedColumn": "Completed",
-      "revenueColumn": "Revenue",
+      "revenueColumn": "Sales",
       "latest12Months": "Latest 12 months",
       "period": {
         "day": "Last 30 days",
@@ -116,13 +121,13 @@
         "month": "Monthly",
         "year": "Yearly"
       },
-      "granularityAriaLabel": "Choose operational trend period",
-      "loading": "Loading order trend data...",
-      "emptyDescription": "No order trend data is available yet.",
+      "granularityAriaLabel": "Choose order trend period",
+      "loading": "Loading order trends...",
+      "emptyDescription": "No order trends are available yet.",
       "errorMessage": "Failed to load order trends.",
-      "zeroValueSummary": "All order trend metrics are zero.",
-      "chartAriaLabel": "Order trend line chart: incoming, paid, and completed",
-      "chartDescription": "Incoming, paid, and completed orders for the selected period."
+      "zeroValueSummary": "All order trend figures are still zero.",
+      "chartAriaLabel": "Order trend line chart: incoming, paid, and completed orders",
+      "chartDescription": "Incoming, paid, and completed order counts for the selected period."
     }
   },
   "salesReports": {
