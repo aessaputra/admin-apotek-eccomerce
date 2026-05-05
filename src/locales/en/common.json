@@ -43,7 +43,8 @@
       "paymentSuccessRate": "Payment Rate",
       "averageOrderValue": "Average Order",
       "fulfillmentRisk": "Pending Completion",
-      "lowStockSkus": "Low Stock"
+      "lowStockSkus": "Low Stock",
+      "periodNote": "KPIs use the last 30 days. The trend chart follows the selected period."
     },
     "alerts": {
       "title": "Action Required",
@@ -72,15 +73,15 @@
         "description": "Metrics and stock counts are still loading. Queue status will update shortly."
       }
     },
-    "totalOrders": "Total Orders",
-    "totalCustomers": "Total Customers",
-    "totalProducts": "Total Products",
-    "totalRevenue": "Total Revenue",
     "recentOrders": "Recent Orders",
     "lowStockAlerts": "Low Stock",
     "noRecentOrders": "No orders yet",
     "noLowStock": "All stock levels OK",
     "viewAll": "View All",
+    "viewAllOrders": "View all orders",
+    "viewAllProducts": "View all products",
+    "orderId": "Order ID",
+    "fullOrderId": "Full order ID",
     "orderDate": "Date",
     "orderTotal": "Total",
     "orderStatus": "Status",
@@ -115,6 +116,7 @@
         "month": "Monthly",
         "year": "Yearly"
       },
+      "granularityAriaLabel": "Choose operational trend period",
       "loading": "Loading order trend data...",
       "emptyDescription": "No order trend data is available yet.",
       "errorMessage": "Failed to load order trends.",

@@ -43,7 +43,8 @@
       "paymentSuccessRate": "Tingkat Pembayaran",
       "averageOrderValue": "Rata-rata Pesanan",
       "fulfillmentRisk": "Pesanan Belum Selesai",
-      "lowStockSkus": "Stok Menipis"
+      "lowStockSkus": "Stok Menipis",
+      "periodNote": "KPI dihitung dari 30 hari terakhir. Grafik tren mengikuti periode yang dipilih."
     },
     "alerts": {
       "title": "Perlu Tindakan",
@@ -72,15 +73,15 @@
         "description": "Metrik dan jumlah stok masih dimuat. Status antrean akan diperbarui sebentar lagi."
       }
     },
-    "totalOrders": "Total Pesanan",
-    "totalCustomers": "Total Pelanggan",
-    "totalProducts": "Total Produk",
-    "totalRevenue": "Total Pendapatan",
     "recentOrders": "Pesanan Terbaru",
     "lowStockAlerts": "Stok Menipis",
     "noRecentOrders": "Belum ada pesanan",
     "noLowStock": "Semua stok aman",
     "viewAll": "Lihat Semua",
+    "viewAllOrders": "Lihat semua pesanan",
+    "viewAllProducts": "Lihat semua produk",
+    "orderId": "ID Pesanan",
+    "fullOrderId": "ID pesanan lengkap",
     "orderDate": "Tanggal",
     "orderTotal": "Total",
     "orderStatus": "Status",
@@ -115,6 +116,7 @@
         "month": "Bulanan",
         "year": "Tahunan"
       },
+      "granularityAriaLabel": "Pilih periode tren operasional",
       "loading": "Memuat data tren pesanan...",
       "emptyDescription": "Belum ada data tren pesanan untuk ditampilkan.",
       "errorMessage": "Gagal memuat tren pesanan.",
