@@ -69,11 +69,19 @@ const mocks = vi.hoisted(() => {
       "dashboard.currentStock": "Stock",
       "dashboard.noRecentOrders": "No orders yet",
       "dashboard.noLowStock": "All stock levels OK",
+      "dashboard.tables.recentOrdersAriaLabel": "Recent orders table",
+      "dashboard.tables.lowStockAriaLabel": "Low stock products table",
       "dashboard.monthlyTrends.title": "Operational Trends",
       "dashboard.monthlyTrends.revenue": "Sales Value",
       "dashboard.monthlyTrends.orderCount": "Incoming Orders",
       "dashboard.monthlyTrends.paidOrders": "Paid",
       "dashboard.monthlyTrends.completedOrders": "Completed",
+      "dashboard.monthlyTrends.dataTableLabel": "Order trend data table",
+      "dashboard.monthlyTrends.periodColumn": "Period",
+      "dashboard.monthlyTrends.incomingColumn": "Incoming",
+      "dashboard.monthlyTrends.paidColumn": "Paid",
+      "dashboard.monthlyTrends.completedColumn": "Completed",
+      "dashboard.monthlyTrends.revenueColumn": "Revenue",
       "dashboard.monthlyTrends.latest12Months": "Latest 12 months",
       "dashboard.monthlyTrends.period.day": "Last 30 days",
       "dashboard.monthlyTrends.period.week": "Last 12 weeks",
@@ -98,12 +106,14 @@ const mocks = vi.hoisted(() => {
   });
   const navigateList = vi.fn();
   const line = vi.fn<(props: LineMockProps) => void>();
+  const tableColumn = vi.fn<(props: { dataIndex?: string | readonly string[]; responsive?: readonly string[] }) => void>();
 
   return {
     useList,
     translate,
     navigateList,
     line,
+    tableColumn,
   };
 });
 
@@ -142,6 +152,7 @@ vi.mock("antd", async () => {
 
   interface TableColumnProps {
     dataIndex?: DataIndex;
+    responsive?: readonly string[];
     title?: React.ReactNode;
     render?: (value: unknown, record: Record<string, unknown>) => React.ReactNode;
   }
@@ -150,6 +161,7 @@ vi.mock("antd", async () => {
     children?: React.ReactNode;
     dataSource?: Record<string, unknown>[];
     locale?: { emptyText?: React.ReactNode };
+    "aria-label"?: string;
   }
 
   const getRecordValue = (record: Record<string, unknown>, dataIndex?: DataIndex): unknown => {
@@ -170,15 +182,17 @@ vi.mock("antd", async () => {
     }, record);
   };
 
-  const TableComponent = ({ children, dataSource = [], locale }: TableProps) => (
-    <div>
+  const TableComponent = ({ children, dataSource = [], locale, "aria-label": ariaLabel }: TableProps) => (
+    <div aria-label={ariaLabel} role="table">
       {dataSource.length === 0 && locale?.emptyText ? <div>{locale.emptyText}</div> : null}
       {ReactModule.Children.map(children, (child) => {
         if (!ReactModule.isValidElement<TableColumnProps>(child)) {
           return child;
         }
 
-        const { dataIndex, render: renderValue, title } = child.props;
+        const { dataIndex, render: renderValue, responsive, title } = child.props;
+
+        mocks.tableColumn({ dataIndex, responsive });
 
         return (
           <div>
@@ -356,9 +370,8 @@ const setupDashboardQueries = ({
 }: DashboardQueryOptions = {}) => {
   const lowStockRows = lowStockProducts ?? (lowStockTotal > 0 ? [{ id: "product-1", name: "Bandage", stock: 4 }] : []);
   const kpiRows = kpiMetricRows ?? monthlyMetricRows;
-  let dayOperationalMetricsCallCount = 0;
 
-  mocks.useList.mockImplementation((params: { resource: string; meta?: Record<string, unknown>; pagination?: Record<string, unknown>; filters?: { field: string; value?: unknown }[] }) => {
+  mocks.useList.mockImplementation((params: { resource: string; meta?: Record<string, unknown>; pagination?: Record<string, unknown>; filters?: { field: string; value?: unknown }[]; queryOptions?: { enabled?: boolean } }) => {
     if (params.resource === "orders" && params.meta?.count === "exact") {
       return { result: { total: 1 } };
     }
@@ -397,15 +410,18 @@ const setupDashboardQueries = ({
     if (params.resource === "admin_operational_metrics") {
       const granularity = params.filters?.find((filter) => filter.field === "granularity")?.value;
 
-      if (granularity === "day") {
-        dayOperationalMetricsCallCount += 1;
+      if (params.queryOptions?.enabled === false) {
+        return {
+          result: undefined,
+          query: { isLoading: false, isError: false, error: null },
+        };
+      }
 
-        if (dayOperationalMetricsCallCount % 2 === 1) {
-          return {
-            result: { data: kpiRows },
-            query: { isLoading: false, isError: false, error: null, ...kpiQuery },
-          };
-        }
+      if (granularity === "day") {
+        return {
+          result: { data: kpiRows },
+          query: { isLoading: false, isError: false, error: null, ...kpiQuery },
+        };
       }
 
       return {
@@ -426,6 +442,7 @@ describe("Dashboard", () => {
     mocks.translate.mockClear();
     mocks.navigateList.mockReset();
     mocks.line.mockClear();
+    mocks.tableColumn.mockClear();
   });
 
   afterEach(() => {
@@ -439,6 +456,17 @@ describe("Dashboard", () => {
 
     expect(screen.getByText("Handed to Courier")).not.toBeNull();
     expect(screen.queryByText("shipped")).toBeNull();
+  });
+
+  it("labels dashboard tables and keeps non-essential recent order columns responsive", () => {
+    setupDashboardQueries();
+
+    render(<Dashboard />);
+
+    expect(screen.getByRole("table", { name: "Recent orders table" })).not.toBeNull();
+    expect(screen.getByRole("table", { name: "Low stock products table" })).not.toBeNull();
+    expect(mocks.tableColumn).toHaveBeenCalledWith({ dataIndex: "total_amount", responsive: ["sm"] });
+    expect(mocks.tableColumn).toHaveBeenCalledWith({ dataIndex: "created_at", responsive: ["md"] });
   });
 
   it("queries low-stock SKUs with an exact active product count", () => {
@@ -481,6 +509,16 @@ describe("Dashboard", () => {
         { field: "end_date", operator: "eq", value: "2026-04-15" },
       ],
     });
+    expect(mocks.useList).toHaveBeenCalledWith({
+      resource: "admin_operational_metrics",
+      pagination: { pageSize: 30 },
+      filters: [
+        { field: "granularity", operator: "eq", value: "day" },
+        { field: "start_date", operator: "eq", value: "2026-03-17" },
+        { field: "end_date", operator: "eq", value: "2026-04-15" },
+      ],
+      queryOptions: { enabled: false },
+    });
   });
 
   it("updates operational metric filters when a new granularity is selected", () => {
@@ -497,6 +535,7 @@ describe("Dashboard", () => {
         { field: "start_date", operator: "eq", value: "2026-01-26" },
         { field: "end_date", operator: "eq", value: "2026-04-19" },
       ],
+      queryOptions: { enabled: true },
     });
   });
 
@@ -545,6 +584,57 @@ describe("Dashboard", () => {
         { field: "start_date", operator: "eq", value: "2026-01-26" },
         { field: "end_date", operator: "eq", value: "2026-04-19" },
       ],
+      queryOptions: { enabled: true },
+    });
+  });
+
+  it("switches back to day trend reusing KPI data without stale weekly rows", () => {
+    setupDashboardQueries({
+      kpiMetricRows: [
+        createMonthlyMetricRow("2026-04-15", {
+          order_count: 1,
+          paid_order_count: 1,
+          completed_order_count: 1,
+          revenue: 10000,
+        }),
+      ],
+      monthlyMetricRows: [
+        createMonthlyMetricRow("2026-04-14", {
+          order_count: 9,
+          paid_order_count: 9,
+          completed_order_count: 9,
+          revenue: 900000,
+        }),
+      ],
+      lowStockTotal: 0,
+    });
+
+    render(<Dashboard />);
+    fireEvent.click(screen.getByRole("button", { name: "Weekly" }));
+    fireEvent.click(screen.getByRole("button", { name: "Daily" }));
+
+    const pageText = document.body.textContent ?? "";
+
+    expect(pageText).toContain(`Sales Value${currencyFormatter.format(10000)}`);
+    expect(pageText).toContain("Incoming Orders1");
+    expect(mocks.useList).toHaveBeenCalledWith({
+      resource: "admin_operational_metrics",
+      pagination: { pageSize: 30 },
+      filters: [
+        { field: "granularity", operator: "eq", value: "day" },
+        { field: "start_date", operator: "eq", value: "2026-03-17" },
+        { field: "end_date", operator: "eq", value: "2026-04-15" },
+      ],
+    });
+    expect(mocks.useList).toHaveBeenLastCalledWith({
+      resource: "admin_operational_metrics",
+      pagination: { pageSize: 30 },
+      filters: [
+        { field: "granularity", operator: "eq", value: "day" },
+        { field: "start_date", operator: "eq", value: "2026-03-17" },
+        { field: "end_date", operator: "eq", value: "2026-04-15" },
+      ],
+      queryOptions: { enabled: false },
     });
   });
 
@@ -629,7 +719,7 @@ describe("Dashboard", () => {
 
       expect(screen.getByText("Metrics unavailable")).not.toBeNull();
       expect(screen.getByText("Some metrics could not be loaded. Review the trend panel and retry shortly.")).not.toBeNull();
-      expect(screen.queryByText("Failed to load order trends.")).toBeNull();
+      expect(screen.getAllByRole("alert").some((alert) => alert.textContent === "Failed to load order trends.")).toBe(true);
       expect(screen.queryByText("database host leaked")).toBeNull();
       expect(document.body.textContent).not.toContain("database host leaked");
     });
@@ -725,7 +815,7 @@ describe("Dashboard", () => {
   });
 
   it("renders the order trend loading state while the aggregate query is pending", () => {
-    setupDashboardQueries({ monthlyQuery: { isLoading: true } });
+    setupDashboardQueries({ kpiQuery: { isLoading: true } });
 
     render(<Dashboard />);
 
@@ -758,7 +848,7 @@ describe("Dashboard", () => {
   it("renders the order trend error state without exposing failed query details", () => {
     setupDashboardQueries({
       monthlyMetricRows: [],
-      monthlyQuery: { isError: true, error: new Error("database host leaked") },
+      kpiQuery: { isError: true, error: new Error("database host leaked") },
     });
 
     render(<Dashboard />);
