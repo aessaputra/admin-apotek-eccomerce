@@ -2,7 +2,6 @@ import { Line } from "@ant-design/charts";
 import { Alert, Card, Col, Empty, Radio, Row, Skeleton, Space, Statistic, Tooltip, Typography, theme } from "antd";
 import type { RadioChangeEvent } from "antd";
 import { useId, useMemo } from "react";
-import { currencyFormatter } from "../../utils/formatters";
 import type {
   MonthlyOperationalTrendChartPoint,
   MonthlyOperationalTrendData,
@@ -61,18 +60,14 @@ export interface MonthlyOperationalTrendCardProps {
   granularity: OperationalTrendGranularity;
   granularityOptions: readonly MonthlyOperationalTrendGranularityOption[];
   onGranularityChange: (granularity: OperationalTrendGranularity) => void;
+  locale?: string;
 }
 
-const compactNumberFormatter = new Intl.NumberFormat("id-ID", {
-  maximumFractionDigits: 1,
-  notation: "compact",
-});
-
-const compactMonthFormatter = new Intl.DateTimeFormat("id-ID", {
-  month: "short",
-  timeZone: "Asia/Jakarta",
-  year: "2-digit",
-});
+const TREND_METRIC_PATTERNS: Record<CountMetricKey, { lineDash?: number[]; opacity: number; shape: string }> = {
+  orderCount: { opacity: 1, shape: "circle" },
+  paidOrderCount: { lineDash: [6, 4], opacity: 0.9, shape: "square" },
+  completedOrderCount: { lineDash: [2, 4], opacity: 0.9, shape: "diamond" },
+};
 
 export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardProps> = ({
   data,
@@ -83,10 +78,28 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
   granularity,
   granularityOptions,
   onGranularityChange,
+  locale = "id-ID",
 }) => {
   const { token } = theme.useToken();
   const chartDescriptionId = useId();
-  const formattedRevenue = useMemo(() => currencyFormatter.format(totals.revenue), [totals.revenue]);
+  const compactNumberFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat(locale, {
+        maximumFractionDigits: 1,
+        notation: "compact",
+      }),
+    [locale],
+  );
+  const currencyFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat(locale, {
+        style: "currency",
+        currency: "IDR",
+        maximumFractionDigits: 0,
+      }),
+    [locale],
+  );
+  const formattedRevenue = useMemo(() => currencyFormatter.format(totals.revenue), [currencyFormatter, totals.revenue]);
   const revenueSummary = useMemo(
     () =>
       [
@@ -139,6 +152,22 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
       labels.paidOrders,
     ],
   );
+  const metricColorRange = useMemo(
+    () => [token.colorPrimary, token.colorSuccess, token.colorInfo],
+    [token.colorInfo, token.colorPrimary, token.colorSuccess],
+  );
+  const metricDomain = useMemo(
+    () => [labels.orderCount, labels.paidOrders, labels.completedOrders],
+    [labels.completedOrders, labels.orderCount, labels.paidOrders],
+  );
+  const monthTickFormatter = useMemo(
+    () => createCompactMonthTickFormatter(locale),
+    [locale],
+  );
+  const countTickFormatter = useMemo(
+    () => createCompactCountTickFormatter(compactNumberFormatter),
+    [compactNumberFormatter],
+  );
   const chartConfig = useMemo(
     () => ({
       data: countChartData,
@@ -146,15 +175,30 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
       yField: "value",
       colorField: "seriesLabel",
       seriesField: "seriesLabel",
+      scale: {
+        color: {
+          domain: metricDomain,
+          range: metricColorRange,
+        },
+      },
+      style: {
+        lineWidth: 2,
+        lineDash: (seriesRows: CountTrendChartPoint[]) => getMetricPattern(seriesRows[0]?.metric).lineDash,
+        opacity: (seriesRows: CountTrendChartPoint[]) => getMetricPattern(seriesRows[0]?.metric).opacity,
+      },
+      point: {
+        shapeField: (point: CountTrendChartPoint) => getMetricPattern(point.metric).shape,
+        sizeField: 4,
+      },
       height: 280,
       autoFit: true,
       axis: {
         x: {
-          labelFormatter: formatCompactMonthTick,
+          labelFormatter: monthTickFormatter,
           tickCount: 6,
         },
         y: {
-          labelFormatter: formatCompactCountTick,
+          labelFormatter: countTickFormatter,
         },
       },
       legend: {
@@ -166,7 +210,7 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
         title: "monthLabel",
       },
     }),
-    [countChartData],
+    [countChartData, countTickFormatter, metricColorRange, metricDomain, monthTickFormatter],
   );
   const hasRows = data.rows.length > 0;
   const hasOnlyZeroValues =
@@ -193,15 +237,16 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
             <Typography.Text type="secondary">{labels.periodLabel}</Typography.Text>
           </Space>
         </Col>
-        <Col xs={24} md={12} style={{ display: "flex", justifyContent: "flex-end" }}>
+        <Col xs={24} md={12} style={{ display: "flex", justifyContent: "flex-end", minWidth: 0 }}>
           <Radio.Group
             aria-label={labels.granularityAriaLabel}
             optionType="button"
             buttonStyle="solid"
-            size="small"
+            size="middle"
             value={granularity}
             options={granularityOptions.map((option) => ({ label: option.label, value: option.value }))}
             onChange={handleGranularityChange}
+            style={{ display: "flex", flexWrap: "wrap", gap: token.marginXXS, justifyContent: "flex-end" }}
           />
         </Col>
       </Row>
@@ -311,7 +356,10 @@ const mapCountPoints = (
     value,
   }));
 
-const formatCompactMonthTick = (monthLabel: string): string => {
+const getMetricPattern = (metric: CountMetricKey | undefined): { lineDash?: number[]; opacity: number; shape: string } =>
+  metric ? TREND_METRIC_PATTERNS[metric] : TREND_METRIC_PATTERNS.orderCount;
+
+const createCompactMonthTickFormatter = (locale: string) => (monthLabel: string): string => {
   const [year, month] = monthLabel.split("-");
   const yearNumber = Number(year);
   const monthIndex = Number(month) - 1;
@@ -320,11 +368,11 @@ const formatCompactMonthTick = (monthLabel: string): string => {
     return monthLabel;
   }
 
-  return compactMonthFormatter.format(new Date(Date.UTC(yearNumber, monthIndex, 1)));
+  return new Intl.DateTimeFormat(locale, { month: "short", timeZone: "Asia/Jakarta", year: "2-digit" }).format(new Date(Date.UTC(yearNumber, monthIndex, 1)));
 };
 
-const formatCompactCountTick = (value: number | string): string => {
+const createCompactCountTickFormatter = (formatter: Intl.NumberFormat) => (value: number | string): string => {
   const numericValue = typeof value === "number" ? value : Number(value);
 
-  return Number.isFinite(numericValue) ? compactNumberFormatter.format(numericValue) : String(value);
+  return Number.isFinite(numericValue) ? formatter.format(numericValue) : String(value);
 };

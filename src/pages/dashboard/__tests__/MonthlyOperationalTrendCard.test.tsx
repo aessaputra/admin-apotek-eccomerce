@@ -21,6 +21,21 @@ interface LineMockProps {
   yField: string;
   colorField: string;
   seriesField: string;
+  point?: {
+    shapeField?: (point: LineMockDatum) => string;
+    sizeField?: number;
+  };
+  scale?: {
+    color?: {
+      domain?: string[];
+      range?: string[];
+    };
+  };
+  style?: {
+    lineWidth?: number;
+    lineDash?: (seriesRows: LineMockDatum[]) => number[] | undefined;
+    opacity?: (seriesRows: LineMockDatum[]) => number;
+  };
   axis?: {
     x?: {
       tickCount?: number;
@@ -108,10 +123,14 @@ vi.mock("antd", () => ({
         borderRadiusLG: 8,
         colorBorderSecondary: "#d9d9d9",
         colorFillAlter: "#fafafa",
+        colorInfo: "#13c2c2",
+        colorPrimary: "#1677ff",
+        colorSuccess: "#52c41a",
         fontSizeLG: 16,
         fontSizeSM: 12,
         fontWeightStrong: 600,
         marginMD: 16,
+        marginXXS: 4,
         paddingSM: 12,
       },
     }),
@@ -120,25 +139,25 @@ vi.mock("antd", () => ({
 
 const REFERENCE_DATE = new Date("2026-04-15T00:00:00.000Z");
 const labels = {
-  title: "Operational Trends",
-  revenue: "Sales Value",
+  title: "Order Trends",
+  revenue: "Sales",
   orderCount: "Incoming Orders",
-  paidOrders: "Paid",
+  paidOrders: "Paid Orders",
   completedOrders: "Completed",
   periodLabel: "Last 12 months",
-  loading: "Loading order trend data...",
-  emptyDescription: "No order trend data is available yet.",
+  loading: "Loading order trends...",
+  emptyDescription: "No order trends are available yet.",
   errorMessage: "Failed to load order trends.",
-  zeroValueSummary: "All order trend metrics are zero.",
-  chartAriaLabel: "Order trend line chart: incoming, paid, and completed",
-  chartDescription: "Incoming, paid, and completed orders for the selected period.",
+  zeroValueSummary: "All order trend figures are still zero.",
+  chartAriaLabel: "Order trend line chart: incoming, paid, and completed orders",
+  chartDescription: "Incoming, paid, and completed order counts for the selected period.",
   dataTableLabel: "Order trend data table",
   periodColumn: "Period",
   incomingColumn: "Incoming",
   paidColumn: "Paid",
   completedColumn: "Completed",
-  revenueColumn: "Revenue",
-  granularityAriaLabel: "Choose operational trend period",
+  revenueColumn: "Sales",
+  granularityAriaLabel: "Choose order trend period",
 };
 const granularityOptions = [
   { label: "Daily", value: "day" as const },
@@ -247,6 +266,13 @@ describe("MonthlyOperationalTrendCard", () => {
     expect(lineProps.yField).toBe("value");
     expect(lineProps.colorField).toBe("seriesLabel");
     expect(lineProps.seriesField).toBe("seriesLabel");
+    expect(lineProps.scale?.color?.domain).toEqual([labels.orderCount, labels.paidOrders, labels.completedOrders]);
+    expect(lineProps.scale?.color?.range).toEqual(["#1677ff", "#52c41a", "#13c2c2"]);
+    expect(lineProps.style?.lineWidth).toBe(2);
+    expect(lineProps.style?.lineDash?.([{ monthStart: "2026-04-01", metric: "paidOrderCount", seriesLabel: labels.paidOrders, value: 3 }])).toEqual([6, 4]);
+    expect(lineProps.style?.lineDash?.([{ monthStart: "2026-04-01", metric: "completedOrderCount", seriesLabel: labels.completedOrders, value: 2 }])).toEqual([2, 4]);
+    expect(lineProps.point?.shapeField?.({ monthStart: "2026-04-01", metric: "completedOrderCount", seriesLabel: labels.completedOrders, value: 2 })).toBe("diamond");
+    expect(lineProps.point?.sizeField).toBe(4);
     expect(lineProps.axis?.x?.tickCount).toBe(6);
     expect(lineProps.axis?.x?.labelFormatter?.("2026-04")).toBe("Apr 26");
     expect(lineProps.axis?.y?.labelFormatter?.(12500).replace(/\u00a0/g, " ")).toBe("12,5 rb");

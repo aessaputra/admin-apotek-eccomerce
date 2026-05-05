@@ -1,7 +1,7 @@
 type SupabaseNumericValue = string | number | bigint | null | undefined;
 
 const JAKARTA_UTC_OFFSET_IN_MILLISECONDS = 7 * 60 * 60 * 1000;
-const JAKARTA_TIME_ZONE = "Asia/Jakarta";
+export const JAKARTA_TIME_ZONE = "Asia/Jakarta";
 const MONTHS_IN_TREND_RANGE = 12;
 const DAYS_IN_TREND_RANGE = 30;
 const WEEKS_IN_TREND_RANGE = 12;
@@ -274,9 +274,10 @@ export const buildMonthlyOperationalTrendData = (
 export const buildOperationalTrendData = (
   metricRows: readonly OperationalMetricRow[],
   granularity: OperationalTrendGranularity,
+  locale = "id-ID",
 ): MonthlyOperationalTrendData => {
   const rows = metricRows
-    .map((row) => normalizeOperationalTrendRow(row, granularity))
+    .map((row) => normalizeOperationalTrendRow(row, granularity, locale))
     .filter((row): row is MonthlyOperationalTrendDisplayRow => row !== null);
 
   return {
@@ -323,6 +324,7 @@ const formatMonthLabel = (monthStart: string): string => monthStart.slice(0, 7);
 const normalizeOperationalTrendRow = (
   row: OperationalMetricRow,
   granularity: OperationalTrendGranularity,
+  locale: string,
 ): MonthlyOperationalTrendDisplayRow | null => {
   const bucketStart = normalizeBucketStart(row.bucket_start);
 
@@ -332,7 +334,7 @@ const normalizeOperationalTrendRow = (
 
   return {
     monthStart: bucketStart,
-    monthLabel: formatBucketLabel(bucketStart, row.bucket_end, granularity),
+    monthLabel: formatBucketLabel(bucketStart, row.bucket_end, granularity, locale),
     orderCount: parseSupabaseCount(row.order_count),
     paidOrderCount: parseSupabaseCount(row.paid_order_count),
     completedOrderCount: parseSupabaseCount(row.completed_order_count),
@@ -354,26 +356,27 @@ const formatBucketLabel = (
   bucketStart: string,
   bucketEnd: string | null,
   granularity: OperationalTrendGranularity,
+  locale: string,
 ): string => {
   const startDate = new Date(`${bucketStart}T00:00:00.000Z`);
 
   if (granularity === "day") {
-    return new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", timeZone: JAKARTA_TIME_ZONE }).format(startDate);
+    return new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short", timeZone: JAKARTA_TIME_ZONE }).format(startDate);
   }
 
   if (granularity === "week") {
     const endDate = bucketEnd && isValidBucketStart(bucketEnd) ? new Date(`${bucketEnd.slice(0, 10)}T00:00:00.000Z`) : addDays(startDate, 6);
 
-    const dateFormatter = new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", timeZone: JAKARTA_TIME_ZONE });
+    const dateFormatter = new Intl.DateTimeFormat(locale, { day: "2-digit", month: "short", timeZone: JAKARTA_TIME_ZONE });
 
     return `${dateFormatter.format(startDate)}–${dateFormatter.format(endDate)}`;
   }
 
   if (granularity === "year") {
-    return new Intl.DateTimeFormat("id-ID", { timeZone: JAKARTA_TIME_ZONE, year: "numeric" }).format(startDate);
+    return new Intl.DateTimeFormat(locale, { timeZone: JAKARTA_TIME_ZONE, year: "numeric" }).format(startDate);
   }
 
-  return new Intl.DateTimeFormat("id-ID", { month: "short", timeZone: JAKARTA_TIME_ZONE, year: "2-digit" }).format(startDate);
+  return new Intl.DateTimeFormat(locale, { month: "short", timeZone: JAKARTA_TIME_ZONE, year: "2-digit" }).format(startDate);
 };
 
 const getJakartaDate = (referenceDate: Date): Date => new Date(referenceDate.getTime() + JAKARTA_UTC_OFFSET_IN_MILLISECONDS);
