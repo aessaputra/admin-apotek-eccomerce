@@ -52,6 +52,12 @@
       "sourceType": "github",
       "computedHash": "5e052e505bfac4945d2f19f32125242233d29428233c8c71f6ce08a827d8b681"
     },
+    "impeccable": {
+      "source": "pbakaus/impeccable",
+      "sourceType": "github",
+      "skillPath": "skill/SKILL.md",
+      "computedHash": "8cdf2e788eaca3af7d02026ef9cec55b506100a00d130f938e3fb1ad669c0ad0"
+    },
     "information-architecture": {
       "source": "julianoczkowski/designer-skills",
       "sourceType": "github",
