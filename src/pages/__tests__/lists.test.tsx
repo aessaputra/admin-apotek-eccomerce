@@ -31,14 +31,14 @@ const mocks = vi.hoisted(() => {
     return fallback ?? key;
   });
   const useTable = vi.fn();
-  const show = vi.fn();
+  const navigate = vi.fn();
   const handleBan = vi.fn();
   const handleUnban = vi.fn();
 
   return {
     translate,
     useTable,
-    show,
+    navigate,
     handleBan,
     handleUnban,
   };
@@ -46,7 +46,10 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@refinedev/core", () => ({
   useTranslation: () => ({ translate: mocks.translate }),
-  useNavigation: () => ({ show: mocks.show }),
+}));
+
+vi.mock("react-router", () => ({
+  useNavigate: () => mocks.navigate,
 }));
 
 vi.mock("../../hooks/useBanToggle", () => ({
@@ -297,7 +300,7 @@ describe("list pages", () => {
   beforeEach(() => {
     mocks.translate.mockClear();
     mocks.useTable.mockReset();
-    mocks.show.mockReset();
+    mocks.navigate.mockReset();
     mocks.handleBan.mockReset();
     mocks.handleUnban.mockReset();
   });
@@ -580,13 +583,13 @@ describe("list pages", () => {
 
     const row = screen.getByRole("button", { name: "orders.actions.openRowAriaLabel" });
     fireEvent.click(row);
-    expect(mocks.show).toHaveBeenLastCalledWith("orders", "order-1");
+    expect(mocks.navigate).toHaveBeenLastCalledWith("/orders/show/order-1");
 
     fireEvent.keyDown(row, { key: "Enter" });
-    expect(mocks.show).toHaveBeenLastCalledWith("orders", "order-1");
+    expect(mocks.navigate).toHaveBeenLastCalledWith("/orders/show/order-1");
 
     fireEvent.keyDown(row, { key: " " });
-    expect(mocks.show).toHaveBeenLastCalledWith("orders", "order-1");
+    expect(mocks.navigate).toHaveBeenLastCalledWith("/orders/show/order-1");
   });
 
   it("renders localized order empty and error states", () => {

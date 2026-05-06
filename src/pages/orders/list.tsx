@@ -1,7 +1,8 @@
 import { List, useTable, ShowButton, getDefaultFilter } from "@refinedev/antd";
-import { useNavigation, useTranslation } from "@refinedev/core";
+import { useTranslation, type BaseRecord } from "@refinedev/core";
 import { Alert, Button, Table, Space, Tooltip, Select, Tag } from "antd";
 import type { FilterDropdownProps } from "antd/es/table/interface";
+import { useNavigate } from "react-router";
 import { STATUS_COLORS, PAYMENT_COLORS, getStatusOptions, getPaymentOptions } from "../../constants/orders";
 import { getFallbackCourierOption } from "../../constants/couriers";
 
@@ -21,6 +22,14 @@ interface SelectFilterOption {
   label: string;
   value: string;
 }
+
+type OrderRecordKey = string | number;
+
+const getOrderRecordKey = (record: BaseRecord): OrderRecordKey | undefined => {
+  const { id } = record;
+
+  return typeof id === "string" || typeof id === "number" ? id : undefined;
+};
 
 const normalizeFilterValue = (value: unknown): string[] | undefined => {
   if (Array.isArray(value)) {
@@ -73,7 +82,7 @@ const createSelectFilterDropdown = (
 
 export const OrderList: React.FC = () => {
   const { translate } = useTranslation();
-  const { show } = useNavigation();
+  const navigate = useNavigate();
   const { tableProps, tableQuery, filters } = useTable({
     syncWithLocation: true,
     sorters: {
@@ -89,6 +98,9 @@ export const OrderList: React.FC = () => {
   const STATUS_OPTIONS = getStatusOptions(translate);
   const PAYMENT_OPTIONS = getPaymentOptions(translate);
   const orderListTableLabel = translate("orders.tables.listAriaLabel");
+  const openOrderDetail = (id: OrderRecordKey) => {
+    navigate(`/orders/show/${id}`);
+  };
   const emptyOrderText = tableQuery?.isError ? (
     <Alert
       type="error"
@@ -106,27 +118,31 @@ export const OrderList: React.FC = () => {
         rowKey="id"
         scroll={{ x: "max-content" }}
         locale={{ emptyText: emptyOrderText }}
-        onRow={(record: { id?: string }) => ({
-          role: "button",
-          tabIndex: 0,
-          style: { cursor: "pointer" },
-          "aria-label": record.id
-            ? translate("orders.actions.openRowAriaLabel", { id: record.id })
-            : translate("orders.actions.openRowFallbackAriaLabel"),
-          onClick: () => {
-            if (record.id) {
-              show("orders", record.id);
-            }
-          },
-          onKeyDown: (event: React.KeyboardEvent<HTMLElement>) => {
-            if (!record.id || (event.key !== "Enter" && event.key !== " ")) {
-              return;
-            }
+        onRow={(record: BaseRecord) => {
+          const recordId = getOrderRecordKey(record);
 
-            event.preventDefault();
-            show("orders", record.id);
-          },
-        })}
+          return {
+            role: "button",
+            tabIndex: 0,
+            style: { cursor: "pointer" },
+            "aria-label": recordId !== undefined
+              ? translate("orders.actions.openRowAriaLabel", { id: String(recordId) })
+              : translate("orders.actions.openRowFallbackAriaLabel"),
+            onClick: () => {
+              if (recordId !== undefined) {
+                openOrderDetail(recordId);
+              }
+            },
+            onKeyDown: (event: React.KeyboardEvent<HTMLElement>) => {
+              if (recordId === undefined || (event.key !== "Enter" && event.key !== " ")) {
+                return;
+              }
+
+              event.preventDefault();
+              openOrderDetail(recordId);
+            },
+          };
+        }}
       >
         <Table.Column dataIndex="id" title={translate("orders.fields.id")} width={80} />
         <Table.Column dataIndex="total_amount" title={translate("orders.fields.total")} responsive={["sm"]} render={(v) => `Rp ${Number(v || 0).toLocaleString("id-ID")}`} />
@@ -179,19 +195,27 @@ export const OrderList: React.FC = () => {
           key="actions"
           align="center"
           width={80}
-          render={(_, record: { id: string }) => (
-            <Space size="small" onClick={(event) => event.stopPropagation()}>
-              <Tooltip title={translate("orders.showDetail")} trigger={["hover", "focus"]}>
-                <ShowButton
-                  hideText
-                  size="small"
-                  recordItemId={record.id}
-                  resource="orders"
-                  aria-label={translate("orders.actions.showDetailAriaLabel", { id: record.id })}
-                />
-              </Tooltip>
-            </Space>
-          )}
+          render={(_, record: BaseRecord) => {
+            const recordId = getOrderRecordKey(record);
+
+            if (recordId === undefined) {
+              return null;
+            }
+
+            return (
+              <Space size="small" onClick={(event) => event.stopPropagation()}>
+                <Tooltip title={translate("orders.showDetail")} trigger={["hover", "focus"]}>
+                  <ShowButton
+                    hideText
+                    size="small"
+                    recordItemId={recordId}
+                    resource="orders"
+                    aria-label={translate("orders.actions.showDetailAriaLabel", { id: String(recordId) })}
+                  />
+                </Tooltip>
+              </Space>
+            );
+          }}
         />
       </Table>
       </div>
