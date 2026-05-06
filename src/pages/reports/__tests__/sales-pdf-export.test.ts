@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  SALES_PDF_SECTION_KEYS,
   buildSalesReportPdf,
   generateSalesPdfFilename,
   type SalesPdfExportInput,
 } from "../sales-pdf-export";
+import { SALES_PDF_SECTION_KEYS } from "../sales-pdf-constants";
 
 const pdfMocks = vi.hoisted(() => {
   type AutoTableOptions = {

@@ -1,11 +1,6 @@
-export const SALES_PDF_SECTION_KEYS = [
-  "dailySalesSummary",
-  "soldProducts",
-  "bestSellingProducts",
-  "largestCustomers",
-] as const;
+import { SALES_PDF_SECTION_KEYS, type SalesPdfSectionKey } from "./sales-pdf-constants";
 
-export type SalesPdfSectionKey = (typeof SALES_PDF_SECTION_KEYS)[number];
+export { SALES_PDF_SECTION_KEYS, type SalesPdfSectionKey };
 
 export type SalesPdfDailySalesRow = {
   sale_date: string;
