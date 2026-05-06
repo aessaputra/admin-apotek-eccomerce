@@ -415,7 +415,9 @@
       "productItems": "No product items are attached to this order."
     },
     "actions": {
-      "showDetailAriaLabel": "View order {{id}} details"
+      "showDetailAriaLabel": "View order {{id}} details",
+      "openRowAriaLabel": "Open order {{id}} details",
+      "openRowFallbackAriaLabel": "Open order details"
     },
     "accessibility": {
       "statusLocked": "Order status is locked",

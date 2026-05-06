@@ -415,7 +415,9 @@
       "productItems": "Belum ada produk dalam pesanan ini."
     },
     "actions": {
-      "showDetailAriaLabel": "Lihat detail pesanan {{id}}"
+      "showDetailAriaLabel": "Lihat detail pesanan {{id}}",
+      "openRowAriaLabel": "Buka detail pesanan {{id}}",
+      "openRowFallbackAriaLabel": "Buka detail pesanan"
     },
     "accessibility": {
       "statusLocked": "Status pesanan terkunci",
