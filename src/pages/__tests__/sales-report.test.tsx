@@ -1,8 +1,8 @@
 import React from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SALES_PDF_SECTION_KEYS } from "../reports/sales-pdf-export";
-import type { SalesPdfSectionKey } from "../reports/sales-pdf-export";
+import { SALES_PDF_SECTION_KEYS } from "../reports/sales-pdf-constants";
+import type { SalesPdfSectionKey } from "../reports/sales-pdf-constants";
 import { SalesReport } from "../reports/sales";
 
 const mocks = vi.hoisted(() => {
@@ -109,7 +109,6 @@ vi.mock("../../providers/supabase-client", () => ({
 
 vi.mock("../reports/sales-pdf-export", () => ({
   buildSalesReportPdf: mocks.buildPdf,
-  SALES_PDF_SECTION_KEYS: ["dailySalesSummary", "soldProducts", "bestSellingProducts", "largestCustomers"] as const,
 }));
 
 vi.mock("antd", () => {
@@ -312,7 +311,7 @@ describe("SalesReport", () => {
     expect(screen.getByText("Ringkasan Penjualan Harian")).not.toBeNull();
     expect(screen.getByText("Produk Terlaris")).not.toBeNull();
     expect(screen.getByText("Produk Terjual")).not.toBeNull();
-    expect(screen.getByText("Customer Terbesar")).not.toBeNull();
+    expect(screen.getByText("Pelanggan Terbesar")).not.toBeNull();
     expect(screen.getAllByText("Produk").length).toBeGreaterThan(0);
     expect(screen.getByText("Jumlah")).not.toBeNull();
     expect(screen.getByText("Harga Satuan")).not.toBeNull();
@@ -340,7 +339,7 @@ describe("SalesReport", () => {
     expect(screen.getByText("Belum ada data produk terjual")).not.toBeNull();
     expect(screen.getByText("Ringkasan Penjualan Harian")).not.toBeNull();
     expect(screen.getByText("Produk Terlaris")).not.toBeNull();
-    expect(screen.getByText("Customer Terbesar")).not.toBeNull();
+    expect(screen.getByText("Pelanggan Terbesar")).not.toBeNull();
   });
 
   it("renders localized fallback for sold products without a product name", () => {

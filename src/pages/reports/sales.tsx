@@ -4,7 +4,7 @@ import { Button, Card, Checkbox, Col, DatePicker, Modal, Row, Space, Table, Typo
 import type { Dayjs } from "dayjs";
 import { useCallback, useMemo, useState, type CSSProperties } from "react";
 import { supabaseClient } from "../../providers/supabase-client";
-import { SALES_PDF_SECTION_KEYS, type SalesPdfSectionKey } from "./sales-pdf-export";
+import { SALES_PDF_SECTION_KEYS, type SalesPdfSectionKey } from "./sales-pdf-constants";
 
 type DailySalesRecord = {
   sale_date: string;
@@ -40,10 +40,10 @@ type CustomerSalesRecord = {
 };
 
 const SECTION_OPTIONS: { key: SalesPdfSectionKey; labelKey: string }[] = [
-  { key: "dailySalesSummary", labelKey: "salesReports.sectionTitleDailySummary" },
-  { key: "soldProducts", labelKey: "salesReports.sectionTitleSoldProducts" },
-  { key: "bestSellingProducts", labelKey: "salesReports.sectionTitleTopProducts" },
-  { key: "largestCustomers", labelKey: "salesReports.sectionTitleTopCustomers" },
+  { key: "dailySalesSummary", labelKey: "reports.sales.section_title_daily_summary" },
+  { key: "soldProducts", labelKey: "reports.sales.section_title_sold_products" },
+  { key: "bestSellingProducts", labelKey: "reports.sales.section_title_top_products" },
+  { key: "largestCustomers", labelKey: "reports.sales.section_title_top_customers" },
 ];
 
 export const SalesReport: React.FC = () => {
@@ -122,7 +122,7 @@ export const SalesReport: React.FC = () => {
     resource: "report_customer_sales",
     pagination: { pageSize: 20 },
     errorNotification: (error) => ({
-      message: t("reports.sales.load_error_customers", "Gagal memuat data penjualan customer"),
+      message: t("reports.sales.load_error_customers", "Gagal memuat data penjualan pelanggan"),
       description: (error instanceof Error ? error.message : undefined) ?? t("notifications.error"),
       type: "error",
     }),
@@ -141,6 +141,8 @@ export const SalesReport: React.FC = () => {
     () => ({ display: "flex", flexDirection: "column", gap: token.marginXS }),
     [token.marginXS],
   );
+  const titleStyle = useMemo<CSSProperties>(() => ({ margin: 0 }), []);
+  const rangePickerStyle = useMemo<CSSProperties>(() => ({ flex: 1, minWidth: 0 }), []);
 
   const dailySalesColumns = useMemo<TableProps<DailySalesRecord>["columns"]>(
     () => [
@@ -174,7 +176,7 @@ export const SalesReport: React.FC = () => {
     () => ({
       emptyText: t("reports.sales.empty_daily", "Tidak ada data pada rentang tanggal ini"),
     }),
-    [t],
+    [t, locale],
   );
 
   const soldProductsColumns = useMemo<TableProps<SoldProductsRecord>["columns"]>(
@@ -214,7 +216,7 @@ export const SalesReport: React.FC = () => {
     () => ({
       emptyText: t("reports.sales.empty_sold_products", "Belum ada data produk terjual"),
     }),
-    [t],
+    [t, locale],
   );
 
   const productSalesColumns = useMemo<TableProps<ProductSalesRecord>["columns"]>(
@@ -246,7 +248,7 @@ export const SalesReport: React.FC = () => {
     () => ({
       emptyText: t("reports.sales.empty_products", "Belum ada data penjualan produk"),
     }),
-    [t],
+    [t, locale],
   );
 
   const customerSalesColumns = useMemo<TableProps<CustomerSalesRecord>["columns"]>(
@@ -276,12 +278,17 @@ export const SalesReport: React.FC = () => {
 
   const customerSalesTableLocale = useMemo<TableProps<CustomerSalesRecord>["locale"]>(
     () => ({
-      emptyText: t("reports.sales.empty_customers", "Belum ada data penjualan per customer"),
+      emptyText: t("reports.sales.empty_customers", "Belum ada data penjualan per pelanggan"),
     }),
-    [t],
+    [t, locale],
   );
 
   const handleExportPdf = useCallback(async () => {
+    if (selectedSections.length === 0) {
+      messageApi.warning(t("reports.sales.no_section_validation_disabled_text", "Pilih setidaknya satu bagian untuk diekspor"));
+      return;
+    }
+
     const startDate = dateRange?.[0]?.startOf("day").toISOString() ?? null;
     const endDate = dateRange?.[1]?.endOf("day").toISOString() ?? null;
 
@@ -308,18 +315,18 @@ export const SalesReport: React.FC = () => {
         selectedSectionKeys: selectedSections,
         dateRange: { startDate, endDate },
         localeLabels: {
-          reportTitle: t("salesReports.pdfTitle", "Laporan Penjualan"),
-          generatedAtLabel: t("salesReports.generatedAtLabel", "Dibuat pada"),
-          dateRangeLabel: t("salesReports.periodLabel", "Periode"),
+          reportTitle: t("reports.sales.pdf_title", "Laporan Penjualan"),
+          generatedAtLabel: t("reports.sales.generated_at_label", "Dibuat pada"),
+          dateRangeLabel: t("reports.sales.period_label", "Periode"),
           sectionLabels: {
-            dailySalesSummary: t("salesReports.sectionTitleDailySummary", "Ringkasan Penjualan Harian"),
-            soldProducts: t("salesReports.sectionTitleSoldProducts", "Produk Terjual"),
-            bestSellingProducts: t("salesReports.sectionTitleTopProducts", "Produk Terlaris"),
-            largestCustomers: t("salesReports.sectionTitleTopCustomers", "Pelanggan Terbesar"),
+            dailySalesSummary: t("reports.sales.section_title_daily_summary", "Ringkasan Penjualan Harian"),
+            soldProducts: t("reports.sales.section_title_sold_products", "Produk Terjual"),
+            bestSellingProducts: t("reports.sales.section_title_top_products", "Produk Terlaris"),
+            largestCustomers: t("reports.sales.section_title_top_customers", "Pelanggan Terbesar"),
           },
-          emptyValueText: t("salesReports.emptyValueText", "-"),
-          emptyReportText: t("salesReports.emptyReportText", "Tidak ada data"),
-          pageLabel: t("salesReports.pageLabel", "Halaman"),
+          emptyValueText: t("reports.sales.empty_value_text", "-"),
+          emptyReportText: t("reports.sales.empty_report_text", "Tidak ada data"),
+          pageLabel: t("reports.sales.page_label", "Halaman"),
           columnHeaders: {
             dailySalesSummary: [
               t("reports.sales.date", "Tanggal"),
@@ -328,8 +335,8 @@ export const SalesReport: React.FC = () => {
               t("reports.sales.aov", "Rata-rata Nilai Order"),
             ],
             soldProducts: [
-              t("salesReports.headerSaleDate", "Tanggal Penjualan"),
-              t("salesReports.headerOrderTime", "Waktu Order"),
+              t("reports.sales.header_sale_date", "Tanggal Penjualan"),
+              t("reports.sales.header_order_time", "Waktu Order"),
               t("reports.sales.product_name", "Produk"),
               t("reports.sales.quantity", "Jumlah"),
               t("reports.sales.unit_price", "Harga Satuan"),
@@ -338,7 +345,7 @@ export const SalesReport: React.FC = () => {
             bestSellingProducts: [
               t("reports.sales.product_name", "Produk"),
               t("reports.sales.category_name", "Kategori"),
-              t("salesReports.headerQtySold", "Qty Terjual"),
+              t("reports.sales.header_qty_sold", "Qty Terjual"),
               t("reports.sales.total_revenue", "Total Omzet"),
             ],
             largestCustomers: [
@@ -354,10 +361,10 @@ export const SalesReport: React.FC = () => {
         generatedAt,
       });
 
-      messageApi.success(t("salesReports.exportPdfSuccess", "Laporan berhasil diekspor"));
+      messageApi.success(t("reports.sales.export_pdf_success", "Laporan berhasil diekspor"));
       setExportModalOpen(false);
     } catch {
-      messageApi.error(t("salesReports.exportPdfError", "Gagal mengekspor laporan"));
+      messageApi.error(t("reports.sales.export_pdf_error", "Gagal mengekspor laporan"));
     } finally {
       setExportLoading(false);
     }
@@ -368,7 +375,7 @@ export const SalesReport: React.FC = () => {
       {contextHolder}
       <Row justify="space-between" align="middle" gutter={[16, 16]} style={headerRowStyle}>
         <Col xs={24} lg={14}>
-          <Typography.Title level={2} style={{ margin: 0 }}>
+          <Typography.Title level={2} style={titleStyle}>
             {t("reports.sales.title", "Laporan Penjualan")}
           </Typography.Title>
         </Col>
@@ -376,7 +383,8 @@ export const SalesReport: React.FC = () => {
           <Space.Compact block style={compactStyle}>
             <DatePicker.RangePicker
               allowClear
-              style={{ flex: 1, minWidth: 0 }}
+              aria-label={t("reports.sales.date_range_aria_label", "Pilih rentang tanggal laporan")}
+              style={rangePickerStyle}
               value={dateRange}
               onChange={(value) => setDateRange(value)}
               placeholder={[
@@ -393,7 +401,7 @@ export const SalesReport: React.FC = () => {
                 setExportModalOpen(true);
               }}
             >
-              {t("salesReports.exportButtonText", "Ekspor PDF")}
+              {t("reports.sales.export_button_text", "Ekspor PDF")}
             </Button>
           </Space.Compact>
         </Col>
@@ -402,27 +410,28 @@ export const SalesReport: React.FC = () => {
       <Modal
         centered
         open={exportModalOpen}
-        title={t("salesReports.exportDialogTitle", "Ekspor Laporan PDF")}
+        title={t("reports.sales.export_dialog_title", "Ekspor Laporan PDF")}
         onCancel={() => setExportModalOpen(false)}
         onOk={handleExportPdf}
-        okText={t("salesReports.confirmExportText", "Ekspor")}
-        cancelText={t("salesReports.cancelText", "Batal")}
+        okText={t("reports.sales.confirm_export_text", "Ekspor")}
+        cancelText={t("reports.sales.cancel_text", "Batal")}
         okButtonProps={{ disabled: selectedSections.length === 0, loading: exportLoading }}
         confirmLoading={exportLoading}
       >
-        <p>{t("salesReports.exportDialogDescription", "Ekspor laporan penjualan untuk periode yang dipilih.")}</p>
-        <Checkbox.Group
-          aria-label={t("reports.sales.export_sections_aria_label", "Pilih bagian laporan yang akan diekspor")}
-          value={selectedSections}
-          onChange={(values) => setSelectedSections(values as SalesPdfSectionKey[])}
-          style={checkboxGroupStyle}
-        >
-          {SECTION_OPTIONS.map((option) => (
-            <Checkbox key={option.key} value={option.key}>
-              {t(option.labelKey)}
-            </Checkbox>
-          ))}
-        </Checkbox.Group>
+        <p>{t("reports.sales.export_dialog_description", "Ekspor laporan penjualan untuk periode yang dipilih.")}</p>
+        <div role="group" aria-label={t("reports.sales.export_sections_aria_label", "Pilih bagian laporan yang akan diekspor")}>
+          <Checkbox.Group
+            value={selectedSections}
+            onChange={(values) => setSelectedSections(values as SalesPdfSectionKey[])}
+            style={checkboxGroupStyle}
+          >
+            {SECTION_OPTIONS.map((option) => (
+              <Checkbox key={option.key} value={option.key}>
+                {t(option.labelKey)}
+              </Checkbox>
+            ))}
+          </Checkbox.Group>
+        </div>
       </Modal>
 
       <Row gutter={[20, 20]}>
@@ -474,7 +483,7 @@ export const SalesReport: React.FC = () => {
       </Col>
 
       <Col xs={24} lg={12}>
-        <Card title={t("reports.sales.top_customers", "Customer Terbesar")}>
+        <Card title={t("reports.sales.top_customers", "Pelanggan Terbesar")}>
           <Table<CustomerSalesRecord>
             rowKey={(record) => record.user_id}
             dataSource={customerSales}
