@@ -102,17 +102,19 @@ vi.mock("antd", async () => {
     children,
     loading,
     locale,
+    scroll,
   }: {
     dataSource?: Record<string, unknown>[];
     children: React.ReactNode;
     loading?: boolean | { spinning?: boolean; tip?: React.ReactNode };
     locale?: { emptyText?: React.ReactNode };
+    scroll?: { x?: string | number | boolean };
   }) => {
     const columns = ReactModule.Children.toArray(children).filter(ReactModule.isValidElement);
     const loadingTip = typeof loading === "object" && loading.spinning ? loading.tip : null;
 
     return (
-      <div data-testid="table">
+      <div data-testid="table" data-scroll-x={String(scroll?.x ?? "")}> 
         {loadingTip ? <div>{loadingTip}</div> : null}
         {dataSource.length === 0 && locale?.emptyText ? <div>{locale.emptyText}</div> : null}
         {columns.map((column, columnIndex) => {
@@ -150,6 +152,15 @@ vi.mock("antd", async () => {
 
   return {
     Table,
+  theme: {
+    useToken: () => ({
+      token: {
+        marginXS: 8,
+        colorTextTertiary: "#999",
+        colorWarning: "#faad14",
+      },
+    }),
+  },
   Space: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   Avatar: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   Input: ({
@@ -194,6 +205,7 @@ vi.mock("antd", async () => {
   },
   Tooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+  Alert: ({ message, description }: { message: React.ReactNode; description?: React.ReactNode }) => <div><div>{message}</div><div>{description}</div></div>,
   Button: ({ children, onClick, loading }: { children: React.ReactNode; onClick?: () => void; loading?: boolean }) => (
     <button type="button" data-loading={String(Boolean(loading))} onClick={onClick}>
       {children}
@@ -530,5 +542,34 @@ describe("list pages", () => {
     expect(screen.getByText("show:orders:order-1")).not.toBeNull();
     expect(screen.getByLabelText("orders.filterStatus")).not.toBeNull();
     expect(screen.getByLabelText("orders.filterPayment")).not.toBeNull();
+    expect(screen.getByTestId("table").getAttribute("data-scroll-x")).toBe("max-content");
+  });
+
+  it("renders localized order empty and error states", () => {
+    mocks.useTable.mockReturnValue({
+      tableProps: {
+        dataSource: [],
+      },
+      tableQuery: { isError: false },
+      filters: [],
+    });
+
+    render(<OrderList />);
+
+    expect(screen.getByText("orders.empty.list")).not.toBeNull();
+
+    mocks.useTable.mockReset();
+    mocks.useTable.mockReturnValue({
+      tableProps: {
+        dataSource: [],
+      },
+      tableQuery: { isError: true },
+      filters: [],
+    });
+
+    render(<OrderList />);
+
+    expect(screen.getByText("orders.empty.listErrorTitle")).not.toBeNull();
+    expect(screen.getByText("orders.empty.listErrorDescription")).not.toBeNull();
   });
 });

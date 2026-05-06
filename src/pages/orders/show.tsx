@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useShow, useTranslation } from "@refinedev/core";
 import { Show, DateField, NumberField } from "@refinedev/antd";
-import { Typography, Table, Tag, Descriptions, Form, Select, Input, Button, Card, App, Timeline, Spin, Tooltip, Switch, Alert, Space } from "antd";
+import { Typography, Table, Tag, Descriptions, Form, Select, Input, Button, Card, App, Timeline, Spin, Tooltip, Switch, Alert, Space, theme } from "antd";
+import type { TableColumnsType } from "antd";
 import { SyncOutlined, InfoCircleOutlined, LockOutlined, WarningOutlined } from "@ant-design/icons";
 import {
   STATUS_COLORS,
@@ -98,6 +99,7 @@ const formatBiteshipStatusLabel = (value: string | null | undefined) => {
 
 export const OrderShow: React.FC = () => {
   const { translate } = useTranslation();
+  const { token } = theme.useToken();
   // Order reads already resolve through the `orders` -> `order_read_model`
   // mapping in the data provider. That provider also hydrates `order_items`
   // separately, so this page intentionally avoids a nested select here.
@@ -108,6 +110,7 @@ export const OrderShow: React.FC = () => {
   const [form] = Form.useForm<{ status: string; waybill_number?: string; waybill_override_reason?: string }>();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
+  const [activityError, setActivityError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [manualWaybillMode, setManualWaybillMode] = useState(false);
@@ -154,6 +157,7 @@ export const OrderShow: React.FC = () => {
   const loadActivities = useCallback(async () => {
     if (!record?.id) return;
     setLoadingActivities(true);
+    setActivityError(null);
     try {
       const { data, error } = await supabaseClient
         .from("order_activities")
@@ -162,15 +166,21 @@ export const OrderShow: React.FC = () => {
         .order("created_at", { ascending: false })
         .limit(20);
 
-      if (!error && data) {
+      if (error) {
+        setActivityError(translate("orders.activity.loadErrorDescription"));
+        return;
+      }
+
+      if (data) {
         setActivities(data as Activity[]);
       }
     } catch (err) {
-      console.error("Failed to load activities:", err);
+      const message = err instanceof Error ? err.message : translate("orders.activity.loadErrorDescription");
+      setActivityError(message);
     } finally {
       setLoadingActivities(false);
     }
-  }, [record?.id]);
+  }, [record?.id, translate]);
 
   useEffect(() => {
     if (record?.id) {
@@ -307,13 +317,13 @@ export const OrderShow: React.FC = () => {
 
   const getActivityIcon = (action: string) => {
     switch (action) {
-      case "payment_success": return <Tag color="green">$</Tag>;
-      case "payment_updated": return <Tag color="orange">$</Tag>;
-      case "status_update": return <Tag color="blue">↻</Tag>;
-      case "sync_tracking": return <Tag color="cyan">⟳</Tag>;
-      case "shipping_created": return <Tag color="purple">📦</Tag>;
-      case "customer_completed": return <Tag color="green">✓</Tag>;
-      default: return <Tag>•</Tag>;
+      case "payment_success": return <Tag color="green" aria-hidden="true">$</Tag>;
+      case "payment_updated": return <Tag color="orange" aria-hidden="true">$</Tag>;
+      case "status_update": return <Tag color="blue" aria-hidden="true">↻</Tag>;
+      case "sync_tracking": return <Tag color="cyan" aria-hidden="true">⟳</Tag>;
+      case "shipping_created": return <Tag color="purple" aria-hidden="true">📦</Tag>;
+      case "customer_completed": return <Tag color="green" aria-hidden="true">✓</Tag>;
+      default: return <Tag aria-hidden="true">•</Tag>;
     }
   };
 
@@ -401,13 +411,14 @@ export const OrderShow: React.FC = () => {
     return null;
   };
 
-  const columns = [
+  const productTableLabel = translate("orders.tables.productItemsAriaLabel");
+  const columns = useMemo<TableColumnsType<OrderItem>>(() => [
     { title: translate("orders.fields.product"), dataIndex: ["products", "name"], key: "product", render: (_: unknown, row: OrderItem) => row.products?.name ?? "-" },
-    { title: translate("orders.fields.sku"), dataIndex: "product_sku_at_purchase", key: "sku", render: (v: string | null | undefined) => formatSkuSnapshot(v) },
+    { title: translate("orders.fields.sku"), dataIndex: "product_sku_at_purchase", key: "sku", responsive: ["sm"], render: (v: string | null | undefined) => formatSkuSnapshot(v) },
     { title: translate("orders.fields.quantity"), dataIndex: "quantity", key: "quantity", width: 80 },
-    { title: translate("orders.fields.unitPrice"), dataIndex: "price_at_purchase", key: "price", render: (v: string | number) => `Rp ${Number(v || 0).toLocaleString("id-ID")}` },
-    { title: translate("orders.fields.subtotal"), key: "subtotal", render: (_: unknown, row: OrderItem) => `Rp ${(Number(row.price_at_purchase || 0) * (row.quantity || 0)).toLocaleString("id-ID")}` },
-  ];
+    { title: translate("orders.fields.unitPrice"), dataIndex: "price_at_purchase", key: "price", responsive: ["md"], render: (v: string | number) => `Rp ${Number(v || 0).toLocaleString("id-ID")}` },
+    { title: translate("orders.fields.subtotal"), key: "subtotal", responsive: ["sm"], render: (_: unknown, row: OrderItem) => `Rp ${(Number(row.price_at_purchase || 0) * (row.quantity || 0)).toLocaleString("id-ID")}` },
+  ], [translate]);
 
   return (
     <Show isLoading={isLoading}>
@@ -420,7 +431,7 @@ export const OrderShow: React.FC = () => {
           </Tag>
           {isStatusDropdownLocked && (
             <Tooltip title={translate("orders.tooltips.statusSystemControlled")}>
-              <LockOutlined style={{ marginLeft: 8, color: "#999" }} />
+              <LockOutlined aria-label={translate("orders.accessibility.statusLocked")} style={{ marginLeft: token.marginXS, color: token.colorTextTertiary }} />
             </Tooltip>
             )}
           </Descriptions.Item>
@@ -502,7 +513,7 @@ export const OrderShow: React.FC = () => {
             {translate("orders.actionsTitle")}
             {isStatusDropdownLocked && (
               <Tooltip title={translate("orders.tooltips.webhookControlled")}>
-                <InfoCircleOutlined style={{ marginLeft: 8, color: "#faad14" }} />
+                <InfoCircleOutlined aria-label={translate("orders.accessibility.webhookControlled")} style={{ marginLeft: token.marginXS, color: token.colorWarning }} />
               </Tooltip>
             )}
           </span>
@@ -582,7 +593,7 @@ export const OrderShow: React.FC = () => {
               <Input
                 placeholder={translate("orders.waybillPlaceholder")}
                 disabled={isWaybillInputDisabled || isSaveDisabled}
-                suffix={isWaybillFullyLocked ? <LockOutlined style={{ color: "#999" }} /> : undefined}
+                suffix={isWaybillFullyLocked ? <LockOutlined aria-label={translate("orders.accessibility.waybillLocked")} style={{ color: token.colorTextTertiary }} /> : undefined}
               />
             </Form.Item>
           )}
@@ -619,13 +630,31 @@ export const OrderShow: React.FC = () => {
 
       <Title level={5} style={{ marginTop: 24 }}>{translate("orders.activityTitle")}</Title>
       <Card styles={{ body: { padding: "12px 24px" } }}>
-        {loadingActivities ? <Spin /> : activities.length === 0 ? <Text type="secondary">{translate("orders.noActivities")}</Text> : (
+        {activityError ? (
+          <Alert
+            type="error"
+            showIcon
+            message={translate("orders.activity.loadErrorTitle")}
+            description={activityError}
+            action={<Button size="small" onClick={loadActivities}>{translate("buttons.retry", {}, "Coba lagi")}</Button>}
+          />
+        ) : loadingActivities ? <Spin /> : activities.length === 0 ? <Text type="secondary">{translate("orders.noActivities")}</Text> : (
           <Timeline items={activities.map((activity) => ({ dot: getActivityIcon(activity.action), children: <div><div>{getActivityText(activity)}</div><Text type="secondary" style={{ fontSize: 12 }}><DateField value={activity.created_at} format="DD/MM/YYYY HH:mm" /></Text></div> }))} />
         )}
       </Card>
 
       <Title level={5} style={{ marginTop: 24 }}>{translate("orders.productList")}</Title>
-      <Table dataSource={items} columns={columns} rowKey="id" pagination={false} size="small" />
+      <div aria-label={productTableLabel}>
+        <Table
+          dataSource={items}
+          columns={columns}
+          rowKey="id"
+          pagination={false}
+          size="small"
+          scroll={{ x: "max-content" }}
+          locale={{ emptyText: translate("orders.empty.productItems") }}
+        />
+      </div>
     </Show>
   );
 };

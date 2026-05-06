@@ -107,8 +107,9 @@ vi.mock("antd", async () => {
     } }],
   });
 
-  const Table = ({ dataSource = [], columns = [] }: { dataSource?: Record<string, unknown>[]; columns?: Array<{ title?: React.ReactNode; dataIndex?: unknown; key?: string; render?: (value: unknown, record: Record<string, unknown>) => React.ReactNode }> }) => (
-    <div>
+  const Table = ({ dataSource = [], columns = [], locale, scroll }: { dataSource?: Record<string, unknown>[]; columns?: Array<{ title?: React.ReactNode; dataIndex?: unknown; key?: string; render?: (value: unknown, record: Record<string, unknown>) => React.ReactNode }>; locale?: { emptyText?: React.ReactNode }; scroll?: { x?: string | number | boolean } }) => (
+    <div data-testid="order-items-table" data-scroll-x={String(scroll?.x ?? "")}>
+      {dataSource.length === 0 && locale?.emptyText ? <div>{locale.emptyText}</div> : null}
       {columns.map((column) => (
         <div key={String(column.key ?? column.title)}>
           <div>{column.title}</div>
@@ -142,6 +143,15 @@ vi.mock("antd", async () => {
     Typography: {
       Title: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
       Text: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+    },
+    theme: {
+      useToken: () => ({
+        token: {
+          marginXS: 8,
+          colorTextTertiary: "#999",
+          colorWarning: "#faad14",
+        },
+      }),
     },
     Table,
     Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
@@ -184,7 +194,7 @@ vi.mock("antd", async () => {
         ),
       }
     ),
-    Button: ({ children, onClick, htmlType, loading, disabled }: { children: React.ReactNode; onClick?: () => void; htmlType?: "submit" | "button"; loading?: boolean; disabled?: boolean }) => <button type={htmlType ?? "button"} onClick={onClick} data-loading={String(Boolean(loading))} disabled={disabled}>{children}</button>,
+    Button: ({ children, onClick, htmlType, loading, disabled }: { children: React.ReactNode; onClick?: () => void; htmlType?: "submit" | "button"; loading?: boolean; disabled?: boolean; size?: "small" | "middle" | "large" }) => <button type={htmlType ?? "button"} onClick={onClick} data-loading={String(Boolean(loading))} disabled={disabled}>{children}</button>,
     Card: ({ title, children }: { title?: React.ReactNode; children: React.ReactNode }) => <div><div>{title}</div>{children}</div>,
     App: {
       useApp: () => ({
@@ -199,7 +209,7 @@ vi.mock("antd", async () => {
     Spin: () => <div>loading</div>,
     Tooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Switch: ({ checked, onChange }: { checked?: boolean; onChange?: (checked: boolean) => void }) => <input type="checkbox" checked={checked} onChange={() => onChange?.(!checked)} />,
-    Alert: ({ message, description }: { message: React.ReactNode; description?: React.ReactNode }) => <div><div>{message}</div><div>{description}</div></div>,
+    Alert: ({ message, description, action }: { message: React.ReactNode; description?: React.ReactNode; action?: React.ReactNode }) => <div><div>{message}</div><div>{description}</div><div>{action}</div></div>,
     Space: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   };
 });
@@ -370,6 +380,38 @@ describe("OrderShow", () => {
     expect(screen.getByText("orders.fields.sku")).not.toBeNull();
     expect(screen.getByText("VIT-C-001")).not.toBeNull();
     expect(screen.getAllByText("SKU belum tersimpan")).toHaveLength(2);
+    expect(screen.getByTestId("order-items-table").getAttribute("data-scroll-x")).toBe("max-content");
+  });
+
+  it("renders localized empty product and activity error states", async () => {
+    mocks.from.mockReturnValueOnce({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          order: vi.fn(() => ({
+            limit: vi.fn().mockResolvedValue({ data: null, error: new Error("activity failed") }),
+          })),
+        })),
+      })),
+    });
+    mocks.useShow.mockReturnValue({
+      result: {
+        id: "order-empty",
+        total_amount: 0,
+        status: "processing",
+        payment_status: "settlement",
+        created_at: "2026-04-01T00:00:00.000Z",
+        order_items: [],
+      },
+      query: { isLoading: false, refetch: mocks.refetch },
+    });
+
+    render(<OrderShow />);
+
+    await waitFor(() => {
+      expect(screen.getByText("orders.activity.loadErrorTitle")).not.toBeNull();
+    });
+    expect(screen.getByText("orders.activity.loadErrorDescription")).not.toBeNull();
+    expect(screen.getByText("orders.empty.productItems")).not.toBeNull();
   });
 
   it("hides sync action for terminal biteship orders", async () => {

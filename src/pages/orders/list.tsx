@@ -1,6 +1,6 @@
 import { List, useTable, ShowButton, getDefaultFilter } from "@refinedev/antd";
 import { useTranslation } from "@refinedev/core";
-import { Button, Table, Space, Tooltip, Select, Tag } from "antd";
+import { Alert, Button, Table, Space, Tooltip, Select, Tag } from "antd";
 import type { FilterDropdownProps } from "antd/es/table/interface";
 import { STATUS_COLORS, PAYMENT_COLORS, getStatusOptions, getPaymentOptions } from "../../constants/orders";
 import { getFallbackCourierOption } from "../../constants/couriers";
@@ -73,7 +73,7 @@ const createSelectFilterDropdown = (
 
 export const OrderList: React.FC = () => {
   const { translate } = useTranslation();
-  const { tableProps, filters } = useTable({
+  const { tableProps, tableQuery, filters } = useTable({
     syncWithLocation: true,
     sorters: {
       initial: [
@@ -87,12 +87,27 @@ export const OrderList: React.FC = () => {
 
   const STATUS_OPTIONS = getStatusOptions(translate);
   const PAYMENT_OPTIONS = getPaymentOptions(translate);
+  const orderListTableLabel = translate("orders.tables.listAriaLabel");
+  const emptyOrderText = tableQuery?.isError ? (
+    <Alert
+      type="error"
+      showIcon
+      message={translate("orders.empty.listErrorTitle")}
+      description={translate("orders.empty.listErrorDescription")}
+    />
+  ) : translate("orders.empty.list");
 
   return (
     <List>
-      <Table {...tableProps} rowKey="id">
+      <div aria-label={orderListTableLabel}>
+      <Table
+        {...tableProps}
+        rowKey="id"
+        scroll={{ x: "max-content" }}
+        locale={{ emptyText: emptyOrderText }}
+      >
         <Table.Column dataIndex="id" title={translate("orders.fields.id")} width={80} />
-        <Table.Column dataIndex="total_amount" title={translate("orders.fields.total")} render={(v) => `Rp ${Number(v || 0).toLocaleString("id-ID")}`} />
+        <Table.Column dataIndex="total_amount" title={translate("orders.fields.total")} responsive={["sm"]} render={(v) => `Rp ${Number(v || 0).toLocaleString("id-ID")}`} />
         <Table.Column
           dataIndex="status"
           title={translate("orders.fields.status")}
@@ -124,6 +139,7 @@ export const OrderList: React.FC = () => {
         <Table.Column
           dataIndex="payment_type"
           title={translate("orders.fields.paymentType")}
+          responsive={["lg"]}
           render={(v: string | null | undefined) => (
             v ? translate(`orders.paymentTypes.${v}`, {}, formatDisplayLabel(v)) : "-"
           )}
@@ -131,10 +147,11 @@ export const OrderList: React.FC = () => {
         <Table.Column
           dataIndex="courier_code"
           title={translate("orders.fields.courierCode")}
+          responsive={["md"]}
           render={(v: string | null | undefined) => (v ? getFallbackCourierOption(v).label : "-")}
         />
-        <Table.Column dataIndex="waybill_number" title={translate("orders.fields.waybillNumber")} render={(v) => v || "-"} />
-        <Table.Column dataIndex="created_at" title={translate("orders.fields.created")} render={(v) => v ? new Date(v).toLocaleDateString() : "-"} />
+        <Table.Column dataIndex="waybill_number" title={translate("orders.fields.waybillNumber")} responsive={["md"]} render={(v) => v || "-"} />
+        <Table.Column dataIndex="created_at" title={translate("orders.fields.created")} responsive={["lg"]} render={(v) => v ? new Date(v).toLocaleDateString("id-ID") : "-"} />
         <Table.Column
           title={translate("table.actions")}
           key="actions"
@@ -142,13 +159,20 @@ export const OrderList: React.FC = () => {
           width={80}
           render={(_, record: { id: string }) => (
             <Space size="small">
-              <Tooltip title={translate("orders.showDetail")}>
-                <ShowButton hideText size="small" recordItemId={record.id} resource="orders" />
+              <Tooltip title={translate("orders.showDetail")} trigger={["hover", "focus"]}>
+                <ShowButton
+                  hideText
+                  size="small"
+                  recordItemId={record.id}
+                  resource="orders"
+                  aria-label={translate("orders.actions.showDetailAriaLabel", { id: record.id })}
+                />
               </Tooltip>
             </Space>
           )}
         />
       </Table>
+      </div>
     </List>
   );
 };
