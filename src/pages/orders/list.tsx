@@ -1,5 +1,5 @@
 import { List, useTable, ShowButton, getDefaultFilter } from "@refinedev/antd";
-import { useTranslation } from "@refinedev/core";
+import { useNavigation, useTranslation } from "@refinedev/core";
 import { Alert, Button, Table, Space, Tooltip, Select, Tag } from "antd";
 import type { FilterDropdownProps } from "antd/es/table/interface";
 import { STATUS_COLORS, PAYMENT_COLORS, getStatusOptions, getPaymentOptions } from "../../constants/orders";
@@ -73,6 +73,7 @@ const createSelectFilterDropdown = (
 
 export const OrderList: React.FC = () => {
   const { translate } = useTranslation();
+  const { show } = useNavigation();
   const { tableProps, tableQuery, filters } = useTable({
     syncWithLocation: true,
     sorters: {
@@ -105,6 +106,27 @@ export const OrderList: React.FC = () => {
         rowKey="id"
         scroll={{ x: "max-content" }}
         locale={{ emptyText: emptyOrderText }}
+        onRow={(record: { id?: string }) => ({
+          role: "button",
+          tabIndex: 0,
+          style: { cursor: "pointer" },
+          "aria-label": record.id
+            ? translate("orders.actions.openRowAriaLabel", { id: record.id })
+            : translate("orders.actions.openRowFallbackAriaLabel"),
+          onClick: () => {
+            if (record.id) {
+              show("orders", record.id);
+            }
+          },
+          onKeyDown: (event: React.KeyboardEvent<HTMLElement>) => {
+            if (!record.id || (event.key !== "Enter" && event.key !== " ")) {
+              return;
+            }
+
+            event.preventDefault();
+            show("orders", record.id);
+          },
+        })}
       >
         <Table.Column dataIndex="id" title={translate("orders.fields.id")} width={80} />
         <Table.Column dataIndex="total_amount" title={translate("orders.fields.total")} responsive={["sm"]} render={(v) => `Rp ${Number(v || 0).toLocaleString("id-ID")}`} />
@@ -158,7 +180,7 @@ export const OrderList: React.FC = () => {
           align="center"
           width={80}
           render={(_, record: { id: string }) => (
-            <Space size="small">
+            <Space size="small" onClick={(event) => event.stopPropagation()}>
               <Tooltip title={translate("orders.showDetail")} trigger={["hover", "focus"]}>
                 <ShowButton
                   hideText

@@ -31,12 +31,14 @@ const mocks = vi.hoisted(() => {
     return fallback ?? key;
   });
   const useTable = vi.fn();
+  const show = vi.fn();
   const handleBan = vi.fn();
   const handleUnban = vi.fn();
 
   return {
     translate,
     useTable,
+    show,
     handleBan,
     handleUnban,
   };
@@ -44,6 +46,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@refinedev/core", () => ({
   useTranslation: () => ({ translate: mocks.translate }),
+  useNavigation: () => ({ show: mocks.show }),
 }));
 
 vi.mock("../../hooks/useBanToggle", () => ({
@@ -103,12 +106,14 @@ vi.mock("antd", async () => {
     loading,
     locale,
     scroll,
+    onRow,
   }: {
     dataSource?: Record<string, unknown>[];
     children: React.ReactNode;
     loading?: boolean | { spinning?: boolean; tip?: React.ReactNode };
     locale?: { emptyText?: React.ReactNode };
     scroll?: { x?: string | number | boolean };
+    onRow?: (record: Record<string, unknown>) => React.HTMLAttributes<HTMLDivElement>;
   }) => {
     const columns = ReactModule.Children.toArray(children).filter(ReactModule.isValidElement);
     const loadingTip = typeof loading === "object" && loading.spinning ? loading.tip : null;
@@ -117,6 +122,16 @@ vi.mock("antd", async () => {
       <div data-testid="table" data-scroll-x={String(scroll?.x ?? "")}> 
         {loadingTip ? <div>{loadingTip}</div> : null}
         {dataSource.length === 0 && locale?.emptyText ? <div>{locale.emptyText}</div> : null}
+        {onRow ? dataSource.map((record) => {
+          const rowProps = onRow(record);
+          const rowKey = String(record.id ?? JSON.stringify(record));
+
+          return (
+            <div key={`row-${rowKey}`} {...rowProps}>
+              row:{rowKey}
+            </div>
+          );
+        }) : null}
         {columns.map((column, columnIndex) => {
           const props = column.props as Record<string, unknown>;
           const columnKey = String(column.key ?? props.dataIndex ?? props.title ?? `column-${columnIndex}`);
@@ -282,6 +297,7 @@ describe("list pages", () => {
   beforeEach(() => {
     mocks.translate.mockClear();
     mocks.useTable.mockReset();
+    mocks.show.mockReset();
     mocks.handleBan.mockReset();
     mocks.handleUnban.mockReset();
   });
@@ -543,6 +559,34 @@ describe("list pages", () => {
     expect(screen.getByLabelText("orders.filterStatus")).not.toBeNull();
     expect(screen.getByLabelText("orders.filterPayment")).not.toBeNull();
     expect(screen.getByTestId("table").getAttribute("data-scroll-x")).toBe("max-content");
+  });
+
+  it("opens order detail when clicking or pressing keyboard on an order row", () => {
+    mocks.useTable.mockReturnValue({
+      tableProps: {
+        dataSource: [
+          {
+            id: "order-1",
+            total_amount: 25000,
+            status: "pending",
+            payment_status: "settlement",
+          },
+        ],
+      },
+      filters: [],
+    });
+
+    render(<OrderList />);
+
+    const row = screen.getByRole("button", { name: "orders.actions.openRowAriaLabel" });
+    fireEvent.click(row);
+    expect(mocks.show).toHaveBeenLastCalledWith("orders", "order-1");
+
+    fireEvent.keyDown(row, { key: "Enter" });
+    expect(mocks.show).toHaveBeenLastCalledWith("orders", "order-1");
+
+    fireEvent.keyDown(row, { key: " " });
+    expect(mocks.show).toHaveBeenLastCalledWith("orders", "order-1");
   });
 
   it("renders localized order empty and error states", () => {
