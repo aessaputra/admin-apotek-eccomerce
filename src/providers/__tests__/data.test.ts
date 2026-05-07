@@ -13,11 +13,37 @@ const mocks = vi.hoisted(() => {
   const orderItemsSelect = vi.fn(() => ({
     eq: orderItemsEq,
   }));
+  const profileMaybeSingle = vi.fn();
+  const profileEq = vi.fn(() => ({
+    maybeSingle: profileMaybeSingle,
+  }));
+  const profileSelect = vi.fn(() => ({
+    eq: profileEq,
+  }));
+  const addressMaybeSingle = vi.fn();
+  const addressEq = vi.fn(() => ({
+    maybeSingle: addressMaybeSingle,
+  }));
+  const addressSelect = vi.fn(() => ({
+    eq: addressEq,
+  }));
   const bannerSelectEq = vi.fn();
   const from = vi.fn((table: string) => {
     if (table === "admin_order_items") {
       return {
         select: orderItemsSelect,
+      };
+    }
+
+    if (table === "profiles") {
+      return {
+        select: profileSelect,
+      };
+    }
+
+    if (table === "addresses") {
+      return {
+        select: addressSelect,
       };
     }
 
@@ -39,6 +65,12 @@ const mocks = vi.hoisted(() => {
     storageFrom,
     orderItemsEq,
     orderItemsSelect,
+    profileMaybeSingle,
+    profileEq,
+    profileSelect,
+    addressMaybeSingle,
+    addressEq,
+    addressSelect,
     bannerSelectEq,
     from,
   };
@@ -79,6 +111,12 @@ describe("dataProvider custom deletes", () => {
     mocks.from.mockClear();
     mocks.orderItemsEq.mockReset();
     mocks.orderItemsSelect.mockClear();
+    mocks.profileMaybeSingle.mockReset();
+    mocks.profileEq.mockClear();
+    mocks.profileSelect.mockClear();
+    mocks.addressMaybeSingle.mockReset();
+    mocks.addressEq.mockClear();
+    mocks.addressSelect.mockClear();
     mocks.bannerSelectEq.mockReset();
 
     mocks.getList.mockResolvedValue({ data: [], total: 0 });
@@ -87,6 +125,8 @@ describe("dataProvider custom deletes", () => {
     mocks.remove.mockResolvedValue({ data: [] });
     mocks.rpc.mockResolvedValue({ data: [], error: null });
     mocks.orderItemsEq.mockResolvedValue({ data: [], error: null });
+    mocks.profileMaybeSingle.mockResolvedValue({ data: null, error: null });
+    mocks.addressMaybeSingle.mockResolvedValue({ data: null, error: null });
     mocks.bannerSelectEq.mockResolvedValue({ data: [], error: null });
   });
 
@@ -343,6 +383,8 @@ describe("dataProvider custom deletes", () => {
     mocks.getOne.mockResolvedValueOnce({
       data: {
         id: "order-1",
+        user_id: "customer-1",
+        shipping_address_id: "address-1",
         payment_status: "settlement",
         waybill_number: "WB-123",
       },
@@ -359,6 +401,30 @@ describe("dataProvider custom deletes", () => {
       ],
       error: null,
     });
+    mocks.profileMaybeSingle.mockResolvedValueOnce({
+      data: {
+        id: "customer-1",
+        full_name: "Alice Customer",
+        phone_number: "+628123456789",
+        email: "alice@example.com",
+      },
+      error: null,
+    });
+    mocks.addressMaybeSingle.mockResolvedValueOnce({
+      data: {
+        id: "address-1",
+        receiver_name: "Alice Receiver",
+        phone_number: "+628987654321",
+        street_address: "Jl. Merdeka No. 1",
+        city: "Bandung",
+        province: "Jawa Barat",
+        postal_code: "40111",
+        area_name: "Coblong",
+        address_note: "Dekat apotek",
+        country_code: "ID",
+      },
+      error: null,
+    });
 
     const result = await getOneMethod({
       resource: "orders",
@@ -372,15 +438,41 @@ describe("dataProvider custom deletes", () => {
       meta: { select: "*" },
     });
     expect(mocks.from).toHaveBeenCalledWith("admin_order_items");
+    expect(mocks.from).toHaveBeenCalledWith("profiles");
+    expect(mocks.from).toHaveBeenCalledWith("addresses");
     expect(mocks.orderItemsSelect).toHaveBeenCalledWith(
       "id, order_id, product_id, product_name, quantity, price_at_purchase, product_sku_at_purchase, created_at"
     );
     expect(mocks.orderItemsEq).toHaveBeenCalledWith("order_id", "order-1");
+    expect(mocks.profileSelect).toHaveBeenCalledWith("id, full_name, phone_number, email");
+    expect(mocks.profileEq).toHaveBeenCalledWith("id", "customer-1");
+    expect(mocks.addressSelect).toHaveBeenCalledWith("id, receiver_name, phone_number, street_address, city, province, postal_code, area_name, address_note, country_code");
+    expect(mocks.addressEq).toHaveBeenCalledWith("id", "address-1");
     expect(result).toEqual({
       data: {
         id: "order-1",
+        user_id: "customer-1",
+        shipping_address_id: "address-1",
         payment_status: "settlement",
         waybill_number: "WB-123",
+        customer: {
+          id: "customer-1",
+          full_name: "Alice Customer",
+          phone_number: "+628123456789",
+          email: "alice@example.com",
+        },
+        shipping_address: {
+          id: "address-1",
+          receiver_name: "Alice Receiver",
+          phone_number: "+628987654321",
+          street_address: "Jl. Merdeka No. 1",
+          city: "Bandung",
+          province: "Jawa Barat",
+          postal_code: "40111",
+          area_name: "Coblong",
+          address_note: "Dekat apotek",
+          country_code: "ID",
+        },
         order_items: [
           {
             id: "item-1",

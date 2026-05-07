@@ -31,6 +31,29 @@ interface AdminOrderItemRecord {
   product_name?: string | null;
 }
 
+interface AdminOrderRecord extends BaseRecord {
+  user_id?: string | null;
+  shipping_address_id?: string | null;
+}
+
+interface AdminOrderCustomerRecord extends BaseRecord {
+  full_name?: string | null;
+  phone_number?: string | null;
+  email?: string | null;
+}
+
+interface AdminShippingAddressRecord extends BaseRecord {
+  receiver_name?: string | null;
+  phone_number?: string | null;
+  street_address?: string | null;
+  city?: string | null;
+  province?: string | null;
+  postal_code?: string | null;
+  area_name?: string | null;
+  address_note?: string | null;
+  country_code?: string | null;
+}
+
 interface AdminOperationalMetricRecord extends BaseRecord {
   bucket_start: string;
   bucket_end: string;
@@ -171,6 +194,42 @@ async function getOrderItems(orderId: string | number) {
   return (data ?? []).map(normalizeOrderItem);
 }
 
+async function getOrderCustomer(userId: unknown): Promise<AdminOrderCustomerRecord | null> {
+  if (typeof userId !== "string" || userId.length === 0) {
+    return null;
+  }
+
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .select("id, full_name, phone_number, email")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as AdminOrderCustomerRecord | null;
+}
+
+async function getShippingAddress(addressId: unknown): Promise<AdminShippingAddressRecord | null> {
+  if (typeof addressId !== "string" || addressId.length === 0) {
+    return null;
+  }
+
+  const { data, error } = await supabaseClient
+    .from("addresses")
+    .select("id, receiver_name, phone_number, street_address, city, province, postal_code, area_name, address_note, country_code")
+    .eq("id", addressId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as AdminShippingAddressRecord | null;
+}
+
 async function deleteCategoryLogo(logoUrl: string | null | undefined): Promise<void> {
   if (!logoUrl) return;
   const path = getStoragePathFromReference(logoUrl, MEDIA_BUCKET);
@@ -281,7 +340,7 @@ export const dataProvider: DataProvider = {
     // Order detail reads come from the same compatibility view, then stitch
     // `order_items` back in because the view intentionally exposes only the
     // denormalized order/payment/shipment fields.
-    const [{ data: order }, orderItems] = await Promise.all([
+    const [{ data: orderData }, orderItems] = await Promise.all([
       baseDataProvider.getOne({
         ...params,
         resource: ORDER_READ_RESOURCE,
@@ -289,10 +348,17 @@ export const dataProvider: DataProvider = {
       }),
       getOrderItems(params.id),
     ]);
+    const order = orderData as AdminOrderRecord;
+    const [customer, shippingAddress] = await Promise.all([
+      getOrderCustomer(order.user_id),
+      getShippingAddress(order.shipping_address_id),
+    ]);
 
     return {
       data: {
-        ...(order as BaseRecord),
+        ...order,
+        customer,
+        shipping_address: shippingAddress,
         order_items: orderItems,
       } as unknown as TData,
     };
