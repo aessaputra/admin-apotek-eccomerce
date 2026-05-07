@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { useShow, useTranslation } from "@refinedev/core";
-import { Show, DateField, NumberField } from "@refinedev/antd";
-import { Typography, Table, Tag, Descriptions, Form, Select, Input, Button, Card, App, Timeline, Spin, Tooltip, Switch, Alert, Space, theme } from "antd";
+import { Show } from "@refinedev/antd";
+import { Typography, Table, Tag, Form, Select, Input, Button, Card, App, Timeline, Spin, Tooltip, Switch, Alert, Space, theme } from "antd";
 import type { TableColumnsType } from "antd";
 import { SyncOutlined, InfoCircleOutlined, LockOutlined, WarningOutlined } from "@ant-design/icons";
 import {
@@ -28,6 +28,7 @@ interface OrderItem {
 interface OrderRecord {
   id: string;
   user_id: string;
+  shipping_address_id?: string | null;
   total_amount: string | number;
   status: string;
   customer_completion_stage?: string | null;
@@ -49,6 +50,22 @@ interface OrderRecord {
   biteship_tracking_id?: string | null;
   created_at: string;
   updated_at?: string | null;
+  customer?: {
+    full_name?: string | null;
+    phone_number?: string | null;
+    email?: string | null;
+  } | null;
+  shipping_address?: {
+    receiver_name?: string | null;
+    phone_number?: string | null;
+    street_address?: string | null;
+    city?: string | null;
+    province?: string | null;
+    postal_code?: string | null;
+    area_name?: string | null;
+    address_note?: string | null;
+    country_code?: string | null;
+  } | null;
   order_items?: OrderItem[];
 }
 
@@ -68,6 +85,11 @@ interface BiteshipExceptionInfo {
   messageKey: string;
 }
 
+interface DetailListItem {
+  label: string;
+  value: ReactNode;
+}
+
 // Statuses where the status dropdown is locked (terminal states)
 const TERMINAL_STATUSES = ["delivered", "cancelled"];
 // Only lock for terminal statuses - shipped can still transition to delivered
@@ -83,6 +105,14 @@ const formatDisplayLabel = (value: string | null | undefined) => {
     .filter(Boolean)
     .map((part) => (part.length <= 3 ? part.toUpperCase() : `${part.charAt(0).toUpperCase()}${part.slice(1)}`))
     .join(" ");
+};
+
+const hasMeaningfulValue = (value: string | null | undefined) => Boolean(value?.trim());
+
+const getMeaningfulValue = (value: string | null | undefined) => {
+  const trimmedValue = value?.trim();
+
+  return trimmedValue || "-";
 };
 
 const formatBiteshipStatusLabel = (value: string | null | undefined) => {
@@ -105,6 +135,7 @@ export const OrderShow: React.FC = () => {
   // separately, so this page intentionally avoids a nested select here.
   const { result: record, query } = useShow<OrderRecord>();
   const { isLoading } = query;
+  const orderLoadError = query.error;
 
   const { modal } = App.useApp();
   const [form] = Form.useForm<{ status: string; waybill_number?: string; waybill_override_reason?: string }>();
@@ -393,20 +424,58 @@ export const OrderShow: React.FC = () => {
   const currentPaymentStatusLabel = record?.payment_status
     ? translate(`paymentStatus.${record.payment_status}`, {}, formatDisplayLabel(record.payment_status))
     : "-";
-  const formatSkuSnapshot = (value: string | null | undefined) => {
+  const currencyFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat("id-ID", {
+        style: "currency",
+        currency: "IDR",
+        maximumFractionDigits: 0,
+      }),
+    [],
+  );
+  const formatCurrency = useCallback(
+    (value: string | number | null | undefined) => {
+      if (value == null) {
+        return "-";
+      }
+
+      const amount = Number(value);
+
+      return Number.isFinite(amount) ? currencyFormatter.format(amount) : "-";
+    },
+    [currencyFormatter],
+  );
+  const formatAdminDate = useCallback((value: string | null | undefined) => {
+    if (!value) {
+      return "-";
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    return new Intl.DateTimeFormat("id-ID", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Asia/Jakarta",
+    }).format(date);
+  }, []);
+  const formatSkuSnapshot = useCallback((value: string | null | undefined) => {
     const sku = value?.trim();
 
     return sku || translate("orders.skuNotStored", {}, "SKU belum tersimpan");
-  };
+  }, [translate]);
 
   const getWaybillSourceBadge = () => {
     if (!record?.waybill_number) return null;
     const source = record.waybill_source;
     if (source === "manual") {
-      return <Tag color="orange" style={{ marginLeft: 8 }}>{translate("orders.waybillSourceManual")}</Tag>;
+      return <Tag color="orange" style={{ marginLeft: token.marginXS }}>{translate("orders.waybillSourceManual")}</Tag>;
     }
     if (hasBiteship) {
-      return <Tag color="blue" style={{ marginLeft: 8 }}>{translate("orders.waybillSourceSystem")}</Tag>;
+      return <Tag color="blue" style={{ marginLeft: token.marginXS }}>{translate("orders.waybillSourceSystem")}</Tag>;
     }
     return null;
   };
@@ -416,134 +485,269 @@ export const OrderShow: React.FC = () => {
     { title: translate("orders.fields.product"), dataIndex: ["products", "name"], key: "product", render: (_: unknown, row: OrderItem) => row.products?.name ?? "-" },
     { title: translate("orders.fields.sku"), dataIndex: "product_sku_at_purchase", key: "sku", responsive: ["sm"], render: (v: string | null | undefined) => formatSkuSnapshot(v) },
     { title: translate("orders.fields.quantity"), dataIndex: "quantity", key: "quantity", width: 80 },
-    { title: translate("orders.fields.unitPrice"), dataIndex: "price_at_purchase", key: "price", responsive: ["md"], render: (v: string | number) => `Rp ${Number(v || 0).toLocaleString("id-ID")}` },
-    { title: translate("orders.fields.subtotal"), key: "subtotal", responsive: ["sm"], render: (_: unknown, row: OrderItem) => `Rp ${(Number(row.price_at_purchase || 0) * (row.quantity || 0)).toLocaleString("id-ID")}` },
-  ], [translate]);
+    { title: translate("orders.fields.unitPrice"), dataIndex: "price_at_purchase", key: "price", responsive: ["md"], render: (v: string | number) => formatCurrency(v) },
+    { title: translate("orders.fields.subtotal"), key: "subtotal", responsive: ["sm"], render: (_: unknown, row: OrderItem) => formatCurrency(Number(row.price_at_purchase || 0) * (row.quantity || 0)) },
+  ], [formatCurrency, formatSkuSnapshot, translate]);
+
+  const sectionSpacing = token.marginLG;
+  const detailGridStyle: CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${token.screenMD}px), 1fr))`,
+    gap: sectionSpacing,
+    alignItems: "start",
+  };
+  const pageStackStyle: CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: sectionSpacing,
+  };
+  const compactCardBodyStyle: CSSProperties = {
+    paddingBlock: token.paddingSM,
+    paddingInline: token.paddingLG,
+  };
+  const sectionTitleStyle: CSSProperties = { marginTop: 0 };
+  const statusSummaryGridStyle: CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${token.screenMD / 3}px), 1fr))`,
+    gap: token.marginMD,
+  };
+  const detailListStyle: CSSProperties = {
+    display: "grid",
+    gap: token.marginMD,
+  };
+  const detailRowStyle: CSSProperties = {
+    display: "grid",
+    gap: token.marginXXS,
+    minWidth: 0,
+    maxWidth: "100%",
+  };
+  const detailLabelStyle: CSSProperties = {
+    color: token.colorTextTertiary,
+    fontSize: token.fontSizeSM,
+    lineHeight: token.lineHeightSM,
+  };
+  const detailValueStyle: CSSProperties = {
+    minWidth: 0,
+    maxWidth: "100%",
+    overflowWrap: "break-word",
+    wordBreak: "normal",
+  };
+  const copyableValueStyle: CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    maxWidth: "100%",
+    minWidth: 0,
+    paddingBlock: token.paddingXXS,
+    overflowWrap: "break-word",
+    wordBreak: "normal",
+    whiteSpace: "normal",
+  };
+  const waybillValueStyle: CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: token.marginXS,
+    maxWidth: "100%",
+    minWidth: 0,
+  };
+
+  const renderCopyableText = (value: string | null | undefined, strong = false) => {
+    const displayValue = getMeaningfulValue(value);
+
+    return (
+      <Text strong={strong} copyable={hasMeaningfulValue(value) ? true : undefined} style={copyableValueStyle}>
+        {displayValue}
+      </Text>
+    );
+  };
+
+  const renderWrappedText = (value: string | null | undefined, strong = false) => (
+    <Text strong={strong} style={copyableValueStyle}>
+      {getMeaningfulValue(value)}
+    </Text>
+  );
+
+  const renderDetailList = (details: DetailListItem[]) => (
+    <div style={detailListStyle}>
+      {details.map((detail) => (
+        <div key={detail.label} style={detailRowStyle}>
+          <Text type="secondary" style={detailLabelStyle}>{detail.label}</Text>
+          <div style={detailValueStyle}>{detail.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const shippingAddressText = [
+    record?.shipping_address?.street_address,
+    record?.shipping_address?.area_name,
+    record?.shipping_address?.city,
+    record?.shipping_address?.province,
+    record?.shipping_address?.postal_code,
+    record?.shipping_address?.country_code,
+  ]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .join(", ");
+
+  const shipmentMarker = record?.waybill_number
+    ? (
+        <Space wrap style={waybillValueStyle}>
+          {renderCopyableText(record.waybill_number, true)}
+          {getWaybillSourceBadge()}
+        </Space>
+      )
+    : renderCopyableText(record?.biteship_tracking_id ?? record?.biteship_order_id);
+
+  const statusSummaryDetails: DetailListItem[] = [
+    {
+      label: translate("orders.fields.id"),
+      value: renderCopyableText(record?.id, true),
+    },
+    {
+      label: translate("orders.currentOrderStatus"),
+      value: (
+        <Space size={token.marginXS} wrap>
+          <Tag color={STATUS_COLORS[record?.status ?? ""] ?? "default"}>{currentOrderStatusLabel}</Tag>
+          {isStatusDropdownLocked && (
+            <Tooltip title={translate("orders.tooltips.statusSystemControlled")}>
+              <LockOutlined aria-label={translate("orders.accessibility.statusLocked")} style={{ color: token.colorTextTertiary }} />
+            </Tooltip>
+          )}
+        </Space>
+      ),
+    },
+    {
+      label: translate("orders.currentPaymentStatus"),
+      value: <Tag color={PAYMENT_COLORS[record?.payment_status ?? ""] ?? "default"}>{currentPaymentStatusLabel}</Tag>,
+    },
+    {
+      label: translate("orders.customerCompletionStage"),
+      value: <Tag color={record?.customer_completion_stage === "completed" ? "green" : "gold"}>{customerCompletionStageLabel}</Tag>,
+    },
+    {
+      label: translate("orders.fields.date"),
+      value: <Text>{formatAdminDate(record?.created_at)}</Text>,
+    },
+    {
+      label: translate("orders.fields.productSubtotal"),
+      value: <Text strong>{formatCurrency(record?.total_amount)}</Text>,
+    },
+    {
+      label: translate("orders.fields.waybillNumber"),
+      value: shipmentMarker,
+    },
+  ];
+
+  const buyerDetails: DetailListItem[] = [
+    { label: translate("orders.fields.customerName"), value: renderWrappedText(record?.customer?.full_name) },
+    { label: translate("orders.fields.customerEmail"), value: renderWrappedText(record?.customer?.email) },
+    { label: translate("orders.fields.customerPhone"), value: renderWrappedText(record?.customer?.phone_number) },
+    { label: translate("orders.fields.receiverName"), value: renderWrappedText(record?.shipping_address?.receiver_name) },
+    { label: translate("orders.fields.receiverPhone"), value: renderWrappedText(record?.shipping_address?.phone_number) },
+    { label: translate("orders.fields.shippingAddress"), value: renderWrappedText(shippingAddressText) },
+    { label: translate("orders.fields.addressNote"), value: renderWrappedText(record?.shipping_address?.address_note) },
+  ];
+
+  const shipmentAndReferenceDetails: DetailListItem[] = [
+    { label: translate("orders.fields.productSubtotal"), value: <Text strong>{formatCurrency(record?.total_amount)}</Text> },
+    { label: translate("orders.fields.shippingCost"), value: <Text>{formatCurrency(record?.shipping_cost)}</Text> },
+    { label: translate("orders.fields.courier"), value: <Text>{courierDescription}</Text> },
+    { label: translate("orders.fields.waybillNumber"), value: shipmentMarker },
+    { label: translate("orders.fields.paymentType"), value: <Text>{paymentTypeLabel}</Text> },
+    { label: translate("orders.fields.midtransOrderId"), value: renderCopyableText(record?.midtrans_order_id) },
+    { label: translate("orders.fields.midtransTransactionId"), value: renderCopyableText(record?.midtrans_transaction_id) },
+    { label: translate("orders.fields.biteshipOrderId"), value: renderCopyableText(record?.biteship_order_id) },
+    { label: translate("orders.fields.biteshipTrackingId"), value: renderCopyableText(record?.biteship_tracking_id) },
+    { label: translate("orders.fields.updatedAt"), value: <Text>{formatAdminDate(record?.updated_at)}</Text> },
+    { label: translate("orders.fields.deliveredAt"), value: <Text>{formatAdminDate(record?.delivered_at)}</Text> },
+    { label: translate("orders.fields.complaintWindowExpiresAt"), value: <Text>{formatAdminDate(record?.complaint_window_expires_at)}</Text> },
+    { label: translate("orders.fields.customerCompletedAt"), value: <Text>{formatAdminDate(record?.customer_completed_at)}</Text> },
+  ];
+
+  if (orderLoadError && !isLoading) {
+    const orderLoadDescription = orderLoadError instanceof Error
+      ? orderLoadError.message
+      : translate("orders.empty.detailErrorDescription", {}, "Muat ulang halaman sebelum mengambil tindakan pada pesanan ini.");
+
+    return (
+      <Show isLoading={isLoading}>
+        <Alert
+          type="error"
+          showIcon
+          message={translate("orders.empty.detailErrorTitle", {}, "Detail pesanan tidak dapat dimuat")}
+          description={orderLoadDescription}
+        />
+      </Show>
+    );
+  }
 
   return (
     <Show isLoading={isLoading}>
-      <Title level={5}>{translate("orders.orderInfo")}</Title>
-      <Descriptions bordered size="small" column={1}>
-        <Descriptions.Item label={translate("orders.fields.id")}>{record?.id ?? "-"}</Descriptions.Item>
-        <Descriptions.Item label={translate("orders.currentOrderStatus")}>
-          <Tag color={STATUS_COLORS[record?.status ?? ""] ?? "default"}>
-            {currentOrderStatusLabel}
-          </Tag>
-          {isStatusDropdownLocked && (
-            <Tooltip title={translate("orders.tooltips.statusSystemControlled")}>
-              <LockOutlined aria-label={translate("orders.accessibility.statusLocked")} style={{ marginLeft: token.marginXS, color: token.colorTextTertiary }} />
-            </Tooltip>
-            )}
-          </Descriptions.Item>
-          <Descriptions.Item label={translate('orders.customerCompletionStage')}>
-            <Tag color={record?.customer_completion_stage === 'completed' ? 'green' : 'gold'}>
-              {customerCompletionStageLabel}
-            </Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label={translate("orders.currentPaymentStatus")}>
-            <Tag color={PAYMENT_COLORS[record?.payment_status ?? ""] ?? "default"}>
-              {currentPaymentStatusLabel}
-            </Tag>
-          </Descriptions.Item>
-        <Descriptions.Item label={translate("orders.fields.paymentType")}><Text>{paymentTypeLabel}</Text></Descriptions.Item>
-        <Descriptions.Item label={translate("orders.fields.midtransOrderId")}><Text copyable>{record?.midtrans_order_id ?? "-"}</Text></Descriptions.Item>
-        <Descriptions.Item label={translate("orders.fields.midtransTransactionId")}><Text copyable>{record?.midtrans_transaction_id ?? "-"}</Text></Descriptions.Item>
-        <Descriptions.Item label={translate("orders.fields.date")}><DateField value={record?.created_at} format="LLL" /></Descriptions.Item>
-      </Descriptions>
+      <div style={pageStackStyle}>
+        <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.orderInfo")}</Title>}>
+          <div style={statusSummaryGridStyle}>
+            {statusSummaryDetails.map((detail) => (
+              <div key={detail.label} style={detailRowStyle}>
+                <Text type="secondary" style={detailLabelStyle}>{detail.label}</Text>
+                <div style={detailValueStyle}>{detail.value}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
 
-      <Title level={5} style={{ marginTop: 24 }}>{translate("orders.totalAndShipping")}</Title>
-      <Descriptions bordered size="small" column={1}>
-        <Descriptions.Item label={translate("orders.fields.productSubtotal")}><NumberField value={record?.total_amount} options={{ style: "currency", currency: "IDR" }} /></Descriptions.Item>
-        <Descriptions.Item label={translate("orders.fields.shippingCost")}>{record?.shipping_cost != null ? `Rp ${Number(record.shipping_cost).toLocaleString("id-ID")}` : "-"}</Descriptions.Item>
-        <Descriptions.Item label={translate("orders.fields.courier")}>{courierDescription}</Descriptions.Item>
-        <Descriptions.Item label={translate("orders.fields.waybillNumber")}>
-          <Space>
-            <Text strong copyable={!!record?.waybill_number}>{record?.waybill_number ?? "-"}</Text>
-            {getWaybillSourceBadge()}
-          </Space>
-        </Descriptions.Item>
-        <Descriptions.Item label={translate("orders.fields.biteshipOrderId")}>
-          <Text copyable>{record?.biteship_order_id ?? "-"}</Text>
-        </Descriptions.Item>
-        <Descriptions.Item label={translate("orders.fields.biteshipTrackingId")}>
-          <Text copyable={!!record?.biteship_tracking_id}>{record?.biteship_tracking_id ?? "-"}</Text>
-        </Descriptions.Item>
-        <Descriptions.Item label={translate("orders.fields.updatedAt")}>{record?.updated_at ? <DateField value={record.updated_at} format="LLL" /> : "-"}</Descriptions.Item>
-        <Descriptions.Item label={translate('orders.fields.deliveredAt')}>
-          {record?.delivered_at ? <DateField value={record.delivered_at} format="LLL" /> : '-'}
-        </Descriptions.Item>
-        <Descriptions.Item label={translate('orders.fields.complaintWindowExpiresAt')}>
-          {record?.complaint_window_expires_at ? (
-            <DateField value={record.complaint_window_expires_at} format="LLL" />
-          ) : '-'}
-        </Descriptions.Item>
-        <Descriptions.Item label={translate('orders.fields.customerCompletedAt')}>
-          {record?.customer_completed_at ? (
-            <DateField value={record.customer_completed_at} format="LLL" />
-          ) : '-'}
-        </Descriptions.Item>
-      </Descriptions>
-
-      {biteshipExceptionInfo && (
-        <Alert
-          style={{ marginTop: 16 }}
-          type={biteshipExceptionInfo.alertType}
-          showIcon
-          message={translate("orders.biteshipAlertTitle")}
-          description={
-            <Space direction="vertical" size={4}>
-              <Text>
-                {translate(
-                  `orders.biteshipAlerts.${biteshipExceptionInfo.messageKey}`,
-                  {},
-                  translate("orders.biteshipAlertUnknown")
-                )}
-              </Text>
-              <Text type="secondary">
-                {translate("orders.biteshipAlertStatusLabel")}: {formatBiteshipStatusLabel(biteshipExceptionInfo.status)}
-              </Text>
-            </Space>
-          }
-        />
-      )}
-
-      <Card
-        title={
-          <span>
-            {translate("orders.actionsTitle")}
-            {isStatusDropdownLocked && (
-              <Tooltip title={translate("orders.tooltips.webhookControlled")}>
-                <InfoCircleOutlined aria-label={translate("orders.accessibility.webhookControlled")} style={{ marginLeft: token.marginXS, color: token.colorWarning }} />
-              </Tooltip>
-            )}
-          </span>
-        }
-        style={{ marginTop: 24 }}
-      >
-        <Text type="secondary">{translate("orders.actionsDescription")}</Text>
-        <Descriptions bordered size="small" column={1} style={{ marginTop: 16, marginBottom: 16 }}>
-        <Descriptions.Item label={translate("orders.currentOrderStatus")}>
-            <Tag color={STATUS_COLORS[record?.status ?? ""] ?? "default"}>{currentOrderStatusLabel}</Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label={translate("orders.currentPaymentStatus")}>
-            <Tag color={PAYMENT_COLORS[record?.payment_status ?? ""] ?? "default"}>{currentPaymentStatusLabel}</Tag>
-          </Descriptions.Item>
-        </Descriptions>
-
-        {canSyncTracking && (
-          <Button type="default" icon={<SyncOutlined spin={syncing} />} onClick={handleSyncTracking} loading={syncing} style={{ marginBottom: 16 }}>
-            {translate("orders.syncTracking")}
-          </Button>
-        )}
-
-        {hasProviderManagedShipment && !manualWaybillMode && !isWaybillFullyLocked && (
+        {biteshipExceptionInfo && (
           <Alert
-            style={{ marginBottom: 16 }}
-            type="info"
+            type={biteshipExceptionInfo.alertType}
             showIcon
-            message={translate("orders.providerManagedWaybillHelp")}
+            message={translate("orders.biteshipAlertTitle")}
+            description={
+              <Space direction="vertical" size={token.marginXXS}>
+                <Text>
+                  {translate(
+                    `orders.biteshipAlerts.${biteshipExceptionInfo.messageKey}`,
+                    {},
+                    translate("orders.biteshipAlertUnknown")
+                  )}
+                </Text>
+                <Text type="secondary">
+                  {translate("orders.biteshipAlertStatusLabel")}: {formatBiteshipStatusLabel(biteshipExceptionInfo.status)}
+                </Text>
+              </Space>
+            }
           />
         )}
+
+        <Card
+          title={
+            <span>
+              {translate("orders.actionsTitle")}
+              {isStatusDropdownLocked && (
+                <Tooltip title={translate("orders.tooltips.webhookControlled")}>
+                  <InfoCircleOutlined aria-label={translate("orders.accessibility.webhookControlled")} style={{ marginLeft: token.marginXS, color: token.colorWarning }} />
+                </Tooltip>
+              )}
+            </span>
+          }
+        >
+          <Text type="secondary">{translate("orders.actionsDescription")}</Text>
+
+          {canSyncTracking && (
+            <div style={{ marginTop: token.marginMD }}>
+              <Button type="default" icon={<SyncOutlined spin={syncing} />} onClick={handleSyncTracking} loading={syncing}>
+                {translate("orders.syncTracking")}
+              </Button>
+            </div>
+          )}
+
+          {hasProviderManagedShipment && !manualWaybillMode && !isWaybillFullyLocked && (
+            <Alert
+              style={{ marginTop: token.marginMD, marginBottom: token.marginMD }}
+              type="info"
+              showIcon
+              message={translate("orders.providerManagedWaybillHelp")}
+            />
+          )}
 
         <Form form={form} layout="vertical" onFinish={handleUpdate} initialValues={{ status: record?.status ?? "pending", waybill_number: record?.waybill_number ?? "" }}>
           <Form.Item
@@ -605,7 +809,7 @@ export const OrderShow: React.FC = () => {
                 type="warning"
                 showIcon
                 icon={<WarningOutlined />}
-                style={{ marginBottom: 16 }}
+                style={{ marginBottom: token.marginMD }}
               />
               <Form.Item
                 name="waybill_override_reason"
@@ -626,34 +830,52 @@ export const OrderShow: React.FC = () => {
             </Button>
           </Form.Item>
         </Form>
-      </Card>
+        </Card>
 
-      <Title level={5} style={{ marginTop: 24 }}>{translate("orders.activityTitle")}</Title>
-      <Card styles={{ body: { padding: "12px 24px" } }}>
-        {activityError ? (
-          <Alert
-            type="error"
-            showIcon
-            message={translate("orders.activity.loadErrorTitle")}
-            description={activityError}
-            action={<Button size="small" onClick={loadActivities}>{translate("buttons.retry", {}, "Coba lagi")}</Button>}
-          />
-        ) : loadingActivities ? <Spin /> : activities.length === 0 ? <Text type="secondary">{translate("orders.noActivities")}</Text> : (
-          <Timeline items={activities.map((activity) => ({ dot: getActivityIcon(activity.action), children: <div><div>{getActivityText(activity)}</div><Text type="secondary" style={{ fontSize: 12 }}><DateField value={activity.created_at} format="DD/MM/YYYY HH:mm" /></Text></div> }))} />
-        )}
-      </Card>
+        <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.productList")}</Title>}>
+          <div aria-label={productTableLabel}>
+            <Table
+              dataSource={items}
+              columns={columns}
+              rowKey="id"
+              pagination={false}
+              size="small"
+              scroll={{ x: "max-content" }}
+              locale={{ emptyText: translate("orders.empty.productItems") }}
+            />
+          </div>
+        </Card>
 
-      <Title level={5} style={{ marginTop: 24 }}>{translate("orders.productList")}</Title>
-      <div aria-label={productTableLabel}>
-        <Table
-          dataSource={items}
-          columns={columns}
-          rowKey="id"
-          pagination={false}
-          size="small"
-          scroll={{ x: "max-content" }}
-          locale={{ emptyText: translate("orders.empty.productItems") }}
-        />
+        <div style={detailGridStyle}>
+          <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.buyerAndShipping")}</Title>}>
+            {renderDetailList(buyerDetails)}
+          </Card>
+
+          <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.totalAndShipping")}</Title>}>
+            {renderDetailList(shipmentAndReferenceDetails)}
+          </Card>
+        </div>
+
+        <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.activityTitle")}</Title>} styles={{ body: compactCardBodyStyle }}>
+          {activityError ? (
+            <Alert
+              type="error"
+              showIcon
+              message={translate("orders.activity.loadErrorTitle")}
+              description={activityError}
+              action={<Button size="small" onClick={loadActivities}>{translate("buttons.retry", {}, "Coba lagi")}</Button>}
+            />
+          ) : loadingActivities ? (
+            <div role="status" aria-live="polite">
+              <Space>
+                <Spin size="small" />
+                <Text type="secondary">{translate("orders.activity.loading", {}, "Memuat aktivitas pesanan...")}</Text>
+              </Space>
+            </div>
+          ) : activities.length === 0 ? <Text type="secondary">{translate("orders.noActivities")}</Text> : (
+            <Timeline items={activities.map((activity) => ({ dot: getActivityIcon(activity.action), children: <div><div>{getActivityText(activity)}</div><Text type="secondary" style={{ fontSize: token.fontSizeSM }}>{formatAdminDate(activity.created_at)}</Text></div> }))} />
+          )}
+        </Card>
       </div>
     </Show>
   );
