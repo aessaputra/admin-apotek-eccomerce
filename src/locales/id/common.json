@@ -401,6 +401,8 @@
     "orderInfo": "Informasi Pesanan",
     "buyerAndShipping": "Pembeli & Alamat Pengiriman",
     "totalAndShipping": "Total & Ongkir",
+    "integrationMetadata": "Metadata Integrasi",
+    "waybillUnavailable": "Resi belum tersedia",
     "waybillRequired": "No. resi wajib diisi saat status {{status}}",
     "waybillPlaceholder": "Masukkan nomor resi setelah pengiriman",
     "saveSuccess": "Pesanan berhasil diperbarui",

@@ -401,6 +401,8 @@
     "orderInfo": "Order Information",
     "buyerAndShipping": "Buyer & Shipping Address",
     "totalAndShipping": "Total & Shipping",
+    "integrationMetadata": "Integration Metadata",
+    "waybillUnavailable": "Waybill not available yet",
     "waybillRequired": "Waybill number is required when status is {{status}}",
     "waybillPlaceholder": "Enter waybill number after shipping",
     "saveSuccess": "Order updated successfully",

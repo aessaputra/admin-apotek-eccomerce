@@ -1,7 +1,7 @@
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { useShow, useTranslation } from "@refinedev/core";
 import { Show } from "@refinedev/antd";
-import { Typography, Table, Tag, Form, Select, Input, Button, Card, App, Timeline, Spin, Tooltip, Switch, Alert, Space, theme } from "antd";
+import { Typography, Table, Tag, Form, Select, Input, Button, Card, App, Timeline, Spin, Tooltip, Switch, Alert, Space, Collapse, theme } from "antd";
 import type { TableColumnsType } from "antd";
 import { SyncOutlined, InfoCircleOutlined, LockOutlined, WarningOutlined } from "@ant-design/icons";
 import {
@@ -590,14 +590,15 @@ export const OrderShow: React.FC = () => {
     .filter((part): part is string => Boolean(part))
     .join(", ");
 
-  const shipmentMarker = record?.waybill_number
+  const waybillNumber = record?.waybill_number?.trim() ?? "";
+  const shipmentMarker = waybillNumber
     ? (
         <Space wrap style={waybillValueStyle}>
-          {renderCopyableText(record.waybill_number, true)}
+          {renderCopyableText(waybillNumber, true)}
           {getWaybillSourceBadge()}
         </Space>
       )
-    : renderCopyableText(record?.biteship_tracking_id ?? record?.biteship_order_id);
+    : <Text type="secondary">{translate("orders.waybillUnavailable")}</Text>;
 
   const statusSummaryDetails: DetailListItem[] = [
     {
@@ -655,14 +656,17 @@ export const OrderShow: React.FC = () => {
     { label: translate("orders.fields.courier"), value: <Text>{courierDescription}</Text> },
     { label: translate("orders.fields.waybillNumber"), value: shipmentMarker },
     { label: translate("orders.fields.paymentType"), value: <Text>{paymentTypeLabel}</Text> },
-    { label: translate("orders.fields.midtransOrderId"), value: renderCopyableText(record?.midtrans_order_id) },
-    { label: translate("orders.fields.midtransTransactionId"), value: renderCopyableText(record?.midtrans_transaction_id) },
-    { label: translate("orders.fields.biteshipOrderId"), value: renderCopyableText(record?.biteship_order_id) },
-    { label: translate("orders.fields.biteshipTrackingId"), value: renderCopyableText(record?.biteship_tracking_id) },
     { label: translate("orders.fields.updatedAt"), value: <Text>{formatAdminDate(record?.updated_at)}</Text> },
     { label: translate("orders.fields.deliveredAt"), value: <Text>{formatAdminDate(record?.delivered_at)}</Text> },
     { label: translate("orders.fields.complaintWindowExpiresAt"), value: <Text>{formatAdminDate(record?.complaint_window_expires_at)}</Text> },
     { label: translate("orders.fields.customerCompletedAt"), value: <Text>{formatAdminDate(record?.customer_completed_at)}</Text> },
+  ];
+
+  const integrationMetadataDetails: DetailListItem[] = [
+    { label: translate("orders.fields.midtransOrderId"), value: renderCopyableText(record?.midtrans_order_id) },
+    { label: translate("orders.fields.midtransTransactionId"), value: renderCopyableText(record?.midtrans_transaction_id) },
+    { label: translate("orders.fields.biteshipOrderId"), value: renderCopyableText(record?.biteship_order_id) },
+    { label: translate("orders.fields.biteshipTrackingId"), value: renderCopyableText(record?.biteship_tracking_id) },
   ];
 
   if (orderLoadError && !isLoading) {
@@ -853,6 +857,17 @@ export const OrderShow: React.FC = () => {
 
           <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.totalAndShipping")}</Title>}>
             {renderDetailList(shipmentAndReferenceDetails)}
+            <Collapse
+              bordered={false}
+              ghost
+              items={[
+                {
+                  key: "integration-metadata",
+                  label: translate("orders.integrationMetadata"),
+                  children: renderDetailList(integrationMetadataDetails),
+                },
+              ]}
+            />
           </Card>
         </div>
 

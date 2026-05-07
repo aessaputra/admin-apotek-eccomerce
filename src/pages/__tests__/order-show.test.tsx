@@ -179,6 +179,16 @@ vi.mock("antd", async () => {
     Table,
     Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
     Descriptions,
+    Collapse: ({ items }: { items?: Array<{ key: string; label: React.ReactNode; children: React.ReactNode }> }) => (
+      <div data-testid="order-integration-metadata">
+        {items?.map((item) => (
+          <div key={item.key}>
+            <button type="button">{item.label}</button>
+            <div>{item.children}</div>
+          </div>
+        ))}
+      </div>
+    ),
     Form,
     Select: ({ options, disabled }: { options?: Array<{ label: string; value: string }>; disabled?: boolean }) => (
       <select
@@ -355,6 +365,7 @@ describe("OrderShow", () => {
     expect(screen.getByText("orders.productList")).not.toBeNull();
     expect(screen.getByText("orders.buyerAndShipping")).not.toBeNull();
     expect(screen.getByText("orders.totalAndShipping")).not.toBeNull();
+    expect(screen.getByText("orders.integrationMetadata")).not.toBeNull();
     expect(screen.getByText("orders.activityTitle")).not.toBeNull();
     expect(screen.getByText("Alice Customer")).not.toBeNull();
     expect(screen.getByText("alice@example.com")).not.toBeNull();
@@ -470,6 +481,7 @@ describe("OrderShow", () => {
     });
 
     expect(screen.getByRole("button", { name: "copy order-blank-copy" })).not.toBeNull();
+    expect(screen.getAllByText("orders.waybillUnavailable").length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "copy -" })).toBeNull();
     expect(screen.getAllByRole("button", { name: /^copy / })).toHaveLength(1);
   });
