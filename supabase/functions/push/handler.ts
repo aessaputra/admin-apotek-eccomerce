@@ -200,6 +200,21 @@ function hasExpoApiErrors(response: ExpoApiResponse): boolean {
   return Array.isArray(response.errors) && response.errors.length > 0;
 }
 
+function createExpoApiHeaders(
+  expoAccessToken: string | undefined
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  };
+
+  if (expoAccessToken) {
+    headers.Authorization = `Bearer ${expoAccessToken}`;
+  }
+
+  return headers;
+}
+
 function isSupportedWebhookPayload(
   payload: Partial<WebhookPayload>
 ): payload is WebhookPayload {
@@ -599,16 +614,6 @@ async function processReceipts(
   }
 
   const expoAccessToken = env.get("EXPO_ACCESS_TOKEN")?.trim();
-  if (!expoAccessToken) {
-    console.error(
-      "[push] Missing EXPO_ACCESS_TOKEN secret for receipt polling"
-    );
-    return jsonResponse({
-      processed: false,
-      reason: "missing_expo_access_token",
-    });
-  }
-
   const ticketIds = deliveries
     .map((delivery) => delivery.ticket_id)
     .filter((ticketId): ticketId is string => !!ticketId);
@@ -618,11 +623,7 @@ async function processReceipts(
   try {
     const response = await fetchFn(EXPO_RECEIPTS_URL, {
       method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${expoAccessToken}`,
-      },
+      headers: createExpoApiHeaders(expoAccessToken),
       body: JSON.stringify({ ids: ticketIds }),
     });
 
@@ -816,24 +817,13 @@ export function createPushHandler(dependencies: PushHandlerDependencies) {
       }
 
       const expoAccessToken = dependencies.env.get("EXPO_ACCESS_TOKEN")?.trim();
-      if (!expoAccessToken) {
-        console.error("[push] Missing EXPO_ACCESS_TOKEN secret");
-        return jsonResponse({
-          delivered: false,
-          reason: "missing_expo_access_token",
-        });
-      }
 
       let expoResponse: ExpoPushResponse;
 
       try {
         const response = await fetchFn(EXPO_PUSH_URL, {
           method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${expoAccessToken}`,
-          },
+          headers: createExpoApiHeaders(expoAccessToken),
           body: JSON.stringify(createExpoMessages(notification, validTargets)),
         });
 

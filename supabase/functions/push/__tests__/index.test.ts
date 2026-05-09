@@ -350,6 +350,48 @@ describe("createPushHandler", () => {
     );
   });
 
+  it("sends notifications without Expo authorization when push security is not configured", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+    });
+    const { client } = createPushClientMock({
+      tokenRows: [
+        {
+          id: "token-row-1",
+          expo_push_token: "ExpoPushToken[token-one]",
+          device_id: "ios-device",
+          platform: "ios",
+        },
+      ],
+    });
+    const createClientFn = vi.fn(() => client);
+    const fetchFn = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ data: { status: "ok", id: "ticket-1" } }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+    );
+
+    const handler = createPushHandler({ createClientFn, env, fetchFn });
+
+    const response = await handler(createWebhookRequest());
+    const [, requestInit] = fetchFn.mock.calls[0] as unknown as [
+      string,
+      RequestInit
+    ];
+    const headers = requestInit.headers as Record<string, string>;
+
+    expect(response.status).toBe(200);
+    expect(headers.Authorization).toBeUndefined();
+    expect(headers.Accept).toBe("application/json");
+    expect(headers["Content-Type"]).toBe("application/json");
+  });
+
   it("records malformed profile push tokens while still delivering to valid devices", async () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
@@ -836,6 +878,55 @@ describe("createPushHandler", () => {
         }),
       ])
     );
+  });
+
+  it("polls receipts without Expo authorization when push security is not configured", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+    });
+    const { client } = createPushClientMock({
+      pendingDeliveries: [
+        {
+          notification_id: "notif-1",
+          user_id: "user-1",
+          expo_push_token: "ExpoPushToken[token-one]",
+          ticket_id: "ticket-ok",
+          attempt_count: 1,
+        },
+      ],
+    });
+    const createClientFn = vi.fn(() => client);
+    const fetchFn = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ data: { "ticket-ok": { status: "ok" } } }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+    );
+
+    const handler = createPushHandler({ createClientFn, env, fetchFn });
+
+    const response = await handler(
+      new Request("https://example.test/functions/v1/push", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer service-role",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "process_receipts" }),
+      })
+    );
+    const [, requestInit] = fetchFn.mock.calls[0] as unknown as [
+      string,
+      RequestInit
+    ];
+    const headers = requestInit.headers as Record<string, string>;
+
+    expect(response.status).toBe(200);
+    expect(headers.Authorization).toBeUndefined();
+    expect(headers.Accept).toBe("application/json");
+    expect(headers["Content-Type"]).toBe("application/json");
   });
 
   it("does not update deliveries when Expo returns top-level receipt errors", async () => {
