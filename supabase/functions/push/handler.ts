@@ -802,6 +802,10 @@ export function createPushHandler(dependencies: PushHandlerDependencies) {
           adminClient,
           buildInvalidTokenDeliveryRows(notification, invalidTargets)
         );
+
+        for (const target of invalidTargets) {
+          await revokePushTarget(adminClient, notification.user_id, target);
+        }
       }
 
       if (validTargets.length === 0) {

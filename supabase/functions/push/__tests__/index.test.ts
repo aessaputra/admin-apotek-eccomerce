@@ -356,7 +356,7 @@ describe("createPushHandler", () => {
       SUPABASE_URL: "https://demo.supabase.co",
       EXPO_ACCESS_TOKEN: "expo-secret",
     });
-    const { client, upserts } = createPushClientMock({
+    const { client, updates, upserts } = createPushClientMock({
       tokenRows: [
         {
           id: "token-row-invalid",
@@ -414,6 +414,42 @@ describe("createPushHandler", () => {
         ticket_id: "ticket-valid",
       }),
     ]);
+    expect(updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: "profile_push_tokens",
+          values: expect.objectContaining({
+            revoked_at: expect.any(String),
+            updated_at: expect.any(String),
+          }),
+          filters: expect.arrayContaining([
+            { column: "user_id", operator: "eq", value: "user-1" },
+            {
+              column: "expo_push_token",
+              operator: "eq",
+              value: "not-an-expo-token",
+            },
+            { column: "revoked_at", operator: "is", value: null },
+            { column: "id", operator: "eq", value: "token-row-invalid" },
+          ]),
+        }),
+        expect.objectContaining({
+          table: "profiles",
+          values: expect.objectContaining({
+            expo_push_token: null,
+            expo_push_token_updated_at: expect.any(String),
+          }),
+          filters: expect.arrayContaining([
+            { column: "id", operator: "eq", value: "user-1" },
+            {
+              column: "expo_push_token",
+              operator: "eq",
+              value: "not-an-expo-token",
+            },
+          ]),
+        }),
+      ])
+    );
   });
 
   it("does not record deliveries when Expo returns top-level send errors", async () => {
