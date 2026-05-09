@@ -1,0 +1,121 @@
+begin;
+
+update public.profile_push_tokens
+set
+  revoked_at = pg_catalog.timezone('utc'::text, pg_catalog.now()),
+  last_seen_at = pg_catalog.timezone('utc'::text, pg_catalog.now())
+where revoked_at is null
+  and expo_push_token !~ '^(ExpoPushToken|ExponentPushToken)\[[^\]]+\]$';
+
+update public.profiles
+set
+  expo_push_token = null,
+  expo_push_token_updated_at = pg_catalog.timezone('utc'::text, pg_catalog.now()),
+  updated_at = pg_catalog.timezone('utc'::text, pg_catalog.now())
+where expo_push_token is not null
+  and pg_catalog.btrim(expo_push_token) !~ '^(ExpoPushToken|ExponentPushToken)\[[^\]]+\]$';
+
+alter table public.profile_push_tokens
+drop constraint if exists profile_push_tokens_active_expo_push_token_format_chk;
+
+alter table public.profile_push_tokens
+add constraint profile_push_tokens_active_expo_push_token_format_chk
+check (
+  revoked_at is not null
+  or expo_push_token ~ '^(ExpoPushToken|ExponentPushToken)\[[^\]]+\]$'
+) not valid;
+
+alter table public.profiles
+drop constraint if exists profiles_expo_push_token_format_chk;
+
+alter table public.profiles
+add constraint profiles_expo_push_token_format_chk
+check (
+  expo_push_token is null
+  or pg_catalog.btrim(expo_push_token) ~ '^(ExpoPushToken|ExponentPushToken)\[[^\]]+\]$'
+) not valid;
+
+create or replace function public.claim_profile_push_token(
+  p_device_id text,
+  p_expo_push_token text,
+  p_platform text,
+  p_last_seen_at timestamptz default pg_catalog.timezone('utc'::text, pg_catalog.now())
+)
+returns public.profile_push_tokens
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_device_id text := nullif(pg_catalog.btrim(p_device_id), '');
+  v_expo_push_token text := nullif(pg_catalog.btrim(p_expo_push_token), '');
+  v_platform text := nullif(pg_catalog.btrim(p_platform), '');
+  v_last_seen_at timestamptz := coalesce(
+    p_last_seen_at,
+    pg_catalog.timezone('utc'::text, pg_catalog.now())
+  );
+  v_token_row public.profile_push_tokens;
+begin
+  if v_user_id is null then
+    raise exception 'Authentication required.' using errcode = '28000';
+  end if;
+
+  if v_device_id is null then
+    raise exception 'device_id is required.' using errcode = '22023';
+  end if;
+
+  if v_expo_push_token is null then
+    raise exception 'expo_push_token is required.' using errcode = '22023';
+  end if;
+
+  if v_expo_push_token !~ '^(ExpoPushToken|ExponentPushToken)\[[^\]]+\]$' then
+    raise exception 'expo_push_token must use ExpoPushToken[...] or ExponentPushToken[...] format.' using errcode = '22023';
+  end if;
+
+  if v_platform is null then
+    raise exception 'platform is required.' using errcode = '22023';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(v_expo_push_token, 0));
+
+  update public.profile_push_tokens
+  set
+    revoked_at = v_last_seen_at,
+    last_seen_at = v_last_seen_at
+  where expo_push_token = v_expo_push_token
+    and revoked_at is null
+    and (user_id <> v_user_id or device_id <> v_device_id);
+
+  insert into public.profile_push_tokens (
+    user_id,
+    device_id,
+    expo_push_token,
+    platform,
+    last_seen_at,
+    revoked_at
+  )
+  values (
+    v_user_id,
+    v_device_id,
+    v_expo_push_token,
+    v_platform,
+    v_last_seen_at,
+    null
+  )
+  on conflict (user_id, device_id)
+  do update set
+    expo_push_token = excluded.expo_push_token,
+    platform = excluded.platform,
+    last_seen_at = excluded.last_seen_at,
+    revoked_at = null
+  returning * into v_token_row;
+
+  return v_token_row;
+end;
+$$;
+
+revoke all on function public.claim_profile_push_token(text, text, text, timestamptz) from public;
+grant execute on function public.claim_profile_push_token(text, text, text, timestamptz) to authenticated;
+
+commit;
