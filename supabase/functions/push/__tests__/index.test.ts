@@ -112,11 +112,30 @@ function createPushClientMock(options?: {
   profileToken?: string | null;
   profileError?: string | null;
   pendingDeliveries?: PendingDeliveryFixture[];
+  authUserId?: string | null;
+  authError?: string | null;
 }) {
   const updates: UpdateRecord[] = [];
   const upserts: UpsertRecord[] = [];
   const selects: Array<{ table: string; columns: string }> = [];
   const selectQueries: Array<{ table: string; filters: QueryFilter[] }> = [];
+  const authGetUser = vi.fn(async () => {
+    if (options?.authError) {
+      return {
+        data: { user: null },
+        error: { message: options.authError },
+      };
+    }
+
+    const configuredUserId = options?.authUserId;
+    const user =
+      configuredUserId === null ? null : { id: configuredUserId ?? "user-1" };
+
+    return {
+      data: { user },
+      error: null,
+    };
+  });
 
   const tableClient = (table: string): PushTableClient => ({
     select: <Row = unknown>(columns: string) => {
@@ -182,9 +201,12 @@ function createPushClientMock(options?: {
 
   const client: PushAdminClient = {
     from: vi.fn(tableClient),
+    auth: {
+      getUser: authGetUser,
+    },
   };
 
-  return { client, selects, selectQueries, updates, upserts };
+  return { client, selects, selectQueries, updates, upserts, authGetUser };
 }
 
 function createNotification(overrides?: Partial<Record<string, unknown>>) {
@@ -220,6 +242,18 @@ function createWebhookRequest(record = createNotification()) {
   });
 }
 
+function createTestNotificationRequest(headers?: Record<string, string>) {
+  return new Request("https://example.test/functions/v1/push", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer user-jwt",
+      "Content-Type": "application/json",
+      ...headers,
+    },
+    body: JSON.stringify({ action: "send_test_notification" }),
+  });
+}
+
 describe("createPushHandler", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -229,6 +263,201 @@ describe("createPushHandler", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("sends an authenticated mobile test notification without notification inserts", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+      EXPO_ACCESS_TOKEN: "expo-secret",
+    });
+    const { client, authGetUser, selects, upserts } = createPushClientMock({
+      authUserId: "mobile-user-1",
+      tokenRows: [
+        {
+          id: "token-row-1",
+          expo_push_token: "ExpoPushToken[test-device]",
+          device_id: "ios-device",
+          platform: "ios",
+        },
+      ],
+    });
+    const createClientFn = vi.fn(() => client);
+    const fetchFn = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ data: { status: "ok", id: "ticket-test" } }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+    );
+
+    const handler = createPushHandler({ createClientFn, env, fetchFn });
+
+    const response = await handler(createTestNotificationRequest());
+    const payload = await response.json();
+    const [, requestInit] = fetchFn.mock.calls[0] as unknown as [
+      string,
+      RequestInit
+    ];
+    const expoBody = JSON.parse(String(requestInit.body));
+
+    expect(response.status).toBe(200);
+    expect(payload).toMatchObject({ delivered: true });
+    expect(authGetUser).toHaveBeenCalledWith("user-jwt");
+    expect(createClientFn).toHaveBeenCalledWith(
+      "https://demo.supabase.co",
+      "service-role"
+    );
+    expect(selects).toContainEqual({
+      table: "profile_push_tokens",
+      columns: "id, expo_push_token, device_id, platform",
+    });
+    expect(fetchFn).toHaveBeenCalledWith(
+      "https://exp.host/--/api/v2/push/send",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer expo-secret",
+        }),
+      })
+    );
+    expect(expoBody).toEqual([
+      expect.objectContaining({
+        to: "ExpoPushToken[test-device]",
+        title: "Tes Notifikasi",
+        body: "Ini adalah notifikasi tes dari aplikasi Apotek Ecommerce.",
+      }),
+    ]);
+    expect(upserts).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ table: "notifications" }),
+      ])
+    );
+    expect(upserts).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ table: "notification_push_deliveries" }),
+      ])
+    );
+  });
+
+  it("rejects test notification requests without a bearer JWT", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+      EXPO_ACCESS_TOKEN: "expo-secret",
+    });
+    const { client, authGetUser } = createPushClientMock();
+    const createClientFn = vi.fn(() => client);
+    const fetchFn = vi.fn();
+
+    const handler = createPushHandler({ createClientFn, env, fetchFn });
+
+    const response = await handler(
+      createTestNotificationRequest({ Authorization: "" })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(payload).toEqual({ error: "Unauthorized" });
+    expect(authGetUser).not.toHaveBeenCalled();
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("rejects test notification requests with an invalid user JWT", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+      EXPO_ACCESS_TOKEN: "expo-secret",
+    });
+    const { client, authGetUser } = createPushClientMock({
+      authError: "invalid jwt",
+    });
+    const createClientFn = vi.fn(() => client);
+    const fetchFn = vi.fn();
+
+    const handler = createPushHandler({ createClientFn, env, fetchFn });
+
+    const response = await handler(createTestNotificationRequest());
+    const payload = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(payload).toEqual({ error: "Unauthorized" });
+    expect(authGetUser).toHaveBeenCalledWith("user-jwt");
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("returns a controlled missing token result for authenticated test notifications", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+      EXPO_ACCESS_TOKEN: "expo-secret",
+    });
+    const { client, upserts } = createPushClientMock({
+      authUserId: "mobile-user-1",
+      tokenRows: [],
+      profileToken: null,
+    });
+    const createClientFn = vi.fn(() => client);
+    const fetchFn = vi.fn();
+
+    const handler = createPushHandler({ createClientFn, env, fetchFn });
+
+    const response = await handler(createTestNotificationRequest());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({ delivered: false, reason: "missing_token" });
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(upserts).toEqual([]);
+  });
+
+  it("returns a controlled invalid token result for authenticated test notifications", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+      EXPO_ACCESS_TOKEN: "expo-secret",
+    });
+    const { client, updates, upserts } = createPushClientMock({
+      authUserId: "mobile-user-1",
+      tokenRows: [
+        {
+          id: "token-row-invalid",
+          expo_push_token: "not-an-expo-token",
+          device_id: "ios-device",
+          platform: "ios",
+        },
+      ],
+    });
+    const createClientFn = vi.fn(() => client);
+    const fetchFn = vi.fn();
+
+    const handler = createPushHandler({ createClientFn, env, fetchFn });
+
+    const response = await handler(createTestNotificationRequest());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({
+      delivered: false,
+      reason: "invalid_token_format",
+    });
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(upserts).toEqual([]);
+    expect(updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: "profile_push_tokens",
+          filters: expect.arrayContaining([
+            { column: "user_id", operator: "eq", value: "mobile-user-1" },
+            {
+              column: "expo_push_token",
+              operator: "eq",
+              value: "not-an-expo-token",
+            },
+          ]),
+        }),
+      ])
+    );
   });
 
   it("skips admin dashboard notifications before profile lookup or Expo access", async () => {

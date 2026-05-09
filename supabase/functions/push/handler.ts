@@ -24,6 +24,10 @@ type ReceiptActionPayload = {
   limit?: unknown;
 };
 
+type TestNotificationActionPayload = {
+  action?: unknown;
+};
+
 type PushQueryError = { message: string };
 
 type ExpoPushTicket = {
@@ -102,6 +106,15 @@ type PushDeliveryUpdate = {
   failed_at?: string | null;
 };
 
+type PushAuthUser = {
+  id?: string;
+};
+
+type PushAuthGetUserResult = {
+  data: { user: PushAuthUser | null };
+  error: PushQueryError | null;
+};
+
 type QueryResult<T> = { data: T; error: PushQueryError | null };
 type MaybeSingleResult<T> = { data: T | null; error: PushQueryError | null };
 
@@ -140,6 +153,9 @@ export interface PushTableClient {
 
 export interface PushAdminClient {
   from: (table: string) => PushTableClient;
+  auth: {
+    getUser: (jwt: string) => PromiseLike<PushAuthGetUserResult>;
+  };
 }
 
 export interface PushEnvironment {
@@ -231,6 +247,23 @@ function isReceiptActionPayload(payload: ReceiptActionPayload): boolean {
   return (
     payload.action === "process_receipts" || payload.action === "check_receipts"
   );
+}
+
+function isTestNotificationActionPayload(
+  payload: TestNotificationActionPayload
+): boolean {
+  return payload.action === "send_test_notification";
+}
+
+function extractBearerToken(req: Request): string | null {
+  const authHeader = req.headers.get("Authorization")?.trim();
+
+  if (!authHeader?.startsWith("Bearer ")) {
+    return null;
+  }
+
+  const token = authHeader.slice("Bearer ".length).trim();
+  return token.length > 0 ? token : null;
 }
 
 function isAdminDashboardNotification(
@@ -392,6 +425,21 @@ function createExpoMessages(
     sound: "default",
     priority: normalizeExpoPriority(notification.priority),
   }));
+}
+
+function createTestNotification(userId: string): NotificationRecord {
+  return {
+    id: `test:${userId}:${Date.now()}`,
+    user_id: userId,
+    type: "test_notification",
+    title: "Tes Notifikasi",
+    body: "Ini adalah notifikasi tes dari aplikasi Apotek Ecommerce.",
+    cta_route: null,
+    data: { action: "send_test_notification" },
+    priority: "normal",
+    source_event_key: null,
+    created_at: new Date().toISOString(),
+  };
 }
 
 function partitionPushTargetsByTokenFormat(targets: PushTokenTarget[]) {
@@ -707,6 +755,181 @@ async function processReceipts(
   return jsonResponse({ processed: true, receipts: updatedCount });
 }
 
+async function sendPushNotification(
+  adminClient: PushAdminClient,
+  fetchFn: typeof fetch,
+  env: PushEnvironment,
+  notification: NotificationRecord,
+  options: { persistDeliveryRows: boolean }
+): Promise<Response> {
+  const pushTargetsResult = await loadPushTargets(adminClient, notification);
+
+  if (pushTargetsResult.lookupFailed) {
+    return jsonResponse({
+      delivered: false,
+      reason: pushTargetsResult.failureReason,
+    });
+  }
+
+  if (pushTargetsResult.tokens.length === 0) {
+    console.info("[push] Recipient has no Expo push token", {
+      notificationId: notification.id,
+      userId: notification.user_id,
+    });
+    return jsonResponse({ delivered: false, reason: "missing_token" });
+  }
+
+  const { validTargets, invalidTargets } = partitionPushTargetsByTokenFormat(
+    pushTargetsResult.tokens
+  );
+
+  if (invalidTargets.length > 0) {
+    console.warn("[push] Recipient push token format is invalid", {
+      notificationId: notification.id,
+      userId: notification.user_id,
+      invalidTokenCount: invalidTargets.length,
+    });
+
+    if (options.persistDeliveryRows) {
+      await persistDeliveries(
+        adminClient,
+        buildInvalidTokenDeliveryRows(notification, invalidTargets)
+      );
+    }
+
+    for (const target of invalidTargets) {
+      await revokePushTarget(adminClient, notification.user_id, target);
+    }
+  }
+
+  if (validTargets.length === 0) {
+    return jsonResponse({
+      delivered: false,
+      reason: "invalid_token_format",
+    });
+  }
+
+  const expoAccessToken = env.get("EXPO_ACCESS_TOKEN")?.trim();
+
+  let expoResponse: ExpoPushResponse;
+
+  try {
+    const response = await fetchFn(EXPO_PUSH_URL, {
+      method: "POST",
+      headers: createExpoApiHeaders(expoAccessToken),
+      body: JSON.stringify(createExpoMessages(notification, validTargets)),
+    });
+
+    expoResponse = (await response
+      .json()
+      .catch(() => ({}))) as ExpoPushResponse;
+
+    if (!response.ok) {
+      console.error("[push] Expo Push API request failed", {
+        notificationId: notification.id,
+        status: response.status,
+        response: expoResponse,
+      });
+      return jsonResponse({
+        delivered: false,
+        reason: "expo_request_failed",
+      });
+    }
+
+    if (hasExpoApiErrors(expoResponse)) {
+      console.error("[push] Expo Push API returned errors", {
+        notificationId: notification.id,
+        response: expoResponse,
+      });
+      return jsonResponse({
+        delivered: false,
+        reason: "expo_response_error",
+      });
+    }
+  } catch (error: unknown) {
+    console.error("[push] Expo Push API network error", {
+      notificationId: notification.id,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return jsonResponse({ delivered: false, reason: "expo_network_error" });
+  }
+
+  const tickets = toTicketList(expoResponse);
+
+  if (options.persistDeliveryRows) {
+    await persistDeliveries(
+      adminClient,
+      buildDeliveryRows(notification, validTargets, tickets)
+    );
+  }
+
+  const indexedErrorTicket = tickets
+    .map((ticket, index) => ({ ticket, index }))
+    .find(({ ticket }) => ticket.status === "error");
+
+  for (const [index, ticket] of tickets.entries()) {
+    if (
+      ticket.status !== "error" ||
+      toExpoErrorCode(ticket) !== "DeviceNotRegistered"
+    ) {
+      continue;
+    }
+
+    const target = validTargets[index];
+    if (target) {
+      await revokePushTarget(adminClient, notification.user_id, target);
+    }
+  }
+
+  if (indexedErrorTicket) {
+    const expoErrorCode = toExpoErrorCode(indexedErrorTicket.ticket);
+
+    if (expoErrorCode !== "DeviceNotRegistered") {
+      console.error("[push] Expo ticket returned an error", {
+        notificationId: notification.id,
+        ticket: indexedErrorTicket.ticket,
+      });
+    }
+
+    return jsonResponse({
+      delivered: false,
+      reason: expoErrorCode ?? "expo_ticket_error",
+      tickets,
+    });
+  }
+
+  return jsonResponse({
+    delivered: true,
+    tickets,
+  });
+}
+
+async function authenticateSupabaseUser(
+  req: Request,
+  adminClient: PushAdminClient
+): Promise<{ userId: string | null; response: Response | null }> {
+  const jwt = extractBearerToken(req);
+
+  if (!jwt) {
+    return {
+      userId: null,
+      response: jsonResponse({ error: "Unauthorized" }, 401),
+    };
+  }
+
+  const { data, error } = await adminClient.auth.getUser(jwt);
+  const userId = typeof data.user?.id === "string" ? data.user.id : "";
+
+  if (error || !userId) {
+    return {
+      userId: null,
+      response: jsonResponse({ error: "Unauthorized" }, 401),
+    };
+  }
+
+  return { userId, response: null };
+}
+
 export function createPushHandler(dependencies: PushHandlerDependencies) {
   const fetchFn = dependencies.fetchFn ?? fetch;
 
@@ -715,15 +938,22 @@ export function createPushHandler(dependencies: PushHandlerDependencies) {
       return jsonResponse({ error: "Method Not Allowed" }, 405);
     }
 
-    if (!isAuthorizedRequest(req, dependencies.env)) {
-      return jsonResponse({ error: "Unauthorized" }, 401);
-    }
-
     try {
       const body = await req.json().catch(() => ({}));
       const receiptPayload = body as ReceiptActionPayload;
+      const testNotificationPayload = body as TestNotificationActionPayload;
 
-      if (!isReceiptActionPayload(receiptPayload)) {
+      if (
+        !isTestNotificationActionPayload(testNotificationPayload) &&
+        !isAuthorizedRequest(req, dependencies.env)
+      ) {
+        return jsonResponse({ error: "Unauthorized" }, 401);
+      }
+
+      if (
+        !isReceiptActionPayload(receiptPayload) &&
+        !isTestNotificationActionPayload(testNotificationPayload)
+      ) {
         const payload = body as Partial<WebhookPayload>;
 
         if (!isSupportedWebhookPayload(payload)) {
@@ -751,6 +981,28 @@ export function createPushHandler(dependencies: PushHandlerDependencies) {
 
       const adminClient = dependencies.createClientFn(supabaseUrl, supabaseKey);
 
+      if (isTestNotificationActionPayload(testNotificationPayload)) {
+        const authResult = await authenticateSupabaseUser(req, adminClient);
+
+        if (authResult.response) {
+          return authResult.response;
+        }
+
+        const userId = authResult.userId;
+
+        if (!userId) {
+          return jsonResponse({ error: "Unauthorized" }, 401);
+        }
+
+        return sendPushNotification(
+          adminClient,
+          fetchFn,
+          dependencies.env,
+          createTestNotification(userId),
+          { persistDeliveryRows: false }
+        );
+      }
+
       if (isReceiptActionPayload(receiptPayload)) {
         return processReceipts(
           adminClient,
@@ -770,142 +1022,13 @@ export function createPushHandler(dependencies: PushHandlerDependencies) {
 
       const notification = payload.record;
 
-      const pushTargetsResult = await loadPushTargets(
+      return sendPushNotification(
         adminClient,
-        notification
+        fetchFn,
+        dependencies.env,
+        notification,
+        { persistDeliveryRows: true }
       );
-
-      if (pushTargetsResult.lookupFailed) {
-        return jsonResponse({
-          delivered: false,
-          reason: pushTargetsResult.failureReason,
-        });
-      }
-
-      if (pushTargetsResult.tokens.length === 0) {
-        console.info("[push] Recipient has no Expo push token", {
-          notificationId: notification.id,
-          userId: notification.user_id,
-        });
-        return jsonResponse({ delivered: false, reason: "missing_token" });
-      }
-
-      const { validTargets, invalidTargets } =
-        partitionPushTargetsByTokenFormat(pushTargetsResult.tokens);
-
-      if (invalidTargets.length > 0) {
-        console.warn("[push] Recipient push token format is invalid", {
-          notificationId: notification.id,
-          userId: notification.user_id,
-          invalidTokenCount: invalidTargets.length,
-        });
-        await persistDeliveries(
-          adminClient,
-          buildInvalidTokenDeliveryRows(notification, invalidTargets)
-        );
-
-        for (const target of invalidTargets) {
-          await revokePushTarget(adminClient, notification.user_id, target);
-        }
-      }
-
-      if (validTargets.length === 0) {
-        return jsonResponse({
-          delivered: false,
-          reason: "invalid_token_format",
-        });
-      }
-
-      const expoAccessToken = dependencies.env.get("EXPO_ACCESS_TOKEN")?.trim();
-
-      let expoResponse: ExpoPushResponse;
-
-      try {
-        const response = await fetchFn(EXPO_PUSH_URL, {
-          method: "POST",
-          headers: createExpoApiHeaders(expoAccessToken),
-          body: JSON.stringify(createExpoMessages(notification, validTargets)),
-        });
-
-        expoResponse = (await response
-          .json()
-          .catch(() => ({}))) as ExpoPushResponse;
-
-        if (!response.ok) {
-          console.error("[push] Expo Push API request failed", {
-            notificationId: notification.id,
-            status: response.status,
-            response: expoResponse,
-          });
-          return jsonResponse({
-            delivered: false,
-            reason: "expo_request_failed",
-          });
-        }
-
-        if (hasExpoApiErrors(expoResponse)) {
-          console.error("[push] Expo Push API returned errors", {
-            notificationId: notification.id,
-            response: expoResponse,
-          });
-          return jsonResponse({
-            delivered: false,
-            reason: "expo_response_error",
-          });
-        }
-      } catch (error: unknown) {
-        console.error("[push] Expo Push API network error", {
-          notificationId: notification.id,
-          message: error instanceof Error ? error.message : String(error),
-        });
-        return jsonResponse({ delivered: false, reason: "expo_network_error" });
-      }
-
-      const tickets = toTicketList(expoResponse);
-      await persistDeliveries(
-        adminClient,
-        buildDeliveryRows(notification, validTargets, tickets)
-      );
-
-      const indexedErrorTicket = tickets
-        .map((ticket, index) => ({ ticket, index }))
-        .find(({ ticket }) => ticket.status === "error");
-
-      for (const [index, ticket] of tickets.entries()) {
-        if (
-          ticket.status !== "error" ||
-          toExpoErrorCode(ticket) !== "DeviceNotRegistered"
-        ) {
-          continue;
-        }
-
-        const target = validTargets[index];
-        if (target) {
-          await revokePushTarget(adminClient, notification.user_id, target);
-        }
-      }
-
-      if (indexedErrorTicket) {
-        const expoErrorCode = toExpoErrorCode(indexedErrorTicket.ticket);
-
-        if (expoErrorCode !== "DeviceNotRegistered") {
-          console.error("[push] Expo ticket returned an error", {
-            notificationId: notification.id,
-            ticket: indexedErrorTicket.ticket,
-          });
-        }
-
-        return jsonResponse({
-          delivered: false,
-          reason: expoErrorCode ?? "expo_ticket_error",
-          tickets,
-        });
-      }
-
-      return jsonResponse({
-        delivered: true,
-        tickets,
-      });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
       console.error("[push] Internal error:", message);
