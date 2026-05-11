@@ -13,9 +13,17 @@ import {
   type ShipmentSnapshot,
   toShipmentSnapshot,
 } from "../_shared/order-manager-mutation.ts";
-import { requiresBiteshipSyncForProviderStatusTransition } from "../_shared/order-flow-rules.ts";
+import {
+  canApplyOrderStatusForPaymentStatus,
+  requiresBiteshipSyncForProviderStatusTransition,
+} from "../_shared/order-flow-rules.ts";
 import { resolveBiteshipStatus } from "../_shared/order-status.ts";
 import { getSupabaseAdminClient } from "../_shared/supabase.ts";
+import {
+  cancelMidtransTransaction,
+  mapMidtransStatus,
+  verifyMidtransTransaction,
+} from "../_shared/midtrans.ts";
 import {
   getSideEffectTask,
   saveSideEffectTask,
@@ -58,6 +66,17 @@ const TRANSITION_RULES: Record<string, string[]> = {
   shipped: ["in_transit", "delivered"],
   in_transit: ["delivered"],
 };
+
+const MIDTRANS_CANCELLABLE_TRANSACTION_STATUSES = new Set([
+  "pending",
+  "authorize",
+]);
+const MIDTRANS_TERMINAL_CANCEL_STATUSES = new Set([
+  "cancel",
+  "deny",
+  "expire",
+  "failure",
+]);
 
 const TERMINAL_STATUSES = new Set(["delivered", "cancelled"]);
 const STATUS_PROGRESS_ORDER: Record<string, number> = {
@@ -264,6 +283,55 @@ async function ensureAwaitingShipmentSideEffectsQueued(
   triggerWebhookSideEffectProcessor(orderId);
 }
 
+async function buildCancellationPaymentUpdate(order: {
+  id: string;
+  status: string;
+  payment_status: string;
+  midtrans_order_id?: string | null;
+}): Promise<Record<string, unknown>> {
+  if (order.payment_status === "settlement") {
+    return {};
+  }
+
+  if (!["pending", "authorize"].includes(order.payment_status)) {
+    return {};
+  }
+
+  const midtransOrderId = order.midtrans_order_id?.trim();
+  if (!midtransOrderId) {
+    return { status: "cancel" };
+  }
+
+  const serverKey = Deno.env.get("MIDTRANS_SERVER_KEY");
+  if (!serverKey) {
+    throw new Error("MIDTRANS_SERVER_KEY is not configured");
+  }
+
+  let verifiedStatus = await verifyMidtransTransaction(midtransOrderId, serverKey);
+  if (verifiedStatus.transaction_status === "settlement") {
+    throw new Error("Paid Midtrans transactions must be refunded through a refund flow before marking payment as refunded");
+  }
+
+  if (MIDTRANS_CANCELLABLE_TRANSACTION_STATUSES.has(verifiedStatus.transaction_status)) {
+    await cancelMidtransTransaction(midtransOrderId, serverKey);
+    verifiedStatus = await verifyMidtransTransaction(midtransOrderId, serverKey);
+  } else if (!MIDTRANS_TERMINAL_CANCEL_STATUSES.has(verifiedStatus.transaction_status)) {
+    throw new Error(`Midtrans transaction status '${verifiedStatus.transaction_status}' is not cancellable`);
+  }
+
+  const { newPaymentStatus } = mapMidtransStatus(
+    verifiedStatus.transaction_status,
+    verifiedStatus.fraud_status || "",
+    order.payment_status as "pending" | "authorize",
+    order.status,
+  );
+
+  return {
+    status: newPaymentStatus,
+    midtrans_transaction_id: verifiedStatus.transaction_id || null,
+  };
+}
+
 async function restoreMutationState(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
   params: {
@@ -411,7 +479,7 @@ Deno.serve(async (req: Request) => {
     const { data: order, error: orderError } = await adminClient
       .from("order_read_model")
       .select(
-        "id, user_id, status, payment_status, waybill_number, waybill_source, biteship_order_id, biteship_tracking_id",
+        "id, user_id, status, payment_status, midtrans_order_id, waybill_number, waybill_source, biteship_order_id, biteship_tracking_id",
       )
       .eq("id", body.orderId)
       .single();
@@ -434,6 +502,24 @@ Deno.serve(async (req: Request) => {
           JSON.stringify({ error: "payload.to is required" }),
           {
             status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      if (
+        !canApplyOrderStatusForPaymentStatus({
+          targetStatus: to,
+          paymentStatus: order.payment_status,
+        })
+      ) {
+        return new Response(
+          JSON.stringify({
+            error: "PAYMENT_NOT_SETTLED",
+            message: "Order fulfillment requires settled payment",
+          }),
+          {
+            status: 409,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           },
         );
@@ -574,22 +660,8 @@ Deno.serve(async (req: Request) => {
         updated_at: operationTimestamp,
       };
 
-      // When cancelling order, also update payment_status to maintain consistency
-      // Following Midtrans best practices: separate order status from payment status
       if (to === "cancelled") {
-        const currentPaymentStatus = order.payment_status;
-
-        if (
-          currentPaymentStatus === "settlement" ||
-          currentPaymentStatus === "capture"
-        ) {
-          // Payment already settled - mark as refund (actual refund should be initiated separately)
-          paymentUpdatePayload.status = "refund";
-        } else if (currentPaymentStatus === "pending") {
-          // Payment still pending - mark as cancelled (void operation)
-          paymentUpdatePayload.status = "cancel";
-        }
-        // For other statuses (expire, deny, refund), leave as-is
+        Object.assign(paymentUpdatePayload, await buildCancellationPaymentUpdate(order));
       }
 
       // If admin is providing a manual waybill (override), record audit metadata
@@ -747,6 +819,19 @@ Deno.serve(async (req: Request) => {
     }
 
     if (body.action === "sync_tracking") {
+      if (order.payment_status !== "settlement") {
+        return new Response(
+          JSON.stringify({
+            error: "PAYMENT_NOT_SETTLED",
+            message: "Tracking sync requires settled payment",
+          }),
+          {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
       if (!order.biteship_order_id) {
         return new Response(
           JSON.stringify({ error: "Order has no biteship_order_id" }),
