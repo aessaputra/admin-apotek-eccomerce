@@ -5,12 +5,14 @@ import {
   ORDER_DETAIL_NOTIFICATION_ROUTE,
   insertNotificationOrThrow,
 } from '../_shared/notification-helpers.ts';
+import { canConfirmReceivedOrder } from '../_shared/order-flow-rules.ts';
 import { getSupabaseAdminClient } from '../_shared/supabase.ts';
 
 type OrderRow = {
   id: string;
   user_id: string | null;
   status: string;
+  payment_status: string;
   delivered_at: string | null;
   complaint_window_expires_at: string | null;
   customer_completed_at: string | null;
@@ -43,6 +45,14 @@ type OrdersTableQuery = {
   };
 };
 
+type OrderReadModelQuery = {
+  select: (columns: string) => {
+    eq: (column: string, value: string) => {
+      maybeSingle: () => PromiseLike<{ data: OrderRow | null; error: { message: string } | null }>;
+    };
+  };
+};
+
 type OrderActivitiesTableQuery = {
   insert: (values: OrderActivitiesInsert) => PromiseLike<{ error: { message: string } | null }>;
 };
@@ -53,6 +63,7 @@ type NotificationsTableQuery = {
 
 type ConfirmOrderReceivedAdminClient = {
   from(table: 'orders'): OrdersTableQuery;
+  from(table: 'order_read_model'): OrderReadModelQuery;
   from(table: 'order_activities'): OrderActivitiesTableQuery;
   from(table: 'notifications'): NotificationsTableQuery;
 };
@@ -144,9 +155,9 @@ Deno.serve(async req => {
 
     const adminClient = getSupabaseAdminClient() as unknown as ConfirmOrderReceivedAdminClient;
     const { data: order, error: orderError } = await adminClient
-      .from('orders')
+      .from('order_read_model')
       .select(
-        'id, user_id, status, delivered_at, complaint_window_expires_at, customer_completed_at',
+        'id, user_id, status, payment_status, delivered_at, complaint_window_expires_at, customer_completed_at',
       )
       .eq('id', orderId)
       .maybeSingle();
@@ -165,6 +176,10 @@ Deno.serve(async req => {
 
     if (order.status !== 'delivered') {
       return jsonResponse({ error: 'Only delivered orders can be confirmed' }, 409);
+    }
+
+    if (!canConfirmReceivedOrder({ orderStatus: order.status, paymentStatus: order.payment_status })) {
+      return jsonResponse({ error: 'Only paid orders can be confirmed' }, 409);
     }
 
     if (order.customer_completed_at) {
