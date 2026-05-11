@@ -94,6 +94,7 @@ interface DetailListItem {
 const TERMINAL_STATUSES = ["delivered", "cancelled"];
 // Only lock for terminal statuses - shipped can still transition to delivered
 const LOCKED_STATUSES = ["delivered", "cancelled"];
+const FULFILLMENT_STATUSES_REQUIRING_SETTLEMENT = ["processing", "awaiting_shipment", "shipped", "in_transit", "delivered"];
 
 const formatDisplayLabel = (value: string | null | undefined) => {
   if (!value) {
@@ -151,14 +152,17 @@ export const OrderShow: React.FC = () => {
   const hasProviderManagedShipment =
     hasBiteship || !!record?.biteship_tracking_id || record?.waybill_source === "system";
   const currentStatus = record?.status ?? "";
-  const canSyncTracking = hasBiteship && !TERMINAL_STATUSES.includes(currentStatus);
+  const isPaymentSettled = record?.payment_status === "settlement";
+  const isTerminalStatus = TERMINAL_STATUSES.includes(currentStatus);
+  const canSyncTracking = hasBiteship && !isTerminalStatus && isPaymentSettled;
+  const showTrackingPaymentGuard = hasBiteship && !isTerminalStatus && !isPaymentSettled;
 
   // Status dropdown lock: only lock for terminal statuses (delivered, cancelled)
   // shipped CAN still transition to delivered, so don't lock it
   const isStatusDropdownLocked = LOCKED_STATUSES.includes(currentStatus);
 
   // Save button: disabled only for terminal statuses
-  const isFormDisabled = TERMINAL_STATUSES.includes(currentStatus);
+  const isFormDisabled = isTerminalStatus;
 
   // Waybill fully locked after shipped/delivered — no override possible
   const isWaybillFullyLocked = ["shipped", "delivered"].includes(currentStatus);
@@ -240,7 +244,15 @@ export const OrderShow: React.FC = () => {
   };
 
   const handleSyncTracking = async () => {
-    if (!record?.biteship_order_id || !canSyncTracking) return;
+    if (!record?.biteship_order_id || isTerminalStatus) return;
+    if (!isPaymentSettled) {
+      modal.error({
+        title: translate("orders.paymentGuard.syncTitle"),
+        content: translate("orders.paymentGuard.syncDescription"),
+      });
+      return;
+    }
+
     setSyncing(true);
     try {
       const result = await invokeOrderManager({
@@ -308,10 +320,21 @@ export const OrderShow: React.FC = () => {
   };
 
   const handleUpdate = (values: { status: string; waybill_number?: string; waybill_override_reason?: string }) => {
+    const isBlockedFulfillmentTransition = !isPaymentSettled && FULFILLMENT_STATUSES_REQUIRING_SETTLEMENT.includes(values.status);
+
+    if (isBlockedFulfillmentTransition) {
+      modal.error({
+        title: translate("orders.paymentGuard.transitionTitle"),
+        content: translate("orders.paymentGuard.transitionDescription"),
+      });
+      return;
+    }
+
     if (values.status === "cancelled") {
+      const cancelContentKey = isPaymentSettled ? "orders.cancelContentPaid" : "orders.cancelContentUnpaid";
       modal.confirm({
         title: translate("orders.cancelConfirm"),
-        content: translate("orders.cancelContent"),
+        content: translate(cancelContentKey),
         okText: translate("orders.cancelOk"),
         cancelText: translate("orders.cancelButton"),
         okButtonProps: { danger: true },
@@ -328,9 +351,15 @@ export const OrderShow: React.FC = () => {
     hasProviderManagedShipment,
     allowManualWaybillOverride: manualWaybillMode,
   });
+  const paymentSafeAllowed = isPaymentSettled
+    ? allowed
+    : allowed.filter((status) => !FULFILLMENT_STATUSES_REQUIRING_SETTLEMENT.includes(status));
+  const blockedFulfillmentTransitions = allowed.filter(
+    (status) => !paymentSafeAllowed.includes(status) && FULFILLMENT_STATUSES_REQUIRING_SETTLEMENT.includes(status),
+  );
   const baseOptions = isStatusDropdownLocked
     ? STATUS_OPTIONS.filter((opt) => opt.value === current)
-    : STATUS_OPTIONS.filter((opt) => allowed.includes(String(opt.value)));
+    : STATUS_OPTIONS.filter((opt) => paymentSafeAllowed.includes(String(opt.value)));
   const currentInOptions = baseOptions.some((opt) => opt.value === current);
   const availableStatusOptions = currentInOptions
     ? baseOptions
@@ -339,6 +368,12 @@ export const OrderShow: React.FC = () => {
     (option) => option.value !== current,
   );
   const isSaveDisabled = isFormDisabled || !hasRealNextStatusTransition;
+  const hasPaymentGuardedFulfillment = blockedFulfillmentTransitions.length > 0;
+  const actionGuideDescription = isStatusDropdownLocked
+    ? translate("orders.actionGuide.lockedDescription")
+    : isPaymentSettled
+      ? translate("orders.actionGuide.settledDescription")
+      : translate("orders.actionGuide.unsettledDescription");
 
   useEffect(() => {
     if (record) {
@@ -735,6 +770,43 @@ export const OrderShow: React.FC = () => {
           }
         >
           <Text type="secondary">{translate("orders.actionsDescription")}</Text>
+
+          <Alert
+            style={{ marginTop: token.marginMD }}
+            type={isStatusDropdownLocked ? "info" : isPaymentSettled ? "success" : "warning"}
+            showIcon
+            message={translate("orders.actionGuide.title")}
+            description={
+              <Space direction="vertical" size={token.marginXXS}>
+                <Text>{actionGuideDescription}</Text>
+                <ol style={{ margin: 0, paddingInlineStart: token.marginLG }}>
+                  <li>{translate("orders.actionGuide.stepPayment")}</li>
+                  <li>{translate("orders.actionGuide.stepFulfillment")}</li>
+                  <li>{translate("orders.actionGuide.stepTracking")}</li>
+                </ol>
+              </Space>
+            }
+          />
+
+          {hasPaymentGuardedFulfillment && (
+            <Alert
+              style={{ marginTop: token.marginMD }}
+              type="warning"
+              showIcon
+              message={translate("orders.paymentGuard.transitionTitle")}
+              description={translate("orders.paymentGuard.transitionDescription")}
+            />
+          )}
+
+          {showTrackingPaymentGuard && (
+            <Alert
+              style={{ marginTop: token.marginMD }}
+              type="warning"
+              showIcon
+              message={translate("orders.paymentGuard.syncTitle")}
+              description={translate("orders.paymentGuard.syncDescription")}
+            />
+          )}
 
           {canSyncTracking && (
             <div style={{ marginTop: token.marginMD }}>

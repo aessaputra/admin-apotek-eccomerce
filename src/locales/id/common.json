@@ -391,7 +391,7 @@
       },
     "updateOrder": "Update Pesanan",
     "actionsTitle": "Aksi Pesanan",
-    "actionsDescription": "Tinjau detail pesanan terbaru sebelum memperbarui status atau informasi pengiriman.",
+    "actionsDescription": "Ikuti langkah aman di bawah sebelum mengubah fulfillment atau data pengiriman.",
       "currentOrderStatus": "Status Pesanan Saat Ini",
       "customerCompletionStage": "Tahap Penyelesaian Pelanggan",
       "currentPaymentStatus": "Status Pembayaran Saat Ini",
@@ -409,10 +409,33 @@
     "saveError": "Gagal memperbarui pesanan",
     "cancelConfirm": "Batalkan pesanan?",
     "cancelContent": "Status pesanan akan diubah menjadi Dibatalkan. Tindakan ini tidak dapat dibatalkan.",
+    "cancelContentPaid": "Pesanan yang sudah dibayar ini akan menjadi Dibatalkan. Lanjutkan hanya jika proses refund atau tindak lanjut settlement sudah ditangani di luar perubahan status ini.",
+    "cancelContentUnpaid": "Pesanan yang belum dibayar ini akan menjadi Dibatalkan dan penanganan pembatalan Midtrans/pesanan akan menghentikan jalur pembayaran tertunda. Tindakan ini tidak dapat dibatalkan.",
     "cancelOk": "Ya, Batalkan",
     "cancelButton": "Batal",
     "filterStatus": "Pilih Status",
     "filterPayment": "Pilih Pembayaran",
+    "quickFilters": {
+      "title": "Antrean operasional",
+      "description": "Gunakan pintasan ini untuk antrean admin umum. Tinjauan pelacakan memakai pesanan dibayar yang sudah dikirim atau sedang transit sebagai filter daftar terdekat yang tersedia.",
+      "clear": "Hapus filter antrean",
+      "paidUnprocessed": {
+        "label": "Dibayar, siap disiapkan",
+        "description": "Pesanan dibayar yang berstatus Processing. Siapkan item dan lanjutkan fulfillment dari halaman detail pesanan."
+      },
+      "readyToShip": {
+        "label": "Siap dikirim",
+        "description": "Pesanan dibayar yang menunggu serah terima pengiriman atau pemeriksaan resi."
+      },
+      "trackingRelevant": {
+        "label": "Pantau kiriman",
+        "description": "Pesanan dibayar yang sudah dikirim atau sedang transit. Gunakan halaman detail untuk sinkronisasi pelacakan jika tersedia."
+      },
+      "awaitingCustomer": {
+        "label": "Menunggu pelanggan",
+        "description": "Pesanan dibayar yang menunggu penyelesaian pelanggan atau tindak lanjut masa komplain."
+      }
+    },
     "showDetail": "Lihat Detail",
     "tables": {
       "listAriaLabel": "Tabel pesanan",
@@ -444,6 +467,21 @@
     "manualWaybillWarning": "Input manual aktif — pengiriman Biteship sudah ada, tetapi nomor resi akan diganti.",
     "providerManagedWaybillHelp": "Biteship mengelola pengiriman ini. Gunakan Sinkronkan Pelacakan untuk pembaruan dari provider, dan aktifkan input resi manual hanya untuk fallback atau override.",
     "syncTracking": "Sinkronkan Pelacakan",
+    "actionGuide": {
+      "title": "Langkah pemrosesan pesanan",
+      "settledDescription": "Pembayaran sudah settlement. Lanjutkan langkah fulfillment berikutnya sesuai bukti pengiriman.",
+      "unsettledDescription": "Pembayaran belum settlement. Fulfillment dan sinkronisasi pelacakan tetap terkunci, tetapi pembatalan tetap tersedia jika status pesanan mengizinkan.",
+      "lockedDescription": "Pesanan ini berada di status akhir. Tinjau detail dan riwayat aktivitas tanpa mengubah fulfillment.",
+      "stepPayment": "Pastikan status pembayaran terlebih dahulu.",
+      "stepFulfillment": "Ubah fulfillment hanya setelah pembayaran settlement.",
+      "stepTracking": "Sinkronkan pelacakan hanya untuk pengiriman provider yang sudah settlement."
+    },
+    "paymentGuard": {
+      "transitionTitle": "Pembayaran harus settlement sebelum fulfillment",
+      "transitionDescription": "Aksi proses, pengiriman, transit, dan terkirim tersedia setelah status pembayaran menjadi Settlement. Pembatalan tetap dapat digunakan jika status pesanan mengizinkan.",
+      "syncTitle": "Sinkronisasi pelacakan menunggu settlement",
+      "syncDescription": "Sinkronkan Pelacakan hanya tersedia setelah pembayaran Settlement, sesuai aturan backend pesanan."
+    },
     "trackingSynced": "Pelacakan Tersinkron",
     "syncFailed": "Sinkronisasi Gagal",
     "trackingSyncSuccess": "Status diperbarui menjadi {{status}}",

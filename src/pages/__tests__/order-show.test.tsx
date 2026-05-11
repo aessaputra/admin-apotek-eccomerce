@@ -411,6 +411,47 @@ describe("OrderShow", () => {
     });
   });
 
+  it("blocks unpaid fulfillment and tracking actions while preserving cancellation", async () => {
+    mocks.useShow.mockReturnValue({
+      result: {
+        id: "order-unpaid",
+        total_amount: 25000,
+        status: "pending",
+        payment_status: "pending",
+        waybill_number: null,
+        waybill_source: null,
+        biteship_order_id: "BT-unpaid",
+        created_at: "2026-04-01T00:00:00.000Z",
+        order_items: [
+          { id: "item-unpaid", quantity: 1, price_at_purchase: 25000, products: { name: "Vitamin C" } },
+        ],
+      },
+      query: { isLoading: false, refetch: mocks.refetch },
+    });
+
+    render(<OrderShow />);
+
+    await waitFor(() => {
+      expect(mocks.setFieldsValue).toHaveBeenCalledWith({ status: "pending", waybill_number: "" });
+    });
+
+    expect(screen.getByText("orders.paymentGuard.transitionTitle")).not.toBeNull();
+    expect(screen.getByText("orders.paymentGuard.syncTitle")).not.toBeNull();
+    expect(screen.queryByRole("option", { name: "orderStatus.processing" })).toBeNull();
+    expect(screen.getByRole("option", { name: "orderStatus.cancelled" })).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "orders.syncTracking" })).toBeNull();
+
+    fireEvent.change(screen.getByLabelText("status-select"), { target: { value: "cancelled" } });
+    fireEvent.click(screen.getByRole("button", { name: "buttons.save" }));
+
+    expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({
+      title: "orders.cancelConfirm",
+      content: "orders.cancelContentUnpaid",
+      okText: "orders.cancelOk",
+    }));
+    expect(mocks.invoke).not.toHaveBeenCalled();
+  });
+
   it("keeps long order and shipping identifiers readable in narrow detail layouts", async () => {
     const longOrderId = "order-2026-05-07-very-long-admin-read-model-identifier";
     const longMidtransOrderId = "MIDTRANS-ORDER-20260507-0000000000000000000001";

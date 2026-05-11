@@ -391,7 +391,7 @@
       },
     "updateOrder": "Update Order",
     "actionsTitle": "Order Actions",
-    "actionsDescription": "Review the latest order details before updating the status or shipment information.",
+    "actionsDescription": "Follow the safe order steps below before changing fulfillment or shipment data.",
       "currentOrderStatus": "Current Order Status",
       "customerCompletionStage": "Customer Completion Stage",
       "currentPaymentStatus": "Current Payment Status",
@@ -409,10 +409,33 @@
     "saveError": "Failed to update order",
     "cancelConfirm": "Cancel order?",
     "cancelContent": "Order status will be changed to Cancelled. This action cannot be undone.",
+    "cancelContentPaid": "This paid order will move to Cancelled. Continue only if the refund or settlement follow-up is already handled outside this status change.",
+    "cancelContentUnpaid": "This unpaid order will move to Cancelled and Midtrans/order cancellation handling will stop the pending payment path. This action cannot be undone.",
     "cancelOk": "Yes, Cancel",
     "cancelButton": "Cancel",
     "filterStatus": "Select Status",
     "filterPayment": "Select Payment",
+    "quickFilters": {
+      "title": "Operational queues",
+      "description": "Use these shortcuts for common admin queues. Tracking review uses paid shipped or in-transit orders as the closest available list filter.",
+      "clear": "Clear queue filters",
+      "paidUnprocessed": {
+        "label": "Paid, ready to prepare",
+        "description": "Paid orders in Processing status. Prepare items and continue fulfillment from the order detail page."
+      },
+      "readyToShip": {
+        "label": "Ready to ship",
+        "description": "Paid orders waiting for shipment handoff or waybill review."
+      },
+      "trackingRelevant": {
+        "label": "Track shipment",
+        "description": "Paid shipped or in-transit orders. Use detail pages to sync tracking when available."
+      },
+      "awaitingCustomer": {
+        "label": "Awaiting customer",
+        "description": "Paid orders waiting for customer completion or complaint-window follow-up."
+      }
+    },
     "showDetail": "View Detail",
     "tables": {
       "listAriaLabel": "Orders table",
@@ -444,6 +467,21 @@
     "manualWaybillWarning": "Manual entry enabled — a Biteship shipment already exists, but the waybill number will be replaced.",
     "providerManagedWaybillHelp": "Biteship manages this shipment. Use Sync Tracking for provider updates, and enable manual waybill entry only for fallback or override cases.",
     "syncTracking": "Sync Tracking",
+    "actionGuide": {
+      "title": "Order processing steps",
+      "settledDescription": "Payment is settled. Continue with the next fulfillment step that matches the shipment evidence.",
+      "unsettledDescription": "Payment is not settled yet. Fulfillment and tracking sync stay locked, but cancellation remains available when this status allows it.",
+      "lockedDescription": "This order is in a terminal status. Review details and activity history instead of changing fulfillment.",
+      "stepPayment": "Confirm payment status first.",
+      "stepFulfillment": "Move fulfillment only after payment is settled.",
+      "stepTracking": "Sync tracking only for settled provider-managed shipments."
+    },
+    "paymentGuard": {
+      "transitionTitle": "Payment must settle before fulfillment",
+      "transitionDescription": "Processing, shipping, transit, and delivery actions are available after payment status becomes Settlement. Cancellation can still be used when the order status allows it.",
+      "syncTitle": "Tracking sync waits for settlement",
+      "syncDescription": "Sync Tracking is available only after payment reaches Settlement, matching the backend order rules."
+    },
     "trackingSynced": "Tracking Synced",
     "syncFailed": "Sync Failed",
     "trackingSyncSuccess": "Status updated to {{status}}",
