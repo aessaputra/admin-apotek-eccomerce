@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canApplyOrderStatusForPaymentStatus,
+  canConfirmReceivedOrder,
   deriveSettlementSideEffectFlags,
+  requiresSettledPaymentForOrderStatus,
   requiresBiteshipSyncForProviderStatusTransition,
   shouldQueueBiteshipFulfillment,
 } from "../order-flow-rules.ts";
@@ -133,5 +136,61 @@ describe("order flow rules", () => {
         biteshipOrderId: null,
       }),
     ).toBeNull();
+  });
+
+  it("requires settled payment before admin fulfillment statuses", () => {
+    expect(requiresSettledPaymentForOrderStatus("pending")).toBe(false);
+    expect(requiresSettledPaymentForOrderStatus("cancelled")).toBe(false);
+    expect(requiresSettledPaymentForOrderStatus("processing")).toBe(true);
+    expect(requiresSettledPaymentForOrderStatus("awaiting_shipment")).toBe(true);
+    expect(requiresSettledPaymentForOrderStatus("shipped")).toBe(true);
+    expect(requiresSettledPaymentForOrderStatus("in_transit")).toBe(true);
+    expect(requiresSettledPaymentForOrderStatus("delivered")).toBe(true);
+  });
+
+  it("rejects unpaid order progression into fulfillment statuses", () => {
+    expect(
+      canApplyOrderStatusForPaymentStatus({
+        targetStatus: "awaiting_shipment",
+        paymentStatus: "pending",
+      }),
+    ).toBe(false);
+
+    expect(
+      canApplyOrderStatusForPaymentStatus({
+        targetStatus: "awaiting_shipment",
+        paymentStatus: "settlement",
+      }),
+    ).toBe(true);
+
+    expect(
+      canApplyOrderStatusForPaymentStatus({
+        targetStatus: "cancelled",
+        paymentStatus: "pending",
+      }),
+    ).toBe(true);
+  });
+
+  it("allows customer completion only for delivered paid orders", () => {
+    expect(
+      canConfirmReceivedOrder({
+        orderStatus: "delivered",
+        paymentStatus: "settlement",
+      }),
+    ).toBe(true);
+
+    expect(
+      canConfirmReceivedOrder({
+        orderStatus: "delivered",
+        paymentStatus: "pending",
+      }),
+    ).toBe(false);
+
+    expect(
+      canConfirmReceivedOrder({
+        orderStatus: "shipped",
+        paymentStatus: "settlement",
+      }),
+    ).toBe(false);
   });
 });

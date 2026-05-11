@@ -10,6 +10,14 @@ const PROVIDER_OWNED_SHIPPING_STATUSES = new Set([
   "delivered",
 ]);
 
+const PAYMENT_REQUIRED_ORDER_STATUSES = new Set([
+  "processing",
+  "awaiting_shipment",
+  "shipped",
+  "in_transit",
+  "delivered",
+]);
+
 type BiteshipFulfillmentQueueArgs = {
   paymentStatus?: string | null;
   status?: string | null;
@@ -49,6 +57,27 @@ export function shouldQueueBiteshipFulfillment(
     Boolean(args.courierCode) &&
     !args.biteshipOrderId
   );
+}
+
+export function requiresSettledPaymentForOrderStatus(status: string): boolean {
+  return PAYMENT_REQUIRED_ORDER_STATUSES.has(status);
+}
+
+export function canApplyOrderStatusForPaymentStatus(args: {
+  targetStatus: string;
+  paymentStatus?: string | null;
+}): boolean {
+  return (
+    !requiresSettledPaymentForOrderStatus(args.targetStatus) ||
+    args.paymentStatus === "settlement"
+  );
+}
+
+export function canConfirmReceivedOrder(args: {
+  orderStatus?: string | null;
+  paymentStatus?: string | null;
+}): boolean {
+  return args.orderStatus === "delivered" && args.paymentStatus === "settlement";
 }
 
 export function deriveSettlementSideEffectFlags(
