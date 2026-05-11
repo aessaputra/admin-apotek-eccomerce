@@ -170,67 +170,68 @@ vi.mock("antd", async () => {
 
   return {
     Table,
-  theme: {
-    useToken: () => ({
-      token: {
-        marginXS: 8,
-        colorTextTertiary: "#999",
-        colorWarning: "#faad14",
-      },
-    }),
-  },
-  Space: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Avatar: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Input: ({
-    allowClear,
-    placeholder,
-    value = "",
-    onChange,
-    "aria-label": ariaLabel,
-  }: {
-    allowClear?: { clearIcon?: React.ReactNode };
-    placeholder?: string;
-    value?: string;
-    onChange?: React.ChangeEventHandler<HTMLInputElement>;
-    "aria-label"?: string;
-  }) => {
-    const clearIcon = allowClear?.clearIcon;
-    const clearLabel = ReactModule.isValidElement(clearIcon)
-      ? String((clearIcon.props as { "aria-label"?: string })["aria-label"] ?? "clear")
-      : "clear";
+    theme: {
+      useToken: () => ({
+        token: {
+          marginXS: 8,
+          marginMD: 16,
+          colorTextTertiary: "#999",
+          colorWarning: "#faad14",
+        },
+      }),
+    },
+    Space: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Avatar: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Input: ({
+      allowClear,
+      placeholder,
+      value = "",
+      onChange,
+      "aria-label": ariaLabel,
+    }: {
+      allowClear?: { clearIcon?: React.ReactNode };
+      placeholder?: string;
+      value?: string;
+      onChange?: React.ChangeEventHandler<HTMLInputElement>;
+      "aria-label"?: string;
+    }) => {
+      const clearIcon = allowClear?.clearIcon;
+      const clearLabel = ReactModule.isValidElement(clearIcon)
+        ? String((clearIcon.props as { "aria-label"?: string })["aria-label"] ?? "clear")
+        : "clear";
 
-    return (
-      <div>
-        <input
-          aria-label={ariaLabel}
-          placeholder={placeholder}
-          value={value}
-          onChange={onChange}
-        />
-        {allowClear ? (
-          <button
-            type="button"
-            aria-label={clearLabel}
-            onClick={() =>
-              onChange?.({ target: { value: "" } } as React.ChangeEvent<HTMLInputElement>)
-            }
-          >
-            clear
-          </button>
-        ) : null}
-      </div>
-    );
-  },
-  Tooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
-  Alert: ({ message, description }: { message: React.ReactNode; description?: React.ReactNode }) => <div><div>{message}</div><div>{description}</div></div>,
-  Button: ({ children, onClick, loading }: { children: React.ReactNode; onClick?: () => void; loading?: boolean }) => (
-    <button type="button" data-loading={String(Boolean(loading))} onClick={onClick}>
-      {children}
-    </button>
-  ),
-  Image: ({ src }: { src: string }) => <span>{src}</span>,
-  Select: ({ placeholder }: { placeholder?: string }) => <select aria-label={placeholder ?? "select"} />,
+      return (
+        <div>
+          <input
+            aria-label={ariaLabel}
+            placeholder={placeholder}
+            value={value}
+            onChange={onChange}
+          />
+          {allowClear ? (
+            <button
+              type="button"
+              aria-label={clearLabel}
+              onClick={() =>
+                onChange?.({ target: { value: "" } } as React.ChangeEvent<HTMLInputElement>)
+              }
+            >
+              clear
+            </button>
+          ) : null}
+        </div>
+      );
+    },
+    Tooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+    Alert: ({ message, description }: { message: React.ReactNode; description?: React.ReactNode }) => <div><div>{message}</div><div>{description}</div></div>,
+    Button: ({ children, onClick, loading }: { children: React.ReactNode; onClick?: () => void; loading?: boolean }) => (
+      <button type="button" data-loading={String(Boolean(loading))} onClick={onClick}>
+        {children}
+      </button>
+    ),
+    Image: ({ src }: { src: string }) => <span>{src}</span>,
+    Select: ({ placeholder }: { placeholder?: string }) => <select aria-label={placeholder ?? "select"} />,
   };
 });
 
@@ -531,13 +532,14 @@ describe("list pages", () => {
   });
 
   it("renders order rows with filters, tags, and show action", () => {
+    const setFilters = vi.fn();
     mocks.useTable.mockReturnValue({
       tableProps: {
         dataSource: [
           {
             id: "order-1",
             total_amount: 25000,
-            status: "pending",
+            status: "processing",
             payment_status: "settlement",
             payment_type: "bank_transfer",
             courier_code: "jne",
@@ -547,13 +549,19 @@ describe("list pages", () => {
         ],
       },
       filters: [],
+      setFilters,
     });
 
     render(<OrderList />);
 
+    expect(screen.getByText("orders.quickFilters.title")).not.toBeNull();
+    expect(screen.getByText("orders.quickFilters.paidUnprocessed.label")).not.toBeNull();
+    expect(screen.getByText("orders.quickFilters.readyToShip.label")).not.toBeNull();
+    expect(screen.getByText("orders.quickFilters.trackingRelevant.label")).not.toBeNull();
+    expect(screen.getByText("orders.quickFilters.awaitingCustomer.label")).not.toBeNull();
     expect(screen.getByText("order-1")).not.toBeNull();
     expect(screen.getByText("Rp 25.000")).not.toBeNull();
-    expect(screen.getByText("orderStatus.pending")).not.toBeNull();
+    expect(screen.getByText("orderStatus.processing")).not.toBeNull();
     expect(screen.getByText("paymentStatus.settlement")).not.toBeNull();
     expect(screen.getByText("Bank Transfer")).not.toBeNull();
     expect(screen.getByText("JNE")).not.toBeNull();
@@ -562,6 +570,33 @@ describe("list pages", () => {
     expect(screen.getByLabelText("orders.filterStatus")).not.toBeNull();
     expect(screen.getByLabelText("orders.filterPayment")).not.toBeNull();
     expect(screen.getByTestId("table").getAttribute("data-scroll-x")).toBe("max-content");
+
+    fireEvent.click(screen.getByRole("button", { name: "orders.quickFilters.paidUnprocessed.label" }));
+
+    expect(setFilters).toHaveBeenCalledWith([
+      { field: "payment_status", operator: "eq", value: "settlement" },
+      { field: "status", operator: "eq", value: "processing" },
+    ], "replace");
+  });
+
+  it("applies the tracking-relevant order quick filter", () => {
+    const setFilters = vi.fn();
+    mocks.useTable.mockReturnValue({
+      tableProps: {
+        dataSource: [],
+      },
+      filters: [],
+      setFilters,
+    });
+
+    render(<OrderList />);
+
+    fireEvent.click(screen.getByRole("button", { name: "orders.quickFilters.trackingRelevant.label" }));
+
+    expect(setFilters).toHaveBeenCalledWith([
+      { field: "payment_status", operator: "eq", value: "settlement" },
+      { field: "status", operator: "in", value: ["shipped", "in_transit"] },
+    ], "replace");
   });
 
   it("opens order detail when clicking or pressing keyboard on an order row", () => {
@@ -577,6 +612,7 @@ describe("list pages", () => {
         ],
       },
       filters: [],
+      setFilters: vi.fn(),
     });
 
     render(<OrderList />);

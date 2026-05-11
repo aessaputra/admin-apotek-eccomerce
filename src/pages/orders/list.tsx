@@ -1,6 +1,6 @@
 import { List, useTable, ShowButton, getDefaultFilter } from "@refinedev/antd";
-import { useTranslation, type BaseRecord } from "@refinedev/core";
-import { Alert, Button, Table, Space, Tooltip, Select, Tag } from "antd";
+import { useTranslation, type BaseRecord, type CrudFilters } from "@refinedev/core";
+import { Alert, Button, Table, Space, Tooltip, Select, Tag, theme } from "antd";
 import type { FilterDropdownProps } from "antd/es/table/interface";
 import { useNavigate } from "react-router";
 import { STATUS_COLORS, PAYMENT_COLORS, getStatusOptions, getPaymentOptions } from "../../constants/orders";
@@ -24,6 +24,52 @@ interface SelectFilterOption {
 }
 
 type OrderRecordKey = string | number;
+
+interface OrderQuickFilter {
+  key: string;
+  labelKey: string;
+  descriptionKey: string;
+  filters: CrudFilters;
+}
+
+const ORDER_QUICK_FILTERS: OrderQuickFilter[] = [
+  {
+    key: "paid-unprocessed",
+    labelKey: "orders.quickFilters.paidUnprocessed.label",
+    descriptionKey: "orders.quickFilters.paidUnprocessed.description",
+    filters: [
+      { field: "payment_status", operator: "eq", value: "settlement" },
+      { field: "status", operator: "eq", value: "processing" },
+    ],
+  },
+  {
+    key: "ready-to-ship",
+    labelKey: "orders.quickFilters.readyToShip.label",
+    descriptionKey: "orders.quickFilters.readyToShip.description",
+    filters: [
+      { field: "payment_status", operator: "eq", value: "settlement" },
+      { field: "status", operator: "eq", value: "awaiting_shipment" },
+    ],
+  },
+  {
+    key: "tracking-relevant",
+    labelKey: "orders.quickFilters.trackingRelevant.label",
+    descriptionKey: "orders.quickFilters.trackingRelevant.description",
+    filters: [
+      { field: "payment_status", operator: "eq", value: "settlement" },
+      { field: "status", operator: "in", value: ["shipped", "in_transit"] },
+    ],
+  },
+  {
+    key: "awaiting-customer",
+    labelKey: "orders.quickFilters.awaitingCustomer.label",
+    descriptionKey: "orders.quickFilters.awaitingCustomer.description",
+    filters: [
+      { field: "payment_status", operator: "eq", value: "settlement" },
+      { field: "customer_completion_stage", operator: "eq", value: "awaiting_customer" },
+    ],
+  },
+];
 
 const getOrderRecordKey = (record: BaseRecord): OrderRecordKey | undefined => {
   const { id } = record;
@@ -82,8 +128,9 @@ const createSelectFilterDropdown = (
 
 export const OrderList: React.FC = () => {
   const { translate } = useTranslation();
+  const { token } = theme.useToken();
   const navigate = useNavigate();
-  const { tableProps, tableQuery, filters } = useTable({
+  const { tableProps, tableQuery, filters, setFilters } = useTable({
     syncWithLocation: true,
     sorters: {
       initial: [
@@ -98,6 +145,14 @@ export const OrderList: React.FC = () => {
   const STATUS_OPTIONS = getStatusOptions(translate);
   const PAYMENT_OPTIONS = getPaymentOptions(translate);
   const orderListTableLabel = translate("orders.tables.listAriaLabel");
+  const applyQuickFilter = (quickFilter: OrderQuickFilter) => {
+    setFilters(quickFilter.filters, "replace");
+  };
+
+  const clearQuickFilters = () => {
+    setFilters([], "replace");
+  };
+
   const openOrderDetail = (id: OrderRecordKey) => {
     navigate(`/orders/show/${id}`);
   };
@@ -112,6 +167,23 @@ export const OrderList: React.FC = () => {
 
   return (
     <List>
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: token.marginMD }}
+        message={translate("orders.quickFilters.title")}
+        description={translate("orders.quickFilters.description")}
+      />
+      <Space wrap style={{ marginBottom: token.marginMD }}>
+        {ORDER_QUICK_FILTERS.map((quickFilter) => (
+          <Tooltip key={quickFilter.key} title={translate(quickFilter.descriptionKey)}>
+            <Button type="default" onClick={() => applyQuickFilter(quickFilter)}>
+              {translate(quickFilter.labelKey)}
+            </Button>
+          </Tooltip>
+        ))}
+        <Button onClick={clearQuickFilters}>{translate("orders.quickFilters.clear")}</Button>
+      </Space>
       <div aria-label={orderListTableLabel}>
       <Table
         {...tableProps}
