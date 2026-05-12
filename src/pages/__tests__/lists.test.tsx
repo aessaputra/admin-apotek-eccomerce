@@ -174,6 +174,7 @@ vi.mock("antd", async () => {
       useToken: () => ({
         token: {
           marginXS: 8,
+          marginXXS: 4,
           marginMD: 16,
           colorTextTertiary: "#999",
           colorWarning: "#faad14",
@@ -181,6 +182,33 @@ vi.mock("antd", async () => {
       }),
     },
     Space: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Radio: {
+      Group: ({
+        "aria-label": ariaLabel,
+        options = [],
+        value,
+        onChange,
+      }: {
+        "aria-label"?: string;
+        options?: { label: React.ReactNode; value: string }[];
+        value?: string;
+        onChange?: (event: { target: { value: string } }) => void;
+      }) => (
+        <div role="radiogroup" aria-label={ariaLabel}>
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={value === option.value}
+              onClick={() => onChange?.({ target: { value: option.value } })}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ),
+    },
     Avatar: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Input: ({
       allowClear,
@@ -554,7 +582,8 @@ describe("list pages", () => {
 
     render(<OrderList />);
 
-    expect(screen.getByText("orders.quickFilters.title")).not.toBeNull();
+    expect(screen.getByRole("radiogroup", { name: "orders.quickFilters.title" })).not.toBeNull();
+    expect(screen.getByRole("radio", { name: "orders.quickFilters.all" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByText("orders.quickFilters.paidUnprocessed.label")).not.toBeNull();
     expect(screen.getByText("orders.quickFilters.readyToShip.label")).not.toBeNull();
     expect(screen.getByText("orders.quickFilters.trackingRelevant.label")).not.toBeNull();
@@ -571,7 +600,7 @@ describe("list pages", () => {
     expect(screen.getByLabelText("orders.filterPayment")).not.toBeNull();
     expect(screen.getByTestId("table").getAttribute("data-scroll-x")).toBe("max-content");
 
-    fireEvent.click(screen.getByRole("button", { name: "orders.quickFilters.paidUnprocessed.label" }));
+    fireEvent.click(screen.getByRole("radio", { name: "orders.quickFilters.paidUnprocessed.label" }));
 
     expect(setFilters).toHaveBeenCalledWith([
       { field: "payment_status", operator: "eq", value: "settlement" },
@@ -591,12 +620,52 @@ describe("list pages", () => {
 
     render(<OrderList />);
 
-    fireEvent.click(screen.getByRole("button", { name: "orders.quickFilters.trackingRelevant.label" }));
+    fireEvent.click(screen.getByRole("radio", { name: "orders.quickFilters.trackingRelevant.label" }));
 
     expect(setFilters).toHaveBeenCalledWith([
       { field: "payment_status", operator: "eq", value: "settlement" },
       { field: "status", operator: "in", value: ["shipped", "in_transit"] },
     ], "replace");
+  });
+
+  it("shows the matching active order quick filter and clears filters with all", () => {
+    const setFilters = vi.fn();
+    mocks.useTable.mockReturnValue({
+      tableProps: {
+        dataSource: [],
+      },
+      filters: [
+        { field: "payment_status", operator: "eq", value: "settlement" },
+        { field: "status", operator: "in", value: ["shipped", "in_transit"] },
+      ],
+      setFilters,
+    });
+
+    render(<OrderList />);
+
+    expect(screen.getByRole("radio", { name: "orders.quickFilters.trackingRelevant.label" }).getAttribute("aria-checked")).toBe("true");
+
+    fireEvent.click(screen.getByRole("radio", { name: "orders.quickFilters.all" }));
+
+    expect(setFilters).toHaveBeenCalledWith([], "replace");
+  });
+
+  it("does not select all when order filters do not match a quick filter", () => {
+    mocks.useTable.mockReturnValue({
+      tableProps: {
+        dataSource: [],
+      },
+      filters: [{ field: "status", operator: "eq", value: "pending" }],
+      setFilters: vi.fn(),
+    });
+
+    render(<OrderList />);
+
+    expect(screen.getByRole("radio", { name: "orders.quickFilters.all" }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("radio", { name: "orders.quickFilters.paidUnprocessed.label" }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("radio", { name: "orders.quickFilters.readyToShip.label" }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("radio", { name: "orders.quickFilters.trackingRelevant.label" }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("radio", { name: "orders.quickFilters.awaitingCustomer.label" }).getAttribute("aria-checked")).toBe("false");
   });
 
   it("opens order detail when clicking or pressing keyboard on an order row", () => {

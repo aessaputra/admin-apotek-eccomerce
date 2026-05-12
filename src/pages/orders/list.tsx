@@ -1,6 +1,7 @@
 import { List, useTable, ShowButton, getDefaultFilter } from "@refinedev/antd";
 import { useTranslation, type BaseRecord, type CrudFilters } from "@refinedev/core";
-import { Alert, Button, Table, Space, Tooltip, Select, Tag, theme } from "antd";
+import { Alert, Button, Radio, Table, Space, Tooltip, Select, Tag, theme } from "antd";
+import type { RadioChangeEvent } from "antd";
 import type { FilterDropdownProps } from "antd/es/table/interface";
 import { useNavigate } from "react-router";
 import { STATUS_COLORS, PAYMENT_COLORS, getStatusOptions, getPaymentOptions } from "../../constants/orders";
@@ -70,6 +71,34 @@ const ORDER_QUICK_FILTERS: OrderQuickFilter[] = [
     ],
   },
 ];
+
+const ALL_ORDER_QUICK_FILTERS_VALUE = "all";
+
+const areQuickFilterValuesEqual = (left: unknown, right: unknown): boolean => JSON.stringify(left) === JSON.stringify(right);
+
+const areQuickFilterFiltersEqual = (left: CrudFilters | undefined, right: CrudFilters): boolean => {
+  if (!left || left.length !== right.length) {
+    return false;
+  }
+
+  return right.every((rightFilter) =>
+    left.some((leftFilter) =>
+      "field" in leftFilter &&
+      "field" in rightFilter &&
+      leftFilter.field === rightFilter.field &&
+      leftFilter.operator === rightFilter.operator &&
+      areQuickFilterValuesEqual(leftFilter.value, rightFilter.value)
+    )
+  );
+};
+
+const getActiveOrderQuickFilterKey = (filters: CrudFilters | undefined): string | undefined => {
+  if (!filters || filters.length === 0) {
+    return ALL_ORDER_QUICK_FILTERS_VALUE;
+  }
+
+  return ORDER_QUICK_FILTERS.find((quickFilter) => areQuickFilterFiltersEqual(filters, quickFilter.filters))?.key;
+};
 
 const getOrderRecordKey = (record: BaseRecord): OrderRecordKey | undefined => {
   const { id } = record;
@@ -145,12 +174,27 @@ export const OrderList: React.FC = () => {
   const STATUS_OPTIONS = getStatusOptions(translate);
   const PAYMENT_OPTIONS = getPaymentOptions(translate);
   const orderListTableLabel = translate("orders.tables.listAriaLabel");
-  const applyQuickFilter = (quickFilter: OrderQuickFilter) => {
-    setFilters(quickFilter.filters, "replace");
-  };
+  const activeQuickFilterKey = getActiveOrderQuickFilterKey(filters);
+  const orderQuickFilterOptions = [
+    { label: translate("orders.quickFilters.all"), value: ALL_ORDER_QUICK_FILTERS_VALUE },
+    ...ORDER_QUICK_FILTERS.map((quickFilter) => ({
+      label: translate(quickFilter.labelKey),
+      value: quickFilter.key,
+    })),
+  ];
+  const handleQuickFilterChange = (event: RadioChangeEvent): void => {
+    const selectedFilterKey = String(event.target.value);
 
-  const clearQuickFilters = () => {
-    setFilters([], "replace");
+    if (selectedFilterKey === ALL_ORDER_QUICK_FILTERS_VALUE) {
+      setFilters([], "replace");
+      return;
+    }
+
+    const selectedQuickFilter = ORDER_QUICK_FILTERS.find((quickFilter) => quickFilter.key === selectedFilterKey);
+
+    if (selectedQuickFilter) {
+      setFilters(selectedQuickFilter.filters, "replace");
+    }
   };
 
   const openOrderDetail = (id: OrderRecordKey) => {
@@ -167,23 +211,16 @@ export const OrderList: React.FC = () => {
 
   return (
     <List>
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: token.marginMD }}
-        message={translate("orders.quickFilters.title")}
-        description={translate("orders.quickFilters.description")}
+      <Radio.Group
+        aria-label={translate("orders.quickFilters.title")}
+        optionType="button"
+        buttonStyle="solid"
+        size="middle"
+        value={activeQuickFilterKey}
+        options={orderQuickFilterOptions}
+        onChange={handleQuickFilterChange}
+        style={{ display: "flex", flexWrap: "wrap", gap: token.marginXXS, marginBottom: token.marginMD }}
       />
-      <Space wrap style={{ marginBottom: token.marginMD }}>
-        {ORDER_QUICK_FILTERS.map((quickFilter) => (
-          <Tooltip key={quickFilter.key} title={translate(quickFilter.descriptionKey)}>
-            <Button type="default" onClick={() => applyQuickFilter(quickFilter)}>
-              {translate(quickFilter.labelKey)}
-            </Button>
-          </Tooltip>
-        ))}
-        <Button onClick={clearQuickFilters}>{translate("orders.quickFilters.clear")}</Button>
-      </Space>
       <div aria-label={orderListTableLabel}>
       <Table
         {...tableProps}
