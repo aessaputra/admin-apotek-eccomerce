@@ -44,7 +44,7 @@ const mocks = vi.hoisted(() => {
       "dashboard.kpis.orders30d": "30-Day Orders",
       "dashboard.kpis.paymentSuccessRate": "Paid Orders",
       "dashboard.kpis.averageOrderValue": "Average Order Value",
-      "dashboard.kpis.fulfillmentRisk": "Paid Orders Not Completed",
+      "dashboard.kpis.fulfillmentRisk": "Paid Orders Not Delivered",
       "dashboard.kpis.lowStockSkus": "Low-Stock Products",
       "dashboard.kpis.unavailable": "Unavailable",
       "dashboard.kpis.periodNote": "Summary figures use the last 30 days. The trend chart follows the selected period.",
@@ -55,8 +55,8 @@ const mocks = vi.hoisted(() => {
       "dashboard.alerts.lowStockError.description": "Refresh the page or check your connection.",
       "dashboard.alerts.recentOrdersError.message": "Couldn’t load recent orders",
       "dashboard.alerts.recentOrdersError.description": "The order list has not loaded. Refresh before treating the queue as empty.",
-      "dashboard.alerts.fulfillmentRisk.message": "{{count}} paid orders are not completed",
-      "dashboard.alerts.fulfillmentRisk.description": "Open the orders list to continue processing, shipping, or completion confirmation.",
+      "dashboard.alerts.fulfillmentRisk.message": "{{count}} paid orders are not delivered",
+      "dashboard.alerts.fulfillmentRisk.description": "Open the orders list to continue processing, shipping, or delivery status updates.",
       "dashboard.alerts.lowStockRisk.message": "{{count}} active products are low on stock",
       "dashboard.alerts.lowStockRisk.description": "Active products below 10 units need restock review.",
       "dashboard.alerts.noRisk.message": "No urgent queue items",
@@ -83,12 +83,12 @@ const mocks = vi.hoisted(() => {
       "dashboard.monthlyTrends.revenue": "Sales",
       "dashboard.monthlyTrends.orderCount": "Incoming Orders",
       "dashboard.monthlyTrends.paidOrders": "Paid Orders",
-      "dashboard.monthlyTrends.completedOrders": "Completed",
+      "dashboard.monthlyTrends.completedOrders": "Delivered",
       "dashboard.monthlyTrends.dataTableLabel": "Order trend data table",
       "dashboard.monthlyTrends.periodColumn": "Period",
       "dashboard.monthlyTrends.incomingColumn": "Incoming",
       "dashboard.monthlyTrends.paidColumn": "Paid",
-      "dashboard.monthlyTrends.completedColumn": "Completed",
+      "dashboard.monthlyTrends.completedColumn": "Delivered",
       "dashboard.monthlyTrends.revenueColumn": "Sales",
       "dashboard.monthlyTrends.latest12Months": "Latest 12 months",
       "dashboard.monthlyTrends.period.day": "Last 30 days",
@@ -104,8 +104,8 @@ const mocks = vi.hoisted(() => {
       "dashboard.monthlyTrends.emptyDescription": "No order trends are available yet.",
       "dashboard.monthlyTrends.errorMessage": "Failed to load order trends.",
       "dashboard.monthlyTrends.zeroValueSummary": "All order trend figures are still zero.",
-      "dashboard.monthlyTrends.chartAriaLabel": "Order trend line chart: incoming, paid, and completed orders",
-      "dashboard.monthlyTrends.chartDescription": "Incoming, paid, and completed order counts for the selected period.",
+      "dashboard.monthlyTrends.chartAriaLabel": "Order trend line chart: incoming, paid, and delivered orders",
+      "dashboard.monthlyTrends.chartDescription": "Incoming, paid, and delivered order counts for the selected period.",
       "orderStatus.shipped": "Handed to Courier",
     };
 
@@ -725,7 +725,7 @@ describe("Dashboard", () => {
     expect(screen.getAllByText("30-Day Orders").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Paid Orders").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Average Order Value")).not.toBeNull();
-    expect(screen.getByText("Paid Orders Not Completed")).not.toBeNull();
+    expect(screen.getByText("Paid Orders Not Delivered")).not.toBeNull();
     expect(screen.getAllByText("Low-Stock Products").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Summary figures use the last 30 days. The trend chart follows the selected period.")).not.toBeNull();
     expect(pageText).toContain(currencyFormatter.format(125000));
@@ -841,7 +841,7 @@ describe("Dashboard", () => {
       expect(document.body.textContent).not.toContain("stock table leaked");
     });
 
-    it("renders a paid-not-fulfilled warning when paid orders exceed completed orders", () => {
+    it("renders a paid-not-delivered warning when paid orders exceed delivered orders", () => {
       setupDashboardQueries({
         monthlyMetricRows: [
           createMonthlyMetricRow("2026-04-15", {
@@ -856,8 +856,8 @@ describe("Dashboard", () => {
 
       render(<Dashboard />);
 
-      expect(screen.getByText("2 paid orders are not completed")).not.toBeNull();
-      expect(screen.getByText("Open the orders list to continue processing, shipping, or completion confirmation.")).not.toBeNull();
+      expect(screen.getByText("2 paid orders are not delivered")).not.toBeNull();
+      expect(screen.getByText("Open the orders list to continue processing, shipping, or delivery status updates.")).not.toBeNull();
       expect(screen.queryByText("No urgent queue items")).toBeNull();
     });
 
@@ -923,13 +923,13 @@ describe("Dashboard", () => {
 
     expect(screen.getByText("Order Trends")).not.toBeNull();
     expect(screen.getByRole("radiogroup", { name: "Choose order trend period" })).not.toBeNull();
-    expect(screen.getByRole("img", { name: "Order trend line chart: incoming, paid, and completed orders" })).not.toBeNull();
-    expect(screen.getByText("Incoming, paid, and completed order counts for the selected period.")).not.toBeNull();
+    expect(screen.getByRole("img", { name: "Order trend line chart: incoming, paid, and delivered orders" })).not.toBeNull();
+    expect(screen.getByText("Incoming, paid, and delivered order counts for the selected period.")).not.toBeNull();
     expect(pageText).toContain("Daily");
     expect(pageText).toContain(currencyFormatter.format(125000));
     expect(pageText).toContain("Incoming Orders5");
     expect(pageText).toContain("Paid Orders3");
-    expect(pageText).toContain("Completed2");
+    expect(pageText).toContain("Delivered2");
   });
 
   it("renders the order trend loading state while the aggregate query is pending", () => {
@@ -1000,7 +1000,7 @@ describe("Dashboard", () => {
     expect(screen.getAllByText("30-Day Orders").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("Paid Orders").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Average Order Value")).not.toBeNull();
-    expect(screen.getByText("Paid Orders Not Completed")).not.toBeNull();
+    expect(screen.getByText("Paid Orders Not Delivered")).not.toBeNull();
     expect(screen.getAllByText("Low-Stock Products").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Recent Orders")).not.toBeNull();
     expect(screen.getByText("Handed to Courier")).not.toBeNull();

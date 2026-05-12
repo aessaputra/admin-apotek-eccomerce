@@ -127,7 +127,12 @@ const REQUIRED_DASHBOARD_KEYS = [
   "dashboard.monthlyTrends.chartDescription",
 ];
 
-const REQUIRED_KEYS = [...REQUIRED_AUTH_KEYS, ...REQUIRED_PAGES_KEYS, ...REQUIRED_DASHBOARD_KEYS];
+const REQUIRED_ORDER_KEYS = [
+  "orders.quickFilters.all",
+  "orders.actionGuide.syncOnlyDescription",
+];
+
+const REQUIRED_KEYS = [...REQUIRED_AUTH_KEYS, ...REQUIRED_PAGES_KEYS, ...REQUIRED_DASHBOARD_KEYS, ...REQUIRED_ORDER_KEYS];
 
 describe("locale files", () => {
   it.each(REQUIRED_KEYS)("has key %s in both id and en locales", (key) => {

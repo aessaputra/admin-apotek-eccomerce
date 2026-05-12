@@ -43,7 +43,7 @@
       "orders30d": "30-Day Orders",
       "paymentSuccessRate": "Paid Orders",
       "averageOrderValue": "Average Order Value",
-      "fulfillmentRisk": "Paid Orders Not Completed",
+      "fulfillmentRisk": "Paid Orders Not Delivered",
       "lowStockSkus": "Low-Stock Products",
       "unavailable": "Unavailable",
       "periodNote": "Summary figures use the last 30 days. The trend chart follows the selected period."
@@ -63,8 +63,8 @@
         "description": "The order list has not loaded. Refresh before treating the queue as empty."
       },
       "fulfillmentRisk": {
-        "message": "{{count}} paid orders are not completed",
-        "description": "Open the orders list to continue processing, shipping, or completion confirmation."
+        "message": "{{count}} paid orders are not delivered",
+        "description": "Open the orders list to continue processing, shipping, or delivery status updates."
       },
       "lowStockRisk": {
         "message": "{{count}} active products are low on stock",
@@ -102,12 +102,12 @@
       "revenue": "Sales",
       "orderCount": "Incoming Orders",
       "paidOrders": "Paid Orders",
-      "completedOrders": "Completed",
+      "completedOrders": "Delivered",
       "dataTableLabel": "Order trend data table",
       "periodColumn": "Period",
       "incomingColumn": "Incoming",
       "paidColumn": "Paid",
-      "completedColumn": "Completed",
+      "completedColumn": "Delivered",
       "revenueColumn": "Sales",
       "latest12Months": "Latest 12 months",
       "period": {
@@ -127,8 +127,8 @@
       "emptyDescription": "No order trends are available yet.",
       "errorMessage": "Failed to load order trends.",
       "zeroValueSummary": "All order trend figures are still zero.",
-      "chartAriaLabel": "Order trend line chart: incoming, paid, and completed orders",
-      "chartDescription": "Incoming, paid, and completed order counts for the selected period."
+      "chartAriaLabel": "Order trend line chart: incoming, paid, and delivered orders",
+      "chartDescription": "Incoming, paid, and delivered order counts for the selected period."
     }
   },
   "salesReports": {
@@ -419,6 +419,7 @@
       "title": "Operational queues",
       "description": "Use these shortcuts for common admin queues. Tracking review uses paid shipped or in-transit orders as the closest available list filter.",
       "clear": "Clear queue filters",
+      "all": "All",
       "paidUnprocessed": {
         "label": "Paid, ready to prepare",
         "description": "Paid orders in Processing status. Prepare items and continue fulfillment from the order detail page."
@@ -465,11 +466,12 @@
     "waybillOverridePlaceholder": "Explain why you are entering the waybill manually",
     "enableManualWaybill": "Enter waybill manually",
     "manualWaybillWarning": "Manual entry enabled — a Biteship shipment already exists, but the waybill number will be replaced.",
-    "providerManagedWaybillHelp": "Biteship manages this shipment. Use Sync Tracking for provider updates, and enable manual waybill entry only for fallback or override cases.",
+    "providerManagedWaybillHelp": "Biteship manages this shipment status and waybill. Manual waybill entry is only a fallback before shipment locks.",
     "syncTracking": "Sync Tracking",
     "actionGuide": {
       "title": "Order processing steps",
       "settledDescription": "Payment is settled. Continue with the next fulfillment step that matches the shipment evidence.",
+      "syncOnlyDescription": "Biteship manages the next shipment status. Use Sync Tracking to update to In Transit or Delivered.",
       "unsettledDescription": "Payment is not settled yet. Fulfillment and tracking sync stay locked, but cancellation remains available when this status allows it.",
       "lockedDescription": "This order is in a terminal status. Review details and activity history instead of changing fulfillment.",
       "stepPayment": "Confirm payment status first.",

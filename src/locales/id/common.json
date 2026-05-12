@@ -43,7 +43,7 @@
       "orders30d": "Pesanan Masuk 30 Hari",
       "paymentSuccessRate": "Pembayaran Berhasil",
       "averageOrderValue": "Rata-rata Nilai Pesanan",
-      "fulfillmentRisk": "Pesanan Dibayar Belum Selesai",
+      "fulfillmentRisk": "Pesanan Dibayar Belum Terkirim",
       "lowStockSkus": "Produk Stok Menipis",
       "unavailable": "Tidak tersedia",
       "periodNote": "Angka ringkasan memakai data 30 hari terakhir. Grafik tren mengikuti periode yang dipilih."
@@ -63,8 +63,8 @@
         "description": "Daftar pesanan belum termuat. Muat ulang sebelum menganggap antrean kosong."
       },
       "fulfillmentRisk": {
-        "message": "{{count}} pesanan dibayar belum selesai",
-        "description": "Buka daftar pesanan untuk melanjutkan proses, pengiriman, atau konfirmasi selesai."
+        "message": "{{count}} pesanan dibayar belum terkirim",
+        "description": "Buka daftar pesanan untuk melanjutkan proses, pengiriman, atau pembaruan status terkirim."
       },
       "lowStockRisk": {
         "message": "{{count}} produk aktif stok menipis",
@@ -102,12 +102,12 @@
       "revenue": "Omzet",
       "orderCount": "Pesanan Masuk",
       "paidOrders": "Dibayar",
-      "completedOrders": "Selesai",
+      "completedOrders": "Terkirim",
       "dataTableLabel": "Tabel data tren pesanan",
       "periodColumn": "Periode",
       "incomingColumn": "Masuk",
       "paidColumn": "Dibayar",
-      "completedColumn": "Selesai",
+      "completedColumn": "Terkirim",
       "revenueColumn": "Omzet",
       "latest12Months": "12 bulan terakhir",
       "period": {
@@ -127,8 +127,8 @@
       "emptyDescription": "Belum ada tren pesanan untuk ditampilkan.",
       "errorMessage": "Gagal memuat tren pesanan.",
       "zeroValueSummary": "Semua angka tren pesanan masih 0.",
-      "chartAriaLabel": "Grafik tren pesanan: masuk, dibayar, dan selesai",
-      "chartDescription": "Jumlah pesanan masuk, dibayar, dan selesai sesuai periode yang dipilih."
+      "chartAriaLabel": "Grafik tren pesanan: masuk, dibayar, dan terkirim",
+      "chartDescription": "Jumlah pesanan masuk, dibayar, dan terkirim sesuai periode yang dipilih."
     }
   },
   "salesReports": {
@@ -419,6 +419,7 @@
       "title": "Antrean operasional",
       "description": "Gunakan pintasan ini untuk antrean admin umum. Tinjauan pelacakan memakai pesanan dibayar yang sudah dikirim atau sedang transit sebagai filter daftar terdekat yang tersedia.",
       "clear": "Hapus filter antrean",
+      "all": "Semua",
       "paidUnprocessed": {
         "label": "Dibayar, siap disiapkan",
         "description": "Pesanan dibayar yang berstatus Processing. Siapkan item dan lanjutkan fulfillment dari halaman detail pesanan."
@@ -465,11 +466,12 @@
     "waybillOverridePlaceholder": "Jelaskan alasan Anda mengisi nomor resi secara manual",
     "enableManualWaybill": "Masukkan resi manual",
     "manualWaybillWarning": "Input manual aktif — pengiriman Biteship sudah ada, tetapi nomor resi akan diganti.",
-    "providerManagedWaybillHelp": "Biteship mengelola pengiriman ini. Gunakan Sinkronkan Pelacakan untuk pembaruan dari provider, dan aktifkan input resi manual hanya untuk fallback atau override.",
+    "providerManagedWaybillHelp": "Biteship mengelola status dan resi pengiriman ini. Input resi manual hanya fallback sebelum pengiriman terkunci.",
     "syncTracking": "Sinkronkan Pelacakan",
     "actionGuide": {
       "title": "Langkah pemrosesan pesanan",
       "settledDescription": "Pembayaran sudah settlement. Lanjutkan langkah fulfillment berikutnya sesuai bukti pengiriman.",
+      "syncOnlyDescription": "Biteship mengelola status pengiriman berikutnya. Gunakan Sinkronkan Pelacakan untuk memperbarui ke Dalam Perjalanan atau Terkirim.",
       "unsettledDescription": "Pembayaran belum settlement. Fulfillment dan sinkronisasi pelacakan tetap terkunci, tetapi pembatalan tetap tersedia jika status pesanan mengizinkan.",
       "lockedDescription": "Pesanan ini berada di status akhir. Tinjau detail dan riwayat aktivitas tanpa mengubah fulfillment.",
       "stepPayment": "Pastikan status pembayaran terlebih dahulu.",
