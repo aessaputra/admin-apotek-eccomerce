@@ -812,6 +812,7 @@ describe("OrderShow", () => {
     expect(screen.getByRole("option", { name: "orderStatus.shipped" })).not.toBeNull();
     expect(screen.queryByRole("option", { name: "orderStatus.in_transit" })).toBeNull();
     expect(screen.queryByRole("option", { name: "orderStatus.delivered" })).toBeNull();
+    expect(screen.getByText("orders.actionGuide.syncOnlyDescription")).not.toBeNull();
     expect(screen.getByRole("button", { name: "buttons.save" }).hasAttribute("disabled")).toBe(true);
   });
 
@@ -839,6 +840,7 @@ describe("OrderShow", () => {
     });
 
     expect(screen.queryByRole("option", { name: "orderStatus.delivered" })).toBeNull();
+    expect(screen.getByText("orders.actionGuide.syncOnlyDescription")).not.toBeNull();
     expect(screen.getByRole("button", { name: "buttons.save" }).hasAttribute("disabled")).toBe(true);
   });
 

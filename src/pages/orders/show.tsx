@@ -369,11 +369,18 @@ export const OrderShow: React.FC = () => {
   );
   const isSaveDisabled = isFormDisabled || !hasRealNextStatusTransition;
   const hasPaymentGuardedFulfillment = blockedFulfillmentTransitions.length > 0;
+  const hasSyncOnlyProviderManagedTransition = hasProviderManagedShipment
+    && isPaymentSettled
+    && !isStatusDropdownLocked
+    && !hasRealNextStatusTransition
+    && canSyncTracking;
   const actionGuideDescription = isStatusDropdownLocked
     ? translate("orders.actionGuide.lockedDescription")
-    : isPaymentSettled
-      ? translate("orders.actionGuide.settledDescription")
-      : translate("orders.actionGuide.unsettledDescription");
+    : hasSyncOnlyProviderManagedTransition
+      ? translate("orders.actionGuide.syncOnlyDescription")
+      : isPaymentSettled
+        ? translate("orders.actionGuide.settledDescription")
+        : translate("orders.actionGuide.unsettledDescription");
 
   useEffect(() => {
     if (record) {
