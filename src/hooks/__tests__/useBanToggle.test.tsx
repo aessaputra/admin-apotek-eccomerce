@@ -10,10 +10,16 @@ const mocks = vi.hoisted(() => {
       return `Ban customer ${params?.name ?? "unknown"}?`;
     }
 
+    if (key === "customers.unbanContent") {
+      return `Restore login access for ${params?.name ?? "unknown"}?`;
+    }
+
     const messages: Record<string, string> = {
       "customers.banConfirm": "Ban customer?",
       "customers.banOk": "Yes, ban",
       "buttons.cancel": "Cancel",
+      "customers.unbanConfirm": "Unblock customer?",
+      "customers.unbanOk": "Restore login access",
       "customers.banSuccess": "Customer banned",
       "customers.banError": "Failed to ban customer",
       "customers.unbanSuccess": "Customer unbanned",
@@ -116,7 +122,7 @@ describe("useBanToggle", () => {
     );
   });
 
-  it("invokes the ban function, invalidates refine caches, and shows success feedback", async () => {
+  it("opens a confirmation modal before unbanning a customer", () => {
     mocks.invoke.mockResolvedValue({ data: { ok: true }, error: null });
 
     const { result } = renderHook(() => useBanToggle(), {
@@ -124,6 +130,37 @@ describe("useBanToggle", () => {
     });
 
     result.current.handleUnban({ id: "user-2", full_name: "Bob" });
+
+    expect(mocks.confirm).toHaveBeenCalledTimes(1);
+    expect(mocks.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Unblock customer?",
+        content: "Restore login access for Bob?",
+        okText: "Restore login access",
+        cancelText: "Cancel",
+        onOk: expect.any(Function),
+      })
+    );
+    expect(mocks.invoke).not.toHaveBeenCalled();
+  });
+
+  it("invokes the unban function after confirmation, invalidates refine caches, and shows success feedback", async () => {
+    mocks.invoke.mockResolvedValue({ data: { ok: true }, error: null });
+
+    const { result } = renderHook(() => useBanToggle(), {
+      wrapper: createWrapper(),
+    });
+
+    result.current.handleUnban({ id: "user-2", full_name: "Bob" });
+
+    const confirmConfig = mocks.confirm.mock.calls[0]?.[0];
+    expect(confirmConfig).toBeDefined();
+
+    if (!confirmConfig || typeof confirmConfig.onOk !== "function") {
+      throw new Error("Expected confirm onOk handler");
+    }
+
+    confirmConfig.onOk();
 
     await waitFor(() => {
       expect(mocks.invoke).toHaveBeenCalledWith("ban-customer", {

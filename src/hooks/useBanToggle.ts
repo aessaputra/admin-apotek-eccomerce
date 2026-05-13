@@ -57,20 +57,29 @@ export function useBanToggle() {
   };
 
   const handleUnban = (record: { id: string; full_name?: string }) => {
-    mutate(
-      { userId: record.id, action: "unban" },
-      {
-        onSuccess: () =>
-          modal.success({ content: translate("customers.unbanSuccess") }),
-        onError: async (e: unknown) => {
-          const msg = await getFunctionsErrorMessage(
-            e,
-            translate("customers.unbanError")
-          );
-          modal.error({ content: msg });
-        },
-      }
-    );
+    modal.confirm({
+      title: translate("customers.unbanConfirm"),
+      content: translate("customers.unbanContent", {
+        name: record.full_name || record.id,
+      }),
+      okText: translate("customers.unbanOk"),
+      cancelText: translate("buttons.cancel"),
+      onOk: () =>
+        mutate(
+          { userId: record.id, action: "unban" },
+          {
+            onSuccess: () =>
+              modal.success({ content: translate("customers.unbanSuccess") }),
+            onError: async (e: unknown) => {
+              const msg = await getFunctionsErrorMessage(
+                e,
+                translate("customers.unbanError")
+              );
+              modal.error({ content: msg });
+            },
+          }
+        ),
+    });
   };
 
   return { handleBan, handleUnban, isPending };
