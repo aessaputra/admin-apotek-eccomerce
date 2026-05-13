@@ -8,13 +8,19 @@ import { ProductShow } from "../products/show";
 
 const mocks = vi.hoisted(() => {
   const translations: Record<string, string> = {};
-  const translate = vi.fn((key: string) => translations[key] ?? key);
+  const translate = vi.fn((key: string, params?: Record<string, string>) => {
+    const message = translations[key] ?? key;
+
+    return params?.name ? message.replace("{{name}}", params.name) : message;
+  });
   const useShow = vi.fn();
   const useList = vi.fn();
   const list = vi.fn();
+  const navigate = vi.fn();
   const handleBan = vi.fn();
   const handleUnban = vi.fn();
-  const useParams = vi.fn(() => ({ id: "cust-1" }));
+  const useParams = vi.fn<() => { id?: string }>();
+  useParams.mockReturnValue({ id: "cust-1" });
 
   return {
     translate,
@@ -22,6 +28,7 @@ const mocks = vi.hoisted(() => {
     useShow,
     useList,
     list,
+    navigate,
     handleBan,
     handleUnban,
     useParams,
@@ -30,6 +37,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("react-router", () => ({
   useParams: mocks.useParams,
+  useNavigate: () => mocks.navigate,
 }));
 
 vi.mock("@refinedev/core", () => ({
@@ -121,6 +129,36 @@ vi.mock("antd", async () => {
 
   Table.Column = Column;
 
+  type MockSpaceProps = React.HTMLAttributes<HTMLDivElement> & {
+    children: React.ReactNode;
+    direction?: string;
+    size?: unknown;
+    wrap?: boolean;
+  };
+
+  const Space = (props: MockSpaceProps) => {
+    const { children, direction: _direction, size: _size, wrap: _wrap, ...domProps } = props;
+
+    return <div {...domProps}>{children}</div>;
+  };
+
+  const Descriptions = Object.assign(
+    ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    {
+      Item: ({ label, children }: { label: React.ReactNode; children: React.ReactNode }) => (
+        <div>
+          <div>{label}</div>
+          <div>{children}</div>
+        </div>
+      ),
+    }
+  );
+
+  const Empty = Object.assign(
+    ({ description }: { description: React.ReactNode }) => <div>{description}</div>,
+    { PRESENTED_IMAGE_SIMPLE: "simple" }
+  );
+
   return {
     Typography: {
       Title: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
@@ -129,11 +167,13 @@ vi.mock("antd", async () => {
         <p style={style}>{children}</p>
       ),
     },
-    Avatar: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Space: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Avatar: ({ children, alt, src }: { children: React.ReactNode; alt?: string; src?: string }) => (
+      src ? <img alt={alt} src={src} /> : <div>{children}</div>
+    ),
+    Space,
     Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
-    Button: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
-      <button type="button" onClick={onClick}>{children}</button>
+    Button: ({ children, disabled, onClick, style }: { children: React.ReactNode; disabled?: boolean; onClick?: () => void; style?: React.CSSProperties }) => (
+      <button type="button" disabled={disabled} style={style} onClick={onClick}>{children}</button>
     ),
     Image: ({ src }: { src: string }) => <span>{src}</span>,
     Card: ({ title, extra, children }: { title?: React.ReactNode; extra?: React.ReactNode; children: React.ReactNode }) => (
@@ -160,27 +200,35 @@ vi.mock("antd", async () => {
       <div>{title}:{String(value)}</div>
     ),
     Tooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Alert: ({ message }: { message?: React.ReactNode }) => <div role="alert">{message}</div>,
-    Skeleton: () => <div data-testid="skeleton" />,
+    Alert: ({ message, description }: { message?: React.ReactNode; description?: React.ReactNode }) => <div role="alert">{message}{description}</div>,
+    Skeleton: ({ active: _active, paragraph: _paragraph, title: _title, ...domProps }: React.HTMLAttributes<HTMLDivElement> & { active?: boolean; paragraph?: unknown; title?: unknown }) => (
+      <div {...domProps} data-testid="skeleton" />
+    ),
     Table,
-    Empty: ({ description }: { description: React.ReactNode }) => <div>{description}</div>,
+    Descriptions,
+    Empty,
     theme: {
       useToken: () => ({
         token: {
           borderRadiusLG: 8,
           colorBorderSecondary: "#d9d9d9",
           colorFillAlter: "#fafafa",
+          colorFillQuaternary: "#f5f5f5",
           colorWarning: "#faad14",
+          controlHeightLG: 40,
           fontSizeHeading3: 24,
           fontSizeHeading4: 20,
           fontSizeLG: 16,
           fontSizeSM: 12,
           fontWeightStrong: 600,
+          lineWidth: 1,
           marginLG: 24,
           marginMD: 16,
           marginSM: 12,
           marginXS: 8,
           marginXXS: 4,
+          paddingLG: 24,
+          paddingMD: 16,
           paddingSM: 12,
         },
       }),
@@ -189,12 +237,61 @@ vi.mock("antd", async () => {
 });
 
 describe("detail and dashboard pages", () => {
-  const mockCustomerShow = (record: Record<string, unknown>) => {
+  const customerDetailTranslations: Record<string, string> = {
+    "customers.detail.unavailable": "Belum tersedia",
+    "customers.detail.unknown": "Pelanggan tidak dikenal",
+    "customers.emailFallback": "Belum tersedia",
+    "customers.detail.profileInfo": "Profil pelanggan",
+    "customers.detail.accountStatus": "Status akun",
+    "customers.detail.recentOrders": "Pesanan terbaru",
+    "customers.detail.back": "Kembali",
+    "customers.detail.active": "Aktif",
+    "customers.detail.banned": "Diblokir",
+    "customers.detail.blockAccount": "Blokir akun",
+    "customers.detail.unblockAccount": "Buka blokir akun",
+    "customers.detail.viewAllTransactions": "Lihat Semua Transaksi",
+    "customers.detail.avatarAlt": "Foto profil {{name}}",
+    "customers.detail.viewOrder": "Lihat Pesanan",
+    "customers.detail.orders.error": "Pesanan terbaru belum dapat dimuat",
+    "customers.detail.orders.loading": "Memuat pesanan...",
+    "customers.detail.orders.empty.title": "Belum ada pesanan",
+    "customers.detail.orders.empty.description": "Pelanggan ini belum memiliki pesanan.",
+    "customers.detail.email": "Email",
+    "customers.detail.phone": "Nomor telepon",
+    "customers.detail.joinedDate": "Tanggal bergabung",
+    "customers.detail.customerId": "ID pelanggan",
+    "customers.fields.fullName": "Nama lengkap",
+    "customers.fields.role": "Peran",
+    "customers.fields.status": "Status",
+  };
+
+  const seedCustomerDetailTranslations = () => {
+    Object.assign(mocks.translations, customerDetailTranslations);
+  };
+
+  const mockRecentOrders = ({
+    data = [],
+    isLoading = false,
+    isError = false,
+  }: {
+    data?: Record<string, unknown>[];
+    isLoading?: boolean;
+    isError?: boolean;
+  } = {}) => {
+    mocks.useList.mockReturnValue({
+      result: { data },
+      query: { isLoading, isError },
+    });
+  };
+
+  const mockCustomerShow = (record: Record<string, unknown> = {}) => {
     mocks.useShow.mockReturnValue({
       result: {
+        id: "customer-123",
         avatar_url: null,
         full_name: "Alice",
         phone_number: "08123",
+        email: "alice@example.com",
         role: "customer",
         is_banned: false,
         created_at: "2026-04-01",
@@ -212,34 +309,57 @@ describe("detail and dashboard pages", () => {
     mocks.useShow.mockReset();
     mocks.useList.mockReset();
     mocks.list.mockReset();
+    mocks.navigate.mockReset();
     mocks.handleBan.mockReset();
     mocks.handleUnban.mockReset();
     mocks.useParams.mockReset();
-    mocks.useParams.mockReturnValue({ id: "cust-1" });
+    mocks.useParams.mockReturnValue({ id: "customer-123" });
+    seedCustomerDetailTranslations();
+    mockRecentOrders();
   });
 
-  it("renders customer details and ban action for active customers", () => {
-    mocks.useShow.mockReturnValue({
-      result: {
-        avatar_url: null,
-        full_name: "Alice",
-        phone_number: "08123",
-        email: "alice@example.com",
-        role: "customer",
-        is_banned: false,
-        created_at: "2026-04-01",
-      },
-      query: { isLoading: false },
+  it("renders customer profile, localized active action, and recent-order query", () => {
+    mockCustomerShow();
+
+    render(<CustomerShow />);
+
+    expect(screen.getByText("Profil pelanggan")).not.toBeNull();
+    expect(screen.getByText("Status akun")).not.toBeNull();
+    expect(screen.getByText("Pesanan terbaru")).not.toBeNull();
+    expect(screen.getByText("Nama lengkap")).not.toBeNull();
+    expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);
+    expect(screen.getByText("08123")).not.toBeNull();
+    expect(screen.getAllByText("alice@example.com").length).toBeGreaterThan(0);
+    expect(screen.getByText("customer")).not.toBeNull();
+    expect(screen.getByText("Aktif")).not.toBeNull();
+
+    expect(mocks.useList).toHaveBeenCalledWith({
+      resource: "orders",
+      pagination: { currentPage: 1, pageSize: 5 },
+      sorters: [{ field: "created_at", order: "desc" }],
+      filters: [{ field: "user_id", operator: "eq", value: "customer-123" }],
+      queryOptions: { enabled: true },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Blokir akun" }));
+    expect(mocks.handleBan).toHaveBeenCalledWith({ id: "customer-123", full_name: "Alice" });
+  });
+
+  it("renders customer profile fallbacks for missing fields", () => {
+    mockCustomerShow({
+      full_name: " ",
+      phone_number: " ",
+      email: null,
+      role: null,
+      created_at: null,
     });
 
     render(<CustomerShow />);
 
-    expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);
-    expect(screen.getByText("08123")).not.toBeNull();
-    expect(screen.getByText("alice@example.com")).not.toBeNull();
-    expect(screen.getByText("customer")).not.toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "customers.ban" }));
-    expect(mocks.handleBan).toHaveBeenCalledWith({ id: "cust-1", full_name: "Alice" });
+    expect(screen.getAllByText("Pelanggan tidak dikenal").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Belum tersedia").length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByText("ID pelanggan")).not.toBeNull();
+    expect(screen.getByText("customer-123")).not.toBeNull();
   });
 
   it.each([
@@ -248,12 +368,11 @@ describe("detail and dashboard pages", () => {
     ["blank", "   "],
   ])("renders the English missing-email fallback when customer email is %s", (_, email) => {
     mocks.translations["customers.emailFallback"] = "Not provided";
-    const record = email === undefined ? {} : { email };
-    mockCustomerShow(record);
+    mockCustomerShow({ email });
 
     render(<CustomerShow />);
 
-    expect(screen.getByText("Not provided")).not.toBeNull();
+    expect(screen.getAllByText("Not provided").length).toBeGreaterThan(0);
   });
 
   it("renders the Indonesian missing-email fallback through the translation mock", () => {
@@ -262,7 +381,121 @@ describe("detail and dashboard pages", () => {
 
     render(<CustomerShow />);
 
-    expect(screen.getByText("Belum tersedia")).not.toBeNull();
+    expect(screen.getAllByText("Belum tersedia").length).toBeGreaterThan(0);
+  });
+
+  it("keeps the customer profile visible when recent orders fail", () => {
+    mockCustomerShow();
+    mockRecentOrders({ isError: true });
+
+    render(<CustomerShow />);
+
+    expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);
+    expect(screen.getByRole("alert").textContent).toContain("Pesanan terbaru belum dapat dimuat");
+  });
+
+  it("announces the recent orders loading state to assistive technology", () => {
+    mockCustomerShow();
+    mockRecentOrders({ isLoading: true });
+
+    render(<CustomerShow />);
+
+    const loadingStatus = screen.getByRole("status");
+
+    expect(loadingStatus.getAttribute("aria-live")).toBe("polite");
+    expect(loadingStatus.getAttribute("aria-busy")).toBe("true");
+    expect(loadingStatus.textContent).toContain("Memuat pesanan...");
+  });
+
+  it("renders explicit alt text for image-backed customer avatars", () => {
+    mockCustomerShow({ avatar_url: "https://cdn.test/alice.png" });
+
+    render(<CustomerShow />);
+
+    const avatarImage = screen.getByRole("img", { name: "Foto profil Alice" }) as HTMLImageElement;
+
+    expect(avatarImage.src).toBe("https://cdn.test/alice.png");
+  });
+
+  it("calls unblock handler for banned customer accounts", () => {
+    mockCustomerShow({ is_banned: true });
+
+    render(<CustomerShow />);
+
+    expect(screen.getByText("Diblokir")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Buka blokir akun" }));
+    expect(mocks.handleUnban).toHaveBeenCalledWith({ id: "customer-123", full_name: "Alice" });
+  });
+
+  it("renders recent orders and opens a selected order", () => {
+    mockCustomerShow();
+    mockRecentOrders({
+      data: [
+        {
+          id: "order-1",
+          order_number: "INV-001",
+          status: "processing",
+          payment_status: "settlement",
+          total_amount: 25000,
+          created_at: "2026-04-10T00:00:00.000Z",
+        },
+      ],
+    });
+
+    render(<CustomerShow />);
+
+    expect(screen.getByText("INV-001")).not.toBeNull();
+    expect(screen.getByText("orderStatus.processing")).not.toBeNull();
+    expect(screen.getByText("paymentStatus.settlement")).not.toBeNull();
+    expect(screen.getByText(/Rp\s*25\.000/)).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Lihat Pesanan" }));
+    expect(mocks.navigate).toHaveBeenCalledWith("/orders/show/order-1");
+  });
+
+  it("renders no-orders empty state", () => {
+    mockCustomerShow();
+
+    render(<CustomerShow />);
+
+    expect(screen.getByText("Belum ada pesanan")).not.toBeNull();
+    expect(screen.getByText("Pelanggan ini belum memiliki pesanan.")).not.toBeNull();
+  });
+
+  it("opens all transactions with a Refine indexed customer filter", () => {
+    mockCustomerShow();
+
+    render(<CustomerShow />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Lihat Semua Transaksi" }));
+
+    const [navigationTarget] = mocks.navigate.mock.calls.at(-1) ?? [];
+    const targetUrl = new URL(String(navigationTarget), "https://admin.test");
+
+    expect(targetUrl.pathname).toBe("/orders");
+    expect(targetUrl.searchParams.get("currentPage")).toBe("1");
+    expect(targetUrl.searchParams.get("filters[0][field]")).toBe("user_id");
+    expect(targetUrl.searchParams.get("filters[0][operator]")).toBe("eq");
+    expect(targetUrl.searchParams.get("filters[0][value]")).toBe("customer-123");
+  });
+
+  it("keeps recent-order querying and all-transactions navigation disabled without a customer id", () => {
+    mocks.useParams.mockReturnValue({});
+    mockCustomerShow({ id: undefined });
+
+    render(<CustomerShow />);
+
+    expect(mocks.useList).toHaveBeenCalledWith({
+      resource: "orders",
+      pagination: { currentPage: 1, pageSize: 5 },
+      sorters: [{ field: "created_at", order: "desc" }],
+      filters: undefined,
+      queryOptions: { enabled: false },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Lihat Semua Transaksi" }));
+
+    expect(mocks.navigate).not.toHaveBeenCalledWith(expect.stringContaining("/orders?"));
   });
 
   it("renders product detail content including images and status", () => {

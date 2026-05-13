@@ -417,7 +417,7 @@
     "filterPayment": "Select Payment",
     "quickFilters": {
       "title": "Operational queues",
-      "description": "Use these shortcuts for common admin queues. Tracking review uses paid shipped or in-transit orders as the closest available list filter.",
+      "description": "Use these shortcuts for common admin queues. Shipment tracking uses paid shipped or in-transit orders as the closest available list filter.",
       "clear": "Clear queue filters",
       "all": "All",
       "paidUnprocessed": {
@@ -428,7 +428,7 @@
         "label": "Ready to ship",
         "description": "Paid orders waiting for shipment handoff or waybill review."
       },
-      "trackingRelevant": {
+      "shipmentTracking": {
         "label": "Track shipment",
         "description": "Paid shipped or in-transit orders. Use detail pages to sync tracking when available."
       },
@@ -576,6 +576,33 @@
       "role": "Role",
       "status": "Status"
     },
+    "detail": {
+      "back": "Back",
+      "profileInfo": "Profile Information",
+      "accountStatus": "Account Status",
+      "customerId": "Customer ID",
+      "email": "Email",
+      "phone": "Phone",
+      "joinedDate": "Joined Date",
+      "active": "Active",
+      "banned": "Banned",
+      "blockAccount": "Block Account",
+      "unblockAccount": "Unblock Account",
+      "recentOrders": "Recent Orders",
+      "viewOrder": "View Order",
+      "viewAllTransactions": "View All Transactions",
+      "avatarAlt": "Profile photo of {{name}}",
+      "orders": {
+        "empty": {
+          "title": "No orders yet",
+          "description": "This customer has not placed any orders yet."
+        },
+        "loading": "Loading orders...",
+        "error": "Failed to load customer orders. Please try again."
+      },
+      "unknown": "Unknown",
+      "unavailable": "Unavailable"
+    },
     "searchName": "Search name",
     "searchPhone": "Search phone",
     "search": {
@@ -596,6 +623,9 @@
     "banOk": "Yes, Ban",
     "banSuccess": "Customer banned successfully",
     "banError": "Failed to ban customer",
+    "unbanConfirm": "Unblock customer?",
+    "unbanContent": "Login access for customer \"{{name}}\" will be restored.",
+    "unbanOk": "Restore Login Access",
     "unbanSuccess": "Customer unbanned successfully",
     "unbanError": "Failed to unban customer",
     "banTooltip": "Ban customer",

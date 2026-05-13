@@ -53,9 +53,9 @@ const ORDER_QUICK_FILTERS: OrderQuickFilter[] = [
     ],
   },
   {
-    key: "tracking-relevant",
-    labelKey: "orders.quickFilters.trackingRelevant.label",
-    descriptionKey: "orders.quickFilters.trackingRelevant.description",
+    key: "shipment-tracking",
+    labelKey: "orders.quickFilters.shipmentTracking.label",
+    descriptionKey: "orders.quickFilters.shipmentTracking.description",
     filters: [
       { field: "payment_status", operator: "eq", value: "settlement" },
       { field: "status", operator: "in", value: ["shipped", "in_transit"] },
@@ -73,8 +73,18 @@ const ORDER_QUICK_FILTERS: OrderQuickFilter[] = [
 ];
 
 const ALL_ORDER_QUICK_FILTERS_VALUE = "all";
+const CUSTOMER_FILTER_FIELD = "user_id";
 
 const areQuickFilterValuesEqual = (left: unknown, right: unknown): boolean => JSON.stringify(left) === JSON.stringify(right);
+
+const isFieldFilter = (filter: CrudFilters[number]): filter is Extract<CrudFilters[number], { field: string }> =>
+  "field" in filter;
+
+const getPreservedCustomerFilters = (filters: CrudFilters | undefined): CrudFilters =>
+  (filters ?? []).filter((filter) => isFieldFilter(filter) && filter.field === CUSTOMER_FILTER_FIELD);
+
+const getFiltersWithoutCustomerFilter = (filters: CrudFilters | undefined): CrudFilters =>
+  (filters ?? []).filter((filter) => !isFieldFilter(filter) || filter.field !== CUSTOMER_FILTER_FIELD);
 
 const areQuickFilterFiltersEqual = (left: CrudFilters | undefined, right: CrudFilters): boolean => {
   if (!left || left.length !== right.length) {
@@ -93,11 +103,13 @@ const areQuickFilterFiltersEqual = (left: CrudFilters | undefined, right: CrudFi
 };
 
 const getActiveOrderQuickFilterKey = (filters: CrudFilters | undefined): string | undefined => {
-  if (!filters || filters.length === 0) {
+  const comparableFilters = getFiltersWithoutCustomerFilter(filters);
+
+  if (comparableFilters.length === 0) {
     return ALL_ORDER_QUICK_FILTERS_VALUE;
   }
 
-  return ORDER_QUICK_FILTERS.find((quickFilter) => areQuickFilterFiltersEqual(filters, quickFilter.filters))?.key;
+  return ORDER_QUICK_FILTERS.find((quickFilter) => areQuickFilterFiltersEqual(comparableFilters, quickFilter.filters))?.key;
 };
 
 const getOrderRecordKey = (record: BaseRecord): OrderRecordKey | undefined => {
@@ -175,6 +187,7 @@ export const OrderList: React.FC = () => {
   const PAYMENT_OPTIONS = getPaymentOptions(translate);
   const orderListTableLabel = translate("orders.tables.listAriaLabel");
   const activeQuickFilterKey = getActiveOrderQuickFilterKey(filters);
+  const preservedCustomerFilters = getPreservedCustomerFilters(filters);
   const orderQuickFilterOptions = [
     { label: translate("orders.quickFilters.all"), value: ALL_ORDER_QUICK_FILTERS_VALUE },
     ...ORDER_QUICK_FILTERS.map((quickFilter) => ({
@@ -186,14 +199,14 @@ export const OrderList: React.FC = () => {
     const selectedFilterKey = String(event.target.value);
 
     if (selectedFilterKey === ALL_ORDER_QUICK_FILTERS_VALUE) {
-      setFilters([], "replace");
+      setFilters(preservedCustomerFilters, "replace");
       return;
     }
 
     const selectedQuickFilter = ORDER_QUICK_FILTERS.find((quickFilter) => quickFilter.key === selectedFilterKey);
 
     if (selectedQuickFilter) {
-      setFilters(selectedQuickFilter.filters, "replace");
+      setFilters([...preservedCustomerFilters, ...selectedQuickFilter.filters], "replace");
     }
   };
 

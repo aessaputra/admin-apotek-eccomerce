@@ -586,7 +586,7 @@ describe("list pages", () => {
     expect(screen.getByRole("radio", { name: "orders.quickFilters.all" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByText("orders.quickFilters.paidUnprocessed.label")).not.toBeNull();
     expect(screen.getByText("orders.quickFilters.readyToShip.label")).not.toBeNull();
-    expect(screen.getByText("orders.quickFilters.trackingRelevant.label")).not.toBeNull();
+    expect(screen.getByText("orders.quickFilters.shipmentTracking.label")).not.toBeNull();
     expect(screen.getByText("orders.quickFilters.awaitingCustomer.label")).not.toBeNull();
     expect(screen.getByText("order-1")).not.toBeNull();
     expect(screen.getByText("Rp 25.000")).not.toBeNull();
@@ -608,7 +608,7 @@ describe("list pages", () => {
     ], "replace");
   });
 
-  it("applies the tracking-relevant order quick filter", () => {
+  it("applies the shipment-tracking order quick filter", () => {
     const setFilters = vi.fn();
     mocks.useTable.mockReturnValue({
       tableProps: {
@@ -620,7 +620,7 @@ describe("list pages", () => {
 
     render(<OrderList />);
 
-    fireEvent.click(screen.getByRole("radio", { name: "orders.quickFilters.trackingRelevant.label" }));
+    fireEvent.click(screen.getByRole("radio", { name: "orders.quickFilters.shipmentTracking.label" }));
 
     expect(setFilters).toHaveBeenCalledWith([
       { field: "payment_status", operator: "eq", value: "settlement" },
@@ -643,11 +643,59 @@ describe("list pages", () => {
 
     render(<OrderList />);
 
-    expect(screen.getByRole("radio", { name: "orders.quickFilters.trackingRelevant.label" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: "orders.quickFilters.shipmentTracking.label" }).getAttribute("aria-checked")).toBe("true");
 
     fireEvent.click(screen.getByRole("radio", { name: "orders.quickFilters.all" }));
 
     expect(setFilters).toHaveBeenCalledWith([], "replace");
+  });
+
+  it("preserves customer filter when clearing order quick filters", () => {
+    const customerFilter = { field: "user_id", operator: "eq", value: "customer-123" };
+    const setFilters = vi.fn();
+    mocks.useTable.mockReturnValue({
+      tableProps: {
+        dataSource: [],
+      },
+      filters: [
+        customerFilter,
+        { field: "payment_status", operator: "eq", value: "settlement" },
+        { field: "status", operator: "in", value: ["shipped", "in_transit"] },
+      ],
+      setFilters,
+    });
+
+    render(<OrderList />);
+
+    expect(screen.getByRole("radio", { name: "orders.quickFilters.shipmentTracking.label" }).getAttribute("aria-checked")).toBe("true");
+
+    fireEvent.click(screen.getByRole("radio", { name: "orders.quickFilters.all" }));
+
+    expect(setFilters).toHaveBeenCalledWith([customerFilter], "replace");
+  });
+
+  it("preserves customer filter when applying an order quick filter", () => {
+    const customerFilter = { field: "user_id", operator: "eq", value: "customer-123" };
+    const setFilters = vi.fn();
+    mocks.useTable.mockReturnValue({
+      tableProps: {
+        dataSource: [],
+      },
+      filters: [customerFilter],
+      setFilters,
+    });
+
+    render(<OrderList />);
+
+    expect(screen.getByRole("radio", { name: "orders.quickFilters.all" }).getAttribute("aria-checked")).toBe("true");
+
+    fireEvent.click(screen.getByRole("radio", { name: "orders.quickFilters.readyToShip.label" }));
+
+    expect(setFilters).toHaveBeenCalledWith([
+      customerFilter,
+      { field: "payment_status", operator: "eq", value: "settlement" },
+      { field: "status", operator: "eq", value: "awaiting_shipment" },
+    ], "replace");
   });
 
   it("does not select all when order filters do not match a quick filter", () => {
@@ -664,7 +712,7 @@ describe("list pages", () => {
     expect(screen.getByRole("radio", { name: "orders.quickFilters.all" }).getAttribute("aria-checked")).toBe("false");
     expect(screen.getByRole("radio", { name: "orders.quickFilters.paidUnprocessed.label" }).getAttribute("aria-checked")).toBe("false");
     expect(screen.getByRole("radio", { name: "orders.quickFilters.readyToShip.label" }).getAttribute("aria-checked")).toBe("false");
-    expect(screen.getByRole("radio", { name: "orders.quickFilters.trackingRelevant.label" }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("radio", { name: "orders.quickFilters.shipmentTracking.label" }).getAttribute("aria-checked")).toBe("false");
     expect(screen.getByRole("radio", { name: "orders.quickFilters.awaitingCustomer.label" }).getAttribute("aria-checked")).toBe("false");
   });
 

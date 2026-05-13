@@ -417,7 +417,7 @@
     "filterPayment": "Pilih Pembayaran",
     "quickFilters": {
       "title": "Antrean operasional",
-      "description": "Gunakan pintasan ini untuk antrean admin umum. Tinjauan pelacakan memakai pesanan dibayar yang sudah dikirim atau sedang transit sebagai filter daftar terdekat yang tersedia.",
+      "description": "Gunakan pintasan ini untuk antrean admin umum. Pelacakan pengiriman memakai pesanan dibayar yang sudah dikirim atau sedang transit sebagai filter daftar terdekat yang tersedia.",
       "clear": "Hapus filter antrean",
       "all": "Semua",
       "paidUnprocessed": {
@@ -428,7 +428,7 @@
         "label": "Siap dikirim",
         "description": "Pesanan dibayar yang menunggu serah terima pengiriman atau pemeriksaan resi."
       },
-      "trackingRelevant": {
+      "shipmentTracking": {
         "label": "Pantau kiriman",
         "description": "Pesanan dibayar yang sudah dikirim atau sedang transit. Gunakan halaman detail untuk sinkronisasi pelacakan jika tersedia."
       },
@@ -576,6 +576,33 @@
       "role": "Peran",
       "status": "Status"
     },
+    "detail": {
+      "back": "Kembali",
+      "profileInfo": "Informasi Profil",
+      "accountStatus": "Status Akun",
+      "customerId": "ID Pelanggan",
+      "email": "Email",
+      "phone": "Telepon",
+      "joinedDate": "Tanggal Bergabung",
+      "active": "Aktif",
+      "banned": "Diblokir",
+      "blockAccount": "Blokir Akun",
+      "unblockAccount": "Buka Blokir",
+      "recentOrders": "Pesanan Terbaru",
+      "viewOrder": "Lihat Pesanan",
+      "viewAllTransactions": "Lihat Semua Transaksi",
+      "avatarAlt": "Foto profil {{name}}",
+      "orders": {
+        "empty": {
+          "title": "Belum ada pesanan",
+          "description": "Pelanggan ini belum memiliki pesanan."
+        },
+        "loading": "Memuat pesanan...",
+        "error": "Gagal memuat pesanan pelanggan. Silakan coba lagi."
+      },
+      "unknown": "Tidak diketahui",
+      "unavailable": "Tidak tersedia"
+    },
     "searchName": "Cari nama",
     "searchPhone": "Cari nomor",
     "search": {
@@ -596,6 +623,9 @@
     "banOk": "Ya, Blokir",
     "banSuccess": "Pelanggan berhasil diblokir",
     "banError": "Gagal memblokir pelanggan",
+    "unbanConfirm": "Buka blokir pelanggan?",
+    "unbanContent": "Akses login pelanggan \"{{name}}\" akan dipulihkan.",
+    "unbanOk": "Pulihkan Akses Login",
     "unbanSuccess": "Blokir pelanggan berhasil dibuka",
     "unbanError": "Gagal membuka blokir pelanggan",
     "banTooltip": "Blokir pelanggan",
