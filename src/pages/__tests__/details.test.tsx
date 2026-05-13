@@ -143,10 +143,12 @@ vi.mock("antd", async () => {
   };
 
   const Descriptions = Object.assign(
-    ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    ({ children, column }: { children: React.ReactNode; column?: number | Record<string, number> }) => (
+      <div data-descriptions-column={typeof column === "number" ? String(column) : JSON.stringify(column)}>{children}</div>
+    ),
     {
-      Item: ({ label, children }: { label: React.ReactNode; children: React.ReactNode }) => (
-        <div>
+      Item: ({ label, children, span }: { label: React.ReactNode; children: React.ReactNode; span?: number }) => (
+        <div data-description-item data-span={span}>
           <div>{label}</div>
           <div>{children}</div>
         </div>
@@ -162,7 +164,7 @@ vi.mock("antd", async () => {
   return {
     Typography: {
       Title: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
-      Text: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+      Text: ({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) => <span style={style}>{children}</span>,
       Paragraph: ({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) => (
         <p style={style}>{children}</p>
       ),
@@ -321,7 +323,7 @@ describe("detail and dashboard pages", () => {
   it("renders customer profile, localized active action, and recent-order query", () => {
     mockCustomerShow();
 
-    render(<CustomerShow />);
+    const { container } = render(<CustomerShow />);
 
     expect(screen.getByText("Profil pelanggan")).not.toBeNull();
     expect(screen.getByText("Status akun")).not.toBeNull();
@@ -330,6 +332,14 @@ describe("detail and dashboard pages", () => {
     expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);
     expect(screen.getByText("08123")).not.toBeNull();
     expect(screen.getAllByText("alice@example.com").length).toBeGreaterThan(0);
+    expect(screen.getByText("Nama lengkap").closest("[data-descriptions-column]")?.getAttribute("data-descriptions-column")).toBe("1");
+    expect(container.querySelectorAll("[data-description-item]")).toHaveLength(6);
+    container.querySelectorAll("[data-description-item]").forEach((item) => {
+      expect(item.getAttribute("data-span")).toBeNull();
+    });
+    expect(
+      screen.getAllByText("alice@example.com").find((node) => node.style.overflowWrap === "anywhere" && node.style.wordBreak === "break-word")
+    ).toBeDefined();
     expect(screen.getByText("customer")).not.toBeNull();
     expect(screen.getByText("Aktif")).not.toBeNull();
 

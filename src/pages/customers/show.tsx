@@ -167,6 +167,18 @@ const createCustomerShowStyles = (token: CustomerShowToken) => ({
   profileMeta: {
     margin: 0,
   } satisfies CSSProperties,
+  profileDescriptionsLabel: {
+    whiteSpace: "normal",
+  } satisfies CSSProperties,
+  profileDescriptionsContent: {
+    minWidth: 0,
+  } satisfies CSSProperties,
+  profileDescriptionValue: {
+    display: "block",
+    minWidth: 0,
+    overflowWrap: "anywhere",
+    wordBreak: "break-word",
+  } satisfies CSSProperties,
   statusStack: {
     width: "100%",
   } satisfies CSSProperties,
@@ -279,21 +291,27 @@ const CustomerProfileCard: React.FC<CustomerProfileCardProps> = ({
       </Space>
     </div>
 
-    <Descriptions column={{ xs: 1, sm: 2 }} bordered size="middle">
+    <Descriptions
+      column={1}
+      bordered
+      size="middle"
+      labelStyle={styles.profileDescriptionsLabel}
+      contentStyle={styles.profileDescriptionsContent}
+    >
       <Descriptions.Item label={translate("customers.fields.fullName")}>
-        {model.customerName}
+        <Text style={styles.profileDescriptionValue}>{model.customerName}</Text>
       </Descriptions.Item>
       <Descriptions.Item label={translate("customers.detail.email")}>
-        {model.displayEmail}
+        <Text style={styles.profileDescriptionValue}>{model.displayEmail}</Text>
       </Descriptions.Item>
       <Descriptions.Item label={translate("customers.detail.phone")}>
-        {model.phoneNumber}
+        <Text style={styles.profileDescriptionValue}>{model.phoneNumber}</Text>
       </Descriptions.Item>
       <Descriptions.Item label={translate("customers.detail.joinedDate")}>
         {customer?.created_at ? <DateField value={customer.created_at} format="LLL" /> : model.unavailableLabel}
       </Descriptions.Item>
       <Descriptions.Item label={translate("customers.detail.customerId")}>
-        <Text code>{customer?.id ?? fallbackCustomerId ?? model.unavailableLabel}</Text>
+        <Text code style={styles.profileDescriptionValue}>{customer?.id ?? fallbackCustomerId ?? model.unavailableLabel}</Text>
       </Descriptions.Item>
       <Descriptions.Item label={translate("customers.fields.role")}>
         <Tag color={model.roleColor}>{customer?.role ?? model.unavailableLabel}</Tag>
