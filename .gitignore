@@ -33,6 +33,11 @@ _.sln
 .sisyphus/
 .worktrees/
 
+# Oh My OpenAgent / OMO local agent workspace
+.omo/*
+!.omo/rules/
+!.omo/rules/**
+
 # Supabase temp files
 supabase/.temp/
 .vercel
