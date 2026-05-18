@@ -1,0 +1,31 @@
+Task 1 schema/RPC security evidence - 2026-05-18
+
+TDD red evidence:
+- Command: pnpm test supabase/migrations/__tests__/database-backed-integration-config-migration.test.ts
+- Initial result before migration existed: FAIL, Missing database backed integration config migration.
+
+Green verification:
+- Command: pnpm test supabase/migrations/__tests__/database-backed-integration-config-migration.test.ts
+- Result after migration and public service-role wrappers: PASS, 1 file, 9 tests.
+- Command: pnpm test
+- Result: PASS, 68 files, 670 tests.
+- Command: pnpm build
+- Result: PASS, tsc and vite build completed.
+- Command: lsp_diagnostics supabase/migrations/__tests__/database-backed-integration-config-migration.test.ts
+- Result: No diagnostics found.
+
+Security shape evidence:
+- Private schema remains unexposed in config.toml; migration does not edit exposed schemas.
+- Private tables created: integration_config_keys, integration_config_versions, integration_config_current_versions, integration_config_audit_logs, order_integration_config_snapshots.
+- Browser roles are explicitly revoked from private tables and private/public RPCs; service_role is granted execute on intended RPCs.
+- Private SECURITY DEFINER routines use set search_path = '' and fully qualified private/vault/auth/pg_catalog references.
+- Vault plaintext read occurs only in private.get_runtime_integration_config via vault.decrypted_secrets.
+- Summary and audit routines return masked metadata only and do not query vault.decrypted_secrets.
+
+Static grep:
+- Command: rg -n "TODO|FIXME|HACK|plaintext|decrypted_secret" "supabase/migrations/20260518180321_database_backed_integration_config.sql" "supabase/migrations/__tests__/database-backed-integration-config-migration.test.ts"
+- Result: no TODO/FIXME/HACK. Matches are expected references to locked Vault read and test assertions around plaintext/decrypted_secret safety.
+
+Local Supabase CLI note:
+- Command: npx supabase migration list --local
+- Result: failed because local Postgres on 127.0.0.1:54322 was not running. No secrets printed.
