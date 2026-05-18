@@ -380,6 +380,9 @@ verify_jwt = false
 [functions.ban-customer]
 verify_jwt = false
 
+[functions.integration-config]
+verify_jwt = false
+
 [functions.cleanup-orphan-storage]
 verify_jwt = false
 
