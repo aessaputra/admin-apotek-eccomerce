@@ -46,25 +46,27 @@ create table if not exists private.integration_config_versions (
   constraint integration_config_versions_version_positive_check
     check (version_number > 0),
   constraint integration_config_versions_status_check
-    check (status = any (array['active'::text, 'retired'::text])),
+    check (status = any (array['active'::text, 'grace'::text, 'retired'::text, 'disabled'::text, 'superseded'::text])),
   constraint integration_config_versions_value_storage_check
     check (
       (vault_secret_id is not null and non_secret_value is null)
       or (vault_secret_id is null and non_secret_value is not null)
     ),
   constraint integration_config_versions_key_version_uidx
-    unique (key_name, version_number)
+    unique (key_name, version_number),
+  constraint integration_config_versions_key_version_id_uidx
+    unique (key_name, version_number, id)
 );
 
 create table if not exists private.integration_config_current_versions (
   key_name text primary key references private.integration_config_keys(key_name) on delete cascade,
-  version_id uuid not null unique references private.integration_config_versions(id) on delete restrict,
+  version_id uuid not null unique,
   version_number integer not null,
   activated_by uuid references auth.users(id) on delete set null,
   activated_at timestamptz not null default pg_catalog.timezone('utc'::text, pg_catalog.now()),
   constraint integration_config_current_versions_version_matches_key
-    foreign key (key_name, version_number)
-    references private.integration_config_versions(key_name, version_number)
+    foreign key (key_name, version_number, version_id)
+    references private.integration_config_versions(key_name, version_number, id)
     on delete restrict
 );
 
@@ -140,6 +142,14 @@ create index if not exists order_integration_config_snapshots_created_idx
 
 create index if not exists integration_config_versions_key_created_idx
   on private.integration_config_versions (key_name, created_at desc);
+
+create unique index if not exists integration_config_versions_one_active_per_key_uidx
+  on private.integration_config_versions (key_name)
+  where status = 'active';
+
+create index if not exists integration_config_versions_key_status_created_idx
+  on private.integration_config_versions (key_name, status, created_at desc)
+  where status in ('active', 'grace');
 
 create index if not exists integration_config_versions_vault_secret_idx
   on private.integration_config_versions (vault_secret_id)
@@ -441,6 +451,7 @@ begin
     non_secret_value,
     masked_value,
     value_fingerprint,
+    status,
     created_by,
     created_reason,
     created_source,
@@ -453,12 +464,25 @@ begin
     null,
     v_masked_value,
     v_value_fingerprint,
+    'superseded',
     p_actor_id,
     pg_catalog.nullif(pg_catalog.btrim(pg_catalog.coalesce(p_reason, '')), ''),
     pg_catalog.coalesce(pg_catalog.nullif(pg_catalog.btrim(p_source), ''), 'service_rpc'),
     pg_catalog.nullif(pg_catalog.btrim(pg_catalog.coalesce(p_request_id, '')), '')
   )
   returning id into v_version_id;
+
+  update private.integration_config_versions as old_versions
+  set
+    status = 'grace',
+    retired_at = null
+  where old_versions.key_name = p_key_name
+    and old_versions.status = 'active'
+    and old_versions.id <> v_version_id;
+
+  update private.integration_config_versions as new_version
+  set status = 'active'
+  where new_version.id = v_version_id;
 
   insert into private.integration_config_current_versions (
     key_name,
@@ -643,6 +667,7 @@ begin
     non_secret_value,
     masked_value,
     value_fingerprint,
+    status,
     created_by,
     created_reason,
     created_source,
@@ -655,12 +680,25 @@ begin
     p_value,
     null,
     null,
+    'superseded',
     p_actor_id,
     pg_catalog.nullif(pg_catalog.btrim(pg_catalog.coalesce(p_reason, '')), ''),
     pg_catalog.coalesce(pg_catalog.nullif(pg_catalog.btrim(p_source), ''), 'service_rpc'),
     pg_catalog.nullif(pg_catalog.btrim(pg_catalog.coalesce(p_request_id, '')), '')
   )
   returning id into v_version_id;
+
+  update private.integration_config_versions as old_versions
+  set
+    status = 'retired',
+    retired_at = pg_catalog.timezone('utc'::text, pg_catalog.now())
+  where old_versions.key_name = p_key_name
+    and old_versions.status = 'active'
+    and old_versions.id <> v_version_id;
+
+  update private.integration_config_versions as new_version
+  set status = 'active'
+  where new_version.id = v_version_id;
 
   insert into private.integration_config_current_versions (
     key_name,

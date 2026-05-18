@@ -64,7 +64,10 @@ describe("database backed integration config migration", () => {
       "constraint integration_config_versions_value_storage_check"
     );
     expect(normalizedSql).toContain(
-      "unique (key_name, version_number)"
+      "constraint integration_config_versions_key_version_uidx unique (key_name, version_number)"
+    );
+    expect(normalizedSql).toContain(
+      "constraint integration_config_versions_key_version_id_uidx unique (key_name, version_number, id)"
     );
     expect(normalizedSql).toContain(
       "create table if not exists private.integration_config_current_versions"
@@ -118,6 +121,13 @@ describe("database backed integration config migration", () => {
     expect(normalizedSql).toContain(
       "constraint integration_config_current_versions_version_matches_key"
     );
+    expect(normalizedSql).toContain("version_id uuid not null unique");
+    expect(normalizedSql).toContain(
+      "foreign key (key_name, version_number, version_id) references private.integration_config_versions(key_name, version_number, id) on delete restrict"
+    );
+    expect(normalizedSql).not.toContain(
+      "version_id uuid not null unique references private.integration_config_versions(id)"
+    );
     expect(normalizedSql).toContain(
       "create index if not exists integration_config_audit_logs_key_created_idx"
     );
@@ -142,6 +152,53 @@ describe("database backed integration config migration", () => {
     expect(normalizedSql).toContain(
       "on private.order_integration_config_snapshots (shipment_id)"
     );
+  });
+
+  it("supports active, grace, and terminal config version statuses", () => {
+    expect(normalizedSql).toContain(
+      "constraint integration_config_versions_status_check"
+    );
+    expect(normalizedSql).toContain(
+      "array['active'::text, 'grace'::text, 'retired'::text, 'disabled'::text, 'superseded'::text]"
+    );
+    expect(normalizedSql).toContain(
+      "create unique index if not exists integration_config_versions_one_active_per_key_uidx"
+    );
+    expect(normalizedSql).toContain(
+      "on private.integration_config_versions (key_name) where status = 'active'"
+    );
+    expect(normalizedSql).toContain(
+      "create index if not exists integration_config_versions_key_status_created_idx"
+    );
+    expect(normalizedSql).toContain(
+      "on private.integration_config_versions (key_name, status, created_at desc)"
+    );
+    expect(normalizedSql).toContain(
+      "where status in ('active', 'grace')"
+    );
+  });
+
+  it("transitions previous active versions when a new current version is activated", () => {
+    const rotateSql = extractFunctionSql(
+      migrationSql,
+      "private.rotate_integration_config_secret"
+    );
+    const updateSql = extractFunctionSql(
+      migrationSql,
+      "private.update_integration_config_value"
+    );
+
+    expect(rotateSql).toContain("update private.integration_config_versions as old_versions");
+    expect(rotateSql).toContain("status = 'grace'");
+    expect(rotateSql).toContain("where old_versions.key_name = p_key_name");
+    expect(rotateSql).toContain("old_versions.status = 'active'");
+    expect(rotateSql).toContain("old_versions.id <> v_version_id");
+
+    expect(updateSql).toContain("update private.integration_config_versions as old_versions");
+    expect(updateSql).toContain("status = 'retired'");
+    expect(updateSql).toContain("where old_versions.key_name = p_key_name");
+    expect(updateSql).toContain("old_versions.status = 'active'");
+    expect(updateSql).toContain("old_versions.id <> v_version_id");
   });
 
   it("keeps app tables free of plaintext secret columns", () => {
