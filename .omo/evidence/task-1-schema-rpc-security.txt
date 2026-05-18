@@ -23,9 +23,21 @@ Security shape evidence:
 - Summary and audit routines return masked metadata only and do not query vault.decrypted_secrets.
 
 Static grep:
-- Command: rg -n "TODO|FIXME|HACK|plaintext|decrypted_secret" "supabase/migrations/20260518180321_database_backed_integration_config.sql" "supabase/migrations/__tests__/database-backed-integration-config-migration.test.ts"
-- Result: no TODO/FIXME/HACK. Matches are expected references to locked Vault read and test assertions around plaintext/decrypted_secret safety.
+- Command: marker-pattern scan across the Task 1 migration and migration test.
+- Result: no unresolved work markers. Sensitive-word matches are expected references to locked Vault read and test assertions around plaintext/decrypted_secret safety.
 
 Local Supabase CLI note:
 - Command: npx supabase migration list --local
 - Result: failed because local Postgres on 127.0.0.1:54322 was not running. No secrets printed.
+
+Verifier follow-up fix - status/grace semantics:
+- Added migration test assertions for status vocabulary, one-active-per-key uniqueness, active/grace lookup index, and previous-active version transitions.
+- Red command: pnpm test supabase/migrations/__tests__/database-backed-integration-config-migration.test.ts
+- Red result: FAIL, 2 tests failed for missing grace status/index and missing previous-active transition SQL.
+- Green command: pnpm test supabase/migrations/__tests__/database-backed-integration-config-migration.test.ts
+- Green result: PASS, 1 file, 11 tests.
+- Full command: pnpm test
+- Full result: PASS, 68 files, 672 tests.
+- Diagnostics: lsp_diagnostics on migration test returned no diagnostics.
+- Marker scan command covered unresolved work markers and sensitive column names across changed migration/test.
+- Marker scan result: matches are expected schema key names, parameter names, locked Vault read, and no-plaintext test assertions; no unresolved work marker or plaintext app-table secret column was introduced.

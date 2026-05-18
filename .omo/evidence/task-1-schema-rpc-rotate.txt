@@ -21,3 +21,13 @@ Verification commands:
 - pnpm test supabase/migrations/__tests__/database-backed-integration-config-migration.test.ts: PASS, 9 tests.
 - pnpm test: PASS, 670 tests.
 - pnpm build: PASS.
+
+Verifier follow-up fix - rotation status semantics:
+- Status vocabulary now includes active, grace, retired, disabled, and superseded.
+- One active version per key is enforced by partial unique index integration_config_versions_one_active_per_key_uidx.
+- Active/grace lookup is supported by integration_config_versions_key_status_created_idx on (key_name, status, created_at desc) where status in ('active', 'grace').
+- Secret rotation transitions previous active versions for the same key to grace before activating the new version.
+- Non-secret updates transition previous active versions for the same key to retired before activating the new version.
+- get_runtime_integration_config remains current-pointer based and filters current versions to status = active.
+- Updated targeted verification: pnpm test supabase/migrations/__tests__/database-backed-integration-config-migration.test.ts: PASS, 11 tests.
+- Updated full verification: pnpm test: PASS, 672 tests.

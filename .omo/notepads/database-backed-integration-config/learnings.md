@@ -29,3 +29,14 @@
 - Added public service-role-only wrappers so later Edge Functions can call RPCs through Supabase API without exposing the private or vault schemas in PostgREST.
 - Added SQL-shape test `supabase/migrations/__tests__/database-backed-integration-config-migration.test.ts`; red run failed on missing migration, green run passed 9 tests.
 - Full verification passed: `pnpm test` 68 files/670 tests and `pnpm build`; `npx supabase migration list --local` could not connect because local Postgres was not running.
+
+## 2026-05-18 Task 1 Verification Fix
+- Atlas found a valid semantic gap: versions only supported `active`/`retired`, and rotation/update did not transition previous active versions.
+- Fixed status semantics to allow `active`, `grace`, `retired`, `disabled`, and `superseded`; added a partial unique one-active-per-key index plus active/grace lookup index for later runtime config helper work.
+- Secret rotation now transitions previous active versions to `grace`; non-secret updates transition previous active versions to `retired`; current runtime fetch still returns only the current pointer with `status = 'active'`.
+- Added regression SQL-shape assertions for status vocabulary, one-active invariant, grace lookup support, and previous-active transitions; red run failed 2 assertions before SQL fix and green run passed 11 tests after.
+
+## 2026-05-18 Task 1 Current Pointer Constraint Fix
+- Current-version pointers must bind `version_id` to the same `(key_name, version_number)` row, not rely on separate independent FKs.
+- Added a named target uniqueness constraint on `private.integration_config_versions(key_name, version_number, id)` so PostgreSQL can enforce the composite pointer FK.
+- Regression test now asserts the exact composite FK shape and rejects the previous inline `version_id`-only FK pattern.
