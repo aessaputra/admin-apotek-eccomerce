@@ -130,3 +130,7 @@
 - Added `provider-env-cutover-source.test.ts` as the final source guard. It failed before the cutover on provider env aliases and provider-prefixed runtime identifiers, then passed after removing fallback support and renaming non-env Midtrans constants.
 - Static checks now return no runtime source matches for provider env reads, provider env aliases, or `Deno.env.toObject()` under `supabase/functions`; remaining provider-name strings are test fixtures or source-guard assertions documented in `.omo/evidence/task-12-no-provider-env-reads.txt`.
 - Verification passed: targeted Task 12 tests (8 files / 75 tests), full `pnpm test` (81 files / 757 tests), `pnpm build`, and LSP diagnostics on changed TypeScript files.
+
+## 2026-05-19 Final Verification F2/F4 Fix
+- Settings integration config now treats backend `text_array` value kinds the same as the existing comma-separated array UI path, so array keys like `biteship.enabled_couriers` submit arrays instead of raw strings.
+- The rotate secret modal disables AntD's password visibility toggle while keeping the blank new-secret input masked for typed placeholder secrets.

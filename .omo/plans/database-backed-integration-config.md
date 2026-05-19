@@ -640,16 +640,16 @@ Wave 6: Final Verification Wave.
 > 4 review agents run in PARALLEL. ALL must APPROVE. Present consolidated results to user and get explicit "okay" before completing.
 > **Do NOT auto-proceed after verification. Wait for user's explicit approval before marking work complete.**
 > **Never mark F1-F4 as checked before getting user's okay.** Rejection or user feedback -> fix -> re-run -> present again -> wait for okay.
-- [ ] F1. Plan Compliance Audit — oracle
+- [x] F1. Plan Compliance Audit — oracle
   - Verify every confirmed design decision and mandatory revision is implemented.
   - Evidence: `.omo/evidence/f1-plan-compliance.md`.
-- [ ] F2. Code Quality Review — unspecified-high
+- [x] F2. Code Quality Review — unspecified-high
   - Review schema/RPC/function/UI code for maintainability, type safety, and project conventions.
   - Evidence: `.omo/evidence/f2-code-quality.md`.
-- [ ] F3. Real Manual QA — unspecified-high (+ playwright if UI)
+- [x] F3. Real Manual QA — unspecified-high (+ playwright if UI)
   - Exercise Settings config tabs, rotate modal with placeholder secret, audit trail, and no plaintext in browser responses.
   - Evidence: `.omo/evidence/f3-manual-qa.md` plus screenshots if Playwright is available.
-- [ ] F4. Scope Fidelity Check — deep
+- [x] F4. Scope Fidelity Check — deep
   - Verify no scope creep: no generic secret manager, no super-admin RBAC expansion, no plaintext reveal UX, no customer frontend contract changes unless documented.
   - Evidence: `.omo/evidence/f4-scope-fidelity.md`.
 

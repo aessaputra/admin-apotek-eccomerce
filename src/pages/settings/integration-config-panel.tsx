@@ -55,9 +55,13 @@ function isSecretKey(key: RuntimeConfigKey): boolean {
   return SECRET_KEYS.includes(key);
 }
 
+function isArrayKind(kind: IntegrationConfigValueKind): boolean {
+  return kind === "string_array" || kind === "text_array";
+}
+
 function stringifyValue(value: unknown, kind: IntegrationConfigValueKind): string {
   if (value === null || value === undefined) return "";
-  if (kind === "string_array" && Array.isArray(value)) return value.join(", ");
+  if (isArrayKind(kind) && Array.isArray(value)) return value.join(", ");
   if (kind === "json" || typeof value === "object") return JSON.stringify(value, null, 2);
   return String(value);
 }
@@ -66,7 +70,7 @@ function parseValue(value: string, kind: IntegrationConfigValueKind): unknown {
   const trimmed = value.trim();
   if (kind === "boolean") return trimmed === "true";
   if (kind === "number") return Number(trimmed);
-  if (kind === "string_array") return trimmed ? trimmed.split(",").map((item) => item.trim()).filter(Boolean) : [];
+  if (isArrayKind(kind)) return trimmed ? trimmed.split(",").map((item) => item.trim()).filter(Boolean) : [];
   if (kind === "json") return trimmed ? JSON.parse(trimmed) : null;
   return value;
 }
@@ -409,6 +413,7 @@ export const IntegrationConfigPanel: React.FC = () => {
               value={rotateForm.secret}
               onChange={(event) => setRotateForm((current) => ({ ...current, secret: event.target.value }))}
               autoComplete="new-password"
+              visibilityToggle={false}
             />
           </Form.Item>
           <Form.Item

@@ -21,7 +21,7 @@ export const RUNTIME_CONFIG_KEYS = [
 
 export type RuntimeConfigKey = (typeof RUNTIME_CONFIG_KEYS)[number];
 
-export type IntegrationConfigValueKind = "secret" | "boolean" | "string" | "number" | "json" | "string_array";
+export type IntegrationConfigValueKind = "secret" | "boolean" | "string" | "number" | "json" | "string_array" | "text_array";
 
 export interface IntegrationConfigSummaryRow {
   key_name: RuntimeConfigKey;

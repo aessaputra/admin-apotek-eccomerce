@@ -244,12 +244,19 @@ vi.mock("antd", () => {
         placeholder,
         value,
         onChange,
+        visibilityToggle,
       }: {
         "aria-label"?: string;
         placeholder?: string;
         value?: string;
         onChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
-      }) => <input aria-label={ariaLabel ?? placeholder ?? "password"} value={value} onChange={onChange} type="password" />,
+        visibilityToggle?: boolean;
+      }) => (
+        <span>
+          <input aria-label={ariaLabel ?? placeholder ?? "password"} value={value} onChange={onChange} type="password" />
+          {visibilityToggle === false ? null : <button type="button" aria-label="password visibility toggle">show</button>}
+        </span>
+      ),
     }
   );
 
@@ -948,6 +955,70 @@ describe("form pages", () => {
     expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
   });
 
+  it("sends text_array integration config updates as arrays", async () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+    mocks.functionsInvoke.mockImplementation((_name: string, { body }: { body: Record<string, unknown> }) => {
+      if (body.action === "summary") {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                key_name: "biteship.enabled_couriers",
+                display_name: "Enabled couriers",
+                description: "Allowed Biteship courier services",
+                value_kind: "text_array",
+                is_secret: false,
+                is_required: true,
+                is_runtime_required: true,
+                version_id: "version-couriers",
+                version_number: 1,
+                status: "active",
+                masked_value: null,
+                value_fingerprint: null,
+                non_secret_value: ["jne:reg"],
+                updated_by: "admin-1",
+                updated_at: "2026-05-19T09:00:00Z",
+              },
+            ],
+          },
+          error: null,
+        });
+      }
+
+      if (body.action === "audit") {
+        return Promise.resolve({ data: { data: [] }, error: null });
+      }
+
+      return Promise.resolve({ data: { data: { ok: true } }, error: null });
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    fireEvent.change(await screen.findByLabelText("New value for biteship.enabled_couriers"), {
+      target: { value: "jne:reg, grab:instant" },
+    });
+    fireEvent.change(screen.getByLabelText("Reason for biteship.enabled_couriers"), {
+      target: { value: "refresh enabled courier list" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save value" }));
+
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "updateValue",
+        key: "biteship.enabled_couriers",
+        value: ["jne:reg", "grab:instant"],
+        reason: "refresh enabled courier list",
+      },
+    }));
+  });
+
   it("requires rotate secret, confirmation phrase, and reason before calling the gateway", async () => {
     mocks.useForm.mockReturnValue({
       formProps: {},
@@ -985,6 +1056,30 @@ describe("form pages", () => {
       },
     }));
     await waitFor(() => expect(mocks.messageSuccess).toHaveBeenCalledWith("Secret rotated safely."));
+  });
+
+  it("keeps rotate secret input masked and removes the password reveal control", async () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Rotate secret" }))[0]);
+    const secretInput = screen.getByLabelText("New secret") as HTMLInputElement;
+
+    expect(within(screen.getByRole("dialog")).queryByRole("button", { name: /password visibility toggle/i })).toBeNull();
+    expect(secretInput.type).toBe("password");
+
+    fireEvent.change(secretInput, { target: { value: "TEST_NEW_SECRET_SENTINEL" } });
+
+    expect(secretInput.type).toBe("password");
+    expect(secretInput.value).toBe("TEST_NEW_SECRET_SENTINEL");
   });
 
   it("renders safe localized gateway errors for rotate failures without plaintext response data", async () => {
