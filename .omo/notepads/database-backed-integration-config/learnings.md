@@ -91,3 +91,7 @@
 - `midtrans-webhook` now performs only read-only runtime/binding lookups before signature validation; invalid signatures and pre-signature config failures return before raw notification, payment, order, audit, or side-effect writes.
 - Confirm, reconciliation, admin order cancellation, and customer unpaid cancellation paths now call Midtrans using transaction-bound runtime config when available and fail closed with safe unavailable errors if runtime config cannot be resolved.
 - Regression coverage added for invalid-signature no-write, missing-config no-write, grace-key status authorization, bound-version preference, static provider-env removal in migrated functions, and service-role-only binding lookup SQL shape.
+
+## 2026-05-19T10:03:15Z Task 5 Review Cleanup
+- Removed unused Task 5 locals flagged by Atlas LSP diagnostics in `midtrans-webhook`, `confirm-midtrans-payment`, and `reconcile-pending-midtrans-payments` without changing Midtrans transition, signature, status verification, amount/currency, or side-effect behavior.
+- Fresh verification after cleanup: LSP diagnostics clear on the three reviewed files, targeted Task 5 tests passed (7 files / 39 tests), and `pnpm build` passed.

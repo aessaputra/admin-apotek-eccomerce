@@ -217,13 +217,12 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const { newPaymentStatus, newOrderStatus, shouldReduceStock } =
-          mapMidtransStatus(
-            verifiedStatus.transaction_status,
-            verifiedFraudStatus,
-            order.payment_status,
-            order.status,
-          );
+        const { newPaymentStatus, newOrderStatus } = mapMidtransStatus(
+          verifiedStatus.transaction_status,
+          verifiedFraudStatus,
+          order.payment_status,
+          order.status,
+        );
 
         const paymentType = normalizeMidtransPaymentType(
           verifiedStatus.payment_type || order.payment_type,

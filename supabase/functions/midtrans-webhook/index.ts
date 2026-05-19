@@ -481,7 +481,6 @@ export function createMidtransWebhookHandler(dependencies: {
     const persistedPaymentStatus =
       (transition?.payment_status as PaymentStatus | undefined) ||
       newPaymentStatus;
-    const persistedOrderStatus = transition?.order_status || order.status;
     const ignorableNoop =
       !applied &&
       isIgnorableMidtransNoop(
