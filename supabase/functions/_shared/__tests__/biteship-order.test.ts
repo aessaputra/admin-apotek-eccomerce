@@ -602,23 +602,23 @@ describe("Biteship runtime API key", () => {
     };
     const env = { get: vi.fn(() => "env-biteship-key-must-not-be-used") };
 
-    const apiKey = await resolveBiteshipApiKeyFromRuntimeConfig(adminClient, env);
+    const apiKey = await resolveBiteshipApiKeyFromRuntimeConfig(adminClient);
 
     expect(apiKey).toBe(apiKeySentinel);
     expect(env.get).not.toHaveBeenCalled();
   });
 
-  it("falls back to the explicit provider env API key when runtime config is missing", async () => {
-    const envApiKeySentinel = "env-biteship-key-sentinel";
+  it("fails closed when runtime config is missing instead of using provider env", async () => {
     const adminClient = {
       rpc: vi.fn(async () => ({ data: [], error: null })),
     };
-    const env = { get: vi.fn((key: string) => key === "BITESHIP_API_KEY" ? envApiKeySentinel : undefined) };
+    const env = { get: vi.fn(() => "env-biteship-key-must-not-be-used") };
 
-    const apiKey = await resolveBiteshipApiKeyFromRuntimeConfig(adminClient, env);
+    await expect(
+      resolveBiteshipApiKeyFromRuntimeConfig(adminClient),
+    ).rejects.toThrow("Biteship runtime config unavailable");
 
-    expect(apiKey).toBe(envApiKeySentinel);
-    expect(env.get).toHaveBeenCalledWith("BITESHIP_API_KEY");
+    expect(env.get).not.toHaveBeenCalled();
   });
 
   it("fails closed with a safe error when runtime and provider env Biteship API keys are missing", async () => {
@@ -628,9 +628,9 @@ describe("Biteship runtime API key", () => {
     const env = { get: vi.fn(() => undefined) };
 
     await expect(
-      resolveBiteshipApiKeyFromRuntimeConfig(adminClient, env),
+      resolveBiteshipApiKeyFromRuntimeConfig(adminClient),
     ).rejects.toThrow("Biteship runtime config unavailable");
-    expect(env.get).toHaveBeenCalledWith("BITESHIP_API_KEY");
+    expect(env.get).not.toHaveBeenCalled();
   });
 
   it("authorizes order creation with the runtime API key without storing it in the snapshot payload", async () => {

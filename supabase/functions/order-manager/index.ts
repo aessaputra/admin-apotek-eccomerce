@@ -73,11 +73,11 @@ const TRANSITION_RULES: Record<string, string[]> = {
   in_transit: ["delivered"],
 };
 
-const MIDTRANS_CANCELLABLE_TRANSACTION_STATUSES = new Set([
+const PAYMENT_PROVIDER_CANCELLABLE_TRANSACTION_STATUSES = new Set([
   "pending",
   "authorize",
 ]);
-const MIDTRANS_TERMINAL_CANCEL_STATUSES = new Set([
+const PAYMENT_PROVIDER_TERMINAL_CANCEL_STATUSES = new Set([
   "cancel",
   "deny",
   "expire",
@@ -319,7 +319,7 @@ async function buildCancellationPaymentUpdate(
     throw new Error("Paid Midtrans transactions must be refunded through a refund flow before marking payment as refunded");
   }
 
-  if (MIDTRANS_CANCELLABLE_TRANSACTION_STATUSES.has(verifiedStatus.transaction_status)) {
+  if (PAYMENT_PROVIDER_CANCELLABLE_TRANSACTION_STATUSES.has(verifiedStatus.transaction_status)) {
     await cancelMidtransTransaction(midtransOrderId, runtimeConfig.serverKey, {
       isProduction: runtimeConfig.isProduction,
     });
@@ -328,7 +328,7 @@ async function buildCancellationPaymentUpdate(
       runtimeConfig.serverKey,
       { isProduction: runtimeConfig.isProduction },
     );
-  } else if (!MIDTRANS_TERMINAL_CANCEL_STATUSES.has(verifiedStatus.transaction_status)) {
+  } else if (!PAYMENT_PROVIDER_TERMINAL_CANCEL_STATUSES.has(verifiedStatus.transaction_status)) {
     throw new Error(`Midtrans transaction status '${verifiedStatus.transaction_status}' is not cancellable`);
   }
 

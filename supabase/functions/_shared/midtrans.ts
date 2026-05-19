@@ -16,12 +16,10 @@ import {
   createRuntimeConfigProvider,
   type RuntimeConfigAdminClient,
   type RuntimeConfigEntry,
-  type RuntimeConfigEnvironment,
-  type RuntimeConfigFallbackOptions,
   type RuntimeConfigStatus,
 } from "./runtime-config.ts";
 
-const MIDTRANS_PAYMENT_TYPE_ALLOWLIST = new Set([
+const PAYMENT_TYPE_ALLOWLIST = new Set([
   "credit_card",
   "bank_transfer",
   "echannel",
@@ -97,7 +95,7 @@ const STALE_PAYMENT_STATUS_MAP: Record<PaymentStatus, PaymentStatus[]> = {
   partial_chargeback: [],
 };
 
-const MIDTRANS_COUNTRY_CODE = "IDN";
+const DEFAULT_COUNTRY_CODE = "IDN";
 
 const trimToUndefined = (
   value: string | null | undefined,
@@ -128,7 +126,7 @@ const normalizeCountryCode = (
 ): string => {
   const normalized = trimToUndefined(countryCode)?.toUpperCase();
   if (!normalized || normalized === "ID" || normalized === "IDN") {
-    return MIDTRANS_COUNTRY_CODE;
+    return DEFAULT_COUNTRY_CODE;
   }
 
   return normalized;
@@ -167,7 +165,7 @@ const buildMidtransAddress = (
 export type MidtransRuntimeConfig = {
   serverKey: string;
   isProduction: boolean;
-  source: "bound" | "active" | "grace" | "fallback";
+  source: "bound" | "active" | "grace";
   serverKeyVersionId: string | null;
   serverKeyVersionNumber: number | null;
   isProductionVersionId: string | null;
@@ -266,7 +264,6 @@ export const cancelMidtransTransaction = async (
 export async function resolveMidtransTransactionRuntimeConfig(
   adminClient: RuntimeConfigAdminClient,
   midtransOrderId: string,
-  env?: RuntimeConfigEnvironment,
 ): Promise<MidtransRuntimeConfig> {
   const binding = await getMidtransPaymentConfigBinding(adminClient, midtransOrderId);
 
@@ -274,13 +271,12 @@ export async function resolveMidtransTransactionRuntimeConfig(
     return resolveBoundMidtransRuntimeConfig(adminClient, binding);
   }
 
-  return resolveActiveMidtransRuntimeConfig(adminClient, env);
+  return resolveActiveMidtransRuntimeConfig(adminClient);
 }
 
 export async function resolveMidtransWebhookRuntimeConfig(
   adminClient: RuntimeConfigAdminClient,
   payload: Pick<MidtransWebhookPayload, "order_id" | "status_code" | "gross_amount" | "signature_key">,
-  env?: RuntimeConfigEnvironment,
 ): Promise<{ config: MidtransRuntimeConfig; signatureValid: boolean }> {
   const binding = await getMidtransPaymentConfigBinding(adminClient, payload.order_id);
 
@@ -292,7 +288,7 @@ export async function resolveMidtransWebhookRuntimeConfig(
     };
   }
 
-  const candidates = await resolveMidtransSignatureCandidates(adminClient, env);
+  const candidates = await resolveMidtransSignatureCandidates(adminClient);
   if (candidates.length === 0) {
     throw new MidtransRuntimeConfigError();
   }
@@ -305,21 +301,6 @@ export async function resolveMidtransWebhookRuntimeConfig(
 
   return { config: candidates[0], signatureValid: false };
 }
-
-
-function createMidtransProviderFallback(
-  env?: RuntimeConfigEnvironment,
-): RuntimeConfigFallbackOptions {
-  return {
-    enabled: true,
-    env,
-    allowKeys: [
-      CONFIG_KEYS.midtransServerKey,
-      CONFIG_KEYS.midtransIsProduction,
-    ],
-  };
-}
-
 async function getMidtransPaymentConfigBinding(
   adminClient: RuntimeConfigAdminClient,
   midtransOrderId: string,
@@ -377,12 +358,10 @@ async function resolveBoundMidtransRuntimeConfig(
 
 async function resolveActiveMidtransRuntimeConfig(
   adminClient: RuntimeConfigAdminClient,
-  env?: RuntimeConfigEnvironment,
 ): Promise<MidtransRuntimeConfig> {
   const runtimeConfig = createRuntimeConfigProvider({
     adminClient,
     cacheTtlMs: 0,
-    fallback: createMidtransProviderFallback(env),
   });
 
   try {
@@ -394,7 +373,7 @@ async function resolveActiveMidtransRuntimeConfig(
     return buildMidtransRuntimeConfig(
       serverKeyEntry,
       isProductionEntry,
-      serverKeyEntry.status === "fallback" ? "fallback" : "active",
+      "active",
     );
   } catch (error) {
     if (error instanceof RuntimeConfigError) {
@@ -407,23 +386,19 @@ async function resolveActiveMidtransRuntimeConfig(
 
 async function resolveMidtransSignatureCandidates(
   adminClient: RuntimeConfigAdminClient,
-  env?: RuntimeConfigEnvironment,
 ): Promise<MidtransRuntimeConfig[]> {
   const runtimeConfig = createRuntimeConfigProvider({
     adminClient,
     cacheTtlMs: 0,
-    fallback: createMidtransProviderFallback(env),
   });
 
   try {
     const [serverKeyEntries, isProductionEntries] = await Promise.all([
       runtimeConfig.getConfigCandidates(
         CONFIG_KEYS.midtransServerKey,
-        { preSignature: true },
       ),
       runtimeConfig.getConfigCandidates(
         CONFIG_KEYS.midtransIsProduction,
-        { preSignature: true },
       ),
     ]);
 
@@ -440,7 +415,7 @@ async function resolveMidtransSignatureCandidates(
       return buildMidtransRuntimeConfig(
         serverKeyEntry,
         pairedProductionEntry,
-        serverKeyEntry.status === "grace" ? "grace" : serverKeyEntry.status === "fallback" ? "fallback" : "active",
+        serverKeyEntry.status === "grace" ? "grace" : "active",
       );
     });
   } catch (error) {
@@ -453,7 +428,7 @@ async function resolveMidtransSignatureCandidates(
 }
 
 function findPairedProductionEntry(
-  serverKeyStatus: RuntimeConfigStatus | "fallback",
+  serverKeyStatus: RuntimeConfigStatus,
   entries: Array<RuntimeConfigEntry<typeof CONFIG_KEYS.midtransIsProduction>>,
 ): RuntimeConfigEntry<typeof CONFIG_KEYS.midtransIsProduction> | null {
   return entries.find((entry) => entry.status === serverKeyStatus) ??
@@ -622,7 +597,7 @@ export const normalizeMidtransPaymentType = (
     return null;
   }
 
-  return MIDTRANS_PAYMENT_TYPE_ALLOWLIST.has(value) ? value : "other";
+  return PAYMENT_TYPE_ALLOWLIST.has(value) ? value : "other";
 };
 
 export const normalizeMidtransCurrency = (

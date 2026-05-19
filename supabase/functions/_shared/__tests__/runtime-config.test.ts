@@ -235,15 +235,12 @@ describe("runtime config database lookups", () => {
   });
 });
 
-describe("runtime config fallback and errors", () => {
-  it("fails closed for required config when fallback is disabled", async () => {
-    const fallbackSentinel = "fallback-secret-sentinel";
-    const env = createEnvMock({ MIDTRANS_SERVER_KEY: fallbackSentinel });
+describe("runtime config cutover errors", () => {
+  it("fails closed for required config without reading provider environment", async () => {
+    const providerSecretSentinel = "provider-secret-sentinel";
+    const env = createEnvMock({ PROVIDER_SECRET: providerSecretSentinel });
     const adminClient = createRuntimeConfigClient([]);
-    const provider = createRuntimeConfigProvider({
-      adminClient,
-      fallback: { enabled: false, env },
-    });
+    const provider = createRuntimeConfigProvider({ adminClient });
 
     const error = await captureRuntimeConfigError(() =>
       provider.getRequiredConfig(CONFIG_KEYS.midtransServerKey),
@@ -255,45 +252,28 @@ describe("runtime config fallback and errors", () => {
       keyName: CONFIG_KEYS.midtransServerKey,
     });
     expect(env.get).not.toHaveBeenCalled();
-    expect(JSON.stringify(error)).not.toContain(fallbackSentinel);
+    expect(JSON.stringify(error)).not.toContain(providerSecretSentinel);
   });
 
-  it("requires fallback callers to explicitly allow each fallback key", async () => {
-    const env = createEnvMock({ MIDTRANS_SERVER_KEY: "allowed-key-required" });
+  it("returns null for optional missing config without provider fallback", async () => {
+    const env = createEnvMock({ PROVIDER_SECRET: "optional-provider-sentinel" });
     const adminClient = createRuntimeConfigClient([]);
-    const provider = createRuntimeConfigProvider({
-      adminClient,
-      fallback: { enabled: true, env },
-    });
+    const provider = createRuntimeConfigProvider({ adminClient });
 
-    const error = await captureRuntimeConfigError(() =>
-      provider.getRequiredConfig(CONFIG_KEYS.midtransServerKey),
-    );
+    const config = await provider.getOptionalConfig(CONFIG_KEYS.pushExpoAccessToken);
 
-    expect(error.code).toBe("CONFIG_MISSING" satisfies RuntimeConfigErrorCode);
+    expect(config).toBeNull();
     expect(env.get).not.toHaveBeenCalled();
   });
 
-  it("fails closed instead of using fallback in pre-signature mode", async () => {
-    const fallbackSentinel = "fallback-midtrans-secret-sentinel";
-    const env = createEnvMock({ MIDTRANS_SERVER_KEY: fallbackSentinel });
-    const onFallback = vi.fn();
+  it("fails closed in pre-signature mode without provider fallback", async () => {
+    const providerSecretSentinel = "presignature-provider-sentinel";
+    const env = createEnvMock({ PROVIDER_SECRET: providerSecretSentinel });
     const adminClient = createRuntimeConfigClient([]);
-    const provider = createRuntimeConfigProvider({
-      adminClient,
-      fallback: {
-        enabled: true,
-        env,
-        allowKeys: [CONFIG_KEYS.midtransServerKey],
-        onFallback,
-      },
-    });
+    const provider = createRuntimeConfigProvider({ adminClient });
 
     const error = await captureRuntimeConfigError(() =>
-      provider.getRequiredConfig(
-        CONFIG_KEYS.midtransServerKey,
-        { preSignature: true },
-      )
+      provider.getRequiredConfig(CONFIG_KEYS.midtransServerKey)
     );
 
     expect(error.toLogSafe()).toMatchObject({
@@ -301,69 +281,11 @@ describe("runtime config fallback and errors", () => {
       keyName: CONFIG_KEYS.midtransServerKey,
     });
     expect(env.get).not.toHaveBeenCalled();
-    expect(onFallback).not.toHaveBeenCalled();
     expect(adminClient.rpc).toHaveBeenCalledTimes(1);
     expect(adminClient.rpc.mock.calls.map(([rpcName]) => rpcName)).toEqual([
       "get_runtime_integration_config_versions",
     ]);
-    expect(JSON.stringify(error)).not.toContain(fallbackSentinel);
-  });
-
-  it("observes post-signature fallback with log-safe metadata only", async () => {
-    const fallbackSentinel = "fallback-midtrans-secret-sentinel";
-    const env = createEnvMock({ MIDTRANS_SERVER_KEY: fallbackSentinel });
-    const onFallback = vi.fn();
-    const adminClient = createRuntimeConfigClient([]);
-    const provider = createRuntimeConfigProvider({
-      adminClient,
-      fallback: {
-        enabled: true,
-        env,
-        allowKeys: [CONFIG_KEYS.midtransServerKey],
-        onFallback,
-      },
-    });
-
-    const config = await provider.getRequiredConfig(CONFIG_KEYS.midtransServerKey);
-
-    expect(config.source).toBe("environment");
-    expect(config.value).toBe(fallbackSentinel);
-    expect(onFallback).toHaveBeenCalledTimes(1);
-    expect(onFallback).toHaveBeenCalledWith(
-      expect.objectContaining({
-        keyName: CONFIG_KEYS.midtransServerKey,
-        source: "environment",
-        status: "fallback",
-        warning: expect.objectContaining({ code: "CONFIG_FALLBACK_USED" }),
-      }),
-    );
-    expect(JSON.stringify(onFallback.mock.calls)).not.toContain(fallbackSentinel);
-    expect(JSON.stringify(toLogSafeRuntimeConfig(config))).not.toContain(fallbackSentinel);
-  });
-
-  it("rejects invalid fallback values without serializing the submitted value", async () => {
-    const invalidBooleanSentinel = "not-a-boolean-sentinel";
-    const env = createEnvMock({ MIDTRANS_IS_PRODUCTION: invalidBooleanSentinel });
-    const adminClient = createRuntimeConfigClient([]);
-    const provider = createRuntimeConfigProvider({
-      adminClient,
-      fallback: {
-        enabled: true,
-        env,
-        allowKeys: [CONFIG_KEYS.midtransIsProduction],
-      },
-    });
-
-    const error = await captureRuntimeConfigError(() =>
-      provider.getRequiredConfig(CONFIG_KEYS.midtransIsProduction),
-    );
-
-    expect(error.code).toBe("CONFIG_INVALID" satisfies RuntimeConfigErrorCode);
-    expect(error.toLogSafe()).toMatchObject({
-      code: "CONFIG_INVALID",
-      keyName: CONFIG_KEYS.midtransIsProduction,
-    });
-    expect(JSON.stringify(error)).not.toContain(invalidBooleanSentinel);
+    expect(JSON.stringify(error)).not.toContain(providerSecretSentinel);
   });
 
   it("reports unavailable database lookups without leaking database messages", async () => {

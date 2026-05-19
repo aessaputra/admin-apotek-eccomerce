@@ -393,7 +393,7 @@ Deno.serve(async (req: Request) => {
         ? "https://app.midtrans.com/snap/v1/transactions"
         : "https://app.sandbox.midtrans.com/snap/v1/transactions";
 
-      const MIDTRANS_REQUEST_TIMEOUT_MS = 30_000;
+      const PAYMENT_PROVIDER_REQUEST_TIMEOUT_MS = 30_000;
 
       let midtransResponse: Response;
       try {
@@ -405,7 +405,7 @@ Deno.serve(async (req: Request) => {
             Authorization: `Basic ${btoa(`${midtransConfig.serverKey}:`)}`,
           },
           body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(MIDTRANS_REQUEST_TIMEOUT_MS),
+          signal: AbortSignal.timeout(PAYMENT_PROVIDER_REQUEST_TIMEOUT_MS),
         });
       } catch (error: unknown) {
         if (

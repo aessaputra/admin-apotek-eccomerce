@@ -240,16 +240,10 @@ function createExpoApiHeaders(
 
 async function resolveExpoAccessTokenFromRuntimeConfig(
   adminClient: RuntimeConfigAdminClient,
-  env: PushEnvironment
 ): Promise<string | undefined> {
   const runtimeConfig = createRuntimeConfigProvider({
     adminClient,
     cacheTtlMs: 0,
-    fallback: {
-      enabled: true,
-      env,
-      allowKeys: [CONFIG_KEYS.pushExpoAccessToken],
-    },
   });
 
   try {
@@ -668,7 +662,6 @@ function createReceiptUpdate(
 async function processReceipts(
   adminClient: PushAdminClient,
   fetchFn: typeof fetch,
-  env: PushEnvironment,
   limit: number
 ): Promise<Response> {
   const { data: pendingDeliveries, error: pendingError } = await adminClient
@@ -705,8 +698,7 @@ async function processReceipts(
   }
 
   const expoAccessToken = await resolveExpoAccessTokenFromRuntimeConfig(
-    adminClient,
-    env
+    adminClient
   );
   const ticketIds = deliveries
     .map((delivery) => delivery.ticket_id)
@@ -804,7 +796,6 @@ async function processReceipts(
 async function sendPushNotification(
   adminClient: PushAdminClient,
   fetchFn: typeof fetch,
-  env: PushEnvironment,
   notification: NotificationRecord,
   options: { persistDeliveryRows: boolean }
 ): Promise<Response> {
@@ -856,8 +847,7 @@ async function sendPushNotification(
   }
 
   const expoAccessToken = await resolveExpoAccessTokenFromRuntimeConfig(
-    adminClient,
-    env
+    adminClient
   );
 
   let expoResponse: ExpoPushResponse;
@@ -1046,7 +1036,6 @@ export function createPushHandler(dependencies: PushHandlerDependencies) {
         return sendPushNotification(
           adminClient,
           fetchFn,
-          dependencies.env,
           createTestNotification(userId),
           { persistDeliveryRows: false }
         );
@@ -1056,7 +1045,6 @@ export function createPushHandler(dependencies: PushHandlerDependencies) {
         return processReceipts(
           adminClient,
           fetchFn,
-          dependencies.env,
           normalizeReceiptLimit(receiptPayload.limit)
         );
       }
@@ -1074,7 +1062,6 @@ export function createPushHandler(dependencies: PushHandlerDependencies) {
       return sendPushNotification(
         adminClient,
         fetchFn,
-        dependencies.env,
         notification,
         { persistDeliveryRows: true }
       );

@@ -595,7 +595,7 @@ Wave 6: Final Verification Wave.
 
   **Commit**: YES | Message: `feat(config): add migration fallback and legacy bindings` | Files: migrations, runtime helper, tests, placeholder-only operator notes if needed
 
-- [ ] 12. Remove final provider env fallback and prove cutover
+- [x] 12. Remove final provider env fallback and prove cutover
 
   **What to do**: Remove final runtime fallback reads for `MIDTRANS_*`, `BITESHIP_API_KEY`, and `EXPO_ACCESS_TOKEN` after all runtime helpers are wired and tests pass. Keep only Supabase bootstrap env. Add static tests or scriptable checks that fail on provider env reads, aliases, multiline wrappers, or `Deno.env.toObject()` in runtime source. Run full test/build. Confirm `biteship/index.ts` no longer reads `BITESHIP_API_KEY` at module load.
   **Must NOT do**: Do not leave fallback code in happy paths. Do not remove `SUPABASE_URL` or `SUPABASE_SERVICE_ROLE_KEY`.

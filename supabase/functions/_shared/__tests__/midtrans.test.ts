@@ -360,20 +360,7 @@ describe("Midtrans runtime config resolution", () => {
   });
 
 
-  it("falls back to explicit provider env for post-signature active transaction config", async () => {
-    const env = {
-      get: vi.fn((key: string) => {
-        if (key === "MIDTRANS_SERVER_KEY") {
-          return "midtrans-env-fallback-key";
-        }
-
-        if (key === "MIDTRANS_IS_PRODUCTION") {
-          return "true";
-        }
-
-        return undefined;
-      }),
-    };
+  it("fails closed for active transaction config when runtime rows are missing", async () => {
     const adminClient = {
       rpc: vi.fn(async (name: string) => {
         if (name === "get_midtrans_payment_config_binding") {
@@ -384,23 +371,12 @@ describe("Midtrans runtime config resolution", () => {
       }),
     };
 
-    const config = await resolveMidtransTransactionRuntimeConfig(
-      adminClient,
-      "MIDTRANS-ENV-FALLBACK-ORDER",
-      env,
-    );
-
-    expect(config).toMatchObject({
-      source: "fallback",
-      serverKey: "midtrans-env-fallback-key",
-      isProduction: true,
-      serverKeyVersionId: null,
-      serverKeyVersionNumber: null,
-      isProductionVersionId: null,
-      isProductionVersionNumber: null,
-    });
-    expect(env.get).toHaveBeenCalledWith("MIDTRANS_SERVER_KEY");
-    expect(env.get).toHaveBeenCalledWith("MIDTRANS_IS_PRODUCTION");
+    await expect(
+      resolveMidtransTransactionRuntimeConfig(
+        adminClient,
+        "UNBOUND-PAYMENT-ORDER",
+      ),
+    ).rejects.toThrow("Midtrans runtime config unavailable");
   });
 
   it("does not use provider env fallback while selecting pre-signature webhook candidates", async () => {
@@ -426,7 +402,6 @@ describe("Midtrans runtime config resolution", () => {
           gross_amount: "150000.00",
           signature_key: "invalid-signature",
         },
-        env,
       ),
     ).rejects.toThrow("Midtrans runtime config unavailable");
     expect(env.get).not.toHaveBeenCalled();

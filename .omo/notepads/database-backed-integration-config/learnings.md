@@ -123,3 +123,10 @@
 - Fixed the audit trail UI to render actor ID and source separately; the prior UI collapsed them with `actor_id || source`, hiding source for admin-originated events.
 - Mutation error toasts now use localized generic rotate/update failures instead of raw gateway error payloads, preventing plaintext sentinel data from response errors from reaching user-visible messages.
 - Verification passed: `pnpm test src/pages/__tests__/forms.test.tsx src/locales/__tests__/common-keys.test.ts`, full `pnpm test`, `pnpm build`, and LSP diagnostics on changed TSX files.
+
+## 2026-05-19 Task 12 Provider Env Cutover
+- Removed the final provider-env fallback surface from `_shared/runtime-config.ts`; runtime config now resolves DB/Vault-backed rows only, while Supabase bootstrap reads remain in function edges and shared Supabase helpers.
+- Removed Midtrans, Biteship, and Expo push fallback call-site options. Missing required Midtrans/Biteship runtime config now fails closed through the existing safe unavailable/runtime-config errors; missing Expo push token remains optional and simply omits the Expo Authorization header.
+- Added `provider-env-cutover-source.test.ts` as the final source guard. It failed before the cutover on provider env aliases and provider-prefixed runtime identifiers, then passed after removing fallback support and renaming non-env Midtrans constants.
+- Static checks now return no runtime source matches for provider env reads, provider env aliases, or `Deno.env.toObject()` under `supabase/functions`; remaining provider-name strings are test fixtures or source-guard assertions documented in `.omo/evidence/task-12-no-provider-env-reads.txt`.
+- Verification passed: targeted Task 12 tests (8 files / 75 tests), full `pnpm test` (81 files / 757 tests), `pnpm build`, and LSP diagnostics on changed TypeScript files.

@@ -9,7 +9,6 @@ import {
   createRuntimeConfigProvider,
   type RuntimeConfigAdminClient,
   type RuntimeConfigEntry,
-  type RuntimeConfigEnvironment,
   type RuntimeConfigKey,
 } from "./runtime-config.ts";
 import type { Order, OrderItem } from "./types.ts";
@@ -246,16 +245,10 @@ export function getBiteshipAuthorizationHeader(apiKey: string): string {
 
 export async function resolveBiteshipApiKeyFromRuntimeConfig(
   adminClient: RuntimeConfigAdminClient,
-  _env?: RuntimeConfigEnvironment,
 ): Promise<string> {
   const runtimeConfig = createRuntimeConfigProvider({
     adminClient,
     cacheTtlMs: 0,
-    fallback: {
-      enabled: true,
-      env: _env,
-      allowKeys: [CONFIG_KEYS.biteshipApiKey],
-    },
   });
 
   try {
@@ -765,7 +758,6 @@ async function loadBiteshipSnapshotRuntimeConfig(
   const provider = createRuntimeConfigProvider({
     adminClient,
     cacheTtlMs: 0,
-    fallback: { enabled: false },
   });
   const entries = await Promise.all(
     BITESHIP_SNAPSHOT_CONFIG_KEYS.map((keyName) =>
