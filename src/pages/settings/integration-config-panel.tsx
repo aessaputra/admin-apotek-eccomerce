@@ -151,8 +151,8 @@ export const IntegrationConfigPanel: React.FC = () => {
       setRotateErrors({});
       await refreshGatewayData();
     },
-    onError: (error) => {
-      messageApi.error(error instanceof Error ? error.message : translate("settings.integration.rotate.error", {}, "Secret rotation failed."));
+    onError: () => {
+      messageApi.error(translate("settings.integration.rotate.error", {}, "Secret rotation failed."));
     },
   });
 
@@ -163,8 +163,8 @@ export const IntegrationConfigPanel: React.FC = () => {
       messageApi.success(translate("settings.integration.update.success", {}, "Configuration updated."));
       await refreshGatewayData();
     },
-    onError: (error) => {
-      messageApi.error(error instanceof Error ? error.message : translate("settings.integration.update.error", {}, "Configuration update failed."));
+    onError: () => {
+      messageApi.error(translate("settings.integration.update.error", {}, "Configuration update failed."));
     },
   });
 
@@ -339,7 +339,8 @@ export const IntegrationConfigPanel: React.FC = () => {
         <Col xs={24} md={6}>
           <Space direction="vertical" size={token.marginXXS}>
             <Typography.Text>{row.actor_role || "-"}</Typography.Text>
-            <Typography.Text type="secondary">{row.actor_id || row.source || "-"}</Typography.Text>
+            <Typography.Text type="secondary">{row.actor_id || "-"}</Typography.Text>
+            <Typography.Text type="secondary">{row.source || "-"}</Typography.Text>
             <Typography.Text type="secondary">{row.reason || "-"}</Typography.Text>
           </Space>
         </Col>

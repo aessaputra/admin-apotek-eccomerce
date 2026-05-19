@@ -514,7 +514,7 @@ Wave 6: Final Verification Wave.
 
   **Commit**: YES | Message: `feat(settings): add integration config tabs` | Files: `src/pages/settings/index.tsx`, UI helpers, locale files, UI tests
 
-- [ ] 10. Complete admin UI gateway tests and audit trail behavior
+- [x] 10. Complete admin UI gateway tests and audit trail behavior
 
   **What to do**: Add/extend Vitest tests for settings integration config tabs, audit trail rendering, gateway client error handling, and admin/non-admin UX. Ensure audit rows show action, key, old/new masked values, actor/source, reason, timestamp, request ID. Ensure network mock responses containing plaintext sentinel are not rendered.
   **Must NOT do**: Do not add plaintext reveal/download UX. Do not skip locale parity.

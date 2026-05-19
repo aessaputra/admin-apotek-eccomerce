@@ -117,3 +117,9 @@
 - Atlas gap confirmed: Settings integration config rows rendered status/version/update metadata but not the required per-key last runtime read value.
 - Added a UI-only lookup from already-loaded audit rows where `action = 'runtime_read'` and `key_name` exactly matches the summary row; rows without a runtime read render `-`.
 - Tests now include a safe runtime-read audit event and assert the page body never contains the plaintext sentinel, covering fragmented text nodes as well as exact text queries.
+
+## 2026-05-19 Task 10 Admin UI Gateway Tests
+- Extended Settings integration config Vitest coverage for safe loading, non-admin gateway errors, update validation/failure, rotate success/failure, and audit rows with action, key, old/new masked values, actor role/id, source, reason, timestamp, and request ID.
+- Fixed the audit trail UI to render actor ID and source separately; the prior UI collapsed them with `actor_id || source`, hiding source for admin-originated events.
+- Mutation error toasts now use localized generic rotate/update failures instead of raw gateway error payloads, preventing plaintext sentinel data from response errors from reaching user-visible messages.
+- Verification passed: `pnpm test src/pages/__tests__/forms.test.tsx src/locales/__tests__/common-keys.test.ts`, full `pnpm test`, `pnpm build`, and LSP diagnostics on changed TSX files.
