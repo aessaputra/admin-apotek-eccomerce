@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+// @ts-expect-error Deno Edge Runtime resolves npm specifiers at deploy time.
 import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
 import {
   buildMidtransPaymentRecord,
@@ -7,6 +8,8 @@ import {
   isIgnorableMidtransNoop,
   mapMidtransStatus,
   normalizeMidtransPaymentType,
+  resolveMidtransTransactionRuntimeConfig,
+  MidtransRuntimeConfigError,
   verifyMidtransTransaction,
 } from "../_shared/midtrans.ts";
 import { getSupabaseAdminClient } from "../_shared/supabase.ts";
@@ -20,6 +23,13 @@ import type {
   Order,
   PaymentStatus,
 } from "../_shared/types.ts";
+
+declare const Deno: {
+  serve: (handler: (req: Request) => Response | Promise<Response>) => void;
+  env: {
+    get: (key: string) => string | undefined;
+  };
+};
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -144,17 +154,27 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Order is missing midtrans_order_id" }, 400);
     }
 
-    const serverKey = Deno.env.get("MIDTRANS_SERVER_KEY");
-    if (!serverKey) {
-      return jsonResponse(
-        { error: "MIDTRANS_SERVER_KEY is not configured" },
-        500,
+    let runtimeConfig;
+    try {
+      runtimeConfig = await resolveMidtransTransactionRuntimeConfig(
+        adminClient,
+        midtransOrderId,
       );
+    } catch (configError) {
+      if (configError instanceof MidtransRuntimeConfigError) {
+        return jsonResponse(
+          { error: "Midtrans runtime config unavailable" },
+          503,
+        );
+      }
+
+      throw configError;
     }
 
     const verifiedStatus = await verifyMidtransTransaction(
       midtransOrderId,
-      serverKey,
+      runtimeConfig.serverKey,
+      { isProduction: runtimeConfig.isProduction },
     );
     const verifiedFraudStatus = verifiedStatus.fraud_status || "";
 

@@ -10,6 +10,14 @@ import type {
   SnapItemDetail,
   PaymentStatus,
 } from "./types.ts";
+import {
+  CONFIG_KEYS,
+  RuntimeConfigError,
+  createRuntimeConfigProvider,
+  type RuntimeConfigAdminClient,
+  type RuntimeConfigEntry,
+  type RuntimeConfigStatus,
+} from "./runtime-config.ts";
 
 const MIDTRANS_PAYMENT_TYPE_ALLOWLIST = new Set([
   "credit_card",
@@ -154,11 +162,32 @@ const buildMidtransAddress = (
   return Object.keys(address).length > 0 ? address : undefined;
 };
 
-declare const Deno: {
-  env: {
-    get: (key: string) => string | undefined;
-  };
+export type MidtransRuntimeConfig = {
+  serverKey: string;
+  isProduction: boolean;
+  source: "bound" | "active" | "grace" | "fallback";
+  serverKeyVersionId: string | null;
+  serverKeyVersionNumber: number | null;
+  isProductionVersionId: string | null;
+  isProductionVersionNumber: number | null;
 };
+
+type MidtransPaymentConfigBindingRow = {
+  payment_id?: string | null;
+  midtrans_order_id?: string | null;
+  server_key_version_id?: string | null;
+  server_key_version_number?: number | null;
+  is_production_version_id?: string | null;
+  is_production_version_number?: number | null;
+  is_production?: boolean | null;
+};
+
+export class MidtransRuntimeConfigError extends Error {
+  constructor(message = "Midtrans runtime config unavailable") {
+    super(message);
+    this.name = "MidtransRuntimeConfigError";
+  }
+}
 
 export const verifyMidtransSignature = async (
   orderId: string,
@@ -182,11 +211,9 @@ export const verifyMidtransSignature = async (
 export const verifyMidtransTransaction = async (
   orderId: string,
   serverKey: string,
+  options: { isProduction?: boolean } = {},
 ): Promise<MidtransStatusResponse> => {
-  const isProduction = Deno.env.get("MIDTRANS_IS_PRODUCTION") === "true";
-  const baseUrl = isProduction
-    ? "https://api.midtrans.com/v2"
-    : "https://api.sandbox.midtrans.com/v2";
+  const baseUrl = getMidtransStatusBaseUrl(options.isProduction === true);
 
   const response = await fetch(`${baseUrl}/${orderId}/status`, {
     method: "GET",
@@ -211,11 +238,9 @@ export const verifyMidtransTransaction = async (
 export const cancelMidtransTransaction = async (
   orderId: string,
   serverKey: string,
+  options: { isProduction?: boolean } = {},
 ): Promise<void> => {
-  const isProduction = Deno.env.get("MIDTRANS_IS_PRODUCTION") === "true";
-  const baseUrl = isProduction
-    ? "https://api.midtrans.com/v2"
-    : "https://api.sandbox.midtrans.com/v2";
+  const baseUrl = getMidtransStatusBaseUrl(options.isProduction === true);
 
   const response = await fetch(`${baseUrl}/${orderId}/cancel`, {
     method: "POST",
@@ -234,6 +259,234 @@ export const cancelMidtransTransaction = async (
     );
   }
 };
+
+
+export async function resolveMidtransTransactionRuntimeConfig(
+  adminClient: RuntimeConfigAdminClient,
+  midtransOrderId: string,
+): Promise<MidtransRuntimeConfig> {
+  const binding = await getMidtransPaymentConfigBinding(adminClient, midtransOrderId);
+
+  if (binding) {
+    return resolveBoundMidtransRuntimeConfig(adminClient, binding);
+  }
+
+  return resolveActiveMidtransRuntimeConfig(adminClient);
+}
+
+export async function resolveMidtransWebhookRuntimeConfig(
+  adminClient: RuntimeConfigAdminClient,
+  payload: Pick<MidtransWebhookPayload, "order_id" | "status_code" | "gross_amount" | "signature_key">,
+): Promise<{ config: MidtransRuntimeConfig; signatureValid: boolean }> {
+  const binding = await getMidtransPaymentConfigBinding(adminClient, payload.order_id);
+
+  if (binding) {
+    const boundConfig = await resolveBoundMidtransRuntimeConfig(adminClient, binding);
+    return {
+      config: boundConfig,
+      signatureValid: await verifyMidtransSignatureWithConfig(payload, boundConfig),
+    };
+  }
+
+  const candidates = await resolveMidtransSignatureCandidates(adminClient);
+  if (candidates.length === 0) {
+    throw new MidtransRuntimeConfigError();
+  }
+
+  for (const candidate of candidates) {
+    if (await verifyMidtransSignatureWithConfig(payload, candidate)) {
+      return { config: candidate, signatureValid: true };
+    }
+  }
+
+  return { config: candidates[0], signatureValid: false };
+}
+
+async function getMidtransPaymentConfigBinding(
+  adminClient: RuntimeConfigAdminClient,
+  midtransOrderId: string,
+): Promise<MidtransPaymentConfigBindingRow | null> {
+  const { data, error } = await adminClient.rpc(
+    "get_midtrans_payment_config_binding",
+    { p_midtrans_order_id: midtransOrderId },
+  );
+
+  if (error) {
+    throw new MidtransRuntimeConfigError();
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  return isMidtransPaymentConfigBindingRow(row) ? row : null;
+}
+
+async function resolveBoundMidtransRuntimeConfig(
+  adminClient: RuntimeConfigAdminClient,
+  binding: MidtransPaymentConfigBindingRow,
+): Promise<MidtransRuntimeConfig> {
+  const serverKeyVersionNumber = readPositiveVersionNumber(
+    binding.server_key_version_number,
+  );
+  const isProductionVersionNumber = readPositiveVersionNumber(
+    binding.is_production_version_number,
+  );
+  const runtimeConfig = createRuntimeConfigProvider({ adminClient, cacheTtlMs: 0 });
+
+  try {
+    const [serverKeyEntry, isProductionEntry] = await Promise.all([
+      runtimeConfig.getConfigVersion(
+        CONFIG_KEYS.midtransServerKey,
+        serverKeyVersionNumber,
+      ),
+      runtimeConfig.getConfigVersion(
+        CONFIG_KEYS.midtransIsProduction,
+        isProductionVersionNumber,
+      ),
+    ]);
+
+    return buildMidtransRuntimeConfig(
+      serverKeyEntry,
+      isProductionEntry,
+      "bound",
+    );
+  } catch (error) {
+    if (error instanceof RuntimeConfigError) {
+      throw new MidtransRuntimeConfigError();
+    }
+
+    throw error;
+  }
+}
+
+async function resolveActiveMidtransRuntimeConfig(
+  adminClient: RuntimeConfigAdminClient,
+): Promise<MidtransRuntimeConfig> {
+  const runtimeConfig = createRuntimeConfigProvider({ adminClient, cacheTtlMs: 0 });
+
+  try {
+    const [serverKeyEntry, isProductionEntry] = await Promise.all([
+      runtimeConfig.getRequiredConfig(CONFIG_KEYS.midtransServerKey),
+      runtimeConfig.getRequiredConfig(CONFIG_KEYS.midtransIsProduction),
+    ]);
+
+    return buildMidtransRuntimeConfig(
+      serverKeyEntry,
+      isProductionEntry,
+      serverKeyEntry.status === "fallback" ? "fallback" : "active",
+    );
+  } catch (error) {
+    if (error instanceof RuntimeConfigError) {
+      throw new MidtransRuntimeConfigError();
+    }
+
+    throw error;
+  }
+}
+
+async function resolveMidtransSignatureCandidates(
+  adminClient: RuntimeConfigAdminClient,
+): Promise<MidtransRuntimeConfig[]> {
+  const runtimeConfig = createRuntimeConfigProvider({ adminClient, cacheTtlMs: 0 });
+
+  try {
+    const [serverKeyEntries, isProductionEntries] = await Promise.all([
+      runtimeConfig.getConfigCandidates(CONFIG_KEYS.midtransServerKey),
+      runtimeConfig.getConfigCandidates(CONFIG_KEYS.midtransIsProduction),
+    ]);
+
+    return serverKeyEntries.map((serverKeyEntry) => {
+      const pairedProductionEntry = findPairedProductionEntry(
+        serverKeyEntry.status,
+        isProductionEntries,
+      );
+
+      if (!pairedProductionEntry) {
+        throw new MidtransRuntimeConfigError();
+      }
+
+      return buildMidtransRuntimeConfig(
+        serverKeyEntry,
+        pairedProductionEntry,
+        serverKeyEntry.status === "grace" ? "grace" : serverKeyEntry.status === "fallback" ? "fallback" : "active",
+      );
+    });
+  } catch (error) {
+    if (error instanceof RuntimeConfigError) {
+      throw new MidtransRuntimeConfigError();
+    }
+
+    throw error;
+  }
+}
+
+function findPairedProductionEntry(
+  serverKeyStatus: RuntimeConfigStatus | "fallback",
+  entries: Array<RuntimeConfigEntry<typeof CONFIG_KEYS.midtransIsProduction>>,
+): RuntimeConfigEntry<typeof CONFIG_KEYS.midtransIsProduction> | null {
+  return entries.find((entry) => entry.status === serverKeyStatus) ??
+    entries.find((entry) => entry.status === "active") ??
+    entries[0] ??
+    null;
+}
+
+function buildMidtransRuntimeConfig(
+  serverKeyEntry: RuntimeConfigEntry<typeof CONFIG_KEYS.midtransServerKey>,
+  isProductionEntry: RuntimeConfigEntry<typeof CONFIG_KEYS.midtransIsProduction>,
+  source: MidtransRuntimeConfig["source"],
+): MidtransRuntimeConfig {
+  if (typeof serverKeyEntry.value !== "string" || serverKeyEntry.value.trim() === "") {
+    throw new MidtransRuntimeConfigError();
+  }
+
+  if (typeof isProductionEntry.value !== "boolean") {
+    throw new MidtransRuntimeConfigError();
+  }
+
+  return {
+    serverKey: serverKeyEntry.value,
+    isProduction: isProductionEntry.value,
+    source,
+    serverKeyVersionId: serverKeyEntry.versionId,
+    serverKeyVersionNumber: serverKeyEntry.versionNumber,
+    isProductionVersionId: isProductionEntry.versionId,
+    isProductionVersionNumber: isProductionEntry.versionNumber,
+  };
+}
+
+async function verifyMidtransSignatureWithConfig(
+  payload: Pick<MidtransWebhookPayload, "order_id" | "status_code" | "gross_amount" | "signature_key">,
+  config: MidtransRuntimeConfig,
+): Promise<boolean> {
+  return verifyMidtransSignature(
+    payload.order_id,
+    payload.status_code,
+    payload.gross_amount,
+    config.serverKey,
+    payload.signature_key,
+  );
+}
+
+function isMidtransPaymentConfigBindingRow(
+  value: unknown,
+): value is MidtransPaymentConfigBindingRow {
+  return !!value &&
+    typeof value === "object" &&
+    typeof (value as MidtransPaymentConfigBindingRow).server_key_version_number === "number" &&
+    typeof (value as MidtransPaymentConfigBindingRow).is_production_version_number === "number";
+}
+
+function readPositiveVersionNumber(value: unknown): number {
+  if (!Number.isInteger(value) || Number(value) <= 0) {
+    throw new MidtransRuntimeConfigError();
+  }
+
+  return Number(value);
+}
+
+function getMidtransStatusBaseUrl(isProduction: boolean): string {
+  return isProduction
+    ? "https://api.midtrans.com/v2"
+    : "https://api.sandbox.midtrans.com/v2";
+}
 
 export const mapMidtransStatus = (
   transactionStatus: string,

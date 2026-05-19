@@ -1,4 +1,3 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   assertMidtransCurrencyConsistency,
   buildMidtransPaymentRecord,
@@ -7,10 +6,11 @@ import {
   isIgnorableMidtransNoop,
   mapMidtransStatus,
   normalizeMidtransPaymentType,
-  verifyMidtransSignature,
+  resolveMidtransWebhookRuntimeConfig,
+  MidtransRuntimeConfigError,
   verifyMidtransTransaction,
+  type MidtransRuntimeConfig,
 } from "../_shared/midtrans.ts";
-import { getSupabaseAdminClient } from "../_shared/supabase.ts";
 import {
   ORDER_DETAIL_NOTIFICATION_ROUTE,
   insertNotificationOrThrow,
@@ -35,6 +35,19 @@ declare const Deno: {
 };
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
+
+type SupabaseAdminClient = {
+  from: (tableName: string) => any;
+  rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{
+    data: unknown;
+    error: { message?: string } | null;
+  }>;
+};
+
+async function getDefaultAdminClient(): Promise<SupabaseAdminClient> {
+  const supabaseModule = await import("../_shared/supabase.ts");
+  return supabaseModule.getSupabaseAdminClient() as SupabaseAdminClient;
+}
 
 function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -123,7 +136,7 @@ function buildPaymentNotification(orderId: string, paymentStatus: PaymentStatus)
 }
 
 async function ensurePaymentNotification(
-  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  adminClient: SupabaseAdminClient,
   orderId: string,
   userId: string | null,
   paymentStatus: PaymentStatus,
@@ -154,7 +167,7 @@ async function ensurePaymentNotification(
 }
 
 async function persistRawNotificationEarly(
-  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  adminClient: SupabaseAdminClient,
   payload: MidtransWebhookPayload,
 ): Promise<void> {
   const currency = assertMidtransCurrencyConsistency(
@@ -192,14 +205,16 @@ function sleep(ms: number): Promise<void> {
 
 async function verifyMidtransTransactionWithRetry(
   orderId: string,
-  serverKey: string,
+  runtimeConfig: MidtransRuntimeConfig,
   attempts = 3,
 ): Promise<MidtransStatusResponse> {
   let lastError: unknown;
 
   for (let index = 0; index < attempts; index += 1) {
     try {
-      return await verifyMidtransTransaction(orderId, serverKey);
+      return await verifyMidtransTransaction(orderId, runtimeConfig.serverKey, {
+        isProduction: runtimeConfig.isProduction,
+      });
     } catch (error) {
       lastError = error;
       if (index < attempts - 1) {
@@ -214,7 +229,7 @@ async function verifyMidtransTransactionWithRetry(
 }
 
 async function getOrderWithRetry(
-  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  adminClient: SupabaseAdminClient,
   midtransOrderId: string,
   attempts = 3,
 ): Promise<Order | null> {
@@ -239,13 +254,12 @@ async function getOrderWithRetry(
 }
 
 async function upsertPaymentRecord(
+  adminClient: SupabaseAdminClient,
   order: Order,
   payload: MidtransWebhookPayload,
   verifiedStatus: MidtransStatusResponse,
   status: PaymentStatus,
 ): Promise<void> {
-  const adminClient = getSupabaseAdminClient();
-
   const { data: existingPayment } = await adminClient
     .from("payments")
     .select("paid_at")
@@ -269,14 +283,19 @@ async function upsertPaymentRecord(
   }
 }
 
-Deno.serve(async (req) => {
+export function createMidtransWebhookHandler(dependencies: {
+  getAdminClient?: () => SupabaseAdminClient | Promise<SupabaseAdminClient>;
+} = {}) {
+  const getAdminClient = dependencies.getAdminClient ?? getDefaultAdminClient;
+
+  return async (req: Request) => {
   if (req.method !== "POST") {
     console.error("[midtrans-webhook] Invalid method:", req.method);
     return errorResponse("Method Not Allowed", 405);
   }
 
   let payload: MidtransWebhookPayload | null = null;
-  let adminClient: ReturnType<typeof getSupabaseAdminClient> | null = null;
+  let adminClient: SupabaseAdminClient | null = null;
 
   try {
     const bodyText = await req.text();
@@ -300,19 +319,25 @@ Deno.serve(async (req) => {
       return errorResponse("Invalid payload", 400);
     }
 
-    const serverKey = Deno.env.get("MIDTRANS_SERVER_KEY");
-    if (!serverKey) {
-      console.error("[midtrans-webhook] Missing MIDTRANS_SERVER_KEY");
-      return errorResponse("Server key not configured", 500);
-    }
+    adminClient = await getAdminClient();
 
-    const isValidSignature = await verifyMidtransSignature(
-      payload.order_id,
-      payload.status_code,
-      payload.gross_amount,
-      serverKey,
-      payload.signature_key,
-    );
+    let runtimeConfig: MidtransRuntimeConfig;
+    let isValidSignature = false;
+    try {
+      const resolution = await resolveMidtransWebhookRuntimeConfig(
+        adminClient,
+        payload,
+      );
+      runtimeConfig = resolution.config;
+      isValidSignature = resolution.signatureValid;
+    } catch (configError) {
+      if (configError instanceof MidtransRuntimeConfigError) {
+        console.error("[midtrans-webhook] Midtrans runtime config unavailable");
+        return errorResponse("Midtrans runtime config unavailable", 503);
+      }
+
+      throw configError;
+    }
 
     if (!isValidSignature) {
       console.error(
@@ -321,8 +346,6 @@ Deno.serve(async (req) => {
       );
       return errorResponse("Invalid signature", 401);
     }
-
-    adminClient = getSupabaseAdminClient();
 
     // Persist raw notification immediately after signature validation for audit trail
     // This ensures we have the payload even if order not found or amount mismatch
@@ -335,7 +358,7 @@ Deno.serve(async (req) => {
     try {
       verifiedStatus = await verifyMidtransTransactionWithRetry(
         payload.order_id,
-        serverKey,
+        runtimeConfig,
       );
     } catch (verificationError) {
       const message =
@@ -469,6 +492,7 @@ Deno.serve(async (req) => {
       );
 
     await upsertPaymentRecord(
+      adminClient,
       order,
       payload,
       verifiedStatus,
@@ -547,4 +571,7 @@ Deno.serve(async (req) => {
     console.error("[midtrans-webhook] Internal error:", message);
     return errorResponse("Internal error", 500);
   }
-});
+  };
+}
+
+Deno.serve(createMidtransWebhookHandler());

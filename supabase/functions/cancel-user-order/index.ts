@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+// @ts-expect-error Deno Edge Runtime resolves npm specifiers at deploy time.
 import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
 import { corsHeaders } from "../_shared/cors.ts";
 import {
@@ -6,6 +7,8 @@ import {
   cancelMidtransTransaction,
   mapMidtransStatus,
   normalizeMidtransPaymentType,
+  resolveMidtransTransactionRuntimeConfig,
+  MidtransRuntimeConfigError,
   verifyMidtransTransaction,
 } from "../_shared/midtrans.ts";
 import { getOrderAggregateById } from "../_shared/order-aggregate.ts";
@@ -201,11 +204,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const serverKey = Deno.env.get("MIDTRANS_SERVER_KEY");
-    if (!serverKey) {
-      return jsonResponse({ error: "MIDTRANS_SERVER_KEY is not configured" }, 500);
-    }
-
     const midtransOrderId = order.midtrans_order_id?.trim();
     if (!midtransOrderId) {
       await cancelLocallyPendingOrder(adminClient, order);
@@ -218,7 +216,25 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    let verifiedStatus = await verifyMidtransTransaction(midtransOrderId, serverKey);
+    let runtimeConfig;
+    try {
+      runtimeConfig = await resolveMidtransTransactionRuntimeConfig(
+        adminClient,
+        midtransOrderId,
+      );
+    } catch (configError) {
+      if (configError instanceof MidtransRuntimeConfigError) {
+        return jsonResponse({ error: "Midtrans runtime config unavailable" }, 503);
+      }
+
+      throw configError;
+    }
+
+    let verifiedStatus = await verifyMidtransTransaction(
+      midtransOrderId,
+      runtimeConfig.serverKey,
+      { isProduction: runtimeConfig.isProduction },
+    );
 
     if (verifiedStatus.transaction_status === "settlement") {
       return jsonResponse(
@@ -232,8 +248,14 @@ Deno.serve(async (req: Request) => {
     }
 
     if (CANCELLABLE_GATEWAY_STATUSES.has(verifiedStatus.transaction_status)) {
-      await cancelMidtransTransaction(midtransOrderId, serverKey);
-      verifiedStatus = await verifyMidtransTransaction(midtransOrderId, serverKey);
+      await cancelMidtransTransaction(midtransOrderId, runtimeConfig.serverKey, {
+        isProduction: runtimeConfig.isProduction,
+      });
+      verifiedStatus = await verifyMidtransTransaction(
+        midtransOrderId,
+        runtimeConfig.serverKey,
+        { isProduction: runtimeConfig.isProduction },
+      );
     } else if (!TERMINAL_GATEWAY_STATUSES.has(verifiedStatus.transaction_status)) {
       return jsonResponse(
         {

@@ -84,3 +84,10 @@
 - Code-quality review gap confirmed: Task 6 only required each `config_version_ids` key to map to an object, so `{}` or metadata without `version_id`/`version_number` could be accepted before Biteship order creation.
 - Hardened both TypeScript snapshot completeness checks and the SQL create-snapshot RPC to require every non-secret Biteship snapshot key to include a non-empty string `version_id` and positive integer `version_number`.
 - Regression coverage now includes malformed per-key metadata in `biteship-order.test.ts` and SQL-shape assertions for the per-key JSONB metadata checks in the Task 6 migration test; `biteship.api_key` remains excluded from snapshot metadata.
+
+## 2026-05-19T09:55:45Z Task 5 Midtrans Runtime Config Migration
+- Added a service-role-only Midtrans payment config binding lookup RPC so Edge Functions can resolve transaction-bound version metadata by `midtrans_order_id` without exposing or storing plaintext Midtrans keys.
+- `_shared/midtrans.ts` now resolves bound runtime config first, then active/grace signature candidates for unbound webhook payloads; status and cancel calls take the resolved `isProduction` mode explicitly so grace-key signatures use the same key/mode for verification.
+- `midtrans-webhook` now performs only read-only runtime/binding lookups before signature validation; invalid signatures and pre-signature config failures return before raw notification, payment, order, audit, or side-effect writes.
+- Confirm, reconciliation, admin order cancellation, and customer unpaid cancellation paths now call Midtrans using transaction-bound runtime config when available and fail closed with safe unavailable errors if runtime config cannot be resolved.
+- Regression coverage added for invalid-signature no-write, missing-config no-write, grace-key status authorization, bound-version preference, static provider-env removal in migrated functions, and service-role-only binding lookup SQL shape.

@@ -304,7 +304,7 @@ Wave 6: Final Verification Wave.
 
   **Commit**: YES | Message: `feat(midtrans): bind transactions to config versions` | Files: Midtrans migration, create Snap token tests
 
-- [ ] 5. Migrate Midtrans functions to transaction-bound runtime config
+- [x] 5. Migrate Midtrans functions to transaction-bound runtime config
 
   **What to do**: Update `create-snap-token`, `midtrans-webhook`, `confirm-midtrans-payment`, `reconcile-pending-midtrans-payments`, `order-manager`, and `_shared/midtrans.ts` to use runtime config helper. New Snap uses active key/env only. Webhook uses transaction-bound key/env when safely resolvable; otherwise tries active + grace for signature without DB writes. If grace matches, status verification uses the same matched key. Confirm/cancel/reconciliation use transaction-bound config. Preserve existing state transition and amount/currency logic.
   **Must NOT do**: Do not write raw notifications, fallback audit, runtime_error audit, or any DB row before a valid Midtrans signature. Do not use active key for old transaction status verification if a transaction-bound version exists.

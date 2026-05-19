@@ -6,6 +6,8 @@ import {
   isIgnorableMidtransNoop,
   mapMidtransStatus,
   normalizeMidtransPaymentType,
+  resolveMidtransTransactionRuntimeConfig,
+  MidtransRuntimeConfigError,
   verifyMidtransTransaction,
 } from "../_shared/midtrans.ts";
 import { getSupabaseAdminClient } from "../_shared/supabase.ts";
@@ -127,15 +129,16 @@ async function listPendingOrders(
     throw new Error(`Failed to list pending orders: ${error.message}`);
   }
 
-  const ids = (data ?? [])
-    .map((row) => row.id)
-    .filter((value): value is string => typeof value === "string");
+  const rows = (data ?? []) as Array<{ id?: unknown }>;
+  const ids = rows
+    .map((row: { id?: unknown }) => row.id)
+    .filter((value: unknown): value is string => typeof value === "string");
 
   const orders = await Promise.all(
-    ids.map((id) => getOrderAggregateById(adminClient, id)),
+    ids.map((id: string) => getOrderAggregateById(adminClient, id)),
   );
 
-  return orders.filter((order): order is Order => order !== null);
+  return orders.filter((order: Order | null): order is Order => order !== null);
 }
 
 Deno.serve(async (req) => {
@@ -154,15 +157,6 @@ Deno.serve(async (req) => {
       typeof body?.limit === "number" && Number.isFinite(body.limit)
         ? body.limit
         : 10;
-    const serverKey = Deno.env.get("MIDTRANS_SERVER_KEY");
-
-    if (!serverKey) {
-      return jsonResponse(
-        { error: "MIDTRANS_SERVER_KEY is not configured" },
-        500,
-      );
-    }
-
     await reconcileMidtransOrphans(adminClient);
 
     const orders = await listPendingOrders(adminClient, requestedLimit);
@@ -180,9 +174,14 @@ Deno.serve(async (req) => {
       }
 
       try {
+        const runtimeConfig = await resolveMidtransTransactionRuntimeConfig(
+          adminClient,
+          midtransOrderId,
+        );
         const verifiedStatus = await verifyMidtransTransaction(
           midtransOrderId,
-          serverKey,
+          runtimeConfig.serverKey,
+          { isProduction: runtimeConfig.isProduction },
         );
         const verifiedFraudStatus = verifiedStatus.fraud_status || "";
 
@@ -305,8 +304,11 @@ Deno.serve(async (req) => {
           paymentStatus: persistedPaymentStatus,
         });
       } catch (error: unknown) {
-        const message =
-          error instanceof Error ? error.message : "Unknown error";
+        const message = error instanceof MidtransRuntimeConfigError
+          ? "Midtrans runtime config unavailable"
+          : error instanceof Error
+          ? error.message
+          : "Unknown error";
         results.push({ orderId: order.id, reconciled: false, message });
       }
     }

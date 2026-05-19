@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+// @ts-expect-error Deno Edge Runtime resolves npm specifiers at deploy time.
 import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
 import { corsHeaders } from "../_shared/cors.ts";
 import {
@@ -22,6 +23,7 @@ import { getSupabaseAdminClient } from "../_shared/supabase.ts";
 import {
   cancelMidtransTransaction,
   mapMidtransStatus,
+  resolveMidtransTransactionRuntimeConfig,
   verifyMidtransTransaction,
 } from "../_shared/midtrans.ts";
 import {
@@ -283,12 +285,15 @@ async function ensureAwaitingShipmentSideEffectsQueued(
   triggerWebhookSideEffectProcessor(orderId);
 }
 
-async function buildCancellationPaymentUpdate(order: {
-  id: string;
-  status: string;
-  payment_status: string;
-  midtrans_order_id?: string | null;
-}): Promise<Record<string, unknown>> {
+async function buildCancellationPaymentUpdate(
+  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  order: {
+    id: string;
+    status: string;
+    payment_status: string;
+    midtrans_order_id?: string | null;
+  },
+): Promise<Record<string, unknown>> {
   if (order.payment_status === "settlement") {
     return {};
   }
@@ -302,19 +307,29 @@ async function buildCancellationPaymentUpdate(order: {
     return { status: "cancel" };
   }
 
-  const serverKey = Deno.env.get("MIDTRANS_SERVER_KEY");
-  if (!serverKey) {
-    throw new Error("MIDTRANS_SERVER_KEY is not configured");
-  }
+  const runtimeConfig = await resolveMidtransTransactionRuntimeConfig(
+    adminClient,
+    midtransOrderId,
+  );
 
-  let verifiedStatus = await verifyMidtransTransaction(midtransOrderId, serverKey);
+  let verifiedStatus = await verifyMidtransTransaction(
+    midtransOrderId,
+    runtimeConfig.serverKey,
+    { isProduction: runtimeConfig.isProduction },
+  );
   if (verifiedStatus.transaction_status === "settlement") {
     throw new Error("Paid Midtrans transactions must be refunded through a refund flow before marking payment as refunded");
   }
 
   if (MIDTRANS_CANCELLABLE_TRANSACTION_STATUSES.has(verifiedStatus.transaction_status)) {
-    await cancelMidtransTransaction(midtransOrderId, serverKey);
-    verifiedStatus = await verifyMidtransTransaction(midtransOrderId, serverKey);
+    await cancelMidtransTransaction(midtransOrderId, runtimeConfig.serverKey, {
+      isProduction: runtimeConfig.isProduction,
+    });
+    verifiedStatus = await verifyMidtransTransaction(
+      midtransOrderId,
+      runtimeConfig.serverKey,
+      { isProduction: runtimeConfig.isProduction },
+    );
   } else if (!MIDTRANS_TERMINAL_CANCEL_STATUSES.has(verifiedStatus.transaction_status)) {
     throw new Error(`Midtrans transaction status '${verifiedStatus.transaction_status}' is not cancellable`);
   }
@@ -661,7 +676,7 @@ Deno.serve(async (req: Request) => {
       };
 
       if (to === "cancelled") {
-        Object.assign(paymentUpdatePayload, await buildCancellationPaymentUpdate(order));
+        Object.assign(paymentUpdatePayload, await buildCancellationPaymentUpdate(adminClient, order));
       }
 
       // If admin is providing a manual waybill (override), record audit metadata
