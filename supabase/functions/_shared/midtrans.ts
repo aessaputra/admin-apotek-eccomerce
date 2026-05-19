@@ -16,6 +16,8 @@ import {
   createRuntimeConfigProvider,
   type RuntimeConfigAdminClient,
   type RuntimeConfigEntry,
+  type RuntimeConfigEnvironment,
+  type RuntimeConfigFallbackOptions,
   type RuntimeConfigStatus,
 } from "./runtime-config.ts";
 
@@ -264,6 +266,7 @@ export const cancelMidtransTransaction = async (
 export async function resolveMidtransTransactionRuntimeConfig(
   adminClient: RuntimeConfigAdminClient,
   midtransOrderId: string,
+  env?: RuntimeConfigEnvironment,
 ): Promise<MidtransRuntimeConfig> {
   const binding = await getMidtransPaymentConfigBinding(adminClient, midtransOrderId);
 
@@ -271,12 +274,13 @@ export async function resolveMidtransTransactionRuntimeConfig(
     return resolveBoundMidtransRuntimeConfig(adminClient, binding);
   }
 
-  return resolveActiveMidtransRuntimeConfig(adminClient);
+  return resolveActiveMidtransRuntimeConfig(adminClient, env);
 }
 
 export async function resolveMidtransWebhookRuntimeConfig(
   adminClient: RuntimeConfigAdminClient,
   payload: Pick<MidtransWebhookPayload, "order_id" | "status_code" | "gross_amount" | "signature_key">,
+  env?: RuntimeConfigEnvironment,
 ): Promise<{ config: MidtransRuntimeConfig; signatureValid: boolean }> {
   const binding = await getMidtransPaymentConfigBinding(adminClient, payload.order_id);
 
@@ -288,7 +292,7 @@ export async function resolveMidtransWebhookRuntimeConfig(
     };
   }
 
-  const candidates = await resolveMidtransSignatureCandidates(adminClient);
+  const candidates = await resolveMidtransSignatureCandidates(adminClient, env);
   if (candidates.length === 0) {
     throw new MidtransRuntimeConfigError();
   }
@@ -300,6 +304,20 @@ export async function resolveMidtransWebhookRuntimeConfig(
   }
 
   return { config: candidates[0], signatureValid: false };
+}
+
+
+function createMidtransProviderFallback(
+  env?: RuntimeConfigEnvironment,
+): RuntimeConfigFallbackOptions {
+  return {
+    enabled: true,
+    env,
+    allowKeys: [
+      CONFIG_KEYS.midtransServerKey,
+      CONFIG_KEYS.midtransIsProduction,
+    ],
+  };
 }
 
 async function getMidtransPaymentConfigBinding(
@@ -359,8 +377,13 @@ async function resolveBoundMidtransRuntimeConfig(
 
 async function resolveActiveMidtransRuntimeConfig(
   adminClient: RuntimeConfigAdminClient,
+  env?: RuntimeConfigEnvironment,
 ): Promise<MidtransRuntimeConfig> {
-  const runtimeConfig = createRuntimeConfigProvider({ adminClient, cacheTtlMs: 0 });
+  const runtimeConfig = createRuntimeConfigProvider({
+    adminClient,
+    cacheTtlMs: 0,
+    fallback: createMidtransProviderFallback(env),
+  });
 
   try {
     const [serverKeyEntry, isProductionEntry] = await Promise.all([
@@ -384,13 +407,24 @@ async function resolveActiveMidtransRuntimeConfig(
 
 async function resolveMidtransSignatureCandidates(
   adminClient: RuntimeConfigAdminClient,
+  env?: RuntimeConfigEnvironment,
 ): Promise<MidtransRuntimeConfig[]> {
-  const runtimeConfig = createRuntimeConfigProvider({ adminClient, cacheTtlMs: 0 });
+  const runtimeConfig = createRuntimeConfigProvider({
+    adminClient,
+    cacheTtlMs: 0,
+    fallback: createMidtransProviderFallback(env),
+  });
 
   try {
     const [serverKeyEntries, isProductionEntries] = await Promise.all([
-      runtimeConfig.getConfigCandidates(CONFIG_KEYS.midtransServerKey),
-      runtimeConfig.getConfigCandidates(CONFIG_KEYS.midtransIsProduction),
+      runtimeConfig.getConfigCandidates(
+        CONFIG_KEYS.midtransServerKey,
+        { preSignature: true },
+      ),
+      runtimeConfig.getConfigCandidates(
+        CONFIG_KEYS.midtransIsProduction,
+        { preSignature: true },
+      ),
     ]);
 
     return serverKeyEntries.map((serverKeyEntry) => {

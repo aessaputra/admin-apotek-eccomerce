@@ -106,6 +106,7 @@ export interface RuntimeConfigFallbackOptions {
   enabled: boolean;
   env?: RuntimeConfigEnvironment;
   allowKeys?: RuntimeConfigKey[];
+  onFallback?: (entry: RuntimeConfigLogSafeEntry) => void | Promise<void>;
 }
 
 export interface RuntimeConfigProviderOptions {
@@ -496,7 +497,7 @@ export class RuntimeConfigProvider {
     options: RuntimeConfigLookupOptions,
   ): Promise<RuntimeConfigEntry<K> | null> {
     const fallback = mergeFallbackOptions(this.options.fallback, options.fallback);
-    if (!fallback.enabled || !isFallbackAllowed(keyName, fallback)) {
+    if (options.preSignature || !fallback.enabled || !isFallbackAllowed(keyName, fallback)) {
       return null;
     }
 
@@ -519,7 +520,7 @@ export class RuntimeConfigProvider {
     );
     const stringValue = stringifyFallbackValue(rawValue);
 
-    return {
+    const entry: RuntimeConfigEntry<K> = {
       keyName,
       value,
       valueKind: definition.valueKind,
@@ -537,6 +538,10 @@ export class RuntimeConfigProvider {
         source: "environment",
       },
     };
+
+    await fallback.onFallback?.(toLogSafeRuntimeConfig(entry));
+
+    return entry;
   }
 }
 

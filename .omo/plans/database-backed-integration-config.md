@@ -554,7 +554,7 @@ Wave 6: Final Verification Wave.
 
   **Commit**: YES | Message: `test(settings): cover integration config management` | Files: Settings tests, locale tests, helpers
 
-- [ ] 11. Implement phased migration, legacy binding, and fallback observability
+- [x] 11. Implement phased migration, legacy binding, and fallback observability
 
   **What to do**: Implement rollout mechanics: seed config definitions, one-time placeholder-safe secret loading guidance/tests, legacy pending order Midtrans binding, Biteship snapshot backfill where possible, DB/Vault-first temporary env fallback, and fallback observability that never writes DB before Midtrans signature validation. Add comments/docs in migration or plan-adjacent evidence explaining how operators load real secrets without committing/printing them.
   **Must NOT do**: Do not put real secret values in SQL, docs, tests, shell commands, or evidence. Do not silently fall back without safe post-signature observability where allowed.

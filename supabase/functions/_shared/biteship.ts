@@ -251,7 +251,11 @@ export async function resolveBiteshipApiKeyFromRuntimeConfig(
   const runtimeConfig = createRuntimeConfigProvider({
     adminClient,
     cacheTtlMs: 0,
-    fallback: { enabled: false },
+    fallback: {
+      enabled: true,
+      env: _env,
+      allowKeys: [CONFIG_KEYS.biteshipApiKey],
+    },
   });
 
   try {

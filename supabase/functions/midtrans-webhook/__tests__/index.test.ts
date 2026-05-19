@@ -44,6 +44,7 @@ function createRequest(payload: Record<string, unknown>) {
 function createAdminClient(options: {
   runtimeUnavailable?: boolean;
   runtimeRows?: unknown[];
+  bindingRows?: unknown[];
 }) {
   const from = vi.fn(() => ({
     upsert: vi.fn(async () => ({ error: null })),
@@ -54,7 +55,7 @@ function createAdminClient(options: {
   }));
   const rpc = vi.fn(async (name: string, args?: Record<string, unknown>) => {
     if (name === "get_midtrans_payment_config_binding") {
-      return { data: [], error: null };
+      return { data: options.bindingRows ?? [], error: null };
     }
 
     if (name === "get_runtime_integration_config_versions") {
@@ -150,6 +151,61 @@ describe("midtrans-webhook pre-signature safety", () => {
     expect(response.status).toBe(503);
     expect(from).not.toHaveBeenCalled();
     expect(rpc).toHaveBeenCalledTimes(3);
+    expect(rpc.mock.calls.map((call) => call[0])).toEqual([
+      "get_midtrans_payment_config_binding",
+      "get_runtime_integration_config_versions",
+      "get_runtime_integration_config_versions",
+    ]);
+  });
+
+  it("returns 401 for invalid signatures on bound legacy transactions without writing rows", async () => {
+    const { adminClient, from, rpc } = createAdminClient({
+      bindingRows: [{
+        payment_id: "payment-legacy-bound",
+        midtrans_order_id: "MIDTRANS-WEBHOOK-ORDER",
+        server_key_version_number: 7,
+        is_production_version_number: 2,
+      }],
+      runtimeRows: [
+        {
+          key_name: "midtrans.server_key",
+          value_kind: "secret",
+          is_secret: true,
+          is_required: true,
+          is_runtime_required: true,
+          version_id: "server-bound-version-id",
+          version_number: 7,
+          status: "retired",
+          runtime_value: "midtrans-bound-sentinel-key",
+          masked_value: "midt*****************key",
+          value_fingerprint: "fingerprint",
+          updated_at: "2026-05-19T00:00:00.000Z",
+        },
+        {
+          key_name: "midtrans.is_production",
+          value_kind: "boolean",
+          is_secret: false,
+          is_required: true,
+          is_runtime_required: true,
+          version_id: "production-bound-version-id",
+          version_number: 2,
+          status: "retired",
+          runtime_value: false,
+          masked_value: "false",
+          value_fingerprint: "fingerprint",
+          updated_at: "2026-05-19T00:00:00.000Z",
+        },
+      ],
+    });
+    const handler = createMidtransWebhookHandler({
+      getAdminClient: () => adminClient as never,
+    });
+
+    const response = await handler(createRequest(makePayload("invalid-bound-signature")));
+
+    await expect(response.json()).resolves.toEqual({ error: "Invalid signature" });
+    expect(response.status).toBe(401);
+    expect(from).not.toHaveBeenCalled();
     expect(rpc.mock.calls.map((call) => call[0])).toEqual([
       "get_midtrans_payment_config_binding",
       "get_runtime_integration_config_versions",

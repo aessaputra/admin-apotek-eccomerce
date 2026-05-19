@@ -608,16 +608,29 @@ describe("Biteship runtime API key", () => {
     expect(env.get).not.toHaveBeenCalled();
   });
 
-  it("fails closed with a safe error when the runtime Biteship API key is missing", async () => {
+  it("falls back to the explicit provider env API key when runtime config is missing", async () => {
+    const envApiKeySentinel = "env-biteship-key-sentinel";
     const adminClient = {
       rpc: vi.fn(async () => ({ data: [], error: null })),
     };
-    const env = { get: vi.fn(() => "env-biteship-key-must-not-be-used") };
+    const env = { get: vi.fn((key: string) => key === "BITESHIP_API_KEY" ? envApiKeySentinel : undefined) };
+
+    const apiKey = await resolveBiteshipApiKeyFromRuntimeConfig(adminClient, env);
+
+    expect(apiKey).toBe(envApiKeySentinel);
+    expect(env.get).toHaveBeenCalledWith("BITESHIP_API_KEY");
+  });
+
+  it("fails closed with a safe error when runtime and provider env Biteship API keys are missing", async () => {
+    const adminClient = {
+      rpc: vi.fn(async () => ({ data: [], error: null })),
+    };
+    const env = { get: vi.fn(() => undefined) };
 
     await expect(
       resolveBiteshipApiKeyFromRuntimeConfig(adminClient, env),
     ).rejects.toThrow("Biteship runtime config unavailable");
-    expect(env.get).not.toHaveBeenCalled();
+    expect(env.get).toHaveBeenCalledWith("BITESHIP_API_KEY");
   });
 
   it("authorizes order creation with the runtime API key without storing it in the snapshot payload", async () => {

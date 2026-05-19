@@ -274,9 +274,10 @@ describe("runtime config fallback and errors", () => {
     expect(env.get).not.toHaveBeenCalled();
   });
 
-  it("uses request-time fallback without fallback audit writes in pre-signature mode", async () => {
+  it("fails closed instead of using fallback in pre-signature mode", async () => {
     const fallbackSentinel = "fallback-midtrans-secret-sentinel";
     const env = createEnvMock({ MIDTRANS_SERVER_KEY: fallbackSentinel });
+    const onFallback = vi.fn();
     const adminClient = createRuntimeConfigClient([]);
     const provider = createRuntimeConfigProvider({
       adminClient,
@@ -284,32 +285,60 @@ describe("runtime config fallback and errors", () => {
         enabled: true,
         env,
         allowKeys: [CONFIG_KEYS.midtransServerKey],
+        onFallback,
       },
     });
 
-    const config = await provider.getRequiredConfig(
-      CONFIG_KEYS.midtransServerKey,
-      { preSignature: true },
+    const error = await captureRuntimeConfigError(() =>
+      provider.getRequiredConfig(
+        CONFIG_KEYS.midtransServerKey,
+        { preSignature: true },
+      )
     );
 
-    expect(config).toMatchObject({
+    expect(error.toLogSafe()).toMatchObject({
+      code: "CONFIG_MISSING",
       keyName: CONFIG_KEYS.midtransServerKey,
-      source: "environment",
-      value: fallbackSentinel,
-      warning: {
-        code: "CONFIG_FALLBACK_USED",
-        keyName: CONFIG_KEYS.midtransServerKey,
-      },
     });
-    expect(env.get).toHaveBeenCalledWith("MIDTRANS_SERVER_KEY");
+    expect(env.get).not.toHaveBeenCalled();
+    expect(onFallback).not.toHaveBeenCalled();
     expect(adminClient.rpc).toHaveBeenCalledTimes(1);
     expect(adminClient.rpc.mock.calls.map(([rpcName]) => rpcName)).toEqual([
       "get_runtime_integration_config_versions",
     ]);
-    expect(JSON.stringify(config.warning)).not.toContain(fallbackSentinel);
-    expect(JSON.stringify(toLogSafeRuntimeConfig(config))).not.toContain(
-      fallbackSentinel,
+    expect(JSON.stringify(error)).not.toContain(fallbackSentinel);
+  });
+
+  it("observes post-signature fallback with log-safe metadata only", async () => {
+    const fallbackSentinel = "fallback-midtrans-secret-sentinel";
+    const env = createEnvMock({ MIDTRANS_SERVER_KEY: fallbackSentinel });
+    const onFallback = vi.fn();
+    const adminClient = createRuntimeConfigClient([]);
+    const provider = createRuntimeConfigProvider({
+      adminClient,
+      fallback: {
+        enabled: true,
+        env,
+        allowKeys: [CONFIG_KEYS.midtransServerKey],
+        onFallback,
+      },
+    });
+
+    const config = await provider.getRequiredConfig(CONFIG_KEYS.midtransServerKey);
+
+    expect(config.source).toBe("environment");
+    expect(config.value).toBe(fallbackSentinel);
+    expect(onFallback).toHaveBeenCalledTimes(1);
+    expect(onFallback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        keyName: CONFIG_KEYS.midtransServerKey,
+        source: "environment",
+        status: "fallback",
+        warning: expect.objectContaining({ code: "CONFIG_FALLBACK_USED" }),
+      }),
     );
+    expect(JSON.stringify(onFallback.mock.calls)).not.toContain(fallbackSentinel);
+    expect(JSON.stringify(toLogSafeRuntimeConfig(config))).not.toContain(fallbackSentinel);
   });
 
   it("rejects invalid fallback values without serializing the submitted value", async () => {

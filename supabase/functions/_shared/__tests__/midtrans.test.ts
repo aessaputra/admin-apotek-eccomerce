@@ -4,6 +4,7 @@ import {
   buildSnapPayload,
   calculateMidtransGrossAmount,
   isIgnorableMidtransNoop,
+  resolveMidtransTransactionRuntimeConfig,
   resolveMidtransWebhookRuntimeConfig,
   verifyMidtransTransaction,
 } from "../midtrans.ts";
@@ -356,6 +357,79 @@ describe("Midtrans runtime config resolution", () => {
         }),
       }),
     );
+  });
+
+
+  it("falls back to explicit provider env for post-signature active transaction config", async () => {
+    const env = {
+      get: vi.fn((key: string) => {
+        if (key === "MIDTRANS_SERVER_KEY") {
+          return "midtrans-env-fallback-key";
+        }
+
+        if (key === "MIDTRANS_IS_PRODUCTION") {
+          return "true";
+        }
+
+        return undefined;
+      }),
+    };
+    const adminClient = {
+      rpc: vi.fn(async (name: string) => {
+        if (name === "get_midtrans_payment_config_binding") {
+          return { data: [], error: null };
+        }
+
+        return { data: [], error: null };
+      }),
+    };
+
+    const config = await resolveMidtransTransactionRuntimeConfig(
+      adminClient,
+      "MIDTRANS-ENV-FALLBACK-ORDER",
+      env,
+    );
+
+    expect(config).toMatchObject({
+      source: "fallback",
+      serverKey: "midtrans-env-fallback-key",
+      isProduction: true,
+      serverKeyVersionId: null,
+      serverKeyVersionNumber: null,
+      isProductionVersionId: null,
+      isProductionVersionNumber: null,
+    });
+    expect(env.get).toHaveBeenCalledWith("MIDTRANS_SERVER_KEY");
+    expect(env.get).toHaveBeenCalledWith("MIDTRANS_IS_PRODUCTION");
+  });
+
+  it("does not use provider env fallback while selecting pre-signature webhook candidates", async () => {
+    const env = {
+      get: vi.fn(() => "midtrans-env-fallback-key-must-not-be-used"),
+    };
+    const adminClient = {
+      rpc: vi.fn(async (name: string) => {
+        if (name === "get_midtrans_payment_config_binding") {
+          return { data: [], error: null };
+        }
+
+        return { data: [], error: null };
+      }),
+    };
+
+    await expect(
+      resolveMidtransWebhookRuntimeConfig(
+        adminClient,
+        {
+          order_id: "MIDTRANS-PRESIGNATURE-ORDER",
+          status_code: "200",
+          gross_amount: "150000.00",
+          signature_key: "invalid-signature",
+        },
+        env,
+      ),
+    ).rejects.toThrow("Midtrans runtime config unavailable");
+    expect(env.get).not.toHaveBeenCalled();
   });
 
   it("uses transaction-bound config versions before active or grace candidates", async () => {
