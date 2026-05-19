@@ -1,18 +1,24 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildBiteshipOrderDestinationFields,
   fetchOrderShippingAddress,
 } from "../biteship-order-helpers.ts";
 import {
+  buildBiteshipOrderPayloadFromSnapshot,
   buildBiteshipOrderPayload,
+  ensureBiteshipOrderConfigSnapshot,
   persistBiteshipShipment,
+  type BiteshipOrderConfigSnapshot,
   type StoreSettings,
 } from "../biteship.ts";
+import { CONFIG_KEYS, type RuntimeConfigRow } from "../runtime-config.ts";
 import type { Order, OrderAddress } from "../types.ts";
 
+const getSupabaseAdminClientMock = vi.hoisted(() => vi.fn());
+
 vi.mock("../supabase.ts", () => ({
-  getSupabaseAdminClient: vi.fn(),
+  getSupabaseAdminClient: getSupabaseAdminClientMock,
 }));
 
 const baseOrder: Order = {
@@ -69,6 +75,98 @@ const baseSettings: StoreSettings = {
   origin_area_id: "STORE-AREA-ID",
 };
 
+const baseSnapshot: BiteshipOrderConfigSnapshot = {
+  id: "snapshot-1",
+  order_id: "order-1",
+  shipment_id: null,
+  provider: "biteship",
+  origin_area_id: "SNAPSHOT-AREA-ID",
+  origin_postal_code: "54321",
+  origin_latitude: -6.311111,
+  origin_longitude: 106.911111,
+  courier_codes: ["jne"],
+  courier_service: "reg",
+  shipper_name: "Snapshot Sender",
+  shipper_phone: "0899999999",
+  shipper_email: "snapshot@example.com",
+  shipper_address: "Jl. Snapshot No. 9",
+  shipper_organization: "Snapshot Pharmacy",
+  config_version_ids: {
+    "biteship.origin_postal_code": {
+      version_id: "version-origin-postal",
+      version_number: 4,
+    },
+    "biteship.origin_area_id": {
+      version_id: "version-origin-area",
+      version_number: 5,
+    },
+    "biteship.origin_latitude": {
+      version_id: "version-origin-latitude",
+      version_number: 6,
+    },
+    "biteship.origin_longitude": {
+      version_id: "version-origin-longitude",
+      version_number: 7,
+    },
+    "biteship.enabled_couriers": {
+      version_id: "version-enabled-couriers",
+      version_number: 2,
+    },
+    "shop.shipper_name": {
+      version_id: "version-shipper-name",
+      version_number: 3,
+    },
+    "shop.shipper_phone": {
+      version_id: "version-shipper-phone",
+      version_number: 3,
+    },
+    "shop.shipper_email": {
+      version_id: "version-shipper-email",
+      version_number: 3,
+    },
+    "shop.address": {
+      version_id: "version-shop-address",
+      version_number: 3,
+    },
+    "shop.organization": {
+      version_id: "version-shop-organization",
+      version_number: 3,
+    },
+  },
+  snapshot_source: "webhook_side_effects",
+  created_by: null,
+  created_at: "2026-05-18T00:00:00.000Z",
+};
+
+function createRuntimeConfigRow(
+  keyName: string,
+  runtimeValue: string | string[],
+  versionNumber: number,
+  valueKind: RuntimeConfigRow["value_kind"] = Array.isArray(runtimeValue) ? "text_array" : "text",
+): RuntimeConfigRow {
+  return {
+    key_name: keyName,
+    value_kind: valueKind,
+    is_secret: false,
+    is_required: true,
+    is_runtime_required: true,
+    version_id: `version-${keyName.replaceAll(".", "-")}`,
+    version_number: versionNumber,
+    status: "active",
+    runtime_value: runtimeValue,
+    masked_value: null,
+    value_fingerprint: null,
+    updated_at: "2026-05-18T00:00:00.000Z",
+  };
+}
+
+function createSettingsQueryMock(settings: StoreSettings) {
+  const maybeSingle = vi.fn(async () => ({ data: settings, error: null }));
+  const eq = vi.fn(() => ({ maybeSingle }));
+  const select = vi.fn(() => ({ eq }));
+  return { from: vi.fn(() => ({ select })) };
+}
+
 describe("fetchOrderShippingAddress", () => {
   it("fetches address data explicitly through shipping_address_id", async () => {
     const address: OrderAddress = {
@@ -115,6 +213,146 @@ describe("fetchOrderShippingAddress", () => {
 });
 
 describe("buildBiteshipOrderPayload", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("uses immutable snapshot origin and shipper fields instead of rotated live settings", () => {
+    const payload = buildBiteshipOrderPayloadFromSnapshot(baseOrder, baseSnapshot);
+
+    expect(payload.origin_area_id).toBe("SNAPSHOT-AREA-ID");
+    expect(payload.shipper_contact_name).toBe("Snapshot Sender");
+    expect(payload.shipper_contact_phone).toBe("0899999999");
+    expect(payload.shipper_contact_email).toBe("snapshot@example.com");
+    expect(payload.shipper_organization).toBe("Snapshot Pharmacy");
+    expect(payload.origin_address).toBe("Jl. Snapshot No. 9");
+    expect(payload.courier_company).toBe("jne");
+    expect(payload.courier_type).toBe("reg");
+    expect(JSON.stringify(payload)).not.toContain("ROTATED");
+  });
+
+  it("fails retryably when a snapshot is partial before building a Biteship payload", () => {
+    expect(() =>
+      buildBiteshipOrderPayloadFromSnapshot(baseOrder, {
+        ...baseSnapshot,
+        origin_latitude: null,
+      }),
+    ).toThrow("Biteship config snapshot for order order-1 is incomplete: origin_latitude is required");
+  });
+
+  it.each([
+    ["empty metadata object", {}],
+    ["missing version_number", { version_id: "version-origin-area" }],
+    ["empty version_id", { version_id: " ", version_number: 5 }],
+    ["non-positive version_number", { version_id: "version-origin-area", version_number: 0 }],
+  ])(
+    "fails retryably when snapshot version metadata has %s",
+    (_caseName, metadata) => {
+      expect(() =>
+        buildBiteshipOrderPayloadFromSnapshot(baseOrder, {
+          ...baseSnapshot,
+          config_version_ids: {
+            ...baseSnapshot.config_version_ids,
+            [CONFIG_KEYS.biteshipOriginAreaId]: metadata,
+          },
+        }),
+      ).toThrow(
+        `Biteship config snapshot for order order-1 is incomplete: config_version_ids.${CONFIG_KEYS.biteshipOriginAreaId} must include a non-empty version_id and positive integer version_number`,
+      );
+    },
+  );
+
+  it("creates snapshots from versioned runtime origin metadata instead of rotated live settings", async () => {
+    const originAreaKey = "biteship.origin_area_id";
+    const originLatitudeKey = "biteship.origin_latitude";
+    const originLongitudeKey = "biteship.origin_longitude";
+    const runtimeRows = [
+      createRuntimeConfigRow(CONFIG_KEYS.biteshipOriginPostalCode, "11111", 4),
+      createRuntimeConfigRow(originAreaKey, "CONFIG-AREA-ID", 5),
+      createRuntimeConfigRow(originLatitudeKey, "-6.311111", 6),
+      createRuntimeConfigRow(originLongitudeKey, "106.911111", 7),
+      createRuntimeConfigRow(CONFIG_KEYS.biteshipEnabledCouriers, ["jne:reg"], 8),
+      createRuntimeConfigRow(CONFIG_KEYS.shopShipperName, "Runtime Sender", 9),
+      createRuntimeConfigRow(CONFIG_KEYS.shopShipperPhone, "0813333333", 10),
+      createRuntimeConfigRow(CONFIG_KEYS.shopShipperEmail, "runtime@example.com", 11),
+      createRuntimeConfigRow(CONFIG_KEYS.shopAddress, "Jl. Runtime No. 10", 12),
+      createRuntimeConfigRow(CONFIG_KEYS.shopOrganization, "Runtime Pharmacy", 13),
+    ];
+    const rowsByKey = new Map(runtimeRows.map((row) => [row.key_name, row]));
+    const createSnapshotArgs: Record<string, unknown>[] = [];
+    const adminClient = {
+      rpc: vi.fn(async (name: string, args: Record<string, unknown>) => {
+        if (name === "get_biteship_order_config_snapshot") {
+          return { data: [], error: null };
+        }
+
+        if (name === "get_runtime_integration_config_versions") {
+          const keyName = ((args.p_key_names as string[]) ?? [])[0];
+          const row = rowsByKey.get(keyName);
+          return { data: row ? [row] : [], error: null };
+        }
+
+        expect(name).toBe("create_biteship_order_config_snapshot");
+        createSnapshotArgs.push(args);
+        return {
+          data: [{
+            id: "snapshot-created",
+            order_id: args.p_order_id,
+            shipment_id: args.p_shipment_id,
+            provider: "biteship",
+            origin_area_id: args.p_origin_area_id,
+            origin_postal_code: args.p_origin_postal_code,
+            origin_latitude: args.p_origin_latitude,
+            origin_longitude: args.p_origin_longitude,
+            courier_codes: args.p_courier_codes,
+            courier_service: args.p_courier_service,
+            shipper_name: args.p_shipper_name,
+            shipper_phone: args.p_shipper_phone,
+            shipper_email: args.p_shipper_email,
+            shipper_address: args.p_shipper_address,
+            shipper_organization: args.p_shipper_organization,
+            config_version_ids: args.p_config_version_ids,
+            snapshot_source: args.p_snapshot_source,
+            created_by: args.p_created_by,
+            created_at: "2026-05-18T00:00:00.000Z",
+          }],
+          error: null,
+        };
+      }),
+    };
+    getSupabaseAdminClientMock.mockResolvedValue(
+      createSettingsQueryMock({
+        ...baseSettings,
+        origin_area_id: "ROTATED-LIVE-AREA-ID",
+        origin_latitude: -1.234567,
+        origin_longitude: 101.765432,
+      }),
+    );
+
+    const snapshot = await ensureBiteshipOrderConfigSnapshot(adminClient, baseOrder);
+
+    expect(snapshot).toMatchObject({
+      origin_area_id: "CONFIG-AREA-ID",
+      origin_postal_code: "11111",
+      origin_latitude: -6.311111,
+      origin_longitude: 106.911111,
+      shipper_name: "Runtime Sender",
+    });
+    expect(createSnapshotArgs[0]).toMatchObject({
+      p_origin_area_id: "CONFIG-AREA-ID",
+      p_origin_latitude: -6.311111,
+      p_origin_longitude: 106.911111,
+    });
+    expect(createSnapshotArgs[0].p_config_version_ids).toMatchObject({
+      [originAreaKey]: expect.objectContaining({ version_number: 5 }),
+      [originLatitudeKey]: expect.objectContaining({ version_number: 6 }),
+      [originLongitudeKey]: expect.objectContaining({ version_number: 7 }),
+      [CONFIG_KEYS.biteshipOriginPostalCode]: expect.objectContaining({ version_number: 4 }),
+      [CONFIG_KEYS.biteshipEnabledCouriers]: expect.objectContaining({ version_number: 8 }),
+    });
+    expect(JSON.stringify(createSnapshotArgs[0])).not.toContain("ROTATED-LIVE");
+  });
+
   it("fails with a clear error when instant courier orders have no destination coordinate", () => {
     expect(() =>
       buildBiteshipOrderDestinationFields({

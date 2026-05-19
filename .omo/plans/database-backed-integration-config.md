@@ -349,7 +349,7 @@ Wave 6: Final Verification Wave.
 
   **Commit**: YES | Message: `feat(midtrans): load config from Vault-backed runtime` | Files: Midtrans functions/shared helpers/tests
 
-- [ ] 6. Create Biteship pre-settlement snapshot lifecycle
+- [x] 6. Create Biteship pre-settlement snapshot lifecycle
 
   **What to do**: Add or update logic so Biteship config snapshot is created before settlement can trigger fulfillment. Snapshot must include `origin_area_id`, `origin_latitude`, `origin_longitude`, origin postal code, courier/service selections, shipper name/phone/email/address/organization, and config version IDs. Ensure settlement side effects require an existing valid snapshot or create it atomically before queuing fulfillment, but never wait until Biteship API order creation.
   **Must NOT do**: Do not let old orders read latest active origin/shipper/courier config after rotation. Do not store Biteship API key in snapshot.

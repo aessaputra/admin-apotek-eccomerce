@@ -3,6 +3,13 @@ import { shouldUseInstantBiteshipContract } from "./biteship-courier-contract.ts
 import { parseBiteshipPostalCode, tryParseBiteshipPostalCode } from "./biteship-postal-code.ts";
 import { buildOrderEndpoint } from "./biteship-public-tracking.ts";
 import { getPersistedBiteshipShipmentStatus } from "./order-status.ts";
+import {
+  CONFIG_KEYS,
+  createRuntimeConfigProvider,
+  type RuntimeConfigAdminClient,
+  type RuntimeConfigEntry,
+  type RuntimeConfigKey,
+} from "./runtime-config.ts";
 import type { Order, OrderItem } from "./types.ts";
 
 interface BiteshipOrderItem {
@@ -94,6 +101,48 @@ export interface StoreSettings {
   origin_area_id: string | null;
 }
 
+export type BiteshipConfigSnapshotErrorCode =
+  | "biteship_snapshot_missing"
+  | "biteship_snapshot_incomplete"
+  | "biteship_snapshot_create_failed";
+
+export class BiteshipConfigSnapshotError extends Error {
+  readonly code: BiteshipConfigSnapshotErrorCode;
+  readonly retryable = true;
+
+  constructor(params: {
+    code: BiteshipConfigSnapshotErrorCode;
+    orderId: string;
+    detail?: string;
+  }) {
+    super(buildBiteshipConfigSnapshotErrorMessage(params));
+    this.name = "BiteshipConfigSnapshotError";
+    this.code = params.code;
+  }
+}
+
+export interface BiteshipOrderConfigSnapshot {
+  id: string;
+  order_id: string;
+  shipment_id: string | null;
+  provider: string;
+  origin_area_id: string | null;
+  origin_postal_code: string | null;
+  origin_latitude: number | null;
+  origin_longitude: number | null;
+  courier_codes: string[];
+  courier_service: string | null;
+  shipper_name: string | null;
+  shipper_phone: string | null;
+  shipper_email: string | null;
+  shipper_address: string | null;
+  shipper_organization: string | null;
+  config_version_ids: Record<string, unknown>;
+  snapshot_source: string;
+  created_by: string | null;
+  created_at: string;
+}
+
 export type ShippingActivityActorType = "admin" | "system";
 
 interface PersistBiteshipShipmentParams {
@@ -112,6 +161,18 @@ interface SupabaseMutationResult {
   error: unknown | null;
 }
 
+interface SupabaseRpcResult {
+  data: unknown;
+  error: { message?: string } | null;
+}
+
+interface BiteshipSnapshotAdminClient extends RuntimeConfigAdminClient {
+  rpc: (
+    name: string,
+    args: Record<string, unknown>,
+  ) => PromiseLike<SupabaseRpcResult>;
+}
+
 interface BiteshipShipmentAdminClient {
   from(table: "shipments"): {
     upsert: (
@@ -128,6 +189,103 @@ async function getSupabaseAdminClient() {
   const supabaseModule = await import("./supabase.ts");
 
   return supabaseModule.getSupabaseAdminClient();
+}
+
+const BITESHIP_SNAPSHOT_CONFIG_KEYS = [
+  CONFIG_KEYS.biteshipOriginPostalCode,
+  CONFIG_KEYS.biteshipOriginAreaId,
+  CONFIG_KEYS.biteshipOriginLatitude,
+  CONFIG_KEYS.biteshipOriginLongitude,
+  CONFIG_KEYS.biteshipEnabledCouriers,
+  CONFIG_KEYS.shopShipperName,
+  CONFIG_KEYS.shopShipperPhone,
+  CONFIG_KEYS.shopShipperEmail,
+  CONFIG_KEYS.shopAddress,
+  CONFIG_KEYS.shopOrganization,
+] as const;
+
+type BiteshipSnapshotRuntimeConfigKey =
+  typeof BITESHIP_SNAPSHOT_CONFIG_KEYS[number];
+
+function buildBiteshipConfigSnapshotErrorMessage(params: {
+  code: BiteshipConfigSnapshotErrorCode;
+  orderId: string;
+  detail?: string;
+}): string {
+  if (params.code === "biteship_snapshot_missing") {
+    return `Biteship config snapshot missing for order ${params.orderId}`;
+  }
+
+  if (params.code === "biteship_snapshot_incomplete") {
+    return `Biteship config snapshot for order ${params.orderId} is incomplete: ${params.detail ?? "required fields are missing"}`;
+  }
+
+  return `Biteship config snapshot could not be created for order ${params.orderId}: ${params.detail ?? "configuration unavailable"}`;
+}
+
+export function isBiteshipConfigSnapshotError(
+  error: unknown,
+): error is BiteshipConfigSnapshotError {
+  return error instanceof BiteshipConfigSnapshotError;
+}
+
+function normalizeSnapshotText(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalizedValue = value.trim();
+  return normalizedValue || null;
+}
+
+function normalizeSnapshotTextArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => normalizeSnapshotText(item))
+    .filter((item): item is string => item !== null);
+}
+
+function normalizeSnapshotMetadata(value: unknown): Record<string, unknown> {
+  if (!isRecord(value) || Array.isArray(value)) {
+    return {};
+  }
+
+  return value;
+}
+
+function toSnapshotCoordinate(value: unknown): number | null {
+  return normalizeStoreCoordinate(value);
+}
+
+function normalizeBiteshipSnapshotRow(
+  row: Record<string, unknown>,
+): BiteshipOrderConfigSnapshot {
+  return {
+    id: normalizeSnapshotText(row.id) ?? "",
+    order_id: normalizeSnapshotText(row.order_id) ?? "",
+    shipment_id: normalizeSnapshotText(row.shipment_id),
+    provider: normalizeSnapshotText(row.provider) ?? "",
+    origin_area_id: normalizeSnapshotText(row.origin_area_id),
+    origin_postal_code: normalizeStorePostalCode(row.origin_postal_code),
+    origin_latitude: toSnapshotCoordinate(row.origin_latitude),
+    origin_longitude: toSnapshotCoordinate(row.origin_longitude),
+    courier_codes: normalizeSnapshotTextArray(row.courier_codes).map((item) =>
+      item.toLowerCase()
+    ),
+    courier_service: normalizeSnapshotText(row.courier_service)?.toLowerCase() ?? null,
+    shipper_name: normalizeSnapshotText(row.shipper_name),
+    shipper_phone: normalizeSnapshotText(row.shipper_phone),
+    shipper_email: normalizeSnapshotText(row.shipper_email),
+    shipper_address: normalizeSnapshotText(row.shipper_address),
+    shipper_organization: normalizeSnapshotText(row.shipper_organization),
+    config_version_ids: normalizeSnapshotMetadata(row.config_version_ids),
+    snapshot_source: normalizeSnapshotText(row.snapshot_source) ?? "service_rpc",
+    created_by: normalizeSnapshotText(row.created_by),
+    created_at: normalizeSnapshotText(row.created_at) ?? "",
+  };
 }
 
 function normalizeStorePostalCode(value: unknown): string | null {
@@ -366,6 +524,410 @@ export function isCourierServiceEnabled(
         selection.serviceCode === normalizedServiceCode)
     );
   });
+}
+
+function requireSnapshotField(
+  snapshot: BiteshipOrderConfigSnapshot,
+  fieldName: keyof BiteshipOrderConfigSnapshot,
+): void {
+  const value = snapshot[fieldName];
+  if (typeof value === "string" && value.trim()) {
+    return;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return;
+  }
+
+  throw new BiteshipConfigSnapshotError({
+    code: "biteship_snapshot_incomplete",
+    orderId: snapshot.order_id,
+    detail: `${String(fieldName)} is required`,
+  });
+}
+
+function hasRequiredSnapshotVersionMetadata(value: unknown): boolean {
+  if (!isRecord(value) || Array.isArray(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.version_id === "string" &&
+    value.version_id.trim().length > 0 &&
+    typeof value.version_number === "number" &&
+    Number.isInteger(value.version_number) &&
+    value.version_number > 0
+  );
+}
+
+function requireSnapshotVersionMetadata(
+  snapshot: BiteshipOrderConfigSnapshot,
+): void {
+  const missingKey = BITESHIP_SNAPSHOT_CONFIG_KEYS.find(
+    (keyName) =>
+      !hasRequiredSnapshotVersionMetadata(snapshot.config_version_ids[keyName]),
+  );
+
+  if (!missingKey) {
+    return;
+  }
+
+  throw new BiteshipConfigSnapshotError({
+    code: "biteship_snapshot_incomplete",
+    orderId: snapshot.order_id,
+    detail:
+      `config_version_ids.${missingKey} must include a non-empty version_id and positive integer version_number`,
+  });
+}
+
+export function assertCompleteBiteshipOrderConfigSnapshot(
+  snapshot: BiteshipOrderConfigSnapshot,
+  order: Order,
+): BiteshipOrderConfigSnapshot {
+  if (snapshot.provider !== "biteship") {
+    throw new BiteshipConfigSnapshotError({
+      code: "biteship_snapshot_incomplete",
+      orderId: order.id,
+      detail: "provider must be biteship",
+    });
+  }
+
+  if (snapshot.order_id !== order.id) {
+    throw new BiteshipConfigSnapshotError({
+      code: "biteship_snapshot_incomplete",
+      orderId: order.id,
+      detail: "order_id does not match the order",
+    });
+  }
+
+  requireSnapshotField(snapshot, "origin_area_id");
+  requireSnapshotField(snapshot, "origin_postal_code");
+  requireSnapshotField(snapshot, "origin_latitude");
+  requireSnapshotField(snapshot, "origin_longitude");
+  requireSnapshotField(snapshot, "courier_service");
+  requireSnapshotField(snapshot, "shipper_name");
+  requireSnapshotField(snapshot, "shipper_phone");
+  requireSnapshotField(snapshot, "shipper_email");
+  requireSnapshotField(snapshot, "shipper_address");
+  requireSnapshotField(snapshot, "shipper_organization");
+  requireSnapshotVersionMetadata(snapshot);
+
+  const orderCourierCode = order.courier_code?.trim().toLowerCase();
+  if (!orderCourierCode) {
+    throw new Error("Missing courier_code on order");
+  }
+
+  if (!snapshot.courier_codes.includes(orderCourierCode)) {
+    throw new BiteshipConfigSnapshotError({
+      code: "biteship_snapshot_incomplete",
+      orderId: order.id,
+      detail: "courier_codes must include the selected order courier",
+    });
+  }
+
+  if (snapshot.courier_service !== order.courier_service?.trim().toLowerCase()) {
+    throw new BiteshipConfigSnapshotError({
+      code: "biteship_snapshot_incomplete",
+      orderId: order.id,
+      detail: "courier_service must match the selected order service",
+    });
+  }
+
+  return snapshot;
+}
+
+function getRequiredRuntimeConfigEntry(
+  entries: Map<RuntimeConfigKey, RuntimeConfigEntry>,
+  keyName: BiteshipSnapshotRuntimeConfigKey,
+): RuntimeConfigEntry {
+  const entry = entries.get(keyName);
+  if (!entry) {
+    throw new Error(`Missing runtime config ${keyName}`);
+  }
+
+  return entry;
+}
+
+function getRuntimeConfigString(
+  entries: Map<RuntimeConfigKey, RuntimeConfigEntry>,
+  keyName: BiteshipSnapshotRuntimeConfigKey,
+): string {
+  const value = getRequiredRuntimeConfigEntry(entries, keyName).value;
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`Invalid runtime config ${keyName}`);
+  }
+
+  return value.trim();
+}
+
+function getRuntimeConfigTextArray(
+  entries: Map<RuntimeConfigKey, RuntimeConfigEntry>,
+  keyName: BiteshipSnapshotRuntimeConfigKey,
+): string[] {
+  const value = getRequiredRuntimeConfigEntry(entries, keyName).value;
+  if (!Array.isArray(value)) {
+    throw new Error(`Invalid runtime config ${keyName}`);
+  }
+
+  const values = value.map((item) => item.trim()).filter(Boolean);
+  if (values.length === 0) {
+    throw new Error(`Invalid runtime config ${keyName}`);
+  }
+
+  return values;
+}
+
+function getRuntimeConfigCoordinate(
+  entries: Map<RuntimeConfigKey, RuntimeConfigEntry>,
+  keyName: BiteshipSnapshotRuntimeConfigKey,
+  minimum: number,
+  maximum: number,
+): number {
+  const coordinate = normalizeStoreCoordinate(
+    getRuntimeConfigString(entries, keyName),
+  );
+  if (coordinate === null || coordinate < minimum || coordinate > maximum) {
+    throw new Error(`Invalid runtime config ${keyName}`);
+  }
+
+  return coordinate;
+}
+
+function buildSnapshotConfigVersionMetadata(
+  entries: Map<RuntimeConfigKey, RuntimeConfigEntry>,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    BITESHIP_SNAPSHOT_CONFIG_KEYS.map((keyName) => {
+      const entry = getRequiredRuntimeConfigEntry(entries, keyName);
+      return [
+        keyName,
+        {
+          version_id: entry.versionId,
+          version_number: entry.versionNumber,
+          source: entry.source,
+          status: entry.status,
+        },
+      ];
+    }),
+  );
+}
+
+async function loadBiteshipSnapshotRuntimeConfig(
+  adminClient: RuntimeConfigAdminClient,
+): Promise<Map<RuntimeConfigKey, RuntimeConfigEntry>> {
+  const provider = createRuntimeConfigProvider({
+    adminClient,
+    cacheTtlMs: 0,
+    fallback: { enabled: false },
+  });
+  const entries = await Promise.all(
+    BITESHIP_SNAPSHOT_CONFIG_KEYS.map((keyName) =>
+      provider.getRequiredConfig(keyName)
+    ),
+  );
+
+  return new Map(entries.map((entry) => [entry.keyName, entry]));
+}
+
+function buildSnapshotSettings(
+  snapshot: BiteshipOrderConfigSnapshot,
+): StoreSettings {
+  const enabledCouriers = snapshot.courier_codes
+    .map((courierCode) => `${courierCode}:${snapshot.courier_service}`)
+    .join(",");
+
+  return {
+    store_name: snapshot.shipper_name ?? "",
+    phone_number: snapshot.shipper_phone ?? "",
+    email: snapshot.shipper_email ?? "",
+    organization: snapshot.shipper_organization ?? "",
+    store_address: snapshot.shipper_address ?? "",
+    enabled_couriers: enabledCouriers,
+    origin_postal_code: snapshot.origin_postal_code,
+    origin_latitude: snapshot.origin_latitude,
+    origin_longitude: snapshot.origin_longitude,
+    origin_area_id: snapshot.origin_area_id,
+  };
+}
+
+export function buildBiteshipOrderPayloadFromSnapshot(
+  order: Order,
+  snapshot: BiteshipOrderConfigSnapshot,
+): BiteshipOrderPayload {
+  assertCompleteBiteshipOrderConfigSnapshot(snapshot, order);
+  return buildBiteshipOrderPayload(order, buildSnapshotSettings(snapshot));
+}
+
+export function getStandardBiteshipShipmentOriginAreaIdFromSnapshot(
+  order: Order,
+  snapshot: BiteshipOrderConfigSnapshot,
+): string | null {
+  if (shouldUseInstantBiteshipOrderContract(order)) {
+    return null;
+  }
+
+  return snapshot.origin_area_id?.trim() || null;
+}
+
+export async function readBiteshipOrderConfigSnapshot(
+  adminClient: BiteshipSnapshotAdminClient,
+  orderId: string,
+  options: { allowMissing?: boolean } = {},
+): Promise<BiteshipOrderConfigSnapshot | null> {
+  const { data, error } = await adminClient.rpc(
+    "get_biteship_order_config_snapshot",
+    { p_order_id: orderId },
+  );
+
+  if (error) {
+    throw new BiteshipConfigSnapshotError({
+      code: "biteship_snapshot_create_failed",
+      orderId,
+      detail: "snapshot lookup failed",
+    });
+  }
+
+  const rows = Array.isArray(data) ? data : [];
+  if (rows.length === 0) {
+    if (options.allowMissing) {
+      return null;
+    }
+
+    throw new BiteshipConfigSnapshotError({
+      code: "biteship_snapshot_missing",
+      orderId,
+    });
+  }
+
+  return normalizeBiteshipSnapshotRow(rows[0] as Record<string, unknown>);
+}
+
+export async function ensureBiteshipOrderConfigSnapshot(
+  adminClient: BiteshipSnapshotAdminClient,
+  order: Order,
+): Promise<BiteshipOrderConfigSnapshot> {
+  const existingSnapshot = await readBiteshipOrderConfigSnapshot(
+    adminClient,
+    order.id,
+    { allowMissing: true },
+  );
+  if (existingSnapshot) {
+    return assertCompleteBiteshipOrderConfigSnapshot(existingSnapshot, order);
+  }
+
+  try {
+    const entries = await loadBiteshipSnapshotRuntimeConfig(adminClient);
+
+    const selectedCourierCode = order.courier_code?.trim().toLowerCase();
+    const selectedCourierService = order.courier_service?.trim().toLowerCase();
+    if (!selectedCourierCode) {
+      throw new Error("Missing courier_code on order");
+    }
+    if (!selectedCourierService) {
+      throw new Error("Missing courier_service on order");
+    }
+
+    const snapshotSettings: StoreSettings = {
+      store_name: getRuntimeConfigString(entries, CONFIG_KEYS.shopShipperName),
+      phone_number: getRuntimeConfigString(entries, CONFIG_KEYS.shopShipperPhone),
+      email: getRuntimeConfigString(entries, CONFIG_KEYS.shopShipperEmail),
+      organization: getRuntimeConfigString(entries, CONFIG_KEYS.shopOrganization),
+      store_address: getRuntimeConfigString(entries, CONFIG_KEYS.shopAddress),
+      enabled_couriers: getRuntimeConfigTextArray(
+        entries,
+        CONFIG_KEYS.biteshipEnabledCouriers,
+      ).join(","),
+      origin_postal_code: getRuntimeConfigString(
+        entries,
+        CONFIG_KEYS.biteshipOriginPostalCode,
+      ),
+      origin_area_id: getRuntimeConfigString(
+        entries,
+        CONFIG_KEYS.biteshipOriginAreaId,
+      ),
+      origin_latitude: getRuntimeConfigCoordinate(
+        entries,
+        CONFIG_KEYS.biteshipOriginLatitude,
+        -90,
+        90,
+      ),
+      origin_longitude: getRuntimeConfigCoordinate(
+        entries,
+        CONFIG_KEYS.biteshipOriginLongitude,
+        -180,
+        180,
+      ),
+    };
+
+    assertCompleteStoreSettings(snapshotSettings);
+    if (!snapshotSettings.origin_area_id) {
+      throw new Error("origin_area_id is required");
+    }
+    if (
+      snapshotSettings.origin_latitude === null ||
+      snapshotSettings.origin_longitude === null
+    ) {
+      throw new Error("origin coordinates are required");
+    }
+    if (
+      !isCourierServiceEnabled(
+        snapshotSettings,
+        selectedCourierCode,
+        selectedCourierService,
+      )
+    ) {
+      throw new Error(
+        `Disabled courier service: ${selectedCourierCode}:${selectedCourierService}`,
+      );
+    }
+
+    const { data, error } = await adminClient.rpc(
+      "create_biteship_order_config_snapshot",
+      {
+        p_order_id: order.id,
+        p_shipment_id: null,
+        p_origin_area_id: snapshotSettings.origin_area_id,
+        p_origin_postal_code: snapshotSettings.origin_postal_code,
+        p_origin_latitude: snapshotSettings.origin_latitude,
+        p_origin_longitude: snapshotSettings.origin_longitude,
+        p_courier_codes: [selectedCourierCode],
+        p_courier_service: selectedCourierService,
+        p_shipper_name: snapshotSettings.store_name,
+        p_shipper_phone: snapshotSettings.phone_number,
+        p_shipper_email: snapshotSettings.email,
+        p_shipper_address: snapshotSettings.store_address,
+        p_shipper_organization: snapshotSettings.organization,
+        p_config_version_ids: buildSnapshotConfigVersionMetadata(entries),
+        p_snapshot_source: "webhook_side_effects",
+        p_created_by: null,
+      },
+    );
+
+    if (error) {
+      throw new Error("snapshot RPC failed");
+    }
+
+    const rows = Array.isArray(data) ? data : [];
+    if (rows.length === 0) {
+      throw new Error("snapshot RPC returned no rows");
+    }
+
+    return assertCompleteBiteshipOrderConfigSnapshot(
+      normalizeBiteshipSnapshotRow(rows[0] as Record<string, unknown>),
+      order,
+    );
+  } catch (error) {
+    if (isBiteshipConfigSnapshotError(error)) {
+      throw error;
+    }
+
+    const detail = error instanceof Error ? error.message : "configuration unavailable";
+    throw new BiteshipConfigSnapshotError({
+      code: "biteship_snapshot_create_failed",
+      orderId: order.id,
+      detail,
+    });
+  }
 }
 
 export function assertCompleteStoreSettings(settings: StoreSettings): void {
@@ -730,10 +1292,12 @@ export function buildBiteshipOrderPayload(
 export const createBiteshipOrder = async (
   order: Order,
   apiKey: string,
+  snapshot?: BiteshipOrderConfigSnapshot,
 ): Promise<BiteshipOrderResponse> => {
   const BITESHIP_BASE_URL = "https://api.biteship.com/v1";
-  const settings = await getStoreSettings();
-  const payload = buildBiteshipOrderPayload(order, settings);
+  const payload = snapshot
+    ? buildBiteshipOrderPayloadFromSnapshot(order, snapshot)
+    : buildBiteshipOrderPayload(order, await getStoreSettings());
 
   console.log(`[biteship] Creating order for order ${order.id}`);
 

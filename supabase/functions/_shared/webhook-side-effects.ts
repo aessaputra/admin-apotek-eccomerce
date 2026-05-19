@@ -1,8 +1,12 @@
 import {
   createBiteshipOrder,
-  getStandardBiteshipShipmentOriginAreaId,
-  getStoreSettings,
+  ensureBiteshipOrderConfigSnapshot,
+  getStandardBiteshipShipmentOriginAreaIdFromSnapshot,
+  isBiteshipConfigSnapshotError,
   persistBiteshipShipment,
+  readBiteshipOrderConfigSnapshot,
+  type BiteshipConfigSnapshotErrorCode,
+  type BiteshipOrderConfigSnapshot,
 } from "./biteship.ts";
 import { fetchOrderShippingAddress } from "./biteship-order-helpers.ts";
 import { getOrderAggregateById } from "./order-aggregate.ts";
@@ -66,6 +70,13 @@ function sleep(ms: number): Promise<void> {
 function classifySideEffectError(
   error: unknown,
 ): SideEffectErrorClassification {
+  if (isBiteshipConfigSnapshotError(error)) {
+    return {
+      code: error.code,
+      permanent: false,
+    };
+  }
+
   const message = error instanceof Error ? error.message : String(error);
   const normalizedMessage = message.toLowerCase();
 
@@ -86,6 +97,45 @@ function classifySideEffectError(
   return {
     code: permanent ? "permanent_validation_failure" : "transient_failure",
     permanent,
+  };
+}
+
+function getBiteshipSnapshotErrorDetails(error: unknown): {
+  message: string;
+  code: BiteshipConfigSnapshotErrorCode;
+} {
+  if (isBiteshipConfigSnapshotError(error)) {
+    return {
+      message: error.message,
+      code: error.code,
+    };
+  }
+
+  const message = error instanceof Error
+    ? error.message
+    : "Biteship config snapshot unavailable";
+  const normalizedMessage = message.toLowerCase();
+
+  if (normalizedMessage.includes("snapshot") && normalizedMessage.includes("missing")) {
+    return {
+      message,
+      code: "biteship_snapshot_missing",
+    };
+  }
+
+  if (
+    normalizedMessage.includes("snapshot") &&
+    (normalizedMessage.includes("incomplete") || normalizedMessage.includes("partial"))
+  ) {
+    return {
+      message,
+      code: "biteship_snapshot_incomplete",
+    };
+  }
+
+  return {
+    message,
+    code: "biteship_snapshot_create_failed",
   };
 }
 
@@ -256,6 +306,15 @@ export async function ensureSettlementSideEffectsQueued(
     return false;
   }
 
+  let snapshotError: { message: string; code: BiteshipConfigSnapshotErrorCode } | null = null;
+  if (nextSideEffects.needsBiteship) {
+    try {
+      await ensureBiteshipOrderConfigSnapshot(adminClient, order);
+    } catch (error) {
+      snapshotError = getBiteshipSnapshotErrorDetails(error);
+    }
+  }
+
   if (!existingSideEffectTask) {
     await saveSideEffectTask(
       adminClient,
@@ -263,7 +322,13 @@ export async function ensureSettlementSideEffectsQueued(
       nextSideEffects.needsCartCleanup,
       nextSideEffects.needsStock,
       nextSideEffects.needsBiteship,
+      snapshotError?.message ?? null,
       null,
+      null,
+      null,
+      null,
+      snapshotError?.code ?? null,
+      false,
     );
   } else {
     await saveSideEffectTask(
@@ -272,12 +337,12 @@ export async function ensureSettlementSideEffectsQueued(
       nextSideEffects.needsCartCleanup,
       nextSideEffects.needsStock,
       nextSideEffects.needsBiteship,
-      null,
+      snapshotError?.message ?? null,
       existingSideEffectTask.pending_biteship_order_id ?? null,
       existingSideEffectTask.pending_tracking_id ?? null,
       existingSideEffectTask.pending_waybill_number ?? null,
       null,
-      null,
+      snapshotError?.code ?? null,
       false,
     );
   }
@@ -665,17 +730,33 @@ export async function processWebhookSideEffectTask(
     }
 
     const biteshipKey = Deno.env.get("BITESHIP_API_KEY");
+    let biteshipSnapshot: BiteshipOrderConfigSnapshot | null = null;
 
-    if (needsBiteship && pendingBiteshipOrderId) {
+    if (needsBiteship) {
       try {
-        const settings = await getStoreSettings();
+        biteshipSnapshot = await readBiteshipOrderConfigSnapshot(
+          adminClient,
+          orderId,
+        );
+      } catch (snapshotReadError: unknown) {
+        const snapshotError = getBiteshipSnapshotErrorDetails(snapshotReadError);
+        lastError = snapshotError.message;
+        lastErrorCode = snapshotError.code;
+      }
+    }
+
+    if (needsBiteship && biteshipSnapshot && pendingBiteshipOrderId) {
+      try {
         await persistBiteshipShipment(adminClient, {
           orderId,
           biteshipOrderId: pendingBiteshipOrderId,
           trackingId: pendingTrackingId,
           waybillNumber: pendingWaybillNumber,
           actorType: "system",
-          originAreaId: getStandardBiteshipShipmentOriginAreaId(order, settings),
+          originAreaId: getStandardBiteshipShipmentOriginAreaIdFromSnapshot(
+            order,
+            biteshipSnapshot,
+          ),
           metadata: {
             source: "process_webhook_side_effects_pending_task",
           },
@@ -690,7 +771,7 @@ export async function processWebhookSideEffectTask(
       }
     }
 
-    if (needsBiteship && !order.biteship_order_id && biteshipKey) {
+    if (needsBiteship && biteshipSnapshot && !order.biteship_order_id && biteshipKey) {
       await renewSideEffectTaskLease(adminClient, orderId, leaseOwner);
       let biteshipResponse: BiteshipOrderResponse | null = null;
 
@@ -698,7 +779,7 @@ export async function processWebhookSideEffectTask(
         try {
           await renewSideEffectTaskLease(adminClient, orderId, leaseOwner);
           biteshipResponse = (await withTimeout(
-            createBiteshipOrder(order, biteshipKey),
+            createBiteshipOrder(order, biteshipKey, biteshipSnapshot),
             BITESHIP_CALL_TIMEOUT_MS,
             "Biteship request timeout",
           )) as BiteshipOrderResponse;
@@ -739,14 +820,16 @@ export async function processWebhookSideEffectTask(
         );
 
         try {
-          const settings = await getStoreSettings();
           await persistBiteshipShipment(adminClient, {
             orderId,
             biteshipOrderId: biteshipResponse.id,
             trackingId: biteshipResponse.courier?.tracking_id || null,
             waybillNumber: biteshipResponse.courier?.waybill_id || null,
             actorType: "system",
-            originAreaId: getStandardBiteshipShipmentOriginAreaId(order, settings),
+            originAreaId: getStandardBiteshipShipmentOriginAreaIdFromSnapshot(
+              order,
+              biteshipSnapshot,
+            ),
             metadata: {
               source: "process_webhook_side_effects",
               tracking_id: biteshipResponse.courier?.tracking_id || null,

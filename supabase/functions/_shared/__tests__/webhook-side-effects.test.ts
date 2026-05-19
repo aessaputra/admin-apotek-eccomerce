@@ -1,8 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fetchOrderShippingAddress } from "../biteship-order-helpers.ts";
+import {
+  createBiteshipOrder,
+  ensureBiteshipOrderConfigSnapshot,
+  readBiteshipOrderConfigSnapshot,
+  type BiteshipOrderConfigSnapshot,
+} from "../biteship.ts";
 import { getOrderAggregateById } from "../order-aggregate.ts";
-import { processWebhookSideEffectTask, type SideEffectTask } from "../webhook-side-effects.ts";
+import {
+  ensureSettlementSideEffectsQueued,
+  processWebhookSideEffectTask,
+  type SideEffectTask,
+} from "../webhook-side-effects.ts";
 
 vi.mock("../biteship-order-helpers.ts", () => ({
   fetchOrderShippingAddress: vi.fn(),
@@ -10,9 +20,13 @@ vi.mock("../biteship-order-helpers.ts", () => ({
 
 vi.mock("../biteship.ts", () => ({
   createBiteshipOrder: vi.fn(),
+  ensureBiteshipOrderConfigSnapshot: vi.fn(),
+  getStandardBiteshipShipmentOriginAreaIdFromSnapshot: vi.fn(() => "SNAPSHOT-AREA-ID"),
   getStandardBiteshipShipmentOriginAreaId: vi.fn(),
   getStoreSettings: vi.fn(),
+  isBiteshipConfigSnapshotError: vi.fn(() => false),
   persistBiteshipShipment: vi.fn(),
+  readBiteshipOrderConfigSnapshot: vi.fn(),
 }));
 
 vi.mock("../order-aggregate.ts", () => ({
@@ -42,6 +56,69 @@ type QueryRecord = {
 
 const orderId = "order-selected-cleanup";
 const leaseOwner = "lease-selected-cleanup";
+
+const completeSnapshot: BiteshipOrderConfigSnapshot = {
+  id: "snapshot-1",
+  order_id: orderId,
+  shipment_id: null,
+  provider: "biteship",
+  origin_area_id: "SNAPSHOT-AREA-ID",
+  origin_postal_code: "54321",
+  origin_latitude: -6.311111,
+  origin_longitude: 106.911111,
+  courier_codes: ["jne"],
+  courier_service: "reg",
+  shipper_name: "Snapshot Sender",
+  shipper_phone: "0899999999",
+  shipper_email: "snapshot@example.com",
+  shipper_address: "Jl. Snapshot No. 9",
+  shipper_organization: "Snapshot Pharmacy",
+  config_version_ids: {
+    "biteship.origin_postal_code": {
+      version_id: "version-origin-postal",
+      version_number: 4,
+    },
+    "biteship.origin_area_id": {
+      version_id: "version-origin-area",
+      version_number: 5,
+    },
+    "biteship.origin_latitude": {
+      version_id: "version-origin-latitude",
+      version_number: 6,
+    },
+    "biteship.origin_longitude": {
+      version_id: "version-origin-longitude",
+      version_number: 7,
+    },
+    "biteship.enabled_couriers": {
+      version_id: "version-enabled-couriers",
+      version_number: 2,
+    },
+    "shop.shipper_name": {
+      version_id: "version-shipper-name",
+      version_number: 3,
+    },
+    "shop.shipper_phone": {
+      version_id: "version-shipper-phone",
+      version_number: 3,
+    },
+    "shop.shipper_email": {
+      version_id: "version-shipper-email",
+      version_number: 3,
+    },
+    "shop.address": {
+      version_id: "version-shop-address",
+      version_number: 3,
+    },
+    "shop.organization": {
+      version_id: "version-shop-organization",
+      version_number: 3,
+    },
+  },
+  snapshot_source: "webhook_side_effects",
+  created_by: null,
+  created_at: "2026-05-18T00:00:00.000Z",
+};
 
 function createTask(overrides: Partial<SideEffectTask> = {}): SideEffectTask {
   return {
@@ -168,6 +245,14 @@ class MockAdminClient {
       return Promise.resolve({ data: null, error: null });
     }
 
+    if (record.table === "webhook_side_effect_tasks" && record.action === "upsert") {
+      if (record.payload && typeof record.payload === "object" && "needs_cart_cleanup" in record.payload) {
+        this.finalTaskUpdates.push(record.payload);
+      }
+
+      return Promise.resolve({ data: null, error: null });
+    }
+
     if (record.table === "webhook_side_effect_tasks" && record.action === "delete") {
       this.completedTaskDeletes.push(record);
       return Promise.resolve({ data: null, error: null });
@@ -223,6 +308,132 @@ describe("processWebhookSideEffectTask cart cleanup", () => {
       order_items: [],
     });
     vi.mocked(fetchOrderShippingAddress).mockResolvedValue(null);
+    vi.mocked(ensureBiteshipOrderConfigSnapshot).mockResolvedValue(completeSnapshot);
+    vi.mocked(readBiteshipOrderConfigSnapshot).mockResolvedValue(completeSnapshot);
+  });
+
+  it("creates a Biteship config snapshot before queueing settlement fulfillment", async () => {
+    const adminClient = new MockAdminClient(createTask({
+      needs_cart_cleanup: false,
+      needs_stock: false,
+      needs_biteship: false,
+    }));
+    vi.mocked(getOrderAggregateById).mockResolvedValue({
+      id: orderId,
+      user_id: "user-1",
+      status: "awaiting_shipment",
+      payment_status: "settlement",
+      total_amount: 100_000,
+      courier_code: "jne",
+      courier_service: "reg",
+      biteship_order_id: null,
+      order_items: [],
+    });
+
+    const shouldRunFulfillment = await ensureSettlementSideEffectsQueued(
+      adminClient,
+      orderId,
+      "settlement",
+    );
+
+    expect(shouldRunFulfillment).toBe(true);
+    expect(ensureBiteshipOrderConfigSnapshot).toHaveBeenCalledWith(
+      adminClient,
+      expect.objectContaining({ id: orderId, courier_code: "jne" }),
+    );
+    expect(adminClient.finalTaskUpdates[0]).toMatchObject({
+      needs_biteship: true,
+      last_error: null,
+    });
+  });
+
+  it("blocks Biteship creation retryably when the required snapshot is missing", async () => {
+    vi.stubGlobal("Deno", {
+      env: {
+        get: vi.fn((key: string) => key === "BITESHIP_API_KEY" ? "placeholder-biteship-key" : undefined),
+      },
+    });
+    vi.mocked(readBiteshipOrderConfigSnapshot).mockRejectedValue(
+      new Error("Biteship config snapshot missing for order order-selected-cleanup"),
+    );
+    const adminClient = new MockAdminClient(createTask({
+      needs_cart_cleanup: false,
+      needs_stock: false,
+      needs_biteship: true,
+    }));
+    vi.mocked(getOrderAggregateById).mockResolvedValue({
+      id: orderId,
+      user_id: "user-1",
+      status: "awaiting_shipment",
+      payment_status: "settlement",
+      total_amount: 100_000,
+      courier_code: "jne",
+      courier_service: "reg",
+      biteship_order_id: null,
+      order_items: [],
+    });
+
+    const result = await processWebhookSideEffectTask(adminClient, orderId);
+
+    expect(result).toMatchObject({
+      processed: true,
+      needsRetry: true,
+    });
+    expect(result.message).toContain("Biteship config snapshot missing");
+    expect(createBiteshipOrder).not.toHaveBeenCalled();
+    expect(adminClient.finalTaskUpdates[0]).toMatchObject({
+      needs_biteship: true,
+      last_error_code: "biteship_snapshot_missing",
+      failed_permanently_at: null,
+    });
+  });
+
+  it("passes the stored snapshot into Biteship creation and shipment persistence", async () => {
+    vi.stubGlobal("Deno", {
+      env: {
+        get: vi.fn((key: string) => key === "BITESHIP_API_KEY" ? "placeholder-biteship-key" : undefined),
+      },
+    });
+    vi.mocked(createBiteshipOrder).mockResolvedValue({
+      success: true,
+      id: "biteship-order-1",
+      status: "confirmed",
+      courier: {
+        tracking_id: "tracking-1",
+        waybill_id: "waybill-1",
+        company: "jne",
+        type: "reg",
+      },
+    });
+    const adminClient = new MockAdminClient(createTask({
+      needs_cart_cleanup: false,
+      needs_stock: false,
+      needs_biteship: true,
+    }));
+    vi.mocked(getOrderAggregateById).mockResolvedValue({
+      id: orderId,
+      user_id: "user-1",
+      status: "awaiting_shipment",
+      payment_status: "settlement",
+      total_amount: 100_000,
+      courier_code: "jne",
+      courier_service: "reg",
+      biteship_order_id: null,
+      order_items: [],
+    });
+
+    const result = await processWebhookSideEffectTask(adminClient, orderId);
+
+    expect(result).toEqual({
+      processed: true,
+      needsRetry: false,
+      message: "Fulfillment side effects processed",
+    });
+    expect(createBiteshipOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ id: orderId }),
+      "placeholder-biteship-key",
+      completeSnapshot,
+    );
   });
 
   it("deletes only selected order-linked cart item IDs and leaves unselected IDs untouched", async () => {

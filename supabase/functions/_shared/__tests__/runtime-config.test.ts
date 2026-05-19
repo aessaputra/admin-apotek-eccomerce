@@ -109,6 +109,19 @@ async function captureRuntimeConfigError(
 }
 
 describe("runtime config log-safe helpers", () => {
+  it("defines typed runtime keys for all non-secret Biteship snapshot origin fields", () => {
+    expect(Object.values(CONFIG_KEYS)).toEqual(
+      expect.arrayContaining([
+        "biteship.origin_area_id",
+        "biteship.origin_latitude",
+        "biteship.origin_longitude",
+        CONFIG_KEYS.biteshipOriginPostalCode,
+        CONFIG_KEYS.biteshipEnabledCouriers,
+      ]),
+    );
+    expect(Object.values(CONFIG_KEYS)).toContain(CONFIG_KEYS.biteshipApiKey);
+  });
+
   it("masks and fingerprints values without exposing plaintext", async () => {
     const plaintext = "runtime-secret-sentinel-value";
     const maskedValue = maskRuntimeConfigValue(plaintext);
