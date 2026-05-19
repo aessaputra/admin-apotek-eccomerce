@@ -7,8 +7,10 @@ import {
 import {
   buildBiteshipOrderPayloadFromSnapshot,
   buildBiteshipOrderPayload,
+  createBiteshipOrder,
   ensureBiteshipOrderConfigSnapshot,
   persistBiteshipShipment,
+  resolveBiteshipApiKeyFromRuntimeConfig,
   type BiteshipOrderConfigSnapshot,
   type StoreSettings,
 } from "../biteship.ts";
@@ -568,5 +570,83 @@ describe("persistBiteshipShipment", () => {
 
     expect(upsert).toHaveBeenCalledTimes(1);
     expect(insert).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Biteship runtime API key", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("loads the Biteship API key through runtime config without using env fallback", async () => {
+    const apiKeySentinel = "runtime-biteship-key-sentinel";
+    const adminClient = {
+      rpc: vi.fn(async (name: string, args: Record<string, unknown>) => {
+        expect(name).toBe("get_runtime_integration_config_versions");
+        expect(args).toEqual({
+          p_key_names: [CONFIG_KEYS.biteshipApiKey],
+          p_version_numbers: {},
+          p_include_grace: false,
+        });
+        return {
+          data: [createRuntimeConfigRow(
+            CONFIG_KEYS.biteshipApiKey,
+            apiKeySentinel,
+            3,
+            "secret",
+          )],
+          error: null,
+        };
+      }),
+    };
+    const env = { get: vi.fn(() => "env-biteship-key-must-not-be-used") };
+
+    const apiKey = await resolveBiteshipApiKeyFromRuntimeConfig(adminClient, env);
+
+    expect(apiKey).toBe(apiKeySentinel);
+    expect(env.get).not.toHaveBeenCalled();
+  });
+
+  it("fails closed with a safe error when the runtime Biteship API key is missing", async () => {
+    const adminClient = {
+      rpc: vi.fn(async () => ({ data: [], error: null })),
+    };
+    const env = { get: vi.fn(() => "env-biteship-key-must-not-be-used") };
+
+    await expect(
+      resolveBiteshipApiKeyFromRuntimeConfig(adminClient, env),
+    ).rejects.toThrow("Biteship runtime config unavailable");
+    expect(env.get).not.toHaveBeenCalled();
+  });
+
+  it("authorizes order creation with the runtime API key without storing it in the snapshot payload", async () => {
+    const apiKeySentinel = "runtime-biteship-key-sentinel";
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      expect(init?.headers).toMatchObject({
+        Authorization: `biteship_test.${apiKeySentinel}`,
+      });
+      expect(String(init?.body)).not.toContain(apiKeySentinel);
+      expect(String(init?.body)).toContain("Snapshot Sender");
+      expect(String(init?.body)).not.toContain("api_key");
+      return new Response(JSON.stringify({
+        success: true,
+        id: "biteship-order-1",
+        status: "confirmed",
+        courier: {
+          tracking_id: "tracking-1",
+          waybill_id: "waybill-1",
+          company: "jne",
+          type: "reg",
+        },
+      }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      createBiteshipOrder(baseOrder, apiKeySentinel, baseSnapshot),
+    ).resolves.toMatchObject({ id: "biteship-order-1" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

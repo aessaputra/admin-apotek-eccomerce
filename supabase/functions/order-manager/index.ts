@@ -31,6 +31,10 @@ import {
   saveSideEffectTask,
   triggerWebhookSideEffectProcessor,
 } from "../_shared/webhook-side-effects.ts";
+import {
+  getBiteshipAuthorizationHeader,
+  resolveBiteshipApiKeyFromRuntimeConfig,
+} from "../_shared/biteship.ts";
 
 type TransitionPayload = {
   to: string;
@@ -114,12 +118,6 @@ function canApplySyncedStatus(currentStatus: string, nextStatus: string): boolea
   }
 
   return nextRank >= currentRank;
-}
-
-function getBiteshipAuthorizationHeader(apiKey: string): string {
-  return apiKey.startsWith("biteship_live.") || apiKey.startsWith("biteship_test.")
-    ? apiKey
-    : `biteship_test.${apiKey}`;
 }
 
 function normalizeWaybillNumber(value: unknown): string | null {
@@ -857,12 +855,23 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const biteshipKey = Deno.env.get("BITESHIP_API_KEY");
-      if (!biteshipKey) {
-        throw new Error("Missing BITESHIP_API_KEY");
-      }
+      let authHeader: string;
+      try {
+        const biteshipKey = await resolveBiteshipApiKeyFromRuntimeConfig(adminClient);
+        authHeader = getBiteshipAuthorizationHeader(biteshipKey);
+      } catch (configError: unknown) {
+        if (configError instanceof Error && configError.name === "BiteshipRuntimeConfigError") {
+          return new Response(
+            JSON.stringify({ error: "Biteship runtime config unavailable" }),
+            {
+              status: 503,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
 
-      const authHeader = getBiteshipAuthorizationHeader(biteshipKey);
+        throw configError;
+      }
       let trackingId = order.biteship_tracking_id ?? null;
 
       if (!trackingId) {

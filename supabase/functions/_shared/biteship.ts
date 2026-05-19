@@ -5,9 +5,11 @@ import { buildOrderEndpoint } from "./biteship-public-tracking.ts";
 import { getPersistedBiteshipShipmentStatus } from "./order-status.ts";
 import {
   CONFIG_KEYS,
+  RuntimeConfigError,
   createRuntimeConfigProvider,
   type RuntimeConfigAdminClient,
   type RuntimeConfigEntry,
+  type RuntimeConfigEnvironment,
   type RuntimeConfigKey,
 } from "./runtime-config.ts";
 import type { Order, OrderItem } from "./types.ts";
@@ -121,6 +123,13 @@ export class BiteshipConfigSnapshotError extends Error {
   }
 }
 
+export class BiteshipRuntimeConfigError extends Error {
+  constructor(message = "Biteship runtime config unavailable") {
+    super(message);
+    this.name = "BiteshipRuntimeConfigError";
+  }
+}
+
 export interface BiteshipOrderConfigSnapshot {
   id: string;
   order_id: string;
@@ -227,6 +236,40 @@ export function isBiteshipConfigSnapshotError(
   error: unknown,
 ): error is BiteshipConfigSnapshotError {
   return error instanceof BiteshipConfigSnapshotError;
+}
+
+export function getBiteshipAuthorizationHeader(apiKey: string): string {
+  return apiKey.startsWith("biteship_live.") || apiKey.startsWith("biteship_test.")
+    ? apiKey
+    : `biteship_test.${apiKey}`;
+}
+
+export async function resolveBiteshipApiKeyFromRuntimeConfig(
+  adminClient: RuntimeConfigAdminClient,
+  _env?: RuntimeConfigEnvironment,
+): Promise<string> {
+  const runtimeConfig = createRuntimeConfigProvider({
+    adminClient,
+    cacheTtlMs: 0,
+    fallback: { enabled: false },
+  });
+
+  try {
+    const apiKeyEntry = await runtimeConfig.getRequiredConfig(
+      CONFIG_KEYS.biteshipApiKey,
+    );
+    if (typeof apiKeyEntry.value !== "string" || !apiKeyEntry.value.trim()) {
+      throw new BiteshipRuntimeConfigError();
+    }
+
+    return apiKeyEntry.value.trim();
+  } catch (error) {
+    if (error instanceof RuntimeConfigError) {
+      throw new BiteshipRuntimeConfigError();
+    }
+
+    throw error;
+  }
 }
 
 function normalizeSnapshotText(value: unknown): string | null {
@@ -1301,11 +1344,7 @@ export const createBiteshipOrder = async (
 
   console.log(`[biteship] Creating order for order ${order.id}`);
 
-  const authPrefix =
-    apiKey.startsWith("biteship_live.") || apiKey.startsWith("biteship_test.")
-      ? ""
-      : "biteship_test.";
-  const authKey = `${authPrefix}${apiKey}`;
+  const authKey = getBiteshipAuthorizationHeader(apiKey);
 
   const response = await fetch(`${BITESHIP_BASE_URL}/orders`, {
     method: "POST",

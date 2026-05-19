@@ -5,6 +5,7 @@ import {
   isBiteshipConfigSnapshotError,
   persistBiteshipShipment,
   readBiteshipOrderConfigSnapshot,
+  resolveBiteshipApiKeyFromRuntimeConfig,
   type BiteshipConfigSnapshotErrorCode,
   type BiteshipOrderConfigSnapshot,
 } from "./biteship.ts";
@@ -729,7 +730,6 @@ export async function processWebhookSideEffectTask(
       needsStock = false;
     }
 
-    const biteshipKey = Deno.env.get("BITESHIP_API_KEY");
     let biteshipSnapshot: BiteshipOrderConfigSnapshot | null = null;
 
     if (needsBiteship) {
@@ -771,11 +771,20 @@ export async function processWebhookSideEffectTask(
       }
     }
 
-    if (needsBiteship && biteshipSnapshot && !order.biteship_order_id && biteshipKey) {
+    if (needsBiteship && biteshipSnapshot && !order.biteship_order_id) {
       await renewSideEffectTaskLease(adminClient, orderId, leaseOwner);
       let biteshipResponse: BiteshipOrderResponse | null = null;
+      let biteshipKey: string;
 
-      for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        biteshipKey = await resolveBiteshipApiKeyFromRuntimeConfig(adminClient);
+      } catch (configError: unknown) {
+        lastError = "Biteship runtime config unavailable";
+        lastErrorCode = "biteship_config_unavailable";
+        biteshipKey = "";
+      }
+
+      for (let attempt = 0; biteshipKey && attempt < 3; attempt += 1) {
         try {
           await renewSideEffectTaskLease(adminClient, orderId, leaseOwner);
           biteshipResponse = (await withTimeout(
@@ -854,10 +863,6 @@ export async function processWebhookSideEffectTask(
           lastErrorCode = "biteship_create_failed";
         }
       }
-    } else if (needsBiteship && !biteshipKey && !lastError) {
-      lastError = "BITESHIP_API_KEY is not configured";
-      lastErrorCode = "biteship_key_missing";
-      permanentFailure = true;
     }
 
     await saveSideEffectTask(

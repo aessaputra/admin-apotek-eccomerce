@@ -1,14 +1,17 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+// @ts-expect-error Deno Edge Runtime resolves npm specifiers at deploy time.
 import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
 import {
   assertCompleteStoreSettings,
   assertStoreSettingsHaveRateOrigin,
   filterRatesByEnabledServices,
   getEnabledCouriers,
+  getBiteshipAuthorizationHeader,
   getRequiredStoreOriginPostalCode,
   persistBiteshipShipment,
   getStoreSettings,
   isCourierServiceEnabled,
+  resolveBiteshipApiKeyFromRuntimeConfig,
   type StoreSettings,
 } from "../_shared/biteship.ts";
 import {
@@ -32,9 +35,6 @@ declare const Deno: {
   };
 };
 
-const BITESHIP_API_KEY = Deno.env.get("BITESHIP_API_KEY");
-if (!BITESHIP_API_KEY)
-  throw new Error("Missing BITESHIP_API_KEY environment variable");
 const BITESHIP_API_URL = "https://api.biteship.com";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -119,6 +119,16 @@ function getLoggablePayload(payload: unknown): unknown {
   } = payload;
 
   return safePayload;
+}
+
+async function resolveBiteshipAuthKey(): Promise<string> {
+  const adminClient = getSupabaseAdminClient();
+  const apiKey = await resolveBiteshipApiKeyFromRuntimeConfig(adminClient);
+  return getBiteshipAuthorizationHeader(apiKey);
+}
+
+function isBiteshipRuntimeConfigError(error: unknown): boolean {
+  return error instanceof Error && error.name === "BiteshipRuntimeConfigError";
 }
 
 function withServerShipperAndOriginFields(
@@ -495,12 +505,22 @@ Deno.serve(async (req: Request) => {
 
       const endpoint = "/v1/rates/couriers";
       const biteshipUrl = `${BITESHIP_API_URL}${endpoint}`;
-      const authPrefix =
-        BITESHIP_API_KEY.startsWith("biteship_live.") ||
-        BITESHIP_API_KEY.startsWith("biteship_test.")
-          ? ""
-          : "biteship_test.";
-      const authKey = `${authPrefix}${BITESHIP_API_KEY}`;
+      let authKey: string;
+      try {
+        authKey = await resolveBiteshipAuthKey();
+      } catch (error: unknown) {
+        if (isBiteshipRuntimeConfigError(error)) {
+          return new Response(
+            JSON.stringify({ error: "Biteship runtime config unavailable" }),
+            {
+              status: 503,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
+
+        throw error;
+      }
 
       const successfulRateResponses: RatesExecutionSuccess[] = [];
       const failedRateResponses: RatesExecutionFailure[] = [];
@@ -697,12 +717,22 @@ Deno.serve(async (req: Request) => {
     }
 
     const biteshipUrl = `${BITESHIP_API_URL}${endpoint}`;
-    const authPrefix =
-      BITESHIP_API_KEY.startsWith("biteship_live.") ||
-      BITESHIP_API_KEY.startsWith("biteship_test.")
-        ? ""
-        : "biteship_test.";
-    const authKey = `${authPrefix}${BITESHIP_API_KEY}`;
+    let authKey: string;
+    try {
+      authKey = await resolveBiteshipAuthKey();
+    } catch (error: unknown) {
+      if (isBiteshipRuntimeConfigError(error)) {
+        return new Response(
+          JSON.stringify({ error: "Biteship runtime config unavailable" }),
+          {
+            status: 503,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      throw error;
+    }
 
     const fetchOptions: RequestInit = {
       method: method,

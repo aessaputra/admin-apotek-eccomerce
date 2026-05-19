@@ -391,7 +391,7 @@ Wave 6: Final Verification Wave.
 
   **Commit**: YES | Message: `feat(biteship): snapshot fulfillment config per order` | Files: snapshot migration/helpers/tests
 
-- [ ] 7. Migrate Biteship runtime to request-time Vault-backed config
+- [x] 7. Migrate Biteship runtime to request-time Vault-backed config
 
   **What to do**: Refactor `biteship/index.ts`, `order-manager/index.ts`, `_shared/biteship.ts`, and `_shared/webhook-side-effects.ts` to load `biteship.api_key` from runtime config helper at request/use time. Remove module-load `BITESHIP_API_KEY` dependency in runtime path. Use Biteship snapshots for order creation payloads. Use active config only for new authenticated rate lookup/proxy requests that are not tied to an existing order/shipment snapshot.
   **Must NOT do**: Do not keep final module-level API key reads. Do not use latest active config for old fulfillment snapshots. Do not expose Biteship API key to browser responses.

@@ -95,3 +95,9 @@
 ## 2026-05-19T10:03:15Z Task 5 Review Cleanup
 - Removed unused Task 5 locals flagged by Atlas LSP diagnostics in `midtrans-webhook`, `confirm-midtrans-payment`, and `reconcile-pending-midtrans-payments` without changing Midtrans transition, signature, status verification, amount/currency, or side-effect behavior.
 - Fresh verification after cleanup: LSP diagnostics clear on the three reviewed files, targeted Task 5 tests passed (7 files / 39 tests), and `pnpm build` passed.
+
+## 2026-05-19T10:18:08Z Task 7 Biteship Runtime Config Migration
+- Removed direct `BITESHIP_API_KEY` runtime reads from Biteship proxy, order-manager tracking sync, and webhook side-effect fulfillment paths; `biteship.api_key` now resolves through `_shared/runtime-config.ts` at request/use time with fallback disabled.
+- Added shared Biteship runtime helpers for safe config failure and Authorization header normalization; fulfillment still passes the API key separately from immutable Task 6 order snapshots, and snapshot payload assertions ensure no key is serialized.
+- Added regression coverage for no module-level Biteship API-key guard, runtime RPC lookup of `biteship.api_key`, Biteship Authorization header construction from a placeholder runtime value, safe missing-config failure, source-level provider env removal, and no key leakage in task persistence.
+- Verification passed: targeted Biteship/order-manager-related tests (8 files / 83 tests), LSP diagnostics clear on changed files after adding the Deno npm-specifier annotation, and `pnpm build` passed.

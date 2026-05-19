@@ -5,6 +5,7 @@ import {
   createBiteshipOrder,
   ensureBiteshipOrderConfigSnapshot,
   readBiteshipOrderConfigSnapshot,
+  resolveBiteshipApiKeyFromRuntimeConfig,
   type BiteshipOrderConfigSnapshot,
 } from "../biteship.ts";
 import { getOrderAggregateById } from "../order-aggregate.ts";
@@ -27,6 +28,23 @@ vi.mock("../biteship.ts", () => ({
   isBiteshipConfigSnapshotError: vi.fn(() => false),
   persistBiteshipShipment: vi.fn(),
   readBiteshipOrderConfigSnapshot: vi.fn(),
+  resolveBiteshipApiKeyFromRuntimeConfig: vi.fn(async (adminClient: {
+    rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: QueryError }>;
+  }) => {
+    const { data, error } = await adminClient.rpc(
+      "get_runtime_integration_config_versions",
+      {
+        p_key_names: ["biteship.api_key"],
+        p_version_numbers: {},
+        p_include_grace: false,
+      },
+    );
+    if (error || !Array.isArray(data) || data.length === 0) {
+      throw new Error("Biteship runtime config unavailable");
+    }
+
+    return String((data[0] as { runtime_value?: unknown }).runtime_value ?? "");
+  }),
 }));
 
 vi.mock("../order-aggregate.ts", () => ({
@@ -211,11 +229,13 @@ class MockQueryBuilder {
 
 class MockAdminClient {
   readonly queries: QueryRecord[] = [];
+  readonly rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
   readonly finalTaskUpdates: unknown[] = [];
   readonly completedTaskDeletes: QueryRecord[] = [];
   orderItemRows: OrderItemProvenanceRow[] = [];
   cartItemRows: CartItemOwnershipRow[] = [];
   cartDeleteError: QueryError = null;
+  biteshipApiKey = "runtime-biteship-key-sentinel";
   private readonly task: SideEffectTask;
 
   constructor(task = createTask()) {
@@ -224,6 +244,37 @@ class MockAdminClient {
 
   from(table: string): MockQueryBuilder {
     return new MockQueryBuilder(this, table);
+  }
+
+  async rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: QueryError }> {
+    this.rpcCalls.push({ name, args });
+
+    if (name === "get_runtime_integration_config_versions") {
+      const keyNames = args.p_key_names as string[];
+      if (keyNames.includes("biteship.api_key") && this.biteshipApiKey) {
+        return {
+          data: [{
+            key_name: "biteship.api_key",
+            value_kind: "secret",
+            is_secret: true,
+            is_required: true,
+            is_runtime_required: true,
+            version_id: "version-biteship-api-key",
+            version_number: 2,
+            status: "active",
+            runtime_value: this.biteshipApiKey,
+            masked_value: "runt********************inel",
+            value_fingerprint: "fingerprint",
+            updated_at: "2026-05-19T00:00:00.000Z",
+          }],
+          error: null,
+        };
+      }
+
+      return { data: [], error: null };
+    }
+
+    return { data: null, error: null };
   }
 
   execute(record: QueryRecord, maybeSingle: boolean): Promise<{ data: unknown; error: QueryError }> {
@@ -388,12 +439,7 @@ describe("processWebhookSideEffectTask cart cleanup", () => {
     });
   });
 
-  it("passes the stored snapshot into Biteship creation and shipment persistence", async () => {
-    vi.stubGlobal("Deno", {
-      env: {
-        get: vi.fn((key: string) => key === "BITESHIP_API_KEY" ? "placeholder-biteship-key" : undefined),
-      },
-    });
+  it("passes the runtime API key and stored snapshot into Biteship creation and shipment persistence", async () => {
     vi.mocked(createBiteshipOrder).mockResolvedValue({
       success: true,
       id: "biteship-order-1",
@@ -431,8 +477,60 @@ describe("processWebhookSideEffectTask cart cleanup", () => {
     });
     expect(createBiteshipOrder).toHaveBeenCalledWith(
       expect.objectContaining({ id: orderId }),
-      "placeholder-biteship-key",
+      "runtime-biteship-key-sentinel",
       completeSnapshot,
+    );
+    expect(resolveBiteshipApiKeyFromRuntimeConfig).toHaveBeenCalledWith(
+      adminClient,
+    );
+    expect(adminClient.rpcCalls).toContainEqual({
+      name: "get_runtime_integration_config_versions",
+      args: {
+        p_key_names: ["biteship.api_key"],
+        p_version_numbers: {},
+        p_include_grace: false,
+      },
+    });
+    expect(JSON.stringify(adminClient.finalTaskUpdates)).not.toContain(
+      "runtime-biteship-key-sentinel",
+    );
+  });
+
+  it("fails Biteship fulfillment closed when runtime API key config is missing", async () => {
+    const adminClient = new MockAdminClient(createTask({
+      needs_cart_cleanup: false,
+      needs_stock: false,
+      needs_biteship: true,
+    }));
+    adminClient.biteshipApiKey = "";
+    vi.mocked(getOrderAggregateById).mockResolvedValue({
+      id: orderId,
+      user_id: "user-1",
+      status: "awaiting_shipment",
+      payment_status: "settlement",
+      total_amount: 100_000,
+      courier_code: "jne",
+      courier_service: "reg",
+      biteship_order_id: null,
+      order_items: [],
+    });
+
+    const result = await processWebhookSideEffectTask(adminClient, orderId);
+
+    expect(result).toMatchObject({
+      processed: true,
+      needsRetry: true,
+      message: "Biteship runtime config unavailable",
+    });
+    expect(createBiteshipOrder).not.toHaveBeenCalled();
+    expect(adminClient.finalTaskUpdates[0]).toMatchObject({
+      needs_biteship: true,
+      last_error: "Biteship runtime config unavailable",
+      last_error_code: "biteship_config_unavailable",
+      failed_permanently_at: null,
+    });
+    expect(JSON.stringify(adminClient.finalTaskUpdates)).not.toContain(
+      "runtime-biteship-key-sentinel",
     );
   });
 
