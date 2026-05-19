@@ -1,3 +1,10 @@
+import {
+  CONFIG_KEYS,
+  RuntimeConfigError,
+  createRuntimeConfigProvider,
+  type RuntimeConfigAdminClient,
+} from "../_shared/runtime-config.ts";
+
 type NotificationRecord = {
   id: string;
   user_id: string;
@@ -151,7 +158,7 @@ export interface PushTableClient {
   ) => PromiseLike<{ error: PushQueryError | null }>;
 }
 
-export interface PushAdminClient {
+export interface PushAdminClient extends RuntimeConfigAdminClient {
   from: (table: string) => PushTableClient;
   auth: {
     getUser: (jwt: string) => PromiseLike<PushAuthGetUserResult>;
@@ -229,6 +236,42 @@ function createExpoApiHeaders(
   }
 
   return headers;
+}
+
+async function resolveExpoAccessTokenFromRuntimeConfig(
+  adminClient: RuntimeConfigAdminClient,
+  env: PushEnvironment
+): Promise<string | undefined> {
+  const runtimeConfig = createRuntimeConfigProvider({
+    adminClient,
+    cacheTtlMs: 0,
+    fallback: {
+      enabled: true,
+      env,
+      allowKeys: [CONFIG_KEYS.pushExpoAccessToken],
+    },
+  });
+
+  try {
+    const expoAccessTokenEntry = await runtimeConfig.getOptionalConfig(
+      CONFIG_KEYS.pushExpoAccessToken
+    );
+    const expoAccessToken = expoAccessTokenEntry?.value;
+
+    return typeof expoAccessToken === "string" && expoAccessToken.trim()
+      ? expoAccessToken.trim()
+      : undefined;
+  } catch (error) {
+    if (error instanceof RuntimeConfigError) {
+      console.error(
+        "[push] Expo access token runtime config lookup failed",
+        error.toLogSafe()
+      );
+      return undefined;
+    }
+
+    throw error;
+  }
 }
 
 function isSupportedWebhookPayload(
@@ -661,7 +704,10 @@ async function processReceipts(
     return jsonResponse({ processed: true, receipts: 0 });
   }
 
-  const expoAccessToken = env.get("EXPO_ACCESS_TOKEN")?.trim();
+  const expoAccessToken = await resolveExpoAccessTokenFromRuntimeConfig(
+    adminClient,
+    env
+  );
   const ticketIds = deliveries
     .map((delivery) => delivery.ticket_id)
     .filter((ticketId): ticketId is string => !!ticketId);
@@ -809,7 +855,10 @@ async function sendPushNotification(
     });
   }
 
-  const expoAccessToken = env.get("EXPO_ACCESS_TOKEN")?.trim();
+  const expoAccessToken = await resolveExpoAccessTokenFromRuntimeConfig(
+    adminClient,
+    env
+  );
 
   let expoResponse: ExpoPushResponse;
 

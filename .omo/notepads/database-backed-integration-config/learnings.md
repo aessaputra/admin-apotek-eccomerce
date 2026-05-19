@@ -101,3 +101,8 @@
 - Added shared Biteship runtime helpers for safe config failure and Authorization header normalization; fulfillment still passes the API key separately from immutable Task 6 order snapshots, and snapshot payload assertions ensure no key is serialized.
 - Added regression coverage for no module-level Biteship API-key guard, runtime RPC lookup of `biteship.api_key`, Biteship Authorization header construction from a placeholder runtime value, safe missing-config failure, source-level provider env removal, and no key leakage in task persistence.
 - Verification passed: targeted Biteship/order-manager-related tests (8 files / 83 tests), LSP diagnostics clear on changed files after adding the Deno npm-specifier annotation, and `pnpm build` passed.
+
+## 2026-05-19T11:00:00Z Task 8 Push Runtime Config Migration
+- Push send and receipt paths now resolve optional `push.expo_access_token` through `createRuntimeConfigProvider`/`getOptionalConfig` with `CONFIG_KEYS.pushExpoAccessToken`; no direct push handler `EXPO_ACCESS_TOKEN` read remains.
+- Missing runtime Expo token remains optional and produces no Expo `Authorization` header for both send and receipt calls; active DB runtime config wins over explicit env fallback in tests.
+- Added source-shape regression coverage for push provider env removal plus runtime RPC-backed send/receipt authorization coverage using placeholder sentinel tokens only.

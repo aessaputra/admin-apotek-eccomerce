@@ -432,7 +432,7 @@ Wave 6: Final Verification Wave.
 
   **Commit**: YES | Message: `feat(biteship): load api key from runtime config` | Files: Biteship functions/shared helpers/tests
 
-- [ ] 8. Migrate Expo push token to Vault-backed runtime config
+- [x] 8. Migrate Expo push token to Vault-backed runtime config
 
   **What to do**: Update push handler to load optional `push.expo_access_token` from runtime config helper instead of `Deno.env.get('EXPO_ACCESS_TOKEN')`. Keep token optional if existing behavior allows unauthenticated Expo requests; document/test exact missing-token behavior. Ensure send and receipt paths use same runtime source.
   **Must NOT do**: Do not make token required unless tests and config key definition mark it required. Do not log token.

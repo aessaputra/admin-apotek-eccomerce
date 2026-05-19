@@ -6,6 +6,7 @@ import {
   type PushQueryBuilder,
   type PushTableClient,
 } from "../handler.ts";
+import { CONFIG_KEYS, type RuntimeConfigRow } from "../../_shared/runtime-config.ts";
 
 type QueryError = { message: string };
 type QueryResult<T> = { data: T; error: QueryError | null };
@@ -20,6 +21,29 @@ type UpsertRecord = {
   table: string;
   values: Record<string, unknown> | Array<Record<string, unknown>>;
 };
+
+const runtimeExpoAccessToken = "runtime-expo-token-sentinel";
+const fallbackExpoAccessToken = "fallback-expo-token-sentinel";
+
+function createRuntimeConfigRow(
+  overrides: Partial<RuntimeConfigRow> = {},
+): RuntimeConfigRow {
+  return {
+    key_name: CONFIG_KEYS.pushExpoAccessToken,
+    value_kind: "secret",
+    is_secret: true,
+    is_required: false,
+    is_runtime_required: false,
+    version_id: "push-version-active",
+    version_number: 1,
+    status: "active",
+    runtime_value: runtimeExpoAccessToken,
+    masked_value: "runt****************inel",
+    value_fingerprint: "push-token-fingerprint",
+    updated_at: "2026-05-19T00:00:00.000Z",
+    ...overrides,
+  };
+}
 
 type ProfilePushTokenFixture = {
   id: string;
@@ -114,6 +138,8 @@ function createPushClientMock(options?: {
   pendingDeliveries?: PendingDeliveryFixture[];
   authUserId?: string | null;
   authError?: string | null;
+  runtimeExpoAccessToken?: string | null;
+  runtimeConfigError?: string | null;
 }) {
   const updates: UpdateRecord[] = [];
   const upserts: UpsertRecord[] = [];
@@ -135,6 +161,27 @@ function createPushClientMock(options?: {
       data: { user },
       error: null,
     };
+  });
+
+  const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
+    if (name !== "get_runtime_integration_config_versions") {
+      return { data: null, error: { message: `Unexpected RPC ${name}` } };
+    }
+
+    if (options?.runtimeConfigError) {
+      return { data: null, error: { message: options.runtimeConfigError } };
+    }
+
+    const keyNames = args.p_key_names as string[];
+    const configuredToken = options?.runtimeExpoAccessToken;
+    const data =
+      configuredToken !== undefined &&
+      configuredToken !== null &&
+      keyNames.includes(CONFIG_KEYS.pushExpoAccessToken)
+        ? [createRuntimeConfigRow({ runtime_value: configuredToken })]
+        : [];
+
+    return { data, error: null };
   });
 
   const tableClient = (table: string): PushTableClient => ({
@@ -201,12 +248,13 @@ function createPushClientMock(options?: {
 
   const client: PushAdminClient = {
     from: vi.fn(tableClient),
+    rpc,
     auth: {
       getUser: authGetUser,
     },
   };
 
-  return { client, selects, selectQueries, updates, upserts, authGetUser };
+  return { client, selects, selectQueries, updates, upserts, authGetUser, rpc };
 }
 
 function createNotification(overrides?: Partial<Record<string, unknown>>) {
@@ -269,10 +317,11 @@ describe("createPushHandler", () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: "expo-secret",
+      EXPO_ACCESS_TOKEN: fallbackExpoAccessToken,
     });
     const { client, authGetUser, selects, upserts } = createPushClientMock({
       authUserId: "mobile-user-1",
+      runtimeExpoAccessToken,
       tokenRows: [
         {
           id: "token-row-1",
@@ -317,7 +366,7 @@ describe("createPushHandler", () => {
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({
-          Authorization: "Bearer expo-secret",
+          Authorization: `Bearer ${runtimeExpoAccessToken}`,
         }),
       })
     );
@@ -338,13 +387,13 @@ describe("createPushHandler", () => {
         expect.objectContaining({ table: "notification_push_deliveries" }),
       ])
     );
+    expect(env.get).not.toHaveBeenCalledWith("EXPO_ACCESS_TOKEN");
   });
 
   it("rejects test notification requests without a bearer JWT", async () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: "expo-secret",
     });
     const { client, authGetUser } = createPushClientMock();
     const createClientFn = vi.fn(() => client);
@@ -367,7 +416,6 @@ describe("createPushHandler", () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: "expo-secret",
     });
     const { client, authGetUser } = createPushClientMock({
       authError: "invalid jwt",
@@ -390,10 +438,10 @@ describe("createPushHandler", () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: "expo-secret",
     });
     const { client, upserts } = createPushClientMock({
       authUserId: "mobile-user-1",
+      runtimeExpoAccessToken,
       tokenRows: [],
       profileToken: null,
     });
@@ -415,10 +463,10 @@ describe("createPushHandler", () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: "expo-secret",
     });
     const { client, updates, upserts } = createPushClientMock({
       authUserId: "mobile-user-1",
+      runtimeExpoAccessToken,
       tokenRows: [
         {
           id: "token-row-invalid",
@@ -464,7 +512,6 @@ describe("createPushHandler", () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: "expo-secret",
     });
     const createClientFn = vi.fn();
     const fetchFn = vi.fn();
@@ -494,9 +541,9 @@ describe("createPushHandler", () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: "expo-secret",
     });
     const { client, selects, upserts } = createPushClientMock({
+      runtimeExpoAccessToken,
       tokenRows: [
         {
           id: "token-row-1",
@@ -554,7 +601,7 @@ describe("createPushHandler", () => {
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({
-          Authorization: "Bearer expo-secret",
+          Authorization: `Bearer ${runtimeExpoAccessToken}`,
         }),
       })
     );
@@ -584,7 +631,8 @@ describe("createPushHandler", () => {
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
     });
-    const { client } = createPushClientMock({
+    const { client, rpc } = createPushClientMock({
+      runtimeExpoAccessToken: null,
       tokenRows: [
         {
           id: "token-row-1",
@@ -619,15 +667,20 @@ describe("createPushHandler", () => {
     expect(headers.Authorization).toBeUndefined();
     expect(headers.Accept).toBe("application/json");
     expect(headers["Content-Type"]).toBe("application/json");
+    expect(rpc).toHaveBeenCalledWith("get_runtime_integration_config_versions", {
+      p_key_names: [CONFIG_KEYS.pushExpoAccessToken],
+      p_version_numbers: {},
+      p_include_grace: false,
+    });
   });
 
   it("records malformed profile push tokens while still delivering to valid devices", async () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: "expo-secret",
     });
     const { client, updates, upserts } = createPushClientMock({
+      runtimeExpoAccessToken,
       tokenRows: [
         {
           id: "token-row-invalid",
@@ -727,9 +780,9 @@ describe("createPushHandler", () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: "expo-secret",
     });
     const { client, upserts } = createPushClientMock({
+      runtimeExpoAccessToken,
       tokenRows: [
         {
           id: "token-row-1",
@@ -769,9 +822,9 @@ describe("createPushHandler", () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: "expo-secret",
     });
     const { client, upserts } = createPushClientMock({
+      runtimeExpoAccessToken,
       tokenRows: [
         {
           id: "token-row-1",
@@ -826,9 +879,9 @@ describe("createPushHandler", () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: "expo-secret",
     });
     const { client, selects } = createPushClientMock({
+      runtimeExpoAccessToken,
       tokenRows: [],
       profileToken: "ExpoPushToken[legacy-token]",
     });
@@ -867,7 +920,6 @@ describe("createPushHandler", () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: "expo-secret",
     });
     const { client } = createPushClientMock({
       tokenRows: [],
@@ -893,9 +945,9 @@ describe("createPushHandler", () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: "expo-secret",
     });
     const { client, updates } = createPushClientMock({
+      runtimeExpoAccessToken,
       tokenRows: [
         {
           id: "token-row-1",
@@ -984,9 +1036,9 @@ describe("createPushHandler", () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: "expo-secret",
     });
     const { client, selectQueries, updates } = createPushClientMock({
+      runtimeExpoAccessToken,
       pendingDeliveries: [
         {
           notification_id: "notif-1",
@@ -1066,7 +1118,7 @@ describe("createPushHandler", () => {
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({
-          Authorization: "Bearer expo-secret",
+          Authorization: `Bearer ${runtimeExpoAccessToken}`,
         }),
       })
     );
@@ -1114,7 +1166,8 @@ describe("createPushHandler", () => {
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
     });
-    const { client } = createPushClientMock({
+    const { client, rpc } = createPushClientMock({
+      runtimeExpoAccessToken: null,
       pendingDeliveries: [
         {
           notification_id: "notif-1",
@@ -1156,15 +1209,20 @@ describe("createPushHandler", () => {
     expect(headers.Authorization).toBeUndefined();
     expect(headers.Accept).toBe("application/json");
     expect(headers["Content-Type"]).toBe("application/json");
+    expect(rpc).toHaveBeenCalledWith("get_runtime_integration_config_versions", {
+      p_key_names: [CONFIG_KEYS.pushExpoAccessToken],
+      p_version_numbers: {},
+      p_include_grace: false,
+    });
   });
 
   it("does not update deliveries when Expo returns top-level receipt errors", async () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: "expo-secret",
     });
     const { client, updates } = createPushClientMock({
+      runtimeExpoAccessToken,
       pendingDeliveries: [
         {
           notification_id: "notif-1",
@@ -1210,9 +1268,9 @@ describe("createPushHandler", () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: "expo-secret",
     });
     const { client, updates } = createPushClientMock({
+      runtimeExpoAccessToken,
       pendingDeliveries: [
         {
           notification_id: "notif-1",
