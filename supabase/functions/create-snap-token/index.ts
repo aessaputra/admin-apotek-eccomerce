@@ -1,10 +1,34 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+// @ts-expect-error Deno Edge Runtime resolves npm specifiers at deploy time.
 import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
 import { corsHeaders } from "../_shared/cors.ts";
 import { buildSnapPayload } from "../_shared/midtrans.ts";
+import {
+  CONFIG_KEYS,
+  createRuntimeConfigProvider,
+  RuntimeConfigError,
+  type RuntimeConfigEntry,
+} from "../_shared/runtime-config.ts";
 import { getOrderAggregateById } from "../_shared/order-aggregate.ts";
 import { getSupabaseAdminClient } from "../_shared/supabase.ts";
 import type { AuthUser, Order, SnapResponse } from "../_shared/types.ts";
+import {
+  PaymentSessionError,
+  bindMidtransPaymentConfigVersions,
+  getLatestPaymentSession,
+  persistPaymentSession,
+  type SelectedMidtransConfigBinding,
+  waitForAvailableSnapSession,
+} from "./payment-session.ts";
+
+declare const Deno: {
+  env: {
+    get: (key: string) => string | undefined;
+  };
+  serve: (
+    handler: (req: Request) => Response | Promise<Response>,
+  ) => void;
+};
 
 const JSON_HEADERS = { ...corsHeaders, "Content-Type": "application/json" };
 
@@ -47,119 +71,76 @@ type MidtransSnapError = {
   status_message?: string;
 };
 
-type PaymentSessionRow = {
-  midtrans_order_id?: string | null;
-  snap_token?: string | null;
-  redirect_url?: string | null;
-  snap_token_created_at?: string | null;
+type MidtransSnapRuntimeConfig = {
+  serverKey: string;
+  isProduction: boolean;
+  selectedConfig: SelectedMidtransConfigBinding;
 };
 
-async function getLatestPaymentSession(
+async function resolveMidtransSnapRuntimeConfig(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
-  orderId: string,
-): Promise<PaymentSessionRow | null> {
-  const { data, error } = await adminClient
-    .from("payments")
-    .select("midtrans_order_id, snap_token, redirect_url, snap_token_created_at")
-    .eq("order_id", orderId)
-    .order("updated_at", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+): Promise<MidtransSnapRuntimeConfig> {
+  const runtimeConfig = createRuntimeConfigProvider({
+    adminClient,
+    cacheTtlMs: 0,
+  });
 
-  if (error) {
-    throw new HttpError(500, "Failed to look up latest payment session");
+  try {
+    const [serverKeyEntry, isProductionEntry] = await Promise.all([
+      runtimeConfig.getRequiredConfig(CONFIG_KEYS.midtransServerKey),
+      runtimeConfig.getRequiredConfig(CONFIG_KEYS.midtransIsProduction),
+    ]);
+
+    return {
+      serverKey: readRuntimeString(serverKeyEntry),
+      isProduction: readRuntimeBoolean(isProductionEntry),
+      selectedConfig: {
+        serverKeyVersionId: requireRuntimeVersionId(serverKeyEntry),
+        serverKeyVersionNumber: requireRuntimeVersionNumber(serverKeyEntry),
+        isProductionVersionId: requireRuntimeVersionId(isProductionEntry),
+        isProductionVersionNumber: requireRuntimeVersionNumber(isProductionEntry),
+        isProduction: readRuntimeBoolean(isProductionEntry),
+      },
+    };
+  } catch (error) {
+    if (error instanceof RuntimeConfigError) {
+      throw new HttpError(503, "Midtrans runtime config unavailable");
+    }
+
+    throw error;
   }
-
-  return (data as PaymentSessionRow | null) ?? null;
 }
 
-async function waitForAvailableSnapSession(
-  adminClient: ReturnType<typeof getSupabaseAdminClient>,
-  orderId: string,
-  isTokenExpired: (createdAt: string | null | undefined) => boolean,
-): Promise<PaymentSessionRow | null> {
-  const attempts = 6;
-  const delayMs = 500;
-
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const session = await getLatestPaymentSession(adminClient, orderId);
-
-    if (
-      session?.snap_token &&
-      session.redirect_url &&
-      !isTokenExpired(session.snap_token_created_at)
-    ) {
-      return session;
-    }
-
-    if (attempt < attempts - 1) {
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
+function readRuntimeString(entry: RuntimeConfigEntry): string {
+  if (typeof entry.value !== "string" || entry.value.trim() === "") {
+    throw new HttpError(503, "Midtrans runtime config unavailable");
   }
 
-  return null;
+  return entry.value;
 }
 
-async function persistPaymentSession(
-  adminClient: ReturnType<typeof getSupabaseAdminClient>,
-  order: Order,
-  values: {
-    midtransOrderId: string;
-    snapToken?: string;
-    redirectUrl?: string;
-    snapTokenCreatedAt?: string;
-    grossAmount?: number;
-  },
-): Promise<void> {
-  const { data: existingPayment, error: paymentLookupError } = await adminClient
-    .from("payments")
-    .select("id")
-    .eq("order_id", order.id)
-    .order("updated_at", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (paymentLookupError) {
-    throw new HttpError(500, "Failed to look up payment session");
+function readRuntimeBoolean(entry: RuntimeConfigEntry): boolean {
+  if (typeof entry.value !== "boolean") {
+    throw new HttpError(503, "Midtrans runtime config unavailable");
   }
 
-  const payload = {
-    order_id: order.id,
-    user_id: order.user_id ?? null,
-    checkout_idempotency_key: order.checkout_idempotency_key ?? null,
-    midtrans_order_id: values.midtransOrderId,
-    status: order.payment_status,
-    payment_type: order.payment_type ?? null,
-    gross_amount:
-      values.grossAmount ??
-      (order.gross_amount != null ? Number(order.gross_amount) : Number(order.total_amount || 0) + Number(order.shipping_cost || 0)),
-    expiry_time: order.expired_at ?? null,
-    snap_token: values.snapToken ?? order.snap_token ?? null,
-    redirect_url: values.redirectUrl ?? order.snap_redirect_url ?? null,
-    snap_token_created_at:
-      values.snapTokenCreatedAt ?? order.snap_token_created_at ?? null,
-  };
+  return entry.value;
+}
 
-  if (existingPayment?.id) {
-    const { error } = await adminClient
-      .from("payments")
-      .update(payload)
-      .eq("id", existingPayment.id);
-
-    if (error) {
-      throw new HttpError(500, "Failed to update payment session");
-    }
-
-    return;
+function requireRuntimeVersionId(entry: RuntimeConfigEntry): string {
+  if (!entry.versionId) {
+    throw new HttpError(503, "Midtrans runtime config unavailable");
   }
 
-  const { error } = await adminClient.from("payments").insert(payload);
+  return entry.versionId;
+}
 
-  if (error) {
-    throw new HttpError(500, "Failed to create payment session");
+function requireRuntimeVersionNumber(entry: RuntimeConfigEntry): number {
+  if (!entry.versionNumber) {
+    throw new HttpError(503, "Midtrans runtime config unavailable");
   }
+
+  return entry.versionNumber;
 }
 
 Deno.serve(async (req: Request) => {
@@ -253,6 +234,17 @@ Deno.serve(async (req: Request) => {
       order.snap_redirect_url &&
       !isTokenExpired(order.snap_token_created_at)
     ) {
+      const reusableSession = await getLatestPaymentSession(adminClient, order.id);
+      if (!reusableSession?.id || !reusableSession.midtrans_order_id) {
+        throw new HttpError(500, "Failed to resolve reusable payment session");
+      }
+
+      await bindMidtransPaymentConfigVersions(adminClient, {
+        paymentId: reusableSession.id,
+        midtransOrderId: reusableSession.midtrans_order_id,
+        bindingSource: "snap_token_reuse",
+      });
+
       return jsonResponse({
         snap_token: order.snap_token,
         redirect_url: order.snap_redirect_url,
@@ -263,7 +255,7 @@ Deno.serve(async (req: Request) => {
       const { data: idempotentOrder } = await adminClient
         .from("order_read_model")
         .select(
-          "id, user_id, snap_token, snap_redirect_url, snap_token_created_at",
+          "id, user_id, snap_token, snap_redirect_url, snap_token_created_at, midtrans_order_id",
         )
         .eq("checkout_idempotency_key", order.checkout_idempotency_key)
         .eq("user_id", userId)
@@ -278,12 +270,29 @@ Deno.serve(async (req: Request) => {
         idempotentOrder?.snap_redirect_url &&
         !isTokenExpired(idempotentOrder.snap_token_created_at)
       ) {
+        const sourcePaymentSession = await getLatestPaymentSession(
+          adminClient,
+          idempotentOrder.id,
+        );
+
         if (idempotentOrder.id !== order.id) {
+          if (!sourcePaymentSession?.id) {
+            throw new HttpError(500, "Failed to resolve source payment session");
+          }
+
           await persistPaymentSession(adminClient, order, {
             midtransOrderId: order.midtrans_order_id ?? ensureMidtransOrderId(order),
             snapToken: idempotentOrder.snap_token,
             redirectUrl: idempotentOrder.snap_redirect_url,
             snapTokenCreatedAt: idempotentOrder.snap_token_created_at,
+            bindingSource: "snap_token_reuse",
+            sourcePaymentId: sourcePaymentSession.id,
+          });
+        } else if (sourcePaymentSession?.id && sourcePaymentSession.midtrans_order_id) {
+          await bindMidtransPaymentConfigVersions(adminClient, {
+            paymentId: sourcePaymentSession.id,
+            midtransOrderId: sourcePaymentSession.midtrans_order_id,
+            bindingSource: "snap_token_reuse",
           });
         }
 
@@ -319,6 +328,16 @@ Deno.serve(async (req: Request) => {
       );
 
       if (pendingSession?.snap_token && pendingSession.redirect_url) {
+        if (!pendingSession.id || !pendingSession.midtrans_order_id) {
+          throw new HttpError(500, "Failed to resolve reusable payment session");
+        }
+
+        await bindMidtransPaymentConfigVersions(adminClient, {
+          paymentId: pendingSession.id,
+          midtransOrderId: pendingSession.midtrans_order_id,
+          bindingSource: "snap_token_reuse",
+        });
+
         return jsonResponse({
           snap_token: pendingSession.snap_token,
           redirect_url: pendingSession.redirect_url,
@@ -336,6 +355,16 @@ Deno.serve(async (req: Request) => {
         latestPaymentSession.redirect_url &&
         !isTokenExpired(latestPaymentSession.snap_token_created_at)
       ) {
+        if (!latestPaymentSession.id || !latestPaymentSession.midtrans_order_id) {
+          throw new HttpError(500, "Failed to resolve reusable payment session");
+        }
+
+        await bindMidtransPaymentConfigVersions(adminClient, {
+          paymentId: latestPaymentSession.id,
+          midtransOrderId: latestPaymentSession.midtrans_order_id,
+          bindingSource: "snap_token_reuse",
+        });
+
         return jsonResponse({
           snap_token: latestPaymentSession.snap_token,
           redirect_url: latestPaymentSession.redirect_url,
@@ -359,13 +388,8 @@ Deno.serve(async (req: Request) => {
         } as AuthUser,
       );
 
-      const serverKey = Deno.env.get("MIDTRANS_SERVER_KEY");
-      if (!serverKey) {
-        throw new HttpError(500, "Midtrans server key not configured");
-      }
-
-      const isProduction = Deno.env.get("MIDTRANS_IS_PRODUCTION") === "true";
-      const midtransApiUrl = isProduction
+      const midtransConfig = await resolveMidtransSnapRuntimeConfig(adminClient);
+      const midtransApiUrl = midtransConfig.isProduction
         ? "https://app.midtrans.com/snap/v1/transactions"
         : "https://app.sandbox.midtrans.com/snap/v1/transactions";
 
@@ -378,7 +402,7 @@ Deno.serve(async (req: Request) => {
           headers: {
             Accept: "application/json",
             "Content-Type": "application/json",
-            Authorization: `Basic ${btoa(`${serverKey}:`)}`,
+            Authorization: `Basic ${btoa(`${midtransConfig.serverKey}:`)}`,
           },
           body: JSON.stringify(payload),
           signal: AbortSignal.timeout(MIDTRANS_REQUEST_TIMEOUT_MS),
@@ -417,6 +441,8 @@ Deno.serve(async (req: Request) => {
         redirectUrl: midtransData.redirect_url,
         snapTokenCreatedAt: nowIso,
         grossAmount: payload.transaction_details.gross_amount,
+        bindingSource: "snap_token_created",
+        selectedConfig: midtransConfig.selectedConfig,
       });
 
       return jsonResponse({
@@ -440,7 +466,7 @@ Deno.serve(async (req: Request) => {
       }
     }
   } catch (error: unknown) {
-    if (error instanceof HttpError) {
+    if (error instanceof HttpError || error instanceof PaymentSessionError) {
       return jsonResponse({ error: error.message }, error.status);
     }
 
