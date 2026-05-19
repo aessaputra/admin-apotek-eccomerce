@@ -1,0 +1,5 @@
+2026-05-19T10:18:08Z
+Command: pnpm test supabase/functions/_shared/__tests__/biteship-order.test.ts supabase/functions/_shared/__tests__/biteship-runtime-source.test.ts supabase/functions/_shared/__tests__/webhook-side-effects.test.ts supabase/functions/_shared/__tests__/biteship-rates.test.ts supabase/functions/_shared/__tests__/biteship-public-tracking.test.ts supabase/functions/_shared/__tests__/biteship-postal-code.test.ts
+Result: PASS, 6 files / 74 tests.
+Evidence: biteship-runtime-source asserts no direct BITESHIP_API_KEY env reads remain in Biteship runtime paths and no module-level Biteship API-key guard exists before Deno.serve registration.
+Secret safety: placeholder-only test values; no real Biteship key recorded.
