@@ -821,7 +821,8 @@
     "title": "Settings",
     "tabs": {
       "storeProfile": "Store Profile",
-      "shippingSettings": "Shipping Settings"
+      "shippingSettings": "Shipping Settings",
+      "integrationConfig": "Integration Config"
     },
     "fields": {
       "storeName": "Store Name",
@@ -895,6 +896,68 @@
       "interactionHint": "Or click the map or drag the pin to choose a more precise location.",
       "selectResultAria": "Select {{location}}",
       "closeResultsAria": "Close search results"
+    },
+    "integration": {
+      "safeNotice": {
+        "title": "Secrets stay masked",
+        "description": "This page only shows masked secret metadata and non-secret runtime values through the integration gateway."
+      },
+      "sections": {
+        "midtrans": "Midtrans",
+        "biteship": "Biteship",
+        "shopShipper": "Shop and Shipper",
+        "push": "Push",
+        "cors": "CORS",
+        "auditTrail": "Audit Trail"
+      },
+      "fields": {
+        "safeValue": "Safe value",
+        "lastRuntimeRead": "Last runtime read"
+      },
+      "status": {
+        "unknown": "Unknown",
+        "runtimeRequired": "Runtime required"
+      },
+      "summary": {
+        "loading": "Loading integration configuration...",
+        "empty": "No configuration found for this section.",
+        "error": "Integration configuration could not be loaded."
+      },
+      "rotate": {
+        "action": "Rotate secret",
+        "title": "Rotate {{name}}",
+        "submit": "Rotate secret",
+        "success": "Secret rotated safely.",
+        "error": "Secret rotation failed.",
+        "warningTitle": "Plaintext is never shown",
+        "warningDescription": "Paste the new secret, type the confirmation phrase, and record why this rotation is needed.",
+        "secretLabel": "New secret",
+        "confirmationLabel": "Type {{phrase}}",
+        "confirmPhrase": "ROTATE",
+        "reasonLabel": "Rotation reason",
+        "reasonPlaceholder": "Example: scheduled key rotation"
+      },
+      "update": {
+        "action": "Save value",
+        "success": "Configuration updated.",
+        "error": "Configuration update failed.",
+        "valueLabel": "New value for {{key}}",
+        "reasonLabel": "Reason for {{key}}",
+        "reasonPlaceholder": "Reason for this change"
+      },
+      "validation": {
+        "secretRequired": "Enter the new secret.",
+        "confirmationRequired": "Type {{phrase}} to confirm.",
+        "reasonRequired": "Enter a reason.",
+        "jsonInvalid": "Enter valid JSON."
+      },
+      "audit": {
+        "loading": "Loading audit trail...",
+        "empty": "No audit events yet.",
+        "error": "Audit trail could not be loaded.",
+        "oldValue": "Old",
+        "newValue": "New"
+      }
     },
     "noAreasFound": "No areas found",
     "noCouriersFound": "No couriers available",

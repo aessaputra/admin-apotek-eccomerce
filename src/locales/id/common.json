@@ -821,7 +821,8 @@
     "title": "Pengaturan",
     "tabs": {
       "storeProfile": "Profil Toko",
-      "shippingSettings": "Pengaturan Pengiriman"
+      "shippingSettings": "Pengaturan Pengiriman",
+      "integrationConfig": "Konfigurasi Integrasi"
     },
     "fields": {
       "storeName": "Nama Toko",
@@ -895,6 +896,68 @@
       "interactionHint": "Atau klik pada peta atau seret pin untuk memilih lokasi yang lebih presisi.",
       "selectResultAria": "Pilih {{location}}",
       "closeResultsAria": "Tutup hasil pencarian"
+    },
+    "integration": {
+      "safeNotice": {
+        "title": "Secret tetap tersamarkan",
+        "description": "Halaman ini hanya menampilkan metadata secret tersamarkan dan nilai runtime non-secret melalui gateway integrasi."
+      },
+      "sections": {
+        "midtrans": "Midtrans",
+        "biteship": "Biteship",
+        "shopShipper": "Toko dan Pengirim",
+        "push": "Push",
+        "cors": "CORS",
+        "auditTrail": "Jejak Audit"
+      },
+      "fields": {
+        "safeValue": "Nilai aman",
+        "lastRuntimeRead": "Terakhir dibaca runtime"
+      },
+      "status": {
+        "unknown": "Tidak diketahui",
+        "runtimeRequired": "Wajib untuk runtime"
+      },
+      "summary": {
+        "loading": "Memuat konfigurasi integrasi...",
+        "empty": "Belum ada konfigurasi untuk bagian ini.",
+        "error": "Konfigurasi integrasi tidak dapat dimuat."
+      },
+      "rotate": {
+        "action": "Rotasi secret",
+        "title": "Rotasi {{name}}",
+        "submit": "Rotasi secret",
+        "success": "Secret berhasil dirotasi dengan aman.",
+        "error": "Rotasi secret gagal.",
+        "warningTitle": "Plaintext tidak pernah ditampilkan",
+        "warningDescription": "Tempel secret baru, ketik frasa konfirmasi, dan catat alasan rotasi ini diperlukan.",
+        "secretLabel": "Secret baru",
+        "confirmationLabel": "Ketik {{phrase}}",
+        "confirmPhrase": "ROTATE",
+        "reasonLabel": "Alasan rotasi",
+        "reasonPlaceholder": "Contoh: rotasi kunci terjadwal"
+      },
+      "update": {
+        "action": "Simpan nilai",
+        "success": "Konfigurasi diperbarui.",
+        "error": "Pembaruan konfigurasi gagal.",
+        "valueLabel": "Nilai baru untuk {{key}}",
+        "reasonLabel": "Alasan untuk {{key}}",
+        "reasonPlaceholder": "Alasan perubahan ini"
+      },
+      "validation": {
+        "secretRequired": "Masukkan secret baru.",
+        "confirmationRequired": "Ketik {{phrase}} untuk konfirmasi.",
+        "reasonRequired": "Masukkan alasan.",
+        "jsonInvalid": "Masukkan JSON yang valid."
+      },
+      "audit": {
+        "loading": "Memuat jejak audit...",
+        "empty": "Belum ada audit.",
+        "error": "Jejak audit tidak dapat dimuat.",
+        "oldValue": "Lama",
+        "newValue": "Baru"
+      }
     },
     "noAreasFound": "Area tidak ditemukan",
     "noCouriersFound": "Tidak ada kurir tersedia",

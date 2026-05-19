@@ -106,3 +106,14 @@
 - Push send and receipt paths now resolve optional `push.expo_access_token` through `createRuntimeConfigProvider`/`getOptionalConfig` with `CONFIG_KEYS.pushExpoAccessToken`; no direct push handler `EXPO_ACCESS_TOKEN` read remains.
 - Missing runtime Expo token remains optional and produces no Expo `Authorization` header for both send and receipt calls; active DB runtime config wins over explicit env fallback in tests.
 - Added source-shape regression coverage for push provider env removal plus runtime RPC-backed send/receipt authorization coverage using placeholder sentinel tokens only.
+
+## 2026-05-19 Task 9 Settings Integration Config UI
+- Added the admin Settings integration config UI inside the existing Settings route and tab model, preserving Store Profile and Shipping Settings form behavior.
+- Browser code calls only `supabaseClient.functions.invoke("integration-config", { body })` through a typed client wrapper for summary, rotateSecret, updateValue, and audit actions.
+- Summary and audit rendering intentionally uses only masked secret metadata, status/version/update metadata, non-secret values, and masked audit fields; test sentinels in secret/non-rendered metadata stay absent from the DOM.
+- Rotate modal keeps the new secret field blank on open and requires a new secret, the localized `ROTATE` phrase, and a reason before invoking the gateway.
+
+## 2026-05-19 Task 9 Runtime Read Metadata Fix
+- Atlas gap confirmed: Settings integration config rows rendered status/version/update metadata but not the required per-key last runtime read value.
+- Added a UI-only lookup from already-loaded audit rows where `action = 'runtime_read'` and `key_name` exactly matches the summary row; rows without a runtime read render `-`.
+- Tests now include a safe runtime-read audit event and assert the page body never contains the plaintext sentinel, covering fragmented text nodes as well as exact text queries.

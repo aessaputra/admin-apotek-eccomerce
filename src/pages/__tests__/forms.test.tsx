@@ -1,6 +1,6 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Settings from "../settings";
 import { Profile } from "../profile";
@@ -44,6 +44,7 @@ const mocks = vi.hoisted(() => {
   }> = [];
   const productImagesInsert = vi.fn(() => Promise.resolve({ error: null }));
   const mfaListFactors = vi.fn(() => Promise.resolve({ data: { all: [] }, error: null }));
+  const functionsInvoke = vi.fn();
   const supabaseFrom = vi.fn((table: string) => {
     if (table === "admin_products") {
       const query = {
@@ -84,6 +85,7 @@ const mocks = vi.hoisted(() => {
     productQueries,
     productImagesInsert,
     mfaListFactors,
+    functionsInvoke,
     supabaseFrom,
   };
 });
@@ -165,7 +167,7 @@ vi.mock("antd", () => {
   };
 
   const Form = Object.assign(FormComponent, {
-    Item: ({ children, label }: { children: React.ReactNode; label?: React.ReactNode }) => <div><div>{label}</div>{children}</div>,
+    Item: ({ children, label, help }: { children: React.ReactNode; label?: React.ReactNode; help?: React.ReactNode }) => <div><div>{label}</div>{children}{help ? <div>{help}</div> : null}</div>,
     useForm: () => [
       {
         resetFields: mocks.resetFields,
@@ -179,25 +181,34 @@ vi.mock("antd", () => {
 
   const Input = Object.assign(
     ({
+      "aria-label": ariaLabel,
       onBlur,
       onChange,
       placeholder,
       readOnly,
+      value,
+      type,
     }: {
+      "aria-label"?: string;
       onBlur?: (event: React.FocusEvent<HTMLInputElement>) => void;
       onChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
       placeholder?: string;
       readOnly?: boolean;
+      value?: string;
+      type?: string;
     }) => (
       <input
-        aria-label={placeholder ?? "input"}
+        aria-label={ariaLabel ?? placeholder ?? "input"}
         onBlur={onBlur}
         onChange={onChange}
         readOnly={readOnly}
+        value={value}
+        type={type}
       />
     ),
     {
       TextArea: ({
+        "aria-label": ariaLabel,
         placeholder,
         rows,
         maxLength,
@@ -207,6 +218,7 @@ vi.mock("antd", () => {
         onChange,
         style,
       }: {
+        "aria-label"?: string;
         placeholder?: string;
         rows?: number;
         maxLength?: number;
@@ -217,7 +229,7 @@ vi.mock("antd", () => {
         style?: React.CSSProperties;
       }) => (
         <textarea
-          aria-label={placeholder ?? "textarea"}
+          aria-label={ariaLabel ?? placeholder ?? "textarea"}
           data-maxlength={maxLength}
           data-rows={rows}
           data-showcount={showCount ? "true" : "false"}
@@ -227,7 +239,17 @@ vi.mock("antd", () => {
           style={style}
         />
       ),
-      Password: ({ placeholder }: { placeholder?: string }) => <input aria-label={placeholder ?? "password"} type="password" />,
+      Password: ({
+        "aria-label": ariaLabel,
+        placeholder,
+        value,
+        onChange,
+      }: {
+        "aria-label"?: string;
+        placeholder?: string;
+        value?: string;
+        onChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+      }) => <input aria-label={ariaLabel ?? placeholder ?? "password"} value={value} onChange={onChange} type="password" />,
     }
   );
 
@@ -294,12 +316,24 @@ vi.mock("antd", () => {
     Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
     Divider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Modal: Object.assign(
-      ({ children, open, title, footer }: { children: React.ReactNode; open?: boolean; title?: React.ReactNode; footer?: React.ReactNode }) => open ? <div role="dialog"><div>{title}</div>{children}{footer}</div> : null,
+      ({ children, open, title, footer, onOk, onCancel, okText = "OK", cancelText = "Cancel" }: { children: React.ReactNode; open?: boolean; title?: React.ReactNode; footer?: React.ReactNode; onOk?: () => void; onCancel?: () => void; okText?: React.ReactNode; cancelText?: React.ReactNode }) => open ? (
+        <div role="dialog">
+          <div>{title}</div>
+          {children}
+          {footer ?? (
+            <div>
+              <button type="button" onClick={onCancel}>{cancelText}</button>
+              <button type="button" onClick={onOk}>{okText}</button>
+            </div>
+          )}
+        </div>
+      ) : null,
       { confirm: vi.fn() }
     ),
     message: {
       error: mocks.messageError,
       success: mocks.messageSuccess,
+      useMessage: () => [{ error: mocks.messageError, success: mocks.messageSuccess }, null],
     },
   };
 });
@@ -327,6 +361,9 @@ vi.mock("../../providers/supabase-client", () => ({
       },
     },
     from: mocks.supabaseFrom,
+    functions: {
+      invoke: mocks.functionsInvoke,
+    },
     storage: {
       from: () => ({ remove: vi.fn(() => Promise.resolve({ error: null })) }),
     },
@@ -372,6 +409,100 @@ describe("form pages", () => {
     mocks.productQueries.length = 0;
     mocks.productImagesInsert.mockClear();
     mocks.mfaListFactors.mockClear();
+    mocks.functionsInvoke.mockReset();
+    mocks.functionsInvoke.mockImplementation((_name: string, { body }: { body: Record<string, unknown> }) => {
+      if (body.action === "summary") {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                key_name: "midtrans.server_key",
+                display_name: "Midtrans Server Key",
+                description: "Server credential",
+                value_kind: "secret",
+                is_secret: true,
+                is_required: true,
+                is_runtime_required: true,
+                version_id: "version-secret",
+                version_number: 2,
+                status: "active",
+                masked_value: "SB-Mid-****7890",
+                value_fingerprint: "fingerprint-secret",
+                non_secret_value: "PLAINTEXT_SENTINEL_DO_NOT_RENDER",
+                updated_by: "admin-1",
+                updated_at: "2026-05-19T09:00:00Z",
+              },
+              {
+                key_name: "midtrans.is_production",
+                display_name: "Midtrans Production Mode",
+                description: "Payment mode",
+                value_kind: "boolean",
+                is_secret: false,
+                is_required: true,
+                is_runtime_required: true,
+                version_id: "version-mode",
+                version_number: 1,
+                status: "active",
+                masked_value: null,
+                value_fingerprint: null,
+                non_secret_value: false,
+                updated_by: "admin-1",
+                updated_at: "2026-05-19T09:00:00Z",
+              },
+            ],
+          },
+          error: null,
+        });
+      }
+
+      if (body.action === "audit") {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                id: "audit-1",
+                key_name: "midtrans.server_key",
+                version_id: "version-secret",
+                action: "secret_rotated",
+                actor_id: "admin-1",
+                actor_role: "admin",
+                source: "admin_gateway",
+                request_id: "request-1",
+                reason: "scheduled rotation",
+                old_version_number: 1,
+                new_version_number: 2,
+                old_masked_value: "SB-Mid-****1234",
+                new_masked_value: "SB-Mid-****7890",
+                value_fingerprint: "fingerprint-secret",
+                metadata: { note: "PLAINTEXT_SENTINEL_DO_NOT_RENDER" },
+                created_at: "2026-05-19T10:00:00Z",
+              },
+              {
+                id: "audit-runtime-read",
+                key_name: "midtrans.server_key",
+                version_id: "version-secret",
+                action: "runtime_read",
+                actor_id: null,
+                actor_role: "service_role",
+                source: "edge_function",
+                request_id: "request-runtime-read",
+                reason: null,
+                old_version_number: null,
+                new_version_number: 2,
+                old_masked_value: null,
+                new_masked_value: "SB-Mid-****7890",
+                value_fingerprint: "fingerprint-secret",
+                metadata: { note: "PLAINTEXT_SENTINEL_DO_NOT_RENDER" },
+                created_at: "2026-05-19T11:00:00Z",
+              },
+            ],
+          },
+          error: null,
+        });
+      }
+
+      return Promise.resolve({ data: { data: { ok: true } }, error: null });
+    });
     mocks.supabaseFrom.mockClear();
   });
 
@@ -690,6 +821,68 @@ describe("form pages", () => {
     expect(screen.getByText("MapLocationPicker")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "CourierPickerModal" }));
     expect(mocks.setFieldValue).toHaveBeenCalledWith("enabled_couriers", "jne:reg");
+  });
+
+  it("renders masked integration config and audit fields without plaintext sentinels", async () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    expect(await screen.findAllByText("SB-Mid-****7890")).not.toHaveLength(0);
+    expect(document.body.textContent).toContain("SB-Mid-****1234");
+    expect(document.body.textContent).toContain(`Last runtime read: ${new Date("2026-05-19T11:00:00Z").toLocaleString("id-ID")}`);
+    expect(document.body.textContent).toContain("request-runtime-read");
+    expect(document.body.textContent).toContain("Last runtime read: -");
+    expect(screen.getByText("secret_rotated")).not.toBeNull();
+    expect(screen.queryByText("PLAINTEXT_SENTINEL_DO_NOT_RENDER")).toBeNull();
+    expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
+    expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", { body: { action: "summary", keys: undefined } });
+    expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", { body: { action: "audit", key: undefined, limit: 50 } });
+  });
+
+  it("requires rotate secret, confirmation phrase, and reason before calling the gateway", async () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Rotate secret" }))[0]);
+    expect(screen.getByRole("dialog")).not.toBeNull();
+    expect((screen.getByLabelText("New secret") as HTMLInputElement).value).toBe("");
+
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Rotate secret" }));
+
+    expect(await screen.findByText("Enter the new secret.")).not.toBeNull();
+    expect(screen.getByText("Type ROTATE to confirm.")).not.toBeNull();
+    expect(screen.getByText("Enter a reason.")).not.toBeNull();
+    expect(mocks.functionsInvoke.mock.calls.some((call) => call[1]?.body?.action === "rotateSecret")).toBe(false);
+
+    fireEvent.change(screen.getByLabelText("New secret"), { target: { value: "TEST_NEW_SECRET_SENTINEL" } });
+    fireEvent.change(screen.getByLabelText("Type ROTATE"), { target: { value: "ROTATE" } });
+    fireEvent.change(screen.getByLabelText("Rotation reason"), { target: { value: "scheduled rotation" } });
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Rotate secret" }));
+
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "rotateSecret",
+        key: "midtrans.server_key",
+        secret: "TEST_NEW_SECRET_SENTINEL",
+        reason: "scheduled rotation",
+      },
+    }));
   });
 
   it("renders nothing for profile without identity and shows password mismatch feedback when loaded", async () => {

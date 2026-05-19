@@ -472,7 +472,7 @@ Wave 6: Final Verification Wave.
 
   **Commit**: YES | Message: `feat(push): load expo token from runtime config` | Files: `supabase/functions/push/**`, push tests
 
-- [ ] 9. Add Settings tabs for integration config management
+- [x] 9. Add Settings tabs for integration config management
 
   **What to do**: Extend `src/pages/settings/index.tsx` with tabs/sections for Midtrans, Biteship, Shop/Shipper, Push, CORS, and Audit Trail. Use Ant Design/Refine existing settings patterns. Add API client wrapper for `integration-config` Edge Function calls. Display masked secrets, status, active version, last updated, updated by, last runtime read, and validation errors. Secret rotate inputs are empty-only and require confirmation phrase plus reason. Add i18n keys.
   **Must NOT do**: Do not use Refine direct table CRUD for plaintext or private tables. Do not prefill secret inputs. Do not add a separate visible resource/menu item.

@@ -12,6 +12,7 @@ import { BiteshipAreaSearch } from "../../components/biteship-area-search";
 import { MapLocationPicker } from "../../components/map-location-picker";
 import { CourierPickerModal } from "../../components/courier-picker-modal";
 import { STORE_BRANDING_QUERY_KEY } from "../../hooks/useStoreBranding";
+import { IntegrationConfigPanel } from "./integration-config-panel";
 import {
   getFallbackCourierOption,
   getCourierSelectionCompany,
@@ -353,6 +354,11 @@ export const Settings: React.FC = () => {
           </Row>
         </Card>
       ),
+    },
+    {
+      key: "integrationConfig",
+      label: translate("settings.tabs.integrationConfig", {}, "Integration Config"),
+      children: <IntegrationConfigPanel />,
     },
   ];
 
