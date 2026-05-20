@@ -23,7 +23,6 @@ type UpsertRecord = {
 };
 
 const runtimeExpoAccessToken = "runtime-expo-token-sentinel";
-const fallbackExpoAccessToken = "fallback-expo-token-sentinel";
 
 function createRuntimeConfigRow(
   overrides: Partial<RuntimeConfigRow> = {},
@@ -317,7 +316,6 @@ describe("createPushHandler", () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
       SUPABASE_URL: "https://demo.supabase.co",
-      EXPO_ACCESS_TOKEN: fallbackExpoAccessToken,
     });
     const { client, authGetUser, selects, upserts } = createPushClientMock({
       authUserId: "mobile-user-1",
