@@ -243,6 +243,7 @@ Deno.serve(async (req: Request) => {
         paymentId: reusableSession.id,
         midtransOrderId: reusableSession.midtrans_order_id,
         bindingSource: "snap_token_reuse",
+        sourcePaymentId: reusableSession.id,
       });
 
       return jsonResponse({
@@ -276,23 +277,18 @@ Deno.serve(async (req: Request) => {
         );
 
         if (idempotentOrder.id !== order.id) {
-          if (!sourcePaymentSession?.id) {
-            throw new HttpError(500, "Failed to resolve source payment session");
-          }
-
-          await persistPaymentSession(adminClient, order, {
-            midtransOrderId: order.midtrans_order_id ?? ensureMidtransOrderId(order),
-            snapToken: idempotentOrder.snap_token,
-            redirectUrl: idempotentOrder.snap_redirect_url,
-            snapTokenCreatedAt: idempotentOrder.snap_token_created_at,
-            bindingSource: "snap_token_reuse",
-            sourcePaymentId: sourcePaymentSession.id,
-          });
+          return jsonResponse({
+            error: "Idempotency key is already bound to an existing order",
+            code: "idempotency_key_bound_to_existing_order",
+            source_order_id: idempotentOrder.id,
+            source_midtrans_order_id: idempotentOrder.midtrans_order_id ?? null,
+          }, 409);
         } else if (sourcePaymentSession?.id && sourcePaymentSession.midtrans_order_id) {
           await bindMidtransPaymentConfigVersions(adminClient, {
             paymentId: sourcePaymentSession.id,
             midtransOrderId: sourcePaymentSession.midtrans_order_id,
             bindingSource: "snap_token_reuse",
+            sourcePaymentId: sourcePaymentSession.id,
           });
         }
 
@@ -336,6 +332,7 @@ Deno.serve(async (req: Request) => {
           paymentId: pendingSession.id,
           midtransOrderId: pendingSession.midtrans_order_id,
           bindingSource: "snap_token_reuse",
+          sourcePaymentId: pendingSession.id,
         });
 
         return jsonResponse({
@@ -363,6 +360,7 @@ Deno.serve(async (req: Request) => {
           paymentId: latestPaymentSession.id,
           midtransOrderId: latestPaymentSession.midtrans_order_id,
           bindingSource: "snap_token_reuse",
+          sourcePaymentId: latestPaymentSession.id,
         });
 
         return jsonResponse({
@@ -373,10 +371,6 @@ Deno.serve(async (req: Request) => {
 
       const midtransOrderId = latestPaymentSession?.midtrans_order_id ??
         ensureMidtransOrderId(order);
-      await persistPaymentSession(adminClient, order, {
-        midtransOrderId,
-      });
-
       const payload = buildSnapPayload(
         {
           ...order,
@@ -387,8 +381,14 @@ Deno.serve(async (req: Request) => {
           email: userEmail,
         } as AuthUser,
       );
-
       const midtransConfig = await resolveMidtransSnapRuntimeConfig(adminClient);
+
+      await persistPaymentSession(adminClient, order, {
+        midtransOrderId,
+        grossAmount: payload.transaction_details.gross_amount,
+        bindingSource: "snap_token_created",
+        selectedConfig: midtransConfig.selectedConfig,
+      });
       const midtransApiUrl = midtransConfig.isProduction
         ? "https://app.midtrans.com/snap/v1/transactions"
         : "https://app.sandbox.midtrans.com/snap/v1/transactions";

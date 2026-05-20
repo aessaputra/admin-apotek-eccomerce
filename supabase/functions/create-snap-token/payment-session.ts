@@ -16,14 +16,6 @@ type PaymentLookupQuery = {
 
 type PaymentsTable = {
   select: (columns: string) => PaymentLookupQuery;
-  update: (payload: Record<string, unknown>) => PaymentMutationQuery;
-  insert: (payload: Record<string, unknown>) => PaymentMutationQuery;
-};
-
-type PaymentMutationQuery = {
-  eq: (column: string, value: unknown) => PaymentMutationQuery;
-  select: (columns: string) => PaymentMutationQuery;
-  single: () => PromiseLike<QueryResponse<unknown>>;
 };
 
 export type PaymentSessionAdminClient = Pick<
@@ -52,6 +44,45 @@ export type SelectedMidtransConfigBinding = {
   isProductionVersionNumber: number;
   isProduction: boolean;
 };
+
+type PersistPaymentSessionBaseValues = {
+  midtransOrderId: string;
+  snapToken?: string;
+  redirectUrl?: string;
+  snapTokenCreatedAt?: string;
+  grossAmount?: number;
+};
+
+type PersistPaymentSessionBindingValues =
+  | {
+    bindingSource: "snap_token_created";
+    selectedConfig: SelectedMidtransConfigBinding;
+    sourcePaymentId?: never;
+  }
+  | {
+    bindingSource: "snap_token_reuse";
+    sourcePaymentId: string;
+    selectedConfig?: SelectedMidtransConfigBinding;
+  };
+
+type PersistPaymentSessionValues = PersistPaymentSessionBaseValues &
+  PersistPaymentSessionBindingValues;
+
+type BindMidtransPaymentConfigVersionsValues =
+  | {
+    paymentId: string;
+    midtransOrderId: string;
+    bindingSource: "snap_token_created";
+    sourcePaymentId?: string;
+    selectedConfig?: SelectedMidtransConfigBinding;
+  }
+  | {
+    paymentId: string;
+    midtransOrderId: string;
+    bindingSource: "snap_token_reuse";
+    sourcePaymentId: string;
+    selectedConfig?: SelectedMidtransConfigBinding;
+  };
 
 export class PaymentSessionError extends Error {
   constructor(
@@ -114,13 +145,7 @@ export async function waitForAvailableSnapSession(
 
 export async function bindMidtransPaymentConfigVersions(
   adminClient: PaymentSessionAdminClient,
-  values: {
-    paymentId: string;
-    midtransOrderId: string;
-    bindingSource: MidtransConfigBindingSource;
-    sourcePaymentId?: string;
-    selectedConfig?: SelectedMidtransConfigBinding;
-  },
+  values: BindMidtransPaymentConfigVersionsValues,
 ): Promise<void> {
   const rpcArgs = {
     p_payment_id: values.paymentId,
@@ -156,30 +181,8 @@ export async function bindMidtransPaymentConfigVersions(
 export async function persistPaymentSession(
   adminClient: PaymentSessionAdminClient,
   order: Order,
-  values: {
-    midtransOrderId: string;
-    snapToken?: string;
-    redirectUrl?: string;
-    snapTokenCreatedAt?: string;
-    grossAmount?: number;
-    bindingSource?: MidtransConfigBindingSource;
-    sourcePaymentId?: string;
-    selectedConfig?: SelectedMidtransConfigBinding;
-  },
+  values: PersistPaymentSessionValues,
 ): Promise<PaymentSessionRow> {
-  const { data: existingPayment, error: paymentLookupError } = await adminClient
-    .from("payments")
-    .select("id")
-    .eq("order_id", order.id)
-    .order("updated_at", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (paymentLookupError) {
-    throw new PaymentSessionError(500, "Failed to look up payment session");
-  }
-
   const payload = {
     order_id: order.id,
     user_id: order.user_id ?? null,
@@ -199,78 +202,67 @@ export async function persistPaymentSession(
       values.snapTokenCreatedAt ?? order.snap_token_created_at ?? null,
   };
 
-  const existingPaymentId = readPaymentId(existingPayment);
-  const paymentId = existingPaymentId
-    ? await updatePaymentSession(adminClient, existingPaymentId, payload)
-    : await insertPaymentSession(adminClient, payload);
-
-  if (values.bindingSource) {
-    await bindMidtransPaymentConfigVersions(adminClient, {
-      paymentId,
-      midtransOrderId: values.midtransOrderId,
-      bindingSource: values.bindingSource,
-      sourcePaymentId: values.sourcePaymentId,
-      selectedConfig: values.selectedConfig,
-    });
+  if (!values.bindingSource) {
+    throw new PaymentSessionError(
+      500,
+      "Midtrans payment sessions require config binding metadata",
+    );
   }
 
-  return {
-    id: paymentId,
-    midtrans_order_id: values.midtransOrderId,
-    snap_token: payload.snap_token,
-    redirect_url: payload.redirect_url,
-    snap_token_created_at: payload.snap_token_created_at,
-  };
+  if (values.bindingSource === "snap_token_created" && !values.selectedConfig) {
+    throw new PaymentSessionError(
+      500,
+      "New Midtrans Snap sessions require selected config metadata",
+    );
+  }
+
+  if (values.bindingSource === "snap_token_reuse" && !values.sourcePaymentId) {
+    throw new PaymentSessionError(
+      500,
+      "Reused Midtrans Snap sessions require source payment metadata",
+    );
+  }
+
+  return persistBoundPaymentSession(adminClient, payload, values);
 }
 
-async function updatePaymentSession(
-  adminClient: PaymentSessionAdminClient,
-  paymentId: string,
-  payload: Record<string, unknown>,
-): Promise<string> {
-  const { data, error } = await adminClient
-    .from("payments")
-    .update(payload)
-    .eq("id", paymentId)
-    .select("id")
-    .single();
-
-  if (error) {
-    throw new PaymentSessionError(500, "Failed to update payment session");
-  }
-
-  return readPaymentId(data) ?? paymentId;
-}
-
-async function insertPaymentSession(
+async function persistBoundPaymentSession(
   adminClient: PaymentSessionAdminClient,
   payload: Record<string, unknown>,
-): Promise<string> {
-  const { data, error } = await adminClient
-    .from("payments")
-    .insert(payload)
-    .select("id")
-    .single();
+  values: PersistPaymentSessionBindingValues,
+): Promise<PaymentSessionRow> {
+  const { data, error } = await adminClient.rpc(
+    "persist_midtrans_payment_session",
+    {
+      p_order_id: payload.order_id,
+      p_user_id: payload.user_id,
+      p_checkout_idempotency_key: payload.checkout_idempotency_key,
+      p_midtrans_order_id: payload.midtrans_order_id,
+      p_status: payload.status,
+      p_payment_type: payload.payment_type,
+      p_gross_amount: payload.gross_amount,
+      p_expiry_time: payload.expiry_time,
+      p_snap_token: payload.snap_token,
+      p_redirect_url: payload.redirect_url,
+      p_snap_token_created_at: payload.snap_token_created_at,
+      p_binding_source: values.bindingSource,
+      p_source_payment_id: values.sourcePaymentId ?? null,
+      p_server_key_version_id: values.selectedConfig?.serverKeyVersionId ?? null,
+      p_server_key_version_number: values.selectedConfig?.serverKeyVersionNumber ?? null,
+      p_is_production_version_id: values.selectedConfig?.isProductionVersionId ?? null,
+      p_is_production_version_number: values.selectedConfig?.isProductionVersionNumber ?? null,
+      p_is_production: values.selectedConfig?.isProduction ?? null,
+    },
+  );
 
   if (error) {
-    throw new PaymentSessionError(500, "Failed to create payment session");
+    throw new PaymentSessionError(500, "Failed to persist payment session");
   }
 
-  const paymentId = readPaymentId(data);
-  if (!paymentId) {
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== "object") {
     throw new PaymentSessionError(500, "Failed to resolve payment session");
   }
 
-  return paymentId;
-}
-
-function readPaymentId(value: unknown): string | null {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
-  const paymentId = (value as { id?: unknown }).id;
-  return typeof paymentId === "string" && paymentId.length > 0
-    ? paymentId
-    : null;
+  return row as PaymentSessionRow;
 }
