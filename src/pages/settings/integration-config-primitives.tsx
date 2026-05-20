@@ -1,0 +1,119 @@
+import { Button, Card, Input, Modal, Space, Tag, Typography, theme } from "antd";
+import { useState } from "react";
+import type { IntegrationConfigAuditRow, IntegrationConfigSummaryRow } from "./integration-config-client";
+
+export interface SecretReplacementDraft {
+  value: string;
+}
+
+export function createBlankSecretReplacementDraft(_source?: Partial<IntegrationConfigSummaryRow>): SecretReplacementDraft {
+  return { value: "" };
+}
+
+export interface SecretReplacementInputProps {
+  label: string;
+  draft: SecretReplacementDraft;
+  onChange: (draft: SecretReplacementDraft) => void;
+  onSave: () => void;
+  saving?: boolean;
+  placeholder?: string;
+  saveLabel?: string;
+}
+
+export const SecretReplacementInput: React.FC<SecretReplacementInputProps> = ({
+  label,
+  draft,
+  onChange,
+  onSave,
+  saving = false,
+  placeholder = "Leave blank to keep current value",
+  saveLabel = "Save",
+}) => (
+  <Space direction="vertical" style={{ width: "100%" }}>
+    <Input.Password
+      aria-label={label}
+      value={draft.value}
+      placeholder={placeholder}
+      autoComplete="new-password"
+      visibilityToggle={false}
+      onChange={(event) => onChange({ value: event.target.value })}
+    />
+    <Button loading={saving} onClick={onSave}>
+      {saveLabel}
+    </Button>
+  </Space>
+);
+
+export interface OperationalConfigRowProps {
+  row: IntegrationConfigSummaryRow;
+  actions?: React.ReactNode;
+  children?: React.ReactNode;
+}
+
+export const OperationalConfigRow: React.FC<OperationalConfigRowProps> = ({ row, actions, children }) => {
+  const { token } = theme.useToken();
+  const displayName = row.display_name?.trim() || "Configuration";
+  const description = row.description?.trim();
+
+  return (
+    <Card size="small" style={{ marginBottom: token.marginSM }}>
+      <Space direction="vertical" size={token.marginXS} style={{ width: "100%" }}>
+        <Space direction="vertical" size={token.marginXXS}>
+          <Typography.Text strong>{displayName}</Typography.Text>
+          {description ? <Typography.Text type="secondary">{description}</Typography.Text> : null}
+        </Space>
+        {children}
+        <Space wrap>
+          {row.status ? <Tag>{row.status}</Tag> : null}
+          {actions}
+        </Space>
+      </Space>
+    </Card>
+  );
+};
+
+export interface ConfigDetailsDisclosureProps {
+  row: IntegrationConfigSummaryRow;
+  auditRows?: IntegrationConfigAuditRow[];
+  lastRuntimeRead?: IntegrationConfigAuditRow;
+  buttonLabel?: string;
+}
+
+export const ConfigDetailsDisclosure: React.FC<ConfigDetailsDisclosureProps> = ({
+  row,
+  auditRows = [],
+  lastRuntimeRead,
+  buttonLabel = "Details",
+}) => {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button onClick={() => setOpen(true)}>{buttonLabel}</Button>
+      <Modal open={open} title={row.display_name?.trim() || row.key_name} onCancel={() => setOpen(false)} footer={null}>
+        <Space direction="vertical" style={{ width: "100%" }}>
+          <Typography.Text>Key: {row.key_name}</Typography.Text>
+          {row.version_id ? <Typography.Text>Version ID: {row.version_id}</Typography.Text> : null}
+          {row.version_number ? <Typography.Text>Version: {row.version_number}</Typography.Text> : null}
+          {row.updated_by ? <Typography.Text>Updated by: {row.updated_by}</Typography.Text> : null}
+          {lastRuntimeRead ? (
+            <Typography.Text>Last runtime read request: {lastRuntimeRead.request_id || "-"}</Typography.Text>
+          ) : null}
+          {auditRows.map((auditRow) => (
+            <Card key={auditRow.id} size="small">
+              <Space direction="vertical">
+                <Typography.Text>{auditRow.action}</Typography.Text>
+                <Typography.Text>Request: {auditRow.request_id || "-"}</Typography.Text>
+                <Typography.Text>Actor: {auditRow.actor_role || "-"}</Typography.Text>
+                <Typography.Text>Source: {auditRow.source || "-"}</Typography.Text>
+                <Typography.Text>Reason: {auditRow.reason || "-"}</Typography.Text>
+                <Typography.Text>Old: {auditRow.old_masked_value || "-"}</Typography.Text>
+                <Typography.Text>New: {auditRow.new_masked_value || "-"}</Typography.Text>
+              </Space>
+            </Card>
+          ))}
+        </Space>
+      </Modal>
+    </>
+  );
+};
