@@ -822,7 +822,7 @@
     "tabs": {
       "storeProfile": "Profil Toko",
       "shippingSettings": "Pengaturan Pengiriman",
-      "integrationConfig": "Konfigurasi Integrasi",
+      "integrationConfig": "Teknis",
       "paymentSettings": "Pengaturan Pembayaran"
     },
     "fields": {
@@ -920,9 +920,9 @@
         "runtimeRequired": "Wajib untuk runtime"
       },
       "summary": {
-        "loading": "Memuat konfigurasi integrasi...",
-        "empty": "Belum ada konfigurasi untuk bagian ini.",
-        "error": "Konfigurasi integrasi tidak dapat dimuat."
+        "loading": "Memuat pengaturan teknis...",
+        "empty": "Belum ada pengaturan teknis.",
+        "error": "Pengaturan teknis tidak dapat dimuat."
       },
       "rotate": {
         "action": "Rotasi secret",
@@ -964,7 +964,7 @@
         "action": "Detail"
       },
       "technical": {
-        "description": "Kelola pengaturan teknis runtime yang tidak dimiliki panel pembayaran atau pengiriman.",
+        "description": "Kelola token push, CORS, dan audit teknis. Pembayaran dan pengiriman ada di tab masing-masing.",
         "saveSuccess": "Pengaturan teknis tersimpan.",
         "saveError": "Pengaturan teknis gagal disimpan.",
         "pushToken": {

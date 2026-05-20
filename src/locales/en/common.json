@@ -822,7 +822,7 @@
     "tabs": {
       "storeProfile": "Store Profile",
       "shippingSettings": "Shipping Settings",
-      "integrationConfig": "Integration Config",
+      "integrationConfig": "Technical",
       "paymentSettings": "Payment Settings"
     },
     "fields": {
@@ -920,9 +920,9 @@
         "runtimeRequired": "Runtime required"
       },
       "summary": {
-        "loading": "Loading integration configuration...",
-        "empty": "No configuration found for this section.",
-        "error": "Integration configuration could not be loaded."
+        "loading": "Loading technical settings...",
+        "empty": "No technical settings found.",
+        "error": "Technical settings could not be loaded."
       },
       "rotate": {
         "action": "Rotate secret",
@@ -964,7 +964,7 @@
         "action": "Details"
       },
       "technical": {
-        "description": "Manage runtime technical settings that are not owned by the payment or shipping panels.",
+        "description": "Manage push token, CORS, and technical audit. Payment and shipping live in their own tabs.",
         "saveSuccess": "Technical settings saved.",
         "saveError": "Technical settings could not be saved.",
         "pushToken": {

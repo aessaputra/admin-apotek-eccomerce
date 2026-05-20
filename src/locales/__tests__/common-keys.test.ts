@@ -132,7 +132,20 @@ const REQUIRED_ORDER_KEYS = [
   "orders.actionGuide.syncOnlyDescription",
 ];
 
-const REQUIRED_KEYS = [...REQUIRED_AUTH_KEYS, ...REQUIRED_PAGES_KEYS, ...REQUIRED_DASHBOARD_KEYS, ...REQUIRED_ORDER_KEYS];
+const REQUIRED_SETTINGS_KEYS = [
+  "settings.tabs.storeProfile",
+  "settings.tabs.shippingSettings",
+  "settings.tabs.paymentSettings",
+  "settings.tabs.integrationConfig",
+  "settings.integration.summary.loading",
+  "settings.integration.summary.empty",
+  "settings.integration.summary.error",
+  "settings.integration.technical.description",
+  "settings.payment.description",
+  "settings.shipping.description",
+];
+
+const REQUIRED_KEYS = [...REQUIRED_AUTH_KEYS, ...REQUIRED_PAGES_KEYS, ...REQUIRED_DASHBOARD_KEYS, ...REQUIRED_ORDER_KEYS, ...REQUIRED_SETTINGS_KEYS];
 
 describe("locale files", () => {
   it.each(REQUIRED_KEYS)("has key %s in both id and en locales", (key) => {
