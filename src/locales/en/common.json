@@ -986,6 +986,41 @@
         "saveSuccess": "Midtrans mode saved.",
         "saveError": "Midtrans mode could not be saved."
       }
+    },
+    "shipping": {
+      "description": "Manage the Biteship credential, shipping origin, active couriers, and runtime shipper data.",
+      "summary": {
+        "loading": "Loading shipping settings...",
+        "error": "Shipping settings could not be loaded."
+      },
+      "apiKey": {
+        "label": "Biteship API Key",
+        "description": "Replace the Biteship key without showing the current value.",
+        "placeholder": "Leave blank to keep current"
+      },
+      "postalCode": {
+        "description": "Origin postal code used by Biteship."
+      },
+      "location": {
+        "description": "Choose the shipping origin point on the map."
+      },
+      "shipperName": {
+        "label": "Shipper Name",
+        "description": "Sender name for Biteship orders."
+      },
+      "shipperPhone": {
+        "label": "Shipper Phone",
+        "description": "Sender contact number for couriers."
+      },
+      "shipperEmail": {
+        "label": "Shipper Email",
+        "description": "Sender email for operational reference."
+      },
+      "address": {
+        "description": "Origin address sent to Biteship."
+      },
+      "saveSuccess": "Shipping settings saved.",
+      "saveError": "Shipping settings could not be saved."
     }
   },
   "pages": {

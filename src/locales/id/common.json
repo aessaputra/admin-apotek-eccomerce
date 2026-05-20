@@ -986,6 +986,41 @@
         "saveSuccess": "Mode Midtrans tersimpan.",
         "saveError": "Mode Midtrans gagal disimpan."
       }
+    },
+    "shipping": {
+      "description": "Kelola kredensial Biteship, asal pengiriman, kurir aktif, dan data pengirim runtime.",
+      "summary": {
+        "loading": "Memuat pengaturan pengiriman...",
+        "error": "Pengaturan pengiriman tidak dapat dimuat."
+      },
+      "apiKey": {
+        "label": "Biteship API Key",
+        "description": "Ganti kunci Biteship tanpa menampilkan nilai saat ini.",
+        "placeholder": "Kosongkan jika tidak diganti"
+      },
+      "postalCode": {
+        "description": "Kode pos asal yang dipakai Biteship."
+      },
+      "location": {
+        "description": "Pilih titik asal pengiriman pada peta."
+      },
+      "shipperName": {
+        "label": "Shipper Name",
+        "description": "Nama pengirim pada pesanan Biteship."
+      },
+      "shipperPhone": {
+        "label": "Shipper Phone",
+        "description": "Nomor kontak pengirim untuk kurir."
+      },
+      "shipperEmail": {
+        "label": "Shipper Email",
+        "description": "Email pengirim untuk referensi operasional."
+      },
+      "address": {
+        "description": "Alamat asal yang dikirim ke Biteship."
+      },
+      "saveSuccess": "Pengaturan pengiriman tersimpan.",
+      "saveError": "Pengaturan pengiriman gagal disimpan."
     }
   },
   "pages": {
