@@ -123,11 +123,31 @@ vi.mock("../../components/avatar-upload", () => ({
 }));
 
 vi.mock("../../components/biteship-area-search", () => ({
-  BiteshipAreaSearch: () => <div>BiteshipAreaSearch</div>,
+  BiteshipAreaSearch: ({
+    onAreaSelect,
+    onChange,
+  }: {
+    onAreaSelect?: (area: { areaId: string; areaName: string; postalCode: number }) => void;
+    onChange?: (areaId: string) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() => {
+        onChange?.("area-runtime-1");
+        onAreaSelect?.({ areaId: "area-runtime-1", areaName: "Kebayoran Baru", postalCode: 12110 });
+      }}
+    >
+      BiteshipAreaSearch
+    </button>
+  ),
 }));
 
 vi.mock("../../components/map-location-picker", () => ({
-  MapLocationPicker: () => <div>MapLocationPicker</div>,
+  MapLocationPicker: ({ onLocationChange }: { onLocationChange?: (lat: string, lng: string) => void }) => (
+    <button type="button" onClick={() => onLocationChange?.("-6.244100", "106.799500")}>
+      MapLocationPicker
+    </button>
+  ),
 }));
 
 vi.mock("../../components/courier-picker-modal", () => ({
@@ -430,44 +450,75 @@ describe("form pages", () => {
     mocks.functionsInvoke.mockReset();
     mocks.functionsInvoke.mockImplementation((_name: string, { body }: { body: Record<string, unknown> }) => {
       if (body.action === "summary") {
+        const summaryRows = [
+          {
+            key_name: "midtrans.server_key",
+            display_name: "Midtrans Server Key",
+            description: "Server credential",
+            value_kind: "secret",
+            is_secret: true,
+            is_required: true,
+            is_runtime_required: true,
+            version_id: "version-secret",
+            version_number: 2,
+            status: "active",
+            masked_value: "SB-Mid-****7890",
+            value_fingerprint: "fingerprint-secret",
+            non_secret_value: "PLAINTEXT_SENTINEL_DO_NOT_RENDER",
+            updated_by: "admin-1",
+            updated_at: "2026-05-19T09:00:00Z",
+          },
+          {
+            key_name: "midtrans.is_production",
+            display_name: "Midtrans Production Mode",
+            description: "Payment mode",
+            value_kind: "boolean",
+            is_secret: false,
+            is_required: true,
+            is_runtime_required: true,
+            version_id: "version-mode",
+            version_number: 1,
+            status: "active",
+            masked_value: null,
+            value_fingerprint: null,
+            non_secret_value: false,
+            updated_by: "admin-1",
+            updated_at: "2026-05-19T09:00:00Z",
+          },
+          {
+            key_name: "biteship.api_key",
+            display_name: "Biteship API Key",
+            description: "Biteship credential",
+            value_kind: "secret",
+            is_secret: true,
+            is_required: true,
+            is_runtime_required: true,
+            version_id: "version-biteship-secret",
+            version_number: 4,
+            status: "active",
+            masked_value: "BS-****9999",
+            value_fingerprint: "fingerprint-biteship",
+            non_secret_value: "PLAINTEXT_SENTINEL_DO_NOT_RENDER",
+            updated_by: "admin-1",
+            updated_at: "2026-05-19T09:00:00Z",
+          },
+          { key_name: "biteship.enabled_couriers", display_name: "Active Couriers", description: "Courier services", value_kind: "text_array", is_secret: false, is_required: true, is_runtime_required: true, version_id: "version-couriers", version_number: 1, status: "active", masked_value: null, value_fingerprint: null, non_secret_value: ["jne:reg", "grab:instant"], updated_by: "admin-1", updated_at: "2026-05-19T09:00:00Z" },
+          { key_name: "biteship.origin_postal_code", display_name: "Postal Code", description: "Origin postal code", value_kind: "string", is_secret: false, is_required: true, is_runtime_required: true, version_id: "version-postal", version_number: 1, status: "active", masked_value: null, value_fingerprint: null, non_secret_value: "12110", updated_by: "admin-1", updated_at: "2026-05-19T09:00:00Z" },
+          { key_name: "biteship.origin_area_id", display_name: "Origin Area", description: "Biteship area", value_kind: "string", is_secret: false, is_required: true, is_runtime_required: true, version_id: "version-area", version_number: 1, status: "active", masked_value: null, value_fingerprint: null, non_secret_value: "area-existing", updated_by: "admin-1", updated_at: "2026-05-19T09:00:00Z" },
+          { key_name: "biteship.origin_latitude", display_name: "Latitude", description: "Origin latitude", value_kind: "number", is_secret: false, is_required: true, is_runtime_required: true, version_id: "version-lat", version_number: 1, status: "active", masked_value: null, value_fingerprint: null, non_secret_value: -6.2, updated_by: "admin-1", updated_at: "2026-05-19T09:00:00Z" },
+          { key_name: "biteship.origin_longitude", display_name: "Longitude", description: "Origin longitude", value_kind: "number", is_secret: false, is_required: true, is_runtime_required: true, version_id: "version-lng", version_number: 1, status: "active", masked_value: null, value_fingerprint: null, non_secret_value: 106.8, updated_by: "admin-1", updated_at: "2026-05-19T09:00:00Z" },
+          { key_name: "shop.shipper_name", display_name: "Shipper Name", description: "Sender name", value_kind: "string", is_secret: false, is_required: true, is_runtime_required: true, version_id: "version-shipper-name", version_number: 1, status: "active", masked_value: null, value_fingerprint: null, non_secret_value: "Apotek Sehat", updated_by: "admin-1", updated_at: "2026-05-19T09:00:00Z" },
+          { key_name: "shop.shipper_phone", display_name: "Shipper Phone", description: "Sender phone", value_kind: "string", is_secret: false, is_required: true, is_runtime_required: true, version_id: "version-shipper-phone", version_number: 1, status: "active", masked_value: null, value_fingerprint: null, non_secret_value: "08123456789", updated_by: "admin-1", updated_at: "2026-05-19T09:00:00Z" },
+          { key_name: "shop.shipper_email", display_name: "Shipper Email", description: "Sender email", value_kind: "string", is_secret: false, is_required: true, is_runtime_required: true, version_id: "version-shipper-email", version_number: 1, status: "active", masked_value: null, value_fingerprint: null, non_secret_value: "shipper@example.test", updated_by: "admin-1", updated_at: "2026-05-19T09:00:00Z" },
+          { key_name: "shop.address", display_name: "Store Address", description: "Sender address", value_kind: "string", is_secret: false, is_required: true, is_runtime_required: true, version_id: "version-address", version_number: 1, status: "active", masked_value: null, value_fingerprint: null, non_secret_value: "Jl. Sehat 1", updated_by: "admin-1", updated_at: "2026-05-19T09:00:00Z" },
+          { key_name: "shop.organization", display_name: "Organization", description: "Sender organization", value_kind: "string", is_secret: false, is_required: true, is_runtime_required: true, version_id: "version-organization", version_number: 1, status: "active", masked_value: null, value_fingerprint: null, non_secret_value: "PT Apotek Sehat", updated_by: "admin-1", updated_at: "2026-05-19T09:00:00Z" },
+          { key_name: "push.expo_access_token", display_name: "Expo Push Token", description: "Push credential", value_kind: "secret", is_secret: true, is_required: false, is_runtime_required: false, version_id: "version-push", version_number: 1, status: "active", masked_value: "Expo****", value_fingerprint: "fingerprint-push", non_secret_value: null, updated_by: "admin-1", updated_at: "2026-05-19T09:00:00Z" },
+          { key_name: "cors.allowed_origins", display_name: "Allowed Origins", description: "CORS origins", value_kind: "text_array", is_secret: false, is_required: false, is_runtime_required: false, version_id: "version-cors", version_number: 1, status: "active", masked_value: null, value_fingerprint: null, non_secret_value: ["https://admin.example.test"], updated_by: "admin-1", updated_at: "2026-05-19T09:00:00Z" },
+        ];
+        const requestedKeys = Array.isArray(body.keys) ? body.keys : undefined;
         return Promise.resolve({
           data: {
-            data: [
-              {
-                key_name: "midtrans.server_key",
-                display_name: "Midtrans Server Key",
-                description: "Server credential",
-                value_kind: "secret",
-                is_secret: true,
-                is_required: true,
-                is_runtime_required: true,
-                version_id: "version-secret",
-                version_number: 2,
-                status: "active",
-                masked_value: "SB-Mid-****7890",
-                value_fingerprint: "fingerprint-secret",
-                non_secret_value: "PLAINTEXT_SENTINEL_DO_NOT_RENDER",
-                updated_by: "admin-1",
-                updated_at: "2026-05-19T09:00:00Z",
-              },
-              {
-                key_name: "midtrans.is_production",
-                display_name: "Midtrans Production Mode",
-                description: "Payment mode",
-                value_kind: "boolean",
-                is_secret: false,
-                is_required: true,
-                is_runtime_required: true,
-                version_id: "version-mode",
-                version_number: 1,
-                status: "active",
-                masked_value: null,
-                value_fingerprint: null,
-                non_secret_value: false,
-                updated_by: "admin-1",
-                updated_at: "2026-05-19T09:00:00Z",
-              },
-            ],
+            data: requestedKeys ? summaryRows.filter((row) => requestedKeys.includes(row.key_name)) : summaryRows,
           },
           error: null,
         });
@@ -823,7 +874,7 @@ describe("form pages", () => {
     expect(screen.getAllByText("CategoryLogoUpload").length).toBeGreaterThan(0);
   });
 
-  it("renders settings page and writes courier selections back to the form", () => {
+  it("renders settings page with shipping picker controls outside the public settings form path", async () => {
     mocks.useForm.mockReturnValue({
       formProps: {},
       saveButtonProps: {},
@@ -835,10 +886,12 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    expect(screen.getByText("BiteshipAreaSearch")).not.toBeNull();
-    expect(screen.getByText("MapLocationPicker")).not.toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "CourierPickerModal" }));
-    expect(mocks.setFieldValue).toHaveBeenCalledWith("enabled_couriers", "jne:reg");
+    const shippingPanel = await screen.findByRole("region", { name: "Pengaturan Pengiriman" });
+    expect(await within(shippingPanel).findByText("BiteshipAreaSearch")).not.toBeNull();
+    expect(within(shippingPanel).getByText("MapLocationPicker")).not.toBeNull();
+    fireEvent.click(within(shippingPanel).getByRole("button", { name: "CourierPickerModal" }));
+    expect(mocks.courierModalConfirm).toHaveBeenCalledTimes(1);
+    expect(mocks.setFieldValue).not.toHaveBeenCalledWith("enabled_couriers", expect.anything());
   });
 
   it("payment settings renders sanitized Midtrans controls and requests only payment summary keys", async () => {
@@ -945,6 +998,179 @@ describe("form pages", () => {
     }));
     const updateBody = mocks.functionsInvoke.mock.calls.find((call) => call[1]?.body?.action === "updateValue")?.[1]?.body;
     expect(updateBody).not.toHaveProperty("source");
+  });
+
+
+  it("shipping runtime renders concise integration-backed controls without duplicate public settings editors", async () => {
+    const onFinish = vi.fn();
+    mocks.useForm.mockReturnValue({
+      formProps: { onFinish },
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    const shippingPanel = await screen.findByRole("region", { name: "Pengaturan Pengiriman" });
+    expect(await within(shippingPanel).findByLabelText("Biteship API Key")).not.toBeNull();
+    expect(within(shippingPanel).getByText("Active Couriers")).not.toBeNull();
+    expect(within(shippingPanel).getByText("Origin Area")).not.toBeNull();
+    expect(within(shippingPanel).getByLabelText("Postal Code")).not.toBeNull();
+    expect(within(shippingPanel).getByText("Store Location")).not.toBeNull();
+    expect(within(shippingPanel).getByLabelText("Latitude")).not.toBeNull();
+    expect(within(shippingPanel).getByLabelText("Longitude")).not.toBeNull();
+    expect(within(shippingPanel).getByLabelText("Shipper Name")).not.toBeNull();
+    expect(within(shippingPanel).getByLabelText("Shipper Phone")).not.toBeNull();
+    expect(within(shippingPanel).getByLabelText("Shipper Email")).not.toBeNull();
+    expect(within(shippingPanel).getByLabelText("Store Address")).not.toBeNull();
+    expect(within(shippingPanel).getByLabelText("Organization")).not.toBeNull();
+
+    expect((within(shippingPanel).getByLabelText("Biteship API Key") as HTMLInputElement).value).toBe("");
+    expect(shippingPanel.textContent).not.toContain("biteship.api_key");
+    expect(shippingPanel.textContent).not.toContain("shop.organization");
+    expect(shippingPanel.textContent).not.toContain("Runtime required");
+    expect(shippingPanel.textContent).not.toContain("Last runtime read");
+    expect(shippingPanel.textContent).not.toContain("Reason");
+    expect(shippingPanel.textContent).not.toContain("source");
+    expect(shippingPanel.textContent).not.toContain("version-biteship-secret");
+    expect(shippingPanel.textContent).not.toContain("request-runtime-read");
+    expect(shippingPanel.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
+    expect(shippingPanel.textContent).not.toContain("BS-****9999");
+
+    expect(screen.queryByLabelText("New value for biteship.enabled_couriers")).toBeNull();
+    expect(screen.queryByLabelText("New value for shop.organization")).toBeNull();
+    expect(screen.queryByLabelText("New value for shop.address")).toBeNull();
+    expect(screen.queryByLabelText("New value for biteship.origin_area_id")).toBeNull();
+
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "summary",
+        keys: [
+          "biteship.api_key",
+          "biteship.enabled_couriers",
+          "biteship.origin_postal_code",
+          "biteship.origin_area_id",
+          "biteship.origin_latitude",
+          "biteship.origin_longitude",
+          "shop.shipper_name",
+          "shop.shipper_phone",
+          "shop.shipper_email",
+          "shop.address",
+          "shop.organization",
+        ],
+      },
+    }));
+    expect(onFinish).not.toHaveBeenCalled();
+  });
+
+  it("shipping runtime updates use integration config actions and avoid the public settings save path", async () => {
+    const onFinish = vi.fn();
+    mocks.useForm.mockReturnValue({
+      formProps: { onFinish },
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    const shippingPanel = await screen.findByRole("region", { name: "Pengaturan Pengiriman" });
+    const apiKeyInput = await within(shippingPanel).findByLabelText("Biteship API Key") as HTMLInputElement;
+    const apiKeyRow = apiKeyInput.closest("div")?.parentElement as HTMLElement;
+
+    fireEvent.click(within(apiKeyRow).getByRole("button", { name: "Simpan" }));
+    expect(mocks.functionsInvoke.mock.calls.some((call) => call[1]?.body?.key === "biteship.api_key")).toBe(false);
+
+    fireEvent.change(apiKeyInput, { target: { value: "TEST_NEW_BITESHIP_API_KEY" } });
+    fireEvent.click(within(apiKeyRow).getByRole("button", { name: "Simpan" }));
+
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "rotateSecret",
+        key: "biteship.api_key",
+        secret: "TEST_NEW_BITESHIP_API_KEY",
+        reason: "settings_shipping_save",
+      },
+    }));
+    const rotateBody = mocks.functionsInvoke.mock.calls.find((call) => call[1]?.body?.key === "biteship.api_key")?.[1]?.body;
+    expect(rotateBody).not.toHaveProperty("source");
+    await waitFor(() => expect(apiKeyInput.value).toBe(""));
+
+    fireEvent.click(within(shippingPanel).getByRole("button", { name: "CourierPickerModal" }));
+    const courierRow = within(shippingPanel).getByText("Active Couriers").closest("div")?.parentElement as HTMLElement;
+    fireEvent.click(within(courierRow).getByRole("button", { name: "Simpan" }));
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "updateValue",
+        key: "biteship.enabled_couriers",
+        value: ["jne:reg"],
+        reason: "settings_shipping_save",
+      },
+    }));
+
+    fireEvent.click(within(shippingPanel).getByRole("button", { name: "BiteshipAreaSearch" }));
+    const areaRow = within(shippingPanel).getByText("Origin Area").closest("div")?.parentElement as HTMLElement;
+    fireEvent.click(within(areaRow).getByRole("button", { name: "Simpan" }));
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "updateValue",
+        key: "biteship.origin_area_id",
+        value: "area-runtime-1",
+        reason: "settings_shipping_save",
+      },
+    }));
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "updateValue",
+        key: "biteship.origin_postal_code",
+        value: "12110",
+        reason: "settings_shipping_save",
+      },
+    }));
+
+    fireEvent.click(within(shippingPanel).getByRole("button", { name: "MapLocationPicker" }));
+    const locationRow = within(shippingPanel).getByText("Store Location").closest("div")?.parentElement as HTMLElement;
+    fireEvent.click(within(locationRow).getByRole("button", { name: "Simpan" }));
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "updateValue",
+        key: "biteship.origin_latitude",
+        value: "-6.244100",
+        reason: "settings_shipping_save",
+      },
+    }));
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "updateValue",
+        key: "biteship.origin_longitude",
+        value: "106.799500",
+        reason: "settings_shipping_save",
+      },
+    }));
+
+    const shipperNameInput = within(shippingPanel).getByLabelText("Shipper Name");
+    fireEvent.change(shipperNameInput, { target: { value: "Apotek Runtime" } });
+    const shipperNameRow = shipperNameInput.closest("div")?.parentElement as HTMLElement;
+    fireEvent.click(within(shipperNameRow).getByRole("button", { name: "Simpan" }));
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "updateValue",
+        key: "shop.shipper_name",
+        value: "Apotek Runtime",
+        reason: "settings_shipping_save",
+      },
+    }));
+
+    const updateBodies = mocks.functionsInvoke.mock.calls
+      .map((call) => call[1]?.body)
+      .filter((body) => body?.action === "updateValue" || body?.action === "rotateSecret");
+    expect(updateBodies.every((body) => !Object.prototype.hasOwnProperty.call(body, "source"))).toBe(true);
+    expect(onFinish).not.toHaveBeenCalled();
   });
 
   it("defines one primary Settings owner for every runtime integration config key", () => {
@@ -1139,8 +1365,10 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    fireEvent.change(await screen.findByLabelText("New value for midtrans.is_production"), { target: { value: "true" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save value" }));
+    const modeInput = await screen.findByLabelText("New value for midtrans.is_production");
+    fireEvent.change(modeInput, { target: { value: "true" } });
+    const modeAdvancedRow = modeInput.closest("div")?.parentElement as HTMLElement;
+    fireEvent.click(within(modeAdvancedRow).getByRole("button", { name: "Save value" }));
     expect(mocks.messageError).toHaveBeenCalledWith("Enter a reason.");
     expect(mocks.functionsInvoke.mock.calls.some((call) => call[1]?.body?.action === "updateValue")).toBe(false);
 
@@ -1162,7 +1390,7 @@ describe("form pages", () => {
     });
 
     fireEvent.change(screen.getByLabelText("Reason for midtrans.is_production"), { target: { value: "enable production mode" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save value" }));
+    fireEvent.click(within(modeAdvancedRow).getByRole("button", { name: "Save value" }));
 
     await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
       body: {
@@ -1177,7 +1405,7 @@ describe("form pages", () => {
     expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
   });
 
-  it("sends text_array integration config updates as arrays", async () => {
+  it("sends technical text_array integration config updates as arrays", async () => {
     mocks.useForm.mockReturnValue({
       formProps: {},
       saveButtonProps: {},
@@ -1192,19 +1420,19 @@ describe("form pages", () => {
           data: {
             data: [
               {
-                key_name: "biteship.enabled_couriers",
-                display_name: "Enabled couriers",
-                description: "Allowed Biteship courier services",
+                key_name: "cors.allowed_origins",
+                display_name: "Allowed origins",
+                description: "Allowed CORS origins",
                 value_kind: "text_array",
                 is_secret: false,
                 is_required: true,
                 is_runtime_required: true,
-                version_id: "version-couriers",
+                version_id: "version-cors",
                 version_number: 1,
                 status: "active",
                 masked_value: null,
                 value_fingerprint: null,
-                non_secret_value: ["jne:reg"],
+                non_secret_value: ["https://admin.example.test"],
                 updated_by: "admin-1",
                 updated_at: "2026-05-19T09:00:00Z",
               },
@@ -1223,20 +1451,20 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    fireEvent.change(await screen.findByLabelText("New value for biteship.enabled_couriers"), {
-      target: { value: "jne:reg, grab:instant" },
+    fireEvent.change(await screen.findByLabelText("New value for cors.allowed_origins"), {
+      target: { value: "https://admin.example.test, https://ops.example.test" },
     });
-    fireEvent.change(screen.getByLabelText("Reason for biteship.enabled_couriers"), {
-      target: { value: "refresh enabled courier list" },
+    fireEvent.change(screen.getByLabelText("Reason for cors.allowed_origins"), {
+      target: { value: "refresh allowed origins" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save value" }));
 
     await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
       body: {
         action: "updateValue",
-        key: "biteship.enabled_couriers",
-        value: ["jne:reg", "grab:instant"],
-        reason: "refresh enabled courier list",
+        key: "cors.allowed_origins",
+        value: ["https://admin.example.test", "https://ops.example.test"],
+        reason: "refresh allowed origins",
       },
     }));
   });

@@ -9,22 +9,15 @@ import {
   type IntegrationConfigValueKind,
   type RuntimeConfigKey,
 } from "./integration-config-client";
-import { isSecretRuntimeConfigKey } from "./integration-config-ownership";
+import { INTEGRATION_CONFIG_OWNERSHIP, isSecretRuntimeConfigKey } from "./integration-config-ownership";
 
 const SECTION_KEYS: Record<string, RuntimeConfigKey[]> = {
   midtrans: ["midtrans.server_key", "midtrans.is_production"],
-  biteship: [
-    "biteship.api_key",
-    "biteship.origin_postal_code",
-    "biteship.origin_area_id",
-    "biteship.origin_latitude",
-    "biteship.origin_longitude",
-    "biteship.enabled_couriers",
-  ],
-  shopShipper: ["shop.shipper_name", "shop.shipper_phone", "shop.shipper_email", "shop.address", "shop.organization"],
   push: ["push.expo_access_token"],
   cors: ["cors.allowed_origins"],
 };
+
+const SHIPPING_OWNED_KEYS = new Set<RuntimeConfigKey>(INTEGRATION_CONFIG_OWNERSHIP.shipping);
 
 interface EditableConfigState {
   value: string;
@@ -308,7 +301,14 @@ export const IntegrationConfigPanel: React.FC = () => {
   };
 
   const renderSection = (sectionKey: keyof typeof SECTION_KEYS) => {
-    const rows = SECTION_KEYS[sectionKey].map((key) => rowsByKey.get(key)).filter((row): row is IntegrationConfigSummaryRow => Boolean(row));
+    const rows: IntegrationConfigSummaryRow[] = [];
+
+    for (const key of SECTION_KEYS[sectionKey]) {
+      const row = rowsByKey.get(key);
+      if (row && !SHIPPING_OWNED_KEYS.has(row.key_name)) {
+        rows.push(row);
+      }
+    }
 
     return (
       <Card title={translate(`settings.integration.sections.${sectionKey}`, {}, sectionKey)}>
@@ -368,8 +368,6 @@ export const IntegrationConfigPanel: React.FC = () => {
           description={translate("settings.integration.safeNotice.description", {}, "This page only shows masked secret metadata and non-secret runtime values through the integration gateway.")}
         />
         {renderSection("midtrans")}
-        {renderSection("biteship")}
-        {renderSection("shopShipper")}
         {renderSection("push")}
         {renderSection("cors")}
         <Card title={translate("settings.integration.sections.auditTrail", {}, "Audit Trail")}>
