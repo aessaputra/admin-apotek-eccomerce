@@ -383,18 +383,18 @@
       "receiverPhone": "Receiver Phone",
       "shippingAddress": "Shipping Address",
       "addressNote": "Address Note",
-        "courierCode": "Courier Code",
-        "updatedAt": "Updated At",
-        "deliveredAt": "Delivered At",
-        "complaintWindowExpiresAt": "Confirmation / Complaint Deadline",
-        "customerCompletedAt": "Customer Completed At"
-      },
+      "courierCode": "Courier Code",
+      "updatedAt": "Updated At",
+      "deliveredAt": "Delivered At",
+      "complaintWindowExpiresAt": "Confirmation / Complaint Deadline",
+      "customerCompletedAt": "Customer Completed At"
+    },
     "updateOrder": "Update Order",
     "actionsTitle": "Order Actions",
     "actionsDescription": "Follow the safe order steps below before changing fulfillment or shipment data.",
-      "currentOrderStatus": "Current Order Status",
-      "customerCompletionStage": "Customer Completion Stage",
-      "currentPaymentStatus": "Current Payment Status",
+    "currentOrderStatus": "Current Order Status",
+    "customerCompletionStage": "Customer Completion Stage",
+    "currentPaymentStatus": "Current Payment Status",
     "nextOrderStatus": "Next Order Status",
     "productList": "Product List",
     "skuNotStored": "SKU not stored",
@@ -499,12 +499,12 @@
       "disposed": "Package was disposed by the courier.",
       "cancelled": "Shipment was cancelled in Biteship."
     },
-      "customerCompletionStages": {
-        "not_applicable": "Not Applicable",
-        "awaiting_customer": "Awaiting Customer Confirmation",
-        "completed": "Completed"
-      },
-      "activityTitle": "Order Activities",
+    "customerCompletionStages": {
+      "not_applicable": "Not Applicable",
+      "awaiting_customer": "Awaiting Customer Confirmation",
+      "completed": "Completed"
+    },
+    "activityTitle": "Order Activities",
     "noActivities": "No activities yet",
     "paymentTypes": {
       "bank_transfer": "Bank Transfer",
@@ -517,22 +517,22 @@
       "akulaku": "Akulaku",
       "kredivo": "Kredivo"
     },
-      "activity": {
-        "actors": {
-          "system": "System",
-          "admin": "Admin",
-          "customer": "Customer"
-        },
-        "paymentSuccess": "Payment verified successfully",
-        "paymentUpdated": "Payment status updated",
-        "statusUpdated": "{{actor}} changed status: {{from}} → {{to}}",
-        "trackingSynced": "Tracking synced from Biteship",
-        "shippingCreated": "Shipping order created in Biteship",
-        "customerCompleted": "{{actor}} confirmed receipt of the order",
-        "unknown": "{{action}}: {{from}} → {{to}}",
-        "loadErrorTitle": "Activities could not be loaded",
-        "loadErrorDescription": "Order history is unavailable. Try loading activities again."
+    "activity": {
+      "actors": {
+        "system": "System",
+        "admin": "Admin",
+        "customer": "Customer"
       },
+      "paymentSuccess": "Payment verified successfully",
+      "paymentUpdated": "Payment status updated",
+      "statusUpdated": "{{actor}} changed status: {{from}} → {{to}}",
+      "trackingSynced": "Tracking synced from Biteship",
+      "shippingCreated": "Shipping order created in Biteship",
+      "customerCompleted": "{{actor}} confirmed receipt of the order",
+      "unknown": "{{action}}: {{from}} → {{to}}",
+      "loadErrorTitle": "Activities could not be loaded",
+      "loadErrorDescription": "Order history is unavailable. Try loading activities again."
+    },
     "tooltips": {
       "statusSystemControlled": "This status is updated automatically by the system",
       "webhookControlled": "Some statuses update automatically after payment or delivery updates",
@@ -822,7 +822,8 @@
     "tabs": {
       "storeProfile": "Store Profile",
       "shippingSettings": "Shipping Settings",
-      "integrationConfig": "Integration Config"
+      "integrationConfig": "Integration Config",
+      "paymentSettings": "Payment Settings"
     },
     "fields": {
       "storeName": "Store Name",
@@ -962,7 +963,30 @@
     "noAreasFound": "No areas found",
     "noCouriersFound": "No couriers available",
     "saveSuccess": "Settings saved successfully",
-    "saveError": "Failed to save settings"
+    "saveError": "Failed to save settings",
+    "payment": {
+      "description": "Manage Midtrans payment credentials and runtime checkout mode.",
+      "details": "Details",
+      "summary": {
+        "loading": "Loading payment settings...",
+        "error": "Payment settings could not be loaded."
+      },
+      "serverKey": {
+        "label": "Midtrans Server Key",
+        "description": "Replace the server key without showing the current value.",
+        "placeholder": "Leave blank to keep current",
+        "saveSuccess": "Midtrans server key saved.",
+        "saveError": "Midtrans server key could not be saved."
+      },
+      "mode": {
+        "label": "Midtrans Mode",
+        "description": "Sandbox for testing, Production for customer transactions.",
+        "sandbox": "Sandbox",
+        "production": "Production",
+        "saveSuccess": "Midtrans mode saved.",
+        "saveError": "Midtrans mode could not be saved."
+      }
+    }
   },
   "pages": {
     "login": {

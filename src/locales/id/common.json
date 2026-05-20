@@ -383,18 +383,18 @@
       "receiverPhone": "Telepon Penerima",
       "shippingAddress": "Alamat Pengiriman",
       "addressNote": "Catatan Alamat",
-        "courierCode": "Kode Kurir",
-        "updatedAt": "Diperbarui",
-        "deliveredAt": "Waktu Terkirim",
-        "complaintWindowExpiresAt": "Batas Konfirmasi / Komplain",
-        "customerCompletedAt": "Waktu Selesai oleh Pelanggan"
-      },
+      "courierCode": "Kode Kurir",
+      "updatedAt": "Diperbarui",
+      "deliveredAt": "Waktu Terkirim",
+      "complaintWindowExpiresAt": "Batas Konfirmasi / Komplain",
+      "customerCompletedAt": "Waktu Selesai oleh Pelanggan"
+    },
     "updateOrder": "Update Pesanan",
     "actionsTitle": "Aksi Pesanan",
     "actionsDescription": "Ikuti langkah aman di bawah sebelum mengubah fulfillment atau data pengiriman.",
-      "currentOrderStatus": "Status Pesanan Saat Ini",
-      "customerCompletionStage": "Tahap Penyelesaian Pelanggan",
-      "currentPaymentStatus": "Status Pembayaran Saat Ini",
+    "currentOrderStatus": "Status Pesanan Saat Ini",
+    "customerCompletionStage": "Tahap Penyelesaian Pelanggan",
+    "currentPaymentStatus": "Status Pembayaran Saat Ini",
     "nextOrderStatus": "Status Pesanan Berikutnya",
     "productList": "Daftar Produk",
     "skuNotStored": "SKU belum tersimpan",
@@ -499,12 +499,12 @@
       "disposed": "Paket dimusnahkan oleh kurir.",
       "cancelled": "Pengiriman dibatalkan di Biteship."
     },
-      "customerCompletionStages": {
-        "not_applicable": "Belum Berlaku",
-        "awaiting_customer": "Menunggu Konfirmasi Pelanggan",
-        "completed": "Selesai"
-      },
-      "activityTitle": "Aktivitas Pesanan",
+    "customerCompletionStages": {
+      "not_applicable": "Belum Berlaku",
+      "awaiting_customer": "Menunggu Konfirmasi Pelanggan",
+      "completed": "Selesai"
+    },
+    "activityTitle": "Aktivitas Pesanan",
     "noActivities": "Belum ada aktivitas",
     "paymentTypes": {
       "bank_transfer": "Transfer Bank",
@@ -517,22 +517,22 @@
       "akulaku": "Akulaku",
       "kredivo": "Kredivo"
     },
-      "activity": {
-        "actors": {
-          "system": "Sistem",
-          "admin": "Admin",
-          "customer": "Pelanggan"
-        },
-        "paymentSuccess": "Pembayaran berhasil diverifikasi",
-        "paymentUpdated": "Status pembayaran diperbarui",
-        "statusUpdated": "{{actor}} mengubah status: {{from}} → {{to}}",
-        "trackingSynced": "Pelacakan disinkronkan dari Biteship",
-        "shippingCreated": "Pesanan pengiriman dibuat di Biteship",
-        "customerCompleted": "{{actor}} mengonfirmasi penerimaan pesanan",
-        "unknown": "{{action}}: {{from}} → {{to}}",
-        "loadErrorTitle": "Aktivitas tidak dapat dimuat",
-        "loadErrorDescription": "Riwayat pesanan belum tersedia. Coba muat ulang aktivitas."
+    "activity": {
+      "actors": {
+        "system": "Sistem",
+        "admin": "Admin",
+        "customer": "Pelanggan"
       },
+      "paymentSuccess": "Pembayaran berhasil diverifikasi",
+      "paymentUpdated": "Status pembayaran diperbarui",
+      "statusUpdated": "{{actor}} mengubah status: {{from}} → {{to}}",
+      "trackingSynced": "Pelacakan disinkronkan dari Biteship",
+      "shippingCreated": "Pesanan pengiriman dibuat di Biteship",
+      "customerCompleted": "{{actor}} mengonfirmasi penerimaan pesanan",
+      "unknown": "{{action}}: {{from}} → {{to}}",
+      "loadErrorTitle": "Aktivitas tidak dapat dimuat",
+      "loadErrorDescription": "Riwayat pesanan belum tersedia. Coba muat ulang aktivitas."
+    },
     "tooltips": {
       "statusSystemControlled": "Status ini diperbarui otomatis oleh sistem",
       "webhookControlled": "Beberapa status akan berubah otomatis setelah ada pembaruan pembayaran atau pengiriman",
@@ -822,7 +822,8 @@
     "tabs": {
       "storeProfile": "Profil Toko",
       "shippingSettings": "Pengaturan Pengiriman",
-      "integrationConfig": "Konfigurasi Integrasi"
+      "integrationConfig": "Konfigurasi Integrasi",
+      "paymentSettings": "Pengaturan Pembayaran"
     },
     "fields": {
       "storeName": "Nama Toko",
@@ -962,7 +963,30 @@
     "noAreasFound": "Area tidak ditemukan",
     "noCouriersFound": "Tidak ada kurir tersedia",
     "saveSuccess": "Pengaturan berhasil disimpan",
-    "saveError": "Gagal menyimpan pengaturan"
+    "saveError": "Gagal menyimpan pengaturan",
+    "payment": {
+      "description": "Kelola kredensial dan mode pembayaran Midtrans untuk checkout runtime.",
+      "details": "Detail",
+      "summary": {
+        "loading": "Memuat pengaturan pembayaran...",
+        "error": "Pengaturan pembayaran tidak dapat dimuat."
+      },
+      "serverKey": {
+        "label": "Midtrans Server Key",
+        "description": "Ganti kunci server tanpa menampilkan nilai saat ini.",
+        "placeholder": "Kosongkan jika tidak diganti",
+        "saveSuccess": "Midtrans server key tersimpan.",
+        "saveError": "Midtrans server key gagal disimpan."
+      },
+      "mode": {
+        "label": "Mode Midtrans",
+        "description": "Sandbox untuk uji coba, Produksi untuk transaksi pelanggan.",
+        "sandbox": "Sandbox",
+        "production": "Produksi",
+        "saveSuccess": "Mode Midtrans tersimpan.",
+        "saveError": "Mode Midtrans gagal disimpan."
+      }
+    }
   },
   "pages": {
     "login": {
