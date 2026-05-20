@@ -85,7 +85,7 @@ export const Settings: React.FC = () => {
   const tabItems: TabsProps["items"] = [
     {
       key: "storeProfile",
-      label: translate("settings.tabs.storeProfile", {}, "Store Profile"),
+      label: translate("settings.tabs.storeProfile", {}, "Profil Toko"),
       children: (
         <Card>
           <Form.Item
@@ -125,7 +125,7 @@ export const Settings: React.FC = () => {
     },
     {
       key: "shippingSettings",
-      label: translate("settings.tabs.shippingSettings", {}, "Shipping Settings"),
+      label: translate("settings.tabs.shippingSettings", {}, "Pengaturan Pengiriman"),
       children: <ShippingSettingsPanel />,
     },
     {
@@ -135,7 +135,7 @@ export const Settings: React.FC = () => {
     },
     {
       key: "integrationConfig",
-      label: translate("settings.tabs.integrationConfig", {}, "Integration Config"),
+      label: translate("settings.tabs.integrationConfig", {}, "Teknis"),
       children: <IntegrationConfigPanel />,
     },
   ];

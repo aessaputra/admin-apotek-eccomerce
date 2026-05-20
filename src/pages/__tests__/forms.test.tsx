@@ -330,7 +330,18 @@ vi.mock("antd", () => {
         {checked ? checkedChildren : unCheckedChildren}
       </button>
     ),
-    Tabs: ({ items }: { items?: Array<{ label: React.ReactNode; children: React.ReactNode }> }) => <div>{items?.map((item) => <div key={String(item.label)}>{item.label}{item.children}</div>)}</div>,
+    Tabs: ({ items }: { items?: Array<{ key?: string; label: React.ReactNode; children: React.ReactNode }> }) => (
+      <div>
+        <div role="tablist">
+          {items?.map((item, index) => (
+            <button key={item.key ?? String(item.label)} role="tab" aria-selected={index === 0 ? "true" : "false"} type="button">
+              {item.label}
+            </button>
+          ))}
+        </div>
+        {items?.map((item) => <div key={item.key ?? String(item.label)}>{item.children}</div>)}
+      </div>
+    ),
     Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Alert: ({ message, description }: { message: React.ReactNode; description?: React.ReactNode }) => <div role="alert">{message}{description}</div>,
     List: Object.assign(
@@ -874,6 +885,30 @@ describe("form pages", () => {
     expect(screen.getAllByText("CategoryLogoUpload").length).toBeGreaterThan(0);
   });
 
+  it("renders domain Settings tabs with localized labels", async () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    expect(screen.getByRole("tab", { name: "Profil Toko" })).not.toBeNull();
+    expect(screen.getByRole("tab", { name: "Pengaturan Pengiriman" })).not.toBeNull();
+    expect(screen.getByRole("tab", { name: "Pengaturan Pembayaran" })).not.toBeNull();
+    expect(screen.getByRole("tab", { name: "Teknis" })).not.toBeNull();
+    expect(screen.queryByRole("tab", { name: "Konfigurasi Integrasi" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Integration Config" })).toBeNull();
+
+    expect(await screen.findByRole("region", { name: "Pengaturan Pengiriman" })).not.toBeNull();
+    expect(await screen.findByRole("region", { name: "Pengaturan Pembayaran" })).not.toBeNull();
+    expect(await screen.findByRole("region", { name: "Teknis" })).not.toBeNull();
+  });
+
   it("renders settings page with shipping picker controls outside the public settings form path", async () => {
     mocks.useForm.mockReturnValue({
       formProps: {},
@@ -1296,7 +1331,7 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const advancedPanel = await screen.findByRole("region", { name: "Konfigurasi Integrasi" });
+    const advancedPanel = await screen.findByRole("region", { name: "Teknis" });
     expect(await within(advancedPanel).findByLabelText("Expo Push Token")).not.toBeNull();
     expect(within(advancedPanel).getByLabelText("Allowed Origins")).not.toBeNull();
     expect(within(advancedPanel).getByRole("button", { name: "Lihat audit teknis" })).not.toBeNull();
@@ -1338,7 +1373,7 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const advancedPanel = await screen.findByRole("region", { name: "Konfigurasi Integrasi" });
+    const advancedPanel = await screen.findByRole("region", { name: "Teknis" });
     expect(document.body.textContent).not.toContain("request-1");
     expect(document.body.textContent).not.toContain("request-runtime-read");
     expect(document.body.textContent).not.toContain("version-secret");
@@ -1378,7 +1413,7 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const advancedPanel = await screen.findByRole("region", { name: "Konfigurasi Integrasi" });
+    const advancedPanel = await screen.findByRole("region", { name: "Teknis" });
     const pushTokenInput = await within(advancedPanel).findByLabelText("Expo Push Token") as HTMLInputElement;
     const pushTokenRow = pushTokenInput.closest("div")?.parentElement as HTMLElement;
 
@@ -1413,7 +1448,7 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const advancedPanel = await screen.findByRole("region", { name: "Konfigurasi Integrasi" });
+    const advancedPanel = await screen.findByRole("region", { name: "Teknis" });
     const allowedOriginsInput = await within(advancedPanel).findByLabelText("Allowed Origins");
     const allowedOriginsRow = allowedOriginsInput.closest("div")?.parentElement as HTMLElement;
 
@@ -1464,13 +1499,13 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const advancedPanel = await screen.findByRole("region", { name: "Konfigurasi Integrasi" });
-    expect(within(advancedPanel).getByText("Loading integration configuration...")).not.toBeNull();
+    const advancedPanel = await screen.findByRole("region", { name: "Teknis" });
+    expect(within(advancedPanel).getByText("Loading technical settings...")).not.toBeNull();
 
     resolveSummary?.({ data: { error: "Only admin can manage integration config PLAINTEXT_SENTINEL_DO_NOT_RENDER" }, error: null });
     resolveAudit?.({ data: { error: "Only admin can manage integration config PLAINTEXT_SENTINEL_DO_NOT_RENDER" }, error: null });
 
-    expect(await within(advancedPanel).findByText("Integration configuration could not be loaded.")).not.toBeNull();
+    expect(await within(advancedPanel).findByText("Technical settings could not be loaded.")).not.toBeNull();
     expect(document.body.textContent).not.toContain("Only admin can manage integration config");
     expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
   });

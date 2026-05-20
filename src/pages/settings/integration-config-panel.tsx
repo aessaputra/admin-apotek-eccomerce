@@ -176,7 +176,7 @@ export const IntegrationConfigPanel: React.FC = () => {
     }
   };
 
-  const panelLabel = translate("settings.tabs.integrationConfig", {}, "Konfigurasi Integrasi");
+  const panelLabel = translate("settings.tabs.integrationConfig", {}, "Teknis");
   const pushTokenLabel = translate("settings.integration.technical.pushToken.label", {}, "Expo Push Token");
   const allowedOriginsLabel = translate("settings.integration.technical.allowedOrigins.label", {}, "Allowed Origins");
 
@@ -190,17 +190,17 @@ export const IntegrationConfigPanel: React.FC = () => {
               {translate(
                 "settings.integration.technical.description",
                 {},
-                "Kelola pengaturan teknis runtime yang tidak dimiliki panel pembayaran atau pengiriman."
+                "Kelola token push, CORS, dan audit teknis. Pembayaran dan pengiriman ada di tab masing-masing."
               )}
             </Typography.Text>
             {summaryQuery.isError ? (
-              <Alert type="error" showIcon message={translate("settings.integration.summary.error", {}, "Integration configuration could not be loaded.")} />
+              <Alert type="error" showIcon message={translate("settings.integration.summary.error", {}, "Technical settings could not be loaded.")} />
             ) : null}
             {summaryQuery.isLoading ? (
-              <Typography.Text>{translate("settings.integration.summary.loading", {}, "Loading integration configuration...")}</Typography.Text>
+              <Typography.Text>{translate("settings.integration.summary.loading", {}, "Loading technical settings...")}</Typography.Text>
             ) : null}
             {!summaryQuery.isLoading && !pushTokenRow && !allowedOriginsRow ? (
-              <Typography.Text type="secondary">{translate("settings.integration.summary.empty", {}, "No configuration found for this section.")}</Typography.Text>
+              <Typography.Text type="secondary">{translate("settings.integration.summary.empty", {}, "No technical settings found.")}</Typography.Text>
             ) : null}
             {pushTokenRow ? (
               <OperationalConfigRow
