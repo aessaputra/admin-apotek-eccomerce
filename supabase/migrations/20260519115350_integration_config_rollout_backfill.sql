@@ -221,15 +221,15 @@ with required_biteship_config_versions as (
   from required_biteship_config_versions
 ), active_settings as (
   select
-    pg_catalog.nullif(pg_catalog.btrim(origin_area_id), '') as origin_area_id,
-    pg_catalog.nullif(pg_catalog.btrim(origin_postal_code), '') as origin_postal_code,
+    nullif(pg_catalog.btrim(origin_area_id), '') as origin_area_id,
+    nullif(pg_catalog.btrim(origin_postal_code), '') as origin_postal_code,
     origin_latitude,
     origin_longitude,
-    pg_catalog.nullif(pg_catalog.btrim(store_name), '') as shipper_name,
-    pg_catalog.nullif(pg_catalog.btrim(phone_number), '') as shipper_phone,
-    pg_catalog.nullif(pg_catalog.btrim(email), '') as shipper_email,
-    pg_catalog.nullif(pg_catalog.btrim(store_address), '') as shipper_address,
-    pg_catalog.nullif(pg_catalog.btrim(organization), '') as shipper_organization
+    nullif(pg_catalog.btrim(store_name), '') as shipper_name,
+    nullif(pg_catalog.btrim(phone_number), '') as shipper_phone,
+    nullif(pg_catalog.btrim(email), '') as shipper_email,
+    nullif(pg_catalog.btrim(store_address), '') as shipper_address,
+    nullif(pg_catalog.btrim(organization), '') as shipper_organization
   from public.settings
   where id = 1
 ), legacy_biteship_candidates as (
