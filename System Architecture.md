@@ -538,11 +538,11 @@ Supabase Realtime memakai RLS sehingga hanya perubahan yang diizinkan policy yan
 |--------|----------|------------|
 | Admin Panel | `VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY` | URL project & anon key |
 | Mobile App (Expo) | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` | URL project & anon key |
-| Supabase (Edge Function) | `MIDTRANS_SERVER_KEY`, `MIDTRANS_CLIENT_KEY` | Server Key untuk Snap API; Client Key untuk Snap UI |
-| Supabase (Edge Function) | `BITESHIP_API_KEY` | API key Biteship (Test / Live) untuk cost, orders & tracking |
+| Supabase (Edge Function) | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Bootstrap server-side untuk akses service-role |
+| Supabase Runtime Config | `midtrans.server_key`, `midtrans.is_production`, `biteship.api_key`, `push.expo_access_token` | Provider config disimpan/versioned lewat database-backed integration config |
 | Midtrans Dashboard | Payment Notification URL | URL Edge Function webhook (contoh: `https://<project>.supabase.co/functions/v1/midtrans-webhook`) |
 
-> Gunakan **anon key** untuk client; jangan expose **service_role key**. **Server Key** Midtrans hanya di server (Edge Function).
+> Gunakan **anon key** untuk client; jangan expose **service_role key**. Provider secrets Midtrans, Biteship, dan Expo Push dikelola melalui integration config, bukan frontend env.
 
 ---
 
@@ -557,12 +557,12 @@ Supabase Realtime memakai RLS sehingga hanya perubahan yang diizinkan policy yan
 ### 9.2 Payment (Midtrans)
 - **Verify signature** — Webhook handler wajib verifikasi sebelum update DB
 - **Idempotent** — Handle notifikasi duplikat; return 200 OK
-- **Server Key** — Hanya di Edge Function, never expose ke client
+- **Server Key** — Kelola melalui integration config dan binding versi transaksi; never expose ke client
 - **Atomic stock reduction** — Gunakan RPC `reduce_product_stock()` (bukan read-then-write) untuk mencegah race condition
 - **Initial payment_status** — Order baru dibuat dengan `payment_status = 'unpaid'` sebelum interaksi Midtrans
 
 ### 9.3 Shipping & Logistics (Biteship)
-- **API key** — Hanya ditaruh di environment variable Edge Function.
+- **API key** — Kelola melalui integration config runtime; jangan hard-code atau expose ke client.
 - **Addresses** — Simpan coordinat (`latitude`, `longitude`) atau `area_id` saat form alamat.
 - **Automasi** — Tembak `/v1/orders` Biteship persis sesaat setelah `midtrans-webhook` menyatakan "LUNAS". Ini mengamankan barang sebelum dicetak resi aslinya.
 

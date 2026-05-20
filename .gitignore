@@ -38,6 +38,11 @@ _.sln
 !.omo/rules/
 !.omo/rules/**
 
+# Local security audit artifacts
+.sb-pentest-audit.log
+.sb-pentest-context.json
+.sb-pentest-evidence/
+
 # Supabase temp files
 supabase/.temp/
 .vercel
