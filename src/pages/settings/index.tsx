@@ -3,6 +3,7 @@ import { useTranslation } from "@refinedev/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { Form, Input, Tabs, Card, Upload } from "antd";
 import type { TabsProps } from "antd";
+import { useState } from "react";
 import { useSupabaseUpload } from "../../hooks/useSupabaseUpload";
 import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 import { STORE_BRANDING_QUERY_KEY } from "../../hooks/useStoreBranding";
@@ -18,6 +19,7 @@ interface SettingsFormValues {
 }
 
 const LOGO_PATH_PREFIX = "settings/";
+const STORE_PROFILE_TAB_KEY = "storeProfile";
 
 interface LogoUploadProps {
   value?: string;
@@ -62,6 +64,7 @@ const LogoUpload: React.FC<LogoUploadProps> = ({ value, onChange, placeholder })
 export const Settings: React.FC = () => {
   const { translate } = useTranslation();
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState(STORE_PROFILE_TAB_KEY);
   const { formProps, saveButtonProps, form } = useForm<SettingsFormValues>({
     action: "edit",
     resource: "settings",
@@ -81,46 +84,58 @@ export const Settings: React.FC = () => {
       type: "error",
     },
   });
+  const storeProfileSaveButtonProps = activeTab === STORE_PROFILE_TAB_KEY
+    ? saveButtonProps
+    : {
+        ...saveButtonProps,
+        disabled: true,
+        style: {
+          ...saveButtonProps.style,
+          display: "none",
+        },
+      };
 
   const tabItems: TabsProps["items"] = [
     {
       key: "storeProfile",
       label: translate("settings.tabs.storeProfile", {}, "Profil Toko"),
       children: (
-        <Card>
-          <Form.Item
-            label={translate("settings.fields.storeName", {}, "Store Name")}
-            name="store_name"
-            rules={[{ required: true, message: translate("settings.validation.storeNameRequired", {}, "Store name is required") }]}
-          >
-            <Input placeholder={translate("settings.fields.storeNamePlaceholder", {}, "Enter store name")} />
-          </Form.Item>
-          <Form.Item
-            label={translate("settings.fields.phoneNumber", {}, "Phone Number")}
-            name="phone_number"
-            rules={[{ required: true, message: translate("settings.validation.phoneRequired", {}, "Phone number is required") }]}
-          >
-            <Input placeholder={translate("settings.fields.phoneNumberPlaceholder", {}, "Enter phone number")} />
-          </Form.Item>
-          <Form.Item
-            label={translate("settings.fields.email", {}, "Email")}
-            name="email"
-            rules={[
-              { required: true, message: translate("settings.validation.emailRequired", {}, "Email is required") },
-              { type: "email", message: translate("settings.validation.emailInvalid", {}, "Invalid email format") },
-            ]}
-          >
-            <Input placeholder={translate("settings.fields.emailPlaceholder", {}, "Enter email")} />
-          </Form.Item>
-          <Form.Item
-            label={translate("settings.fields.primaryLogo", {}, "Primary Logo")}
-            name="primary_logo_url"
-          >
-            <LogoUpload
-              placeholder={translate("settings.fields.primaryLogoPlaceholder", {}, "+ Upload Logo")}
-            />
-          </Form.Item>
-        </Card>
+        <Form {...formProps} form={form} layout="vertical">
+          <Card>
+            <Form.Item
+              label={translate("settings.fields.storeName", {}, "Store Name")}
+              name="store_name"
+              rules={[{ required: true, message: translate("settings.validation.storeNameRequired", {}, "Store name is required") }]}
+            >
+              <Input placeholder={translate("settings.fields.storeNamePlaceholder", {}, "Enter store name")} />
+            </Form.Item>
+            <Form.Item
+              label={translate("settings.fields.phoneNumber", {}, "Phone Number")}
+              name="phone_number"
+              rules={[{ required: true, message: translate("settings.validation.phoneRequired", {}, "Phone number is required") }]}
+            >
+              <Input placeholder={translate("settings.fields.phoneNumberPlaceholder", {}, "Enter phone number")} />
+            </Form.Item>
+            <Form.Item
+              label={translate("settings.fields.email", {}, "Email")}
+              name="email"
+              rules={[
+                { required: true, message: translate("settings.validation.emailRequired", {}, "Email is required") },
+                { type: "email", message: translate("settings.validation.emailInvalid", {}, "Invalid email format") },
+              ]}
+            >
+              <Input placeholder={translate("settings.fields.emailPlaceholder", {}, "Enter email")} />
+            </Form.Item>
+            <Form.Item
+              label={translate("settings.fields.primaryLogo", {}, "Primary Logo")}
+              name="primary_logo_url"
+            >
+              <LogoUpload
+                placeholder={translate("settings.fields.primaryLogoPlaceholder", {}, "+ Upload Logo")}
+              />
+            </Form.Item>
+          </Card>
+        </Form>
       ),
     },
     {
@@ -143,17 +158,16 @@ export const Settings: React.FC = () => {
   return (
     <>
       <Edit
-        saveButtonProps={saveButtonProps}
+        saveButtonProps={storeProfileSaveButtonProps}
         title={translate("settings.title", {}, "Settings")}
         breadcrumb={false}
       >
-        <Form {...formProps} form={form} layout="vertical">
-          <Tabs
-            defaultActiveKey="storeProfile"
-            items={tabItems}
-            type="card"
-          />
-        </Form>
+        <Tabs
+          activeKey={activeTab}
+          items={tabItems}
+          onChange={setActiveTab}
+          type="card"
+        />
       </Edit>
     </>
   );

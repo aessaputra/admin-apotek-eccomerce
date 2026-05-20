@@ -105,7 +105,28 @@ vi.mock("@refinedev/core", () => ({
 
 vi.mock("@refinedev/antd", () => ({
   Create: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Edit: ({ children, title }: { children: React.ReactNode; title?: React.ReactNode }) => <div><div>{title}</div>{children}</div>,
+  Edit: ({
+    children,
+    saveButtonProps,
+    title,
+  }: {
+    children: React.ReactNode;
+    saveButtonProps?: { disabled?: boolean; style?: React.CSSProperties };
+    title?: React.ReactNode;
+  }) => (
+    <div>
+      <div>{title}</div>
+      <button
+        aria-label="Store Profile Save"
+        disabled={saveButtonProps?.disabled}
+        style={saveButtonProps?.style}
+        type="submit"
+      >
+        Store Profile Save
+      </button>
+      {children}
+    </div>
+  ),
   useForm: mocks.useForm,
   useSelect: mocks.useSelect,
 }));
@@ -330,18 +351,42 @@ vi.mock("antd", () => {
         {checked ? checkedChildren : unCheckedChildren}
       </button>
     ),
-    Tabs: ({ items }: { items?: Array<{ key?: string; label: React.ReactNode; children: React.ReactNode }> }) => (
-      <div>
-        <div role="tablist">
-          {items?.map((item, index) => (
-            <button key={item.key ?? String(item.label)} role="tab" aria-selected={index === 0 ? "true" : "false"} type="button">
-              {item.label}
-            </button>
-          ))}
+    Tabs: ({
+      activeKey,
+      defaultActiveKey,
+      items,
+      onChange,
+    }: {
+      activeKey?: string;
+      defaultActiveKey?: string;
+      items?: Array<{ key?: string; label: React.ReactNode; children: React.ReactNode }>;
+      onChange?: (activeKey: string) => void;
+    }) => {
+      const selectedKey = activeKey ?? defaultActiveKey ?? items?.[0]?.key;
+
+      return (
+        <div>
+          <div role="tablist">
+            {items?.map((item) => {
+              const itemKey = item.key ?? String(item.label);
+
+              return (
+                <button
+                  key={itemKey}
+                  role="tab"
+                  aria-selected={itemKey === selectedKey ? "true" : "false"}
+                  type="button"
+                  onClick={() => onChange?.(itemKey)}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+          {items?.map((item) => <div key={item.key ?? String(item.label)}>{item.children}</div>)}
         </div>
-        {items?.map((item) => <div key={item.key ?? String(item.label)}>{item.children}</div>)}
-      </div>
-    ),
+      );
+    },
     Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Alert: ({ message, description }: { message: React.ReactNode; description?: React.ReactNode }) => <div role="alert">{message}{description}</div>,
     List: Object.assign(
@@ -903,6 +948,43 @@ describe("form pages", () => {
     expect(screen.getByRole("tab", { name: "Teknis" })).not.toBeNull();
     expect(screen.queryByRole("tab", { name: "Konfigurasi Integrasi" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Integration Config" })).toBeNull();
+
+    expect(await screen.findByRole("region", { name: "Pengaturan Pengiriman" })).not.toBeNull();
+    expect(await screen.findByRole("region", { name: "Pengaturan Pembayaran" })).not.toBeNull();
+    expect(await screen.findByRole("region", { name: "Teknis" })).not.toBeNull();
+  });
+
+  it("scopes the public settings save affordance to the Store Profile tab", async () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: { disabled: false },
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    const storeProfileSave = screen.getByRole("button", { name: "Store Profile Save" }) as HTMLButtonElement;
+    expect(storeProfileSave.disabled).toBe(false);
+    expect(storeProfileSave.style.display).toBe("");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Pengaturan Pengiriman" }));
+    expect(storeProfileSave.disabled).toBe(true);
+    expect(storeProfileSave.style.display).toBe("none");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Pengaturan Pembayaran" }));
+    expect(storeProfileSave.disabled).toBe(true);
+    expect(storeProfileSave.style.display).toBe("none");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Teknis" }));
+    expect(storeProfileSave.disabled).toBe(true);
+    expect(storeProfileSave.style.display).toBe("none");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Profil Toko" }));
+    expect(storeProfileSave.disabled).toBe(false);
+    expect(storeProfileSave.style.display).toBe("");
 
     expect(await screen.findByRole("region", { name: "Pengaturan Pengiriman" })).not.toBeNull();
     expect(await screen.findByRole("region", { name: "Pengaturan Pembayaran" })).not.toBeNull();
