@@ -305,6 +305,11 @@ vi.mock("antd", () => {
       />
     ),
     Select: ({ options, placeholder }: { options?: Array<{ label: string; value: string | boolean }>; placeholder?: string }) => <div>{placeholder ?? options?.map((option) => String(option.label)).join(",")}</div>,
+    Switch: ({ checked, onChange, checkedChildren, unCheckedChildren, "aria-label": ariaLabel }: { checked?: boolean; onChange?: (checked: boolean) => void; checkedChildren?: React.ReactNode; unCheckedChildren?: React.ReactNode; "aria-label"?: string }) => (
+      <button type="button" role="switch" aria-checked={checked ? "true" : "false"} aria-label={ariaLabel ?? "switch"} onClick={() => onChange?.(!checked)}>
+        {checked ? checkedChildren : unCheckedChildren}
+      </button>
+    ),
     Tabs: ({ items }: { items?: Array<{ label: React.ReactNode; children: React.ReactNode }> }) => <div>{items?.map((item) => <div key={String(item.label)}>{item.label}{item.children}</div>)}</div>,
     Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Alert: ({ message, description }: { message: React.ReactNode; description?: React.ReactNode }) => <div role="alert">{message}{description}</div>,
@@ -834,6 +839,112 @@ describe("form pages", () => {
     expect(screen.getByText("MapLocationPicker")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "CourierPickerModal" }));
     expect(mocks.setFieldValue).toHaveBeenCalledWith("enabled_couriers", "jne:reg");
+  });
+
+  it("payment settings renders sanitized Midtrans controls and requests only payment summary keys", async () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
+    expect(await within(paymentPanel).findByText("Midtrans Server Key")).not.toBeNull();
+    expect(within(paymentPanel).getByText("Mode Midtrans")).not.toBeNull();
+    expect((within(paymentPanel).getByLabelText("Midtrans Server Key") as HTMLInputElement).value).toBe("");
+    expect(within(paymentPanel).getByRole("switch", { name: "Mode Midtrans" }).getAttribute("aria-checked")).toBe("false");
+
+    expect(within(paymentPanel).queryByText("midtrans.server_key")).toBeNull();
+    expect(within(paymentPanel).queryByText("midtrans.is_production")).toBeNull();
+    expect(within(paymentPanel).queryByText("Tidak diketahui")).toBeNull();
+    expect(within(paymentPanel).queryByText("Wajib untuk runtime")).toBeNull();
+    expect(within(paymentPanel).queryByText("Terakhir dibaca runtime")).toBeNull();
+    expect(paymentPanel.textContent).not.toContain("version-secret");
+    expect(paymentPanel.textContent).not.toContain("version-mode");
+    expect(paymentPanel.textContent).not.toContain("request-1");
+    expect(paymentPanel.textContent).not.toContain("request-runtime-read");
+    expect(paymentPanel.textContent).not.toContain("Reason");
+    expect(paymentPanel.textContent).not.toContain("source");
+    expect(paymentPanel.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
+    expect(paymentPanel.textContent).not.toContain("SB-Mid-****7890");
+
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "summary",
+        keys: ["midtrans.server_key", "midtrans.is_production"],
+      },
+    }));
+  });
+
+  it("payment settings rotates the Midtrans server key with a hidden reason and clears the replacement input", async () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
+    const serverKeyInput = await within(paymentPanel).findByLabelText("Midtrans Server Key") as HTMLInputElement;
+    const serverKeyRow = serverKeyInput.closest("div")?.parentElement as HTMLElement;
+
+    fireEvent.click(within(serverKeyRow).getByRole("button", { name: "Simpan" }));
+    expect(mocks.functionsInvoke.mock.calls.some((call) => call[1]?.body?.action === "rotateSecret")).toBe(false);
+
+    fireEvent.change(serverKeyInput, { target: { value: "TEST_NEW_MIDTRANS_SERVER_KEY" } });
+    fireEvent.click(within(serverKeyRow).getByRole("button", { name: "Simpan" }));
+
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "rotateSecret",
+        key: "midtrans.server_key",
+        secret: "TEST_NEW_MIDTRANS_SERVER_KEY",
+        reason: "settings_payment_save",
+      },
+    }));
+    const rotateBody = mocks.functionsInvoke.mock.calls.find((call) => call[1]?.body?.action === "rotateSecret")?.[1]?.body;
+    expect(rotateBody).not.toHaveProperty("source");
+    await waitFor(() => expect(serverKeyInput.value).toBe(""));
+  });
+
+  it("payment settings saves Midtrans mode as a boolean without source metadata", async () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
+    const modeSwitch = await within(paymentPanel).findByRole("switch", { name: "Mode Midtrans" });
+    const modeRow = modeSwitch.closest("div")?.parentElement as HTMLElement;
+
+    fireEvent.click(modeSwitch);
+    fireEvent.click(within(modeRow).getByRole("button", { name: "Simpan" }));
+
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "updateValue",
+        key: "midtrans.is_production",
+        value: true,
+        reason: "settings_payment_save",
+      },
+    }));
+    const updateBody = mocks.functionsInvoke.mock.calls.find((call) => call[1]?.body?.action === "updateValue")?.[1]?.body;
+    expect(updateBody).not.toHaveProperty("source");
   });
 
   it("defines one primary Settings owner for every runtime integration config key", () => {

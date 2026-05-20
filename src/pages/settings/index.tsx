@@ -13,6 +13,7 @@ import { MapLocationPicker } from "../../components/map-location-picker";
 import { CourierPickerModal } from "../../components/courier-picker-modal";
 import { STORE_BRANDING_QUERY_KEY } from "../../hooks/useStoreBranding";
 import { IntegrationConfigPanel } from "./integration-config-panel";
+import { PaymentSettingsPanel } from "./payment-settings-panel";
 import {
   getFallbackCourierOption,
   getCourierSelectionCompany,
@@ -354,6 +355,11 @@ export const Settings: React.FC = () => {
           </Row>
         </Card>
       ),
+    },
+    {
+      key: "paymentSettings",
+      label: translate("settings.tabs.paymentSettings", {}, "Pengaturan Pembayaran"),
+      children: <PaymentSettingsPanel />,
     },
     {
       key: "integrationConfig",
