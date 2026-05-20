@@ -957,7 +957,25 @@
         "empty": "No audit events yet.",
         "error": "Audit trail could not be loaded.",
         "oldValue": "Old",
-        "newValue": "New"
+        "newValue": "New",
+        "open": "View technical audit"
+      },
+      "details": {
+        "action": "Details"
+      },
+      "technical": {
+        "description": "Manage runtime technical settings that are not owned by the payment or shipping panels.",
+        "saveSuccess": "Technical settings saved.",
+        "saveError": "Technical settings could not be saved.",
+        "pushToken": {
+          "label": "Expo Push Token",
+          "description": "Replace the Expo token without showing the current value.",
+          "placeholder": "Leave blank to keep current"
+        },
+        "allowedOrigins": {
+          "label": "Allowed Origins",
+          "description": "Admin origins allowed to access the gateway."
+        }
       }
     },
     "noAreasFound": "No areas found",

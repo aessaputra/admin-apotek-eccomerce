@@ -957,7 +957,25 @@
         "empty": "Belum ada audit.",
         "error": "Jejak audit tidak dapat dimuat.",
         "oldValue": "Lama",
-        "newValue": "Baru"
+        "newValue": "Baru",
+        "open": "Lihat audit teknis"
+      },
+      "details": {
+        "action": "Detail"
+      },
+      "technical": {
+        "description": "Kelola pengaturan teknis runtime yang tidak dimiliki panel pembayaran atau pengiriman.",
+        "saveSuccess": "Pengaturan teknis tersimpan.",
+        "saveError": "Pengaturan teknis gagal disimpan.",
+        "pushToken": {
+          "label": "Expo Push Token",
+          "description": "Ganti token Expo tanpa menampilkan nilai saat ini.",
+          "placeholder": "Kosongkan jika tidak diganti"
+        },
+        "allowedOrigins": {
+          "label": "Allowed Origins",
+          "description": "Daftar origin admin yang diizinkan mengakses gateway."
+        }
       }
     },
     "noAreasFound": "Area tidak ditemukan",
