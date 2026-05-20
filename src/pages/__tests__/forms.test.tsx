@@ -3,6 +3,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Settings from "../settings";
+import { INTEGRATION_CONFIG_OWNERSHIP, getPrimaryOwnerForIntegrationConfigKey } from "../settings/integration-config-ownership";
+import {
+  ConfigDetailsDisclosure,
+  OperationalConfigRow,
+  createBlankSecretReplacementDraft,
+} from "../settings/integration-config-primitives";
 import { Profile } from "../profile";
 import { CategoryCreate } from "../categories/create";
 import { CategoryEdit } from "../categories/edit";
@@ -828,6 +834,111 @@ describe("form pages", () => {
     expect(screen.getByText("MapLocationPicker")).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "CourierPickerModal" }));
     expect(mocks.setFieldValue).toHaveBeenCalledWith("enabled_couriers", "jne:reg");
+  });
+
+  it("defines one primary Settings owner for every runtime integration config key", () => {
+    expect(INTEGRATION_CONFIG_OWNERSHIP).toEqual({
+      payment: ["midtrans.server_key", "midtrans.is_production"],
+      shipping: [
+        "biteship.api_key",
+        "biteship.enabled_couriers",
+        "biteship.origin_postal_code",
+        "biteship.origin_area_id",
+        "biteship.origin_latitude",
+        "biteship.origin_longitude",
+        "shop.shipper_name",
+        "shop.shipper_phone",
+        "shop.shipper_email",
+        "shop.address",
+        "shop.organization",
+      ],
+      technical: ["push.expo_access_token", "cors.allowed_origins"],
+    });
+
+    const ownedKeys = Object.values(INTEGRATION_CONFIG_OWNERSHIP).flat();
+
+    expect(new Set(ownedKeys).size).toBe(ownedKeys.length);
+    expect(getPrimaryOwnerForIntegrationConfigKey("midtrans.server_key")).toBe("payment");
+    expect(getPrimaryOwnerForIntegrationConfigKey("biteship.api_key")).toBe("shipping");
+    expect(getPrimaryOwnerForIntegrationConfigKey("cors.allowed_origins")).toBe("technical");
+  });
+
+  it("provides primitive rows that hide raw metadata until details are requested", () => {
+    const row = {
+      key_name: "midtrans.server_key" as const,
+      display_name: "Midtrans Server Key",
+      description: "Server credential",
+      value_kind: "secret" as const,
+      is_secret: true,
+      is_required: true,
+      is_runtime_required: true,
+      version_id: "version-secret",
+      version_number: 2,
+      status: "active",
+      masked_value: "SB-Mid-****7890",
+      value_fingerprint: "fingerprint-secret",
+      non_secret_value: "PLAINTEXT_SENTINEL_DO_NOT_RENDER",
+      updated_by: "admin-1",
+      updated_at: "2026-05-19T09:00:00Z",
+    };
+    const auditRow = {
+      id: "audit-1",
+      key_name: "midtrans.server_key",
+      version_id: "version-secret",
+      action: "secret_rotated",
+      actor_id: "admin-1",
+      actor_role: "admin",
+      source: "admin_gateway",
+      request_id: "request-1",
+      reason: "scheduled rotation",
+      old_version_number: 1,
+      new_version_number: 2,
+      old_masked_value: "SB-Mid-****1234",
+      new_masked_value: "SB-Mid-****7890",
+      value_fingerprint: "fingerprint-secret",
+      metadata: { note: "PLAINTEXT_SENTINEL_DO_NOT_RENDER" },
+      created_at: "2026-05-19T10:00:00Z",
+    };
+    const runtimeRead = { ...auditRow, id: "runtime-read", action: "runtime_read", request_id: "request-runtime-read" };
+
+    render(
+      <OperationalConfigRow
+        row={row}
+        actions={<ConfigDetailsDisclosure row={row} auditRows={[auditRow]} lastRuntimeRead={runtimeRead} />}
+      />
+    );
+
+    expect(screen.getByText("Midtrans Server Key")).not.toBeNull();
+    expect(document.body.textContent).not.toContain("midtrans.server_key");
+    expect(document.body.textContent).not.toContain("Runtime required");
+    expect(document.body.textContent).not.toContain("Last runtime read");
+    expect(document.body.textContent).not.toContain("request-runtime-read");
+    expect(document.body.textContent).not.toContain("request-1");
+    expect(document.body.textContent).not.toContain("version-secret");
+    expect(document.body.textContent).not.toContain("scheduled rotation");
+    expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
+
+    fireEvent.click(screen.getByRole("button", { name: "Details" }));
+
+    expect(screen.getByRole("dialog")).not.toBeNull();
+    expect(document.body.textContent).toContain("midtrans.server_key");
+    expect(document.body.textContent).toContain("version-secret");
+    expect(document.body.textContent).toContain("request-runtime-read");
+    expect(document.body.textContent).toContain("request-1");
+    expect(document.body.textContent).toContain("scheduled rotation");
+    expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
+  });
+
+  it("creates blank secret replacement drafts instead of hydrating masked or plaintext values", () => {
+    const draft = createBlankSecretReplacementDraft({
+      key_name: "midtrans.server_key",
+      masked_value: "SB-Mid-****7890",
+      non_secret_value: "PLAINTEXT_SENTINEL_DO_NOT_RENDER",
+    });
+
+    expect(draft.value).toBe("");
+    expect(JSON.stringify(draft)).not.toContain("SB-Mid-****7890");
+    expect(JSON.stringify(draft)).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
   });
 
   it("renders masked integration config and every required audit field without plaintext sentinels", async () => {

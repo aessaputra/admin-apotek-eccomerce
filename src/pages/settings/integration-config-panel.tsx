@@ -9,8 +9,7 @@ import {
   type IntegrationConfigValueKind,
   type RuntimeConfigKey,
 } from "./integration-config-client";
-
-const SECRET_KEYS: RuntimeConfigKey[] = ["midtrans.server_key", "biteship.api_key", "push.expo_access_token"];
+import { isSecretRuntimeConfigKey } from "./integration-config-ownership";
 
 const SECTION_KEYS: Record<string, RuntimeConfigKey[]> = {
   midtrans: ["midtrans.server_key", "midtrans.is_production"],
@@ -52,7 +51,7 @@ interface RotateModalState {
 const emptyRotateForm: RotateFormState = { secret: "", confirmation: "", reason: "" };
 
 function isSecretKey(key: RuntimeConfigKey): boolean {
-  return SECRET_KEYS.includes(key);
+  return isSecretRuntimeConfigKey(key);
 }
 
 function isArrayKind(kind: IntegrationConfigValueKind): boolean {
