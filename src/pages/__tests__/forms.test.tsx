@@ -1053,7 +1053,7 @@ describe("form pages", () => {
     expect(await within(shippingPanel).findByLabelText("Biteship API Key")).not.toBeNull();
     expect(within(shippingPanel).getByText("Active Couriers")).not.toBeNull();
     expect(within(shippingPanel).getByText("Origin Area")).not.toBeNull();
-    expect(within(shippingPanel).getByLabelText("Postal Code")).not.toBeNull();
+    expect(within(shippingPanel).getByLabelText("Postal Code").getAttribute("readonly")).not.toBeNull();
     expect(within(shippingPanel).getByText("Store Location")).not.toBeNull();
     expect(within(shippingPanel).getByLabelText("Latitude")).not.toBeNull();
     expect(within(shippingPanel).getByLabelText("Longitude")).not.toBeNull();
@@ -1064,16 +1064,45 @@ describe("form pages", () => {
     expect(within(shippingPanel).getByLabelText("Organization")).not.toBeNull();
 
     expect((within(shippingPanel).getByLabelText("Biteship API Key") as HTMLInputElement).value).toBe("");
-    expect(shippingPanel.textContent).not.toContain("biteship.api_key");
-    expect(shippingPanel.textContent).not.toContain("shop.organization");
-    expect(shippingPanel.textContent).not.toContain("Runtime required");
-    expect(shippingPanel.textContent).not.toContain("Last runtime read");
-    expect(shippingPanel.textContent).not.toContain("Reason");
-    expect(shippingPanel.textContent).not.toContain("source");
-    expect(shippingPanel.textContent).not.toContain("version-biteship-secret");
-    expect(shippingPanel.textContent).not.toContain("request-runtime-read");
-    expect(shippingPanel.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
-    expect(shippingPanel.textContent).not.toContain("BS-****9999");
+    for (const forbiddenPrimaryShippingText of [
+      "biteship.api_key",
+      "biteship.enabled_couriers",
+      "biteship.origin_postal_code",
+      "biteship.origin_area_id",
+      "biteship.origin_latitude",
+      "biteship.origin_longitude",
+      "shop.shipper_name",
+      "shop.shipper_phone",
+      "shop.shipper_email",
+      "shop.address",
+      "shop.organization",
+      "Tidak diketahui",
+      "Wajib untuk runtime",
+      "Terakhir dibaca runtime",
+      "Runtime required",
+      "Last runtime read",
+      "Reason",
+      "Alasan",
+      "source",
+      "settings_shipping_save",
+      "version-biteship-secret",
+      "version-couriers",
+      "version-postal",
+      "version-area",
+      "version-lat",
+      "version-lng",
+      "version-shipper-name",
+      "version-shipper-phone",
+      "version-shipper-email",
+      "version-address",
+      "version-organization",
+      "request-1",
+      "request-runtime-read",
+      "PLAINTEXT_SENTINEL_DO_NOT_RENDER",
+      "BS-****9999",
+    ]) {
+      expect(shippingPanel.textContent).not.toContain(forbiddenPrimaryShippingText);
+    }
 
     expect(screen.queryByLabelText("New value for biteship.enabled_couriers")).toBeNull();
     expect(screen.queryByLabelText("New value for shop.organization")).toBeNull();

@@ -311,29 +311,15 @@ export const ShippingSettingsPanel: React.FC = () => {
                     onAreaSelect={handleAreaSelect}
                     placeholder={translate("settings.fields.originAreaIdPlaceholder", {}, "Search area, district, or city...")}
                   />
+                  <Input
+                    aria-label={translate("settings.fields.originPostalCode", {}, "Postal Code")}
+                    readOnly
+                    value={originPostalCodeDraft}
+                  />
                   <Button loading={updateRuntimeMutation.isPending} onClick={() => saveRuntimeUpdates([
                     { key: "biteship.origin_area_id", value: originAreaIdDraft },
                     { key: "biteship.origin_postal_code", value: originPostalCodeDraft },
                   ])}>
-                    {translate("buttons.save", {}, "Simpan")}
-                  </Button>
-                </Space>
-              </OperationalConfigRow>
-            ) : null}
-            {originPostalCodeRow ? (
-              <OperationalConfigRow
-                row={withShippingDisplay(originPostalCodeRow, translate("settings.fields.originPostalCode", {}, "Postal Code"), translate("settings.shipping.postalCode.description", {}, "Kode pos asal yang dipakai Biteship."))}
-              >
-                <Space direction="vertical" style={{ width: "100%" }}>
-                  <Input
-                    aria-label={translate("settings.fields.originPostalCode", {}, "Postal Code")}
-                    maxLength={5}
-                    inputMode="numeric"
-                    value={originPostalCodeDraft}
-                    onChange={(event) => setOriginPostalCodeDraft(event.target.value)}
-                    placeholder={translate("settings.fields.originPostalCodePlaceholder", {}, "Enter postal code")}
-                  />
-                  <Button loading={updateRuntimeMutation.isPending} onClick={() => saveRuntimeUpdates([{ key: "biteship.origin_postal_code", value: originPostalCodeDraft }])}>
                     {translate("buttons.save", {}, "Simpan")}
                   </Button>
                 </Space>
