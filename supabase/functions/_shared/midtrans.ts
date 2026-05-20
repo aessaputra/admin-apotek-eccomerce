@@ -180,6 +180,7 @@ type MidtransPaymentConfigBindingRow = {
   is_production_version_id?: string | null;
   is_production_version_number?: number | null;
   is_production?: boolean | null;
+  binding_source?: string | null;
 };
 
 export class MidtransRuntimeConfigError extends Error {
@@ -282,12 +283,34 @@ export async function resolveMidtransWebhookRuntimeConfig(
 
   if (binding) {
     const boundConfig = await resolveBoundMidtransRuntimeConfig(adminClient, binding);
-    return {
-      config: boundConfig,
-      signatureValid: await verifyMidtransSignatureWithConfig(payload, boundConfig),
-    };
+    const boundSignatureValid = await verifyMidtransSignatureWithConfig(
+      payload,
+      boundConfig,
+    );
+
+    if (boundSignatureValid || !isLegacyMidtransBinding(binding)) {
+      return {
+        config: boundConfig,
+        signatureValid: boundSignatureValid,
+      };
+    }
+
+    const fallbackResolution = await resolveMidtransWebhookCandidateConfig(
+      adminClient,
+      payload,
+    );
+    return fallbackResolution.signatureValid
+      ? fallbackResolution
+      : { config: boundConfig, signatureValid: false };
   }
 
+  return resolveMidtransWebhookCandidateConfig(adminClient, payload);
+}
+
+async function resolveMidtransWebhookCandidateConfig(
+  adminClient: RuntimeConfigAdminClient,
+  payload: Pick<MidtransWebhookPayload, "order_id" | "status_code" | "gross_amount" | "signature_key">,
+): Promise<{ config: MidtransRuntimeConfig; signatureValid: boolean }> {
   const candidates = await resolveMidtransSignatureCandidates(adminClient);
   if (candidates.length === 0) {
     throw new MidtransRuntimeConfigError();
@@ -301,6 +324,12 @@ export async function resolveMidtransWebhookRuntimeConfig(
 
   return { config: candidates[0], signatureValid: false };
 }
+
+function isLegacyMidtransBinding(binding: MidtransPaymentConfigBindingRow): boolean {
+  return binding.binding_source === "legacy_backfill" ||
+    binding.binding_source === "legacy_rollout_backfill";
+}
+
 async function getMidtransPaymentConfigBinding(
   adminClient: RuntimeConfigAdminClient,
   midtransOrderId: string,

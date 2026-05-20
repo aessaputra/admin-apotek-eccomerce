@@ -399,11 +399,6 @@ describe("processWebhookSideEffectTask cart cleanup", () => {
   });
 
   it("blocks Biteship creation retryably when the required snapshot is missing", async () => {
-    vi.stubGlobal("Deno", {
-      env: {
-        get: vi.fn((key: string) => key === "BITESHIP_API_KEY" ? "placeholder-biteship-key" : undefined),
-      },
-    });
     vi.mocked(readBiteshipOrderConfigSnapshot).mockRejectedValue(
       new Error("Biteship config snapshot missing for order order-selected-cleanup"),
     );

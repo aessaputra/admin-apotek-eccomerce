@@ -407,6 +407,87 @@ describe("Midtrans runtime config resolution", () => {
     expect(env.get).not.toHaveBeenCalled();
   });
 
+
+
+  it("falls back to grace candidates when a legacy binding signature does not match", async () => {
+    const payload = {
+      order_id: "MIDTRANS-LEGACY-GRACE-ORDER",
+      status_code: "200",
+      gross_amount: "150000.00",
+      signature_key: await makeSignature(
+        "MIDTRANS-LEGACY-GRACE-ORDER",
+        "200",
+        "150000.00",
+        "midtrans-grace-sentinel-key",
+      ),
+    };
+    const adminClient = {
+      rpc: vi.fn(async (name: string, args: Record<string, unknown>) => {
+        if (name === "get_midtrans_payment_config_binding") {
+          return {
+            data: [{
+              payment_id: "payment-legacy",
+              midtrans_order_id: "MIDTRANS-LEGACY-GRACE-ORDER",
+              server_key_version_number: 6,
+              is_production_version_number: 2,
+              binding_source: "legacy_rollout_backfill",
+            }],
+            error: null,
+          };
+        }
+
+        const keyNames = args.p_key_names as string[];
+        const versionNumbers = args.p_version_numbers as Record<string, number>;
+        if (versionNumbers["midtrans.server_key"] === 6) {
+          return {
+            data: [{
+              ...createRuntimeRows()[0],
+              version_id: "server-bound-wrong-version-id",
+              version_number: 6,
+              status: "retired",
+              runtime_value: "midtrans-wrong-active-backfill-key",
+            }],
+            error: null,
+          };
+        }
+
+        if (versionNumbers["midtrans.is_production"] === 2) {
+          return {
+            data: [{
+              ...createRuntimeRows()[2],
+              version_id: "production-bound-wrong-version-id",
+              version_number: 2,
+              status: "retired",
+              runtime_value: false,
+            }],
+            error: null,
+          };
+        }
+
+        return {
+          data: createRuntimeRows().filter((row) =>
+            !keyNames || keyNames.includes(row.key_name)
+          ),
+          error: null,
+        };
+      }),
+    };
+
+    const resolution = await resolveMidtransWebhookRuntimeConfig(
+      adminClient,
+      payload,
+    );
+
+    expect(resolution.signatureValid).toBe(true);
+    expect(resolution.config).toMatchObject({
+      source: "grace",
+      serverKey: "midtrans-grace-sentinel-key",
+      isProduction: true,
+      serverKeyVersionNumber: 9,
+      isProductionVersionNumber: 3,
+    });
+  });
+
   it("uses transaction-bound config versions before active or grace candidates", async () => {
     const payload = {
       order_id: "MIDTRANS-BOUND-ORDER",
