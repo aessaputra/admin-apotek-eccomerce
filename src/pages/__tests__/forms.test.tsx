@@ -1258,11 +1258,17 @@ describe("form pages", () => {
     fireEvent.click(screen.getByRole("button", { name: "Details" }));
 
     expect(screen.getByRole("dialog")).not.toBeNull();
-    expect(document.body.textContent).toContain("midtrans.server_key");
-    expect(document.body.textContent).toContain("version-secret");
-    expect(document.body.textContent).toContain("request-runtime-read");
-    expect(document.body.textContent).toContain("request-1");
-    expect(document.body.textContent).toContain("scheduled rotation");
+    expect(document.body.textContent).toContain("Key: midtrans.server_key");
+    expect(document.body.textContent).toContain("Version ID: version-secret");
+    expect(document.body.textContent).toContain("Version: 2");
+    expect(document.body.textContent).toContain("Last runtime read request: request-runtime-read");
+    expect(document.body.textContent).toContain("Request: request-1");
+    expect(document.body.textContent).toContain("Actor role: admin");
+    expect(document.body.textContent).toContain("Actor ID: admin-1");
+    expect(document.body.textContent).toContain("Source: admin_gateway");
+    expect(document.body.textContent).toContain("Reason: scheduled rotation");
+    expect(document.body.textContent).toContain("Old: SB-Mid-****1234");
+    expect(document.body.textContent).toContain("New: SB-Mid-****7890");
     expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
   });
 
@@ -1278,7 +1284,7 @@ describe("form pages", () => {
     expect(JSON.stringify(draft)).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
   });
 
-  it("renders masked integration config and every required audit field without plaintext sentinels", async () => {
+  it("advanced section does not render moved domain edit controls", async () => {
     mocks.useForm.mockReturnValue({
       formProps: {},
       saveButtonProps: {},
@@ -1290,29 +1296,146 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    expect(await screen.findAllByText("SB-Mid-****7890")).not.toHaveLength(0);
-    expect(document.body.textContent).toContain("SB-Mid-****1234");
-    expect(document.body.textContent).toContain(`Last runtime read: ${new Date("2026-05-19T11:00:00Z").toLocaleString("id-ID")}`);
-    expect(document.body.textContent).toContain("request-runtime-read");
-    expect(document.body.textContent).toContain("Last runtime read: -");
-    expect(document.body.textContent).toContain("secret_rotated");
-    expect(document.body.textContent).toContain("midtrans.server_key");
-    expect(document.body.textContent).toContain("Old: SB-Mid-****1234");
-    expect(document.body.textContent).toContain("New: SB-Mid-****7890");
-    expect(document.body.textContent).toContain("1 → 2");
-    expect(document.body.textContent).toContain("admin");
-    expect(document.body.textContent).toContain("admin-1");
-    expect(document.body.textContent).toContain("admin_gateway");
-    expect(document.body.textContent).toContain("scheduled rotation");
-    expect(document.body.textContent).toContain(new Date("2026-05-19T10:00:00Z").toLocaleString("id-ID"));
-    expect(document.body.textContent).toContain("request-1");
-    expect(screen.queryByText("PLAINTEXT_SENTINEL_DO_NOT_RENDER")).toBeNull();
-    expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
-    expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", { body: { action: "summary", keys: undefined } });
-    expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", { body: { action: "audit", key: undefined, limit: 50 } });
+    const advancedPanel = await screen.findByRole("region", { name: "Konfigurasi Integrasi" });
+    expect(await within(advancedPanel).findByLabelText("Expo Push Token")).not.toBeNull();
+    expect(within(advancedPanel).getByLabelText("Allowed Origins")).not.toBeNull();
+    expect(within(advancedPanel).getByRole("button", { name: "Lihat audit teknis" })).not.toBeNull();
+
+    expect(advancedPanel.textContent).not.toContain("Midtrans Server Key");
+    expect(advancedPanel.textContent).not.toContain("Mode Midtrans");
+    expect(advancedPanel.textContent).not.toContain("Biteship API Key");
+    expect(advancedPanel.textContent).not.toContain("Active Couriers");
+    expect(advancedPanel.textContent).not.toContain("Shipper Name");
+    expect(advancedPanel.textContent).not.toContain("midtrans.server_key");
+    expect(advancedPanel.textContent).not.toContain("biteship.api_key");
+    expect(advancedPanel.textContent).not.toContain("shop.organization");
+    expect(advancedPanel.textContent).not.toContain("Runtime required");
+    expect(advancedPanel.textContent).not.toContain("Last runtime read");
+    expect(advancedPanel.textContent).not.toContain("Reason");
+    expect(advancedPanel.textContent).not.toContain("request-runtime-read");
+    expect(advancedPanel.textContent).not.toContain("version-secret");
+    expect(advancedPanel.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
+    expect(within(advancedPanel).queryByRole("button", { name: "Rotate secret" })).toBeNull();
+    expect(within(advancedPanel).queryByRole("button", { name: "Save value" })).toBeNull();
+
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "summary",
+        keys: ["push.expo_access_token", "cors.allowed_origins"],
+      },
+    }));
   });
 
-  it("shows safe loading and non-admin gateway errors without raw response internals", async () => {
+  it("details drawer shows sanitized metadata only", async () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    const advancedPanel = await screen.findByRole("region", { name: "Konfigurasi Integrasi" });
+    expect(document.body.textContent).not.toContain("request-1");
+    expect(document.body.textContent).not.toContain("request-runtime-read");
+    expect(document.body.textContent).not.toContain("version-secret");
+    expect(document.body.textContent).not.toContain("admin_gateway");
+    expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
+
+    fireEvent.click(within(advancedPanel).getByRole("button", { name: "Lihat audit teknis" }));
+
+    expect(screen.getByRole("dialog")).not.toBeNull();
+    expect(document.body.textContent).toContain("Payment configuration");
+    expect(document.body.textContent).toContain("secret_rotated");
+    expect(document.body.textContent).toContain("Key: midtrans.server_key");
+    expect(document.body.textContent).toContain("Version ID: version-secret");
+    expect(document.body.textContent).toContain("Version: 2");
+    expect(document.body.textContent).toContain("Request: request-1");
+    expect(document.body.textContent).toContain("Request: request-runtime-read");
+    expect(document.body.textContent).toContain("Actor role: admin");
+    expect(document.body.textContent).toContain("Actor ID: admin-1");
+    expect(document.body.textContent).toContain("Actor role: service_role");
+    expect(document.body.textContent).toContain("Source: admin_gateway");
+    expect(document.body.textContent).toContain("Source: edge_function");
+    expect(document.body.textContent).toContain("Reason: scheduled rotation");
+    expect(document.body.textContent).toContain("Old: SB-Mid-****1234");
+    expect(document.body.textContent).toContain("New: SB-Mid-****7890");
+    expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
+  });
+
+  it("advanced technical settings rotates the Expo push token with a hidden reason", async () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    const advancedPanel = await screen.findByRole("region", { name: "Konfigurasi Integrasi" });
+    const pushTokenInput = await within(advancedPanel).findByLabelText("Expo Push Token") as HTMLInputElement;
+    const pushTokenRow = pushTokenInput.closest("div")?.parentElement as HTMLElement;
+
+    fireEvent.click(within(pushTokenRow).getByRole("button", { name: "Simpan" }));
+    expect(mocks.functionsInvoke.mock.calls.some((call) => call[1]?.body?.key === "push.expo_access_token")).toBe(false);
+
+    fireEvent.change(pushTokenInput, { target: { value: "TEST_NEW_EXPO_ACCESS_TOKEN" } });
+    fireEvent.click(within(pushTokenRow).getByRole("button", { name: "Simpan" }));
+
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "rotateSecret",
+        key: "push.expo_access_token",
+        secret: "TEST_NEW_EXPO_ACCESS_TOKEN",
+        reason: "settings_technical_save",
+      },
+    }));
+    const rotateBody = mocks.functionsInvoke.mock.calls.find((call) => call[1]?.body?.key === "push.expo_access_token")?.[1]?.body;
+    expect(rotateBody).not.toHaveProperty("source");
+    await waitFor(() => expect(pushTokenInput.value).toBe(""));
+  });
+
+  it("advanced technical settings sends CORS origins updates as arrays", async () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    const advancedPanel = await screen.findByRole("region", { name: "Konfigurasi Integrasi" });
+    const allowedOriginsInput = await within(advancedPanel).findByLabelText("Allowed Origins");
+    const allowedOriginsRow = allowedOriginsInput.closest("div")?.parentElement as HTMLElement;
+
+    fireEvent.change(allowedOriginsInput, {
+      target: { value: "https://admin.example.test, https://ops.example.test" },
+    });
+    fireEvent.click(within(allowedOriginsRow).getByRole("button", { name: "Simpan" }));
+
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "updateValue",
+        key: "cors.allowed_origins",
+        value: ["https://admin.example.test", "https://ops.example.test"],
+        reason: "settings_technical_save",
+      },
+    }));
+    const updateBody = mocks.functionsInvoke.mock.calls.find((call) => call[1]?.body?.key === "cors.allowed_origins")?.[1]?.body;
+    expect(updateBody).not.toHaveProperty("source");
+    expect(advancedPanel.textContent).not.toContain("Reason");
+  });
+
+  it("advanced technical settings shows safe loading and gateway errors without raw response internals", async () => {
     mocks.useForm.mockReturnValue({
       formProps: {},
       saveButtonProps: {},
@@ -1341,256 +1464,15 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    expect(await screen.findAllByText("Loading integration configuration...")).not.toHaveLength(0);
-    expect(screen.getByText("Loading audit trail...")).not.toBeNull();
+    const advancedPanel = await screen.findByRole("region", { name: "Konfigurasi Integrasi" });
+    expect(within(advancedPanel).getByText("Loading integration configuration...")).not.toBeNull();
 
     resolveSummary?.({ data: { error: "Only admin can manage integration config PLAINTEXT_SENTINEL_DO_NOT_RENDER" }, error: null });
     resolveAudit?.({ data: { error: "Only admin can manage integration config PLAINTEXT_SENTINEL_DO_NOT_RENDER" }, error: null });
 
-    expect(await screen.findAllByText("Integration configuration could not be loaded.")).not.toHaveLength(0);
-    expect(screen.getByText("Audit trail could not be loaded.")).not.toBeNull();
+    expect(await within(advancedPanel).findByText("Integration configuration could not be loaded.")).not.toBeNull();
     expect(document.body.textContent).not.toContain("Only admin can manage integration config");
     expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
-  });
-
-  it("renders safe localized gateway errors for update failures without plaintext response data", async () => {
-    mocks.useForm.mockReturnValue({
-      formProps: {},
-      saveButtonProps: {},
-      form: {
-        setFieldValue: mocks.setFieldValue,
-        getFieldValue: mocks.getFieldValue,
-      },
-    });
-
-    renderWithQueryClient(<Settings />);
-
-    const modeInput = await screen.findByLabelText("New value for midtrans.is_production");
-    fireEvent.change(modeInput, { target: { value: "true" } });
-    const modeAdvancedRow = modeInput.closest("div")?.parentElement as HTMLElement;
-    fireEvent.click(within(modeAdvancedRow).getByRole("button", { name: "Save value" }));
-    expect(mocks.messageError).toHaveBeenCalledWith("Enter a reason.");
-    expect(mocks.functionsInvoke.mock.calls.some((call) => call[1]?.body?.action === "updateValue")).toBe(false);
-
-    mocks.messageError.mockClear();
-    mocks.functionsInvoke.mockImplementation((_name: string, { body }: { body: Record<string, unknown> }) => {
-      if (body.action === "summary") {
-        return Promise.resolve({ data: { data: [] }, error: null });
-      }
-
-      if (body.action === "audit") {
-        return Promise.resolve({ data: { data: [] }, error: null });
-      }
-
-      if (body.action === "updateValue") {
-        return Promise.resolve({ data: { error: "Validation failed for PLAINTEXT_SENTINEL_DO_NOT_RENDER" }, error: null });
-      }
-
-      return Promise.resolve({ data: { data: { ok: true } }, error: null });
-    });
-
-    fireEvent.change(screen.getByLabelText("Reason for midtrans.is_production"), { target: { value: "enable production mode" } });
-    fireEvent.click(within(modeAdvancedRow).getByRole("button", { name: "Save value" }));
-
-    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
-      body: {
-        action: "updateValue",
-        key: "midtrans.is_production",
-        value: true,
-        reason: "enable production mode",
-      },
-    }));
-    await waitFor(() => expect(mocks.messageError).toHaveBeenCalledWith("Configuration update failed."));
-    expect(mocks.messageError.mock.calls.flat().join(" ")).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
-    expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
-  });
-
-  it("sends technical text_array integration config updates as arrays", async () => {
-    mocks.useForm.mockReturnValue({
-      formProps: {},
-      saveButtonProps: {},
-      form: {
-        setFieldValue: mocks.setFieldValue,
-        getFieldValue: mocks.getFieldValue,
-      },
-    });
-    mocks.functionsInvoke.mockImplementation((_name: string, { body }: { body: Record<string, unknown> }) => {
-      if (body.action === "summary") {
-        return Promise.resolve({
-          data: {
-            data: [
-              {
-                key_name: "cors.allowed_origins",
-                display_name: "Allowed origins",
-                description: "Allowed CORS origins",
-                value_kind: "text_array",
-                is_secret: false,
-                is_required: true,
-                is_runtime_required: true,
-                version_id: "version-cors",
-                version_number: 1,
-                status: "active",
-                masked_value: null,
-                value_fingerprint: null,
-                non_secret_value: ["https://admin.example.test"],
-                updated_by: "admin-1",
-                updated_at: "2026-05-19T09:00:00Z",
-              },
-            ],
-          },
-          error: null,
-        });
-      }
-
-      if (body.action === "audit") {
-        return Promise.resolve({ data: { data: [] }, error: null });
-      }
-
-      return Promise.resolve({ data: { data: { ok: true } }, error: null });
-    });
-
-    renderWithQueryClient(<Settings />);
-
-    fireEvent.change(await screen.findByLabelText("New value for cors.allowed_origins"), {
-      target: { value: "https://admin.example.test, https://ops.example.test" },
-    });
-    fireEvent.change(screen.getByLabelText("Reason for cors.allowed_origins"), {
-      target: { value: "refresh allowed origins" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Save value" }));
-
-    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
-      body: {
-        action: "updateValue",
-        key: "cors.allowed_origins",
-        value: ["https://admin.example.test", "https://ops.example.test"],
-        reason: "refresh allowed origins",
-      },
-    }));
-  });
-
-  it("requires rotate secret, confirmation phrase, and reason before calling the gateway", async () => {
-    mocks.useForm.mockReturnValue({
-      formProps: {},
-      saveButtonProps: {},
-      form: {
-        setFieldValue: mocks.setFieldValue,
-        getFieldValue: mocks.getFieldValue,
-      },
-    });
-
-    renderWithQueryClient(<Settings />);
-
-    fireEvent.click((await screen.findAllByRole("button", { name: "Rotate secret" }))[0]);
-    expect(screen.getByRole("dialog")).not.toBeNull();
-    expect((screen.getByLabelText("New secret") as HTMLInputElement).value).toBe("");
-
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Rotate secret" }));
-
-    expect(await screen.findByText("Enter the new secret.")).not.toBeNull();
-    expect(screen.getByText("Type ROTATE to confirm.")).not.toBeNull();
-    expect(screen.getByText("Enter a reason.")).not.toBeNull();
-    expect(mocks.functionsInvoke.mock.calls.some((call) => call[1]?.body?.action === "rotateSecret")).toBe(false);
-
-    fireEvent.change(screen.getByLabelText("New secret"), { target: { value: "TEST_NEW_SECRET_SENTINEL" } });
-    fireEvent.change(screen.getByLabelText("Type ROTATE"), { target: { value: "ROTATE" } });
-    fireEvent.change(screen.getByLabelText("Rotation reason"), { target: { value: "scheduled rotation" } });
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Rotate secret" }));
-
-    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
-      body: {
-        action: "rotateSecret",
-        key: "midtrans.server_key",
-        secret: "TEST_NEW_SECRET_SENTINEL",
-        reason: "scheduled rotation",
-      },
-    }));
-    await waitFor(() => expect(mocks.messageSuccess).toHaveBeenCalledWith("Secret rotated safely."));
-  });
-
-  it("keeps rotate secret input masked and removes the password reveal control", async () => {
-    mocks.useForm.mockReturnValue({
-      formProps: {},
-      saveButtonProps: {},
-      form: {
-        setFieldValue: mocks.setFieldValue,
-        getFieldValue: mocks.getFieldValue,
-      },
-    });
-
-    renderWithQueryClient(<Settings />);
-
-    fireEvent.click((await screen.findAllByRole("button", { name: "Rotate secret" }))[0]);
-    const secretInput = screen.getByLabelText("New secret") as HTMLInputElement;
-
-    expect(within(screen.getByRole("dialog")).queryByRole("button", { name: /password visibility toggle/i })).toBeNull();
-    expect(secretInput.type).toBe("password");
-
-    fireEvent.change(secretInput, { target: { value: "TEST_NEW_SECRET_SENTINEL" } });
-
-    expect(secretInput.type).toBe("password");
-    expect(secretInput.value).toBe("TEST_NEW_SECRET_SENTINEL");
-  });
-
-  it("renders safe localized gateway errors for rotate failures without plaintext response data", async () => {
-    mocks.useForm.mockReturnValue({
-      formProps: {},
-      saveButtonProps: {},
-      form: {
-        setFieldValue: mocks.setFieldValue,
-        getFieldValue: mocks.getFieldValue,
-      },
-    });
-    mocks.functionsInvoke.mockImplementation((_name: string, { body }: { body: Record<string, unknown> }) => {
-      if (body.action === "summary") {
-        return Promise.resolve({
-          data: {
-            data: [
-              {
-                key_name: "midtrans.server_key",
-                display_name: "Midtrans Server Key",
-                description: "Server credential",
-                value_kind: "secret",
-                is_secret: true,
-                is_required: true,
-                is_runtime_required: true,
-                version_id: "version-secret",
-                version_number: 2,
-                status: "active",
-                masked_value: "SB-Mid-****7890",
-                value_fingerprint: "fingerprint-secret",
-                non_secret_value: null,
-                updated_by: "admin-1",
-                updated_at: "2026-05-19T09:00:00Z",
-              },
-            ],
-          },
-          error: null,
-        });
-      }
-
-      if (body.action === "audit") {
-        return Promise.resolve({ data: { data: [] }, error: null });
-      }
-
-      if (body.action === "rotateSecret") {
-        return Promise.resolve({ data: { error: "Validation failed for TEST_NEW_SECRET_SENTINEL" }, error: null });
-      }
-
-      return Promise.resolve({ data: { data: { ok: true } }, error: null });
-    });
-
-    renderWithQueryClient(<Settings />);
-
-    fireEvent.click((await screen.findAllByRole("button", { name: "Rotate secret" }))[0]);
-    fireEvent.change(screen.getByLabelText("New secret"), { target: { value: "TEST_NEW_SECRET_SENTINEL" } });
-    fireEvent.change(screen.getByLabelText("Type ROTATE"), { target: { value: "ROTATE" } });
-    fireEvent.change(screen.getByLabelText("Rotation reason"), { target: { value: "emergency rotation" } });
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Rotate secret" }));
-
-    await waitFor(() => expect(mocks.messageError).toHaveBeenCalledWith("Secret rotation failed."));
-    expect(mocks.messageError.mock.calls.flat().join(" ")).not.toContain("TEST_NEW_SECRET_SENTINEL");
-    expect(document.body.textContent).not.toContain("TEST_NEW_SECRET_SENTINEL");
   });
 
   it("renders nothing for profile without identity and shows password mismatch feedback when loaded", async () => {

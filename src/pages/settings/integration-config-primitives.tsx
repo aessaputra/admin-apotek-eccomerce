@@ -79,6 +79,10 @@ export interface ConfigDetailsDisclosureProps {
   buttonLabel?: string;
 }
 
+function formatAuditDate(value: string): string {
+  return new Date(value).toLocaleString("id-ID");
+}
+
 export const ConfigDetailsDisclosure: React.FC<ConfigDetailsDisclosureProps> = ({
   row,
   auditRows = [],
@@ -86,16 +90,18 @@ export const ConfigDetailsDisclosure: React.FC<ConfigDetailsDisclosureProps> = (
   buttonLabel = "Details",
 }) => {
   const [open, setOpen] = useState(false);
+  const displayName = row.display_name?.trim() || "Configuration";
 
   return (
     <>
       <Button onClick={() => setOpen(true)}>{buttonLabel}</Button>
-      <Modal open={open} title={row.display_name?.trim() || row.key_name} onCancel={() => setOpen(false)} footer={null}>
+      <Modal open={open} title={displayName} onCancel={() => setOpen(false)} footer={null}>
         <Space direction="vertical" style={{ width: "100%" }}>
           <Typography.Text>Key: {row.key_name}</Typography.Text>
           {row.version_id ? <Typography.Text>Version ID: {row.version_id}</Typography.Text> : null}
           {row.version_number ? <Typography.Text>Version: {row.version_number}</Typography.Text> : null}
           {row.updated_by ? <Typography.Text>Updated by: {row.updated_by}</Typography.Text> : null}
+          {row.updated_at ? <Typography.Text>Updated at: {formatAuditDate(row.updated_at)}</Typography.Text> : null}
           {lastRuntimeRead ? (
             <Typography.Text>Last runtime read request: {lastRuntimeRead.request_id || "-"}</Typography.Text>
           ) : null}
@@ -103,10 +109,15 @@ export const ConfigDetailsDisclosure: React.FC<ConfigDetailsDisclosureProps> = (
             <Card key={auditRow.id} size="small">
               <Space direction="vertical">
                 <Typography.Text>{auditRow.action}</Typography.Text>
+                <Typography.Text>Key: {auditRow.key_name}</Typography.Text>
+                {auditRow.version_id ? <Typography.Text>Version ID: {auditRow.version_id}</Typography.Text> : null}
+                {auditRow.new_version_number ? <Typography.Text>Version: {auditRow.new_version_number}</Typography.Text> : null}
                 <Typography.Text>Request: {auditRow.request_id || "-"}</Typography.Text>
-                <Typography.Text>Actor: {auditRow.actor_role || "-"}</Typography.Text>
+                <Typography.Text>Actor role: {auditRow.actor_role || "-"}</Typography.Text>
+                <Typography.Text>Actor ID: {auditRow.actor_id || "-"}</Typography.Text>
                 <Typography.Text>Source: {auditRow.source || "-"}</Typography.Text>
                 <Typography.Text>Reason: {auditRow.reason || "-"}</Typography.Text>
+                <Typography.Text>{formatAuditDate(auditRow.created_at)}</Typography.Text>
                 <Typography.Text>Old: {auditRow.old_masked_value || "-"}</Typography.Text>
                 <Typography.Text>New: {auditRow.new_masked_value || "-"}</Typography.Text>
               </Space>
