@@ -91,6 +91,16 @@ describe("runtime config version lookup migration", () => {
     expect(privateSql).toContain("case v.status when 'active' then 0 when 'grace' then 1 else 2 end");
   });
 
+  it("uses the SQL coalesce special form for JSONB version request defaults", () => {
+    const privateSql = extractFunctionSql(
+      migrationSql,
+      "private.get_runtime_integration_config_versions",
+    );
+
+    expect(privateSql).not.toContain("pg_catalog.coalesce(p_version_numbers, '{}'::jsonb)");
+    expect(privateSql).toContain("coalesce(p_version_numbers, '{}'::jsonb)");
+  });
+
   it("exposes the version lookup RPC only to service_role", () => {
     expect(normalizedSql).toContain(
       "revoke all on function private.get_runtime_integration_config_versions(text[], jsonb, boolean) from public, anon, authenticated",
