@@ -263,7 +263,7 @@ export const ShippingSettingsPanel: React.FC = () => {
             ) : null}
             {apiKeyRow ? (
               <OperationalConfigRow
-                row={withShippingDisplay(apiKeyRow, translate("settings.shipping.apiKey.label", {}, "Biteship API Key"), translate("settings.shipping.apiKey.description", {}, "Ganti kunci Biteship tanpa menampilkan nilai saat ini."))}
+                row={withShippingDisplay(apiKeyRow, translate("settings.shipping.apiKey.label", {}, "Biteship API Key"), translate("settings.shipping.apiKey.description", {}, ""))}
               >
                 <SecretReplacementInput
                   label={translate("settings.shipping.apiKey.label", {}, "Biteship API Key")}
@@ -302,14 +302,14 @@ export const ShippingSettingsPanel: React.FC = () => {
             ) : null}
             {originAreaIdRow ? (
               <OperationalConfigRow
-                row={withShippingDisplay(originAreaIdRow, translate("settings.fields.originAreaId", {}, "Origin Area"), translate("settings.fields.originAreaIdHelp", {}, "Search Biteship area and apply its postal code."))}
+                row={withShippingDisplay(originAreaIdRow, translate("settings.fields.originAreaId", {}, "Origin Area"), translate("settings.fields.originAreaIdHelp", {}, ""))}
               >
                 <Space direction="vertical" style={{ width: "100%" }}>
                   <BiteshipAreaSearch
                     value={originAreaIdDraft}
                     onChange={setOriginAreaIdDraft}
                     onAreaSelect={handleAreaSelect}
-                    placeholder={translate("settings.fields.originAreaIdPlaceholder", {}, "Search area, district, or city...")}
+                    placeholder={translate("settings.fields.originAreaIdPlaceholder", {}, "Cari kecamatan, kota, atau area Biteship")}
                   />
                   <Input
                     aria-label={translate("settings.fields.originPostalCode", {}, "Postal Code")}
@@ -378,9 +378,9 @@ export const ShippingSettingsPanel: React.FC = () => {
               </OperationalConfigRow>
             ) : null}
             {addressRow ? (
-              <OperationalConfigRow row={withShippingDisplay(addressRow, translate("settings.fields.storeAddress", {}, "Store Address"), translate("settings.shipping.address.description", {}, "Alamat asal yang dikirim ke Biteship."))}>
+              <OperationalConfigRow row={withShippingDisplay(addressRow, translate("settings.fields.storeAddress", {}, "Store Address"), translate("settings.shipping.address.description", {}, ""))}>
                 <Space direction="vertical" style={{ width: "100%" }}>
-                  <Input.TextArea aria-label={translate("settings.fields.storeAddress", {}, "Store Address")} rows={3} value={addressDraft} onChange={(event) => setAddressDraft(event.target.value)} />
+                  <Input.TextArea aria-label={translate("settings.fields.storeAddress", {}, "Store Address")} placeholder={translate("settings.fields.storeAddressPlaceholder", {}, "Alamat asal pengiriman")} rows={3} value={addressDraft} onChange={(event) => setAddressDraft(event.target.value)} />
                   <Button loading={updateRuntimeMutation.isPending} onClick={() => saveRuntimeUpdates([{ key: "shop.address", value: addressDraft }])}>{translate("buttons.save", {}, "Simpan")}</Button>
                 </Space>
               </OperationalConfigRow>

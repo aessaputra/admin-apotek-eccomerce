@@ -840,8 +840,8 @@
       "couriersHelp": "Pilih layanan kurir yang ingin ditampilkan saat perhitungan ongkir. Anda dapat mengatur jenis layanan untuk setiap kurir.",
       "couriersLoadError": "Gagal memuat layanan kurir live. Pengeditan dinonaktifkan sementara agar konfigurasi yang tersimpan tidak tertimpa data parsial.",
       "originAreaId": "Area Pengiriman",
-      "originAreaIdPlaceholder": "Cari kecamatan atau kota...",
-      "originAreaIdHelp": "Opsional jika kode pos atau koordinat peta sudah diatur, tetapi disarankan agar pencocokan area Biteship lebih akurat.",
+      "originAreaIdPlaceholder": "Cari kecamatan, kota, atau area Biteship",
+      "originAreaIdHelp": "",
       "originPostalCode": "Kode Pos",
       "originPostalCodePlaceholder": "Masukkan kode pos",
       "originLatitude": "Lintang",
@@ -850,7 +850,7 @@
       "originLongitudePlaceholder": "Otomatis dari peta",
       "mapLocationPicker": "Lokasi Toko",
       "storeAddress": "Alamat Toko",
-      "storeAddressPlaceholder": "Masukkan alamat lengkap toko",
+      "storeAddressPlaceholder": "Alamat asal pengiriman",
       "primaryLogo": "Logo Utama",
       "primaryLogoPlaceholder": "Unggah Logo"
     },
@@ -991,14 +991,14 @@
       },
       "serverKey": {
         "label": "Midtrans Server Key",
-        "description": "Ganti kunci server tanpa menampilkan nilai saat ini.",
+        "description": "",
         "placeholder": "Kosongkan jika tidak diganti",
         "saveSuccess": "Midtrans server key tersimpan.",
         "saveError": "Midtrans server key gagal disimpan."
       },
       "mode": {
         "label": "Mode Midtrans",
-        "description": "Sandbox untuk uji coba, Produksi untuk transaksi pelanggan.",
+        "description": "Sandbox untuk uji coba. Produksi untuk transaksi pelanggan.",
         "sandbox": "Sandbox",
         "production": "Produksi",
         "saveSuccess": "Mode Midtrans tersimpan.",
@@ -1013,7 +1013,7 @@
       },
       "apiKey": {
         "label": "Biteship API Key",
-        "description": "Ganti kunci Biteship tanpa menampilkan nilai saat ini.",
+        "description": "",
         "placeholder": "Kosongkan jika tidak diganti"
       },
       "postalCode": {
@@ -1035,7 +1035,7 @@
         "description": "Email pengirim untuk referensi operasional."
       },
       "address": {
-        "description": "Alamat asal yang dikirim ke Biteship."
+        "description": ""
       },
       "saveSuccess": "Pengaturan pengiriman tersimpan.",
       "saveError": "Pengaturan pengiriman gagal disimpan."

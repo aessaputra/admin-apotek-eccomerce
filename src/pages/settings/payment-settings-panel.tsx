@@ -127,7 +127,7 @@ export const PaymentSettingsPanel: React.FC = () => {
                 row={withPaymentDisplay(
                   serverKeyRow,
                   serverKeyLabel,
-                  translate("settings.payment.serverKey.description", {}, "Ganti kunci server tanpa menampilkan nilai saat ini.")
+                  translate("settings.payment.serverKey.description", {}, "")
                 )}
                 actions={<ConfigDetailsDisclosure row={serverKeyRow} buttonLabel={translate("settings.payment.details", {}, "Detail")} />}
               >
@@ -147,7 +147,7 @@ export const PaymentSettingsPanel: React.FC = () => {
                 row={withPaymentDisplay(
                   modeRow,
                   modeLabel,
-                  translate("settings.payment.mode.description", {}, "Sandbox untuk uji coba, Produksi untuk transaksi pelanggan.")
+                  translate("settings.payment.mode.description", {}, "Sandbox untuk uji coba. Produksi untuk transaksi pelanggan.")
                 )}
                 actions={<ConfigDetailsDisclosure row={modeRow} buttonLabel={translate("settings.payment.details", {}, "Detail")} />}
               >

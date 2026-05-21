@@ -840,8 +840,8 @@
       "couriersHelp": "Choose which courier services should appear during shipping rate calculation. You can configure service types for each courier.",
       "couriersLoadError": "Failed to load live courier services. Editing is temporarily disabled to avoid saving incomplete data.",
       "originAreaId": "Origin Area",
-      "originAreaIdPlaceholder": "Search area, district, or city...",
-      "originAreaIdHelp": "Optional when postal code or map coordinates are already configured, but recommended for the most accurate Biteship area matching.",
+      "originAreaIdPlaceholder": "Search district, city, or Biteship area",
+      "originAreaIdHelp": "",
       "originPostalCode": "Postal Code",
       "originPostalCodePlaceholder": "Enter postal code",
       "originLatitude": "Latitude",
@@ -850,7 +850,7 @@
       "originLongitudePlaceholder": "Auto-filled from map",
       "mapLocationPicker": "Store Location",
       "storeAddress": "Full Store Address",
-      "storeAddressPlaceholder": "Enter full store address",
+      "storeAddressPlaceholder": "Shipping origin address",
       "primaryLogo": "Primary Logo",
       "primaryLogoPlaceholder": "Upload Logo"
     },
@@ -991,14 +991,14 @@
       },
       "serverKey": {
         "label": "Midtrans Server Key",
-        "description": "Replace the server key without showing the current value.",
+        "description": "",
         "placeholder": "Leave blank to keep current",
         "saveSuccess": "Midtrans server key saved.",
         "saveError": "Midtrans server key could not be saved."
       },
       "mode": {
         "label": "Midtrans Mode",
-        "description": "Sandbox for testing, Production for customer transactions.",
+        "description": "Sandbox for testing. Production for customer transactions.",
         "sandbox": "Sandbox",
         "production": "Production",
         "saveSuccess": "Midtrans mode saved.",
@@ -1013,7 +1013,7 @@
       },
       "apiKey": {
         "label": "Biteship API Key",
-        "description": "Replace the Biteship key without showing the current value.",
+        "description": "",
         "placeholder": "Leave blank to keep current"
       },
       "postalCode": {
@@ -1035,7 +1035,7 @@
         "description": "Sender email for operational reference."
       },
       "address": {
-        "description": "Origin address sent to Biteship."
+        "description": ""
       },
       "saveSuccess": "Shipping settings saved.",
       "saveError": "Shipping settings could not be saved."

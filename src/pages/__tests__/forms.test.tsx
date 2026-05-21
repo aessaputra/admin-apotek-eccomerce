@@ -147,19 +147,24 @@ vi.mock("../../components/biteship-area-search", () => ({
   BiteshipAreaSearch: ({
     onAreaSelect,
     onChange,
+    placeholder,
   }: {
     onAreaSelect?: (area: { areaId: string; areaName: string; postalCode: number }) => void;
     onChange?: (areaId: string) => void;
+    placeholder?: string;
   }) => (
-    <button
-      type="button"
-      onClick={() => {
-        onChange?.("area-runtime-1");
-        onAreaSelect?.({ areaId: "area-runtime-1", areaName: "Kebayoran Baru", postalCode: 12110 });
-      }}
-    >
-      BiteshipAreaSearch
-    </button>
+    <>
+      <input aria-label="Biteship area search" placeholder={placeholder} readOnly />
+      <button
+        type="button"
+        onClick={() => {
+          onChange?.("area-runtime-1");
+          onAreaSelect?.({ areaId: "area-runtime-1", areaName: "Kebayoran Baru", postalCode: 12110 });
+        }}
+      >
+        BiteshipAreaSearch
+      </button>
+    </>
   ),
 }));
 
@@ -248,6 +253,7 @@ vi.mock("antd", () => {
         aria-label={ariaLabel ?? placeholder ?? "input"}
         onBlur={onBlur}
         onChange={onChange}
+        placeholder={placeholder}
         readOnly={readOnly}
         value={value}
         type={type}
@@ -283,6 +289,7 @@ vi.mock("antd", () => {
           data-disabled={disabled ? "true" : "false"}
           value={value}
           onChange={onChange}
+          placeholder={placeholder}
           style={style}
         />
       ),
@@ -300,7 +307,7 @@ vi.mock("antd", () => {
         visibilityToggle?: boolean;
       }) => (
         <span>
-          <input aria-label={ariaLabel ?? placeholder ?? "password"} value={value} onChange={onChange} type="password" />
+          <input aria-label={ariaLabel ?? placeholder ?? "password"} placeholder={placeholder} value={value} onChange={onChange} type="password" />
           {visibilityToggle === false ? null : <button type="button" aria-label="password visibility toggle">show</button>}
         </span>
       ),
@@ -1026,8 +1033,13 @@ describe("form pages", () => {
     const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
     expect(await within(paymentPanel).findByText("Midtrans Server Key")).not.toBeNull();
     expect(within(paymentPanel).getByText("Mode Midtrans")).not.toBeNull();
-    expect((within(paymentPanel).getByLabelText("Midtrans Server Key") as HTMLInputElement).value).toBe("");
+    const serverKeyInput = within(paymentPanel).getByLabelText("Midtrans Server Key") as HTMLInputElement;
+    expect(serverKeyInput.value).toBe("");
+    expect(serverKeyInput.placeholder).toBe("Kosongkan jika tidak diganti");
     expect(within(paymentPanel).getByRole("switch", { name: "Mode Midtrans" }).getAttribute("aria-checked")).toBe("false");
+    expect(within(paymentPanel).getByText("Sandbox untuk uji coba. Produksi untuk transaksi pelanggan.")).not.toBeNull();
+    expect(paymentPanel.textContent).not.toContain("Ganti kunci server tanpa menampilkan nilai saat ini.");
+    expect(paymentPanel.textContent).not.toContain("Sandbox untuk uji coba, Produksi untuk transaksi pelanggan.");
 
     expect(within(paymentPanel).queryByText("midtrans.server_key")).toBeNull();
     expect(within(paymentPanel).queryByText("midtrans.is_production")).toBeNull();
@@ -1132,7 +1144,8 @@ describe("form pages", () => {
     renderWithQueryClient(<Settings />);
 
     const shippingPanel = await screen.findByRole("region", { name: "Pengaturan Pengiriman" });
-    expect(await within(shippingPanel).findByLabelText("Biteship API Key")).not.toBeNull();
+    const biteshipApiKeyInput = await within(shippingPanel).findByLabelText("Biteship API Key") as HTMLInputElement;
+    expect(biteshipApiKeyInput).not.toBeNull();
     expect(within(shippingPanel).getByText("Active Couriers")).not.toBeNull();
     expect(within(shippingPanel).getByText("Origin Area")).not.toBeNull();
     expect(within(shippingPanel).getByLabelText("Postal Code").getAttribute("readonly")).not.toBeNull();
@@ -1145,7 +1158,13 @@ describe("form pages", () => {
     expect(within(shippingPanel).getByLabelText("Store Address")).not.toBeNull();
     expect(within(shippingPanel).getByLabelText("Organization")).not.toBeNull();
 
-    expect((within(shippingPanel).getByLabelText("Biteship API Key") as HTMLInputElement).value).toBe("");
+    expect(biteshipApiKeyInput.value).toBe("");
+    expect(biteshipApiKeyInput.placeholder).toBe("Kosongkan jika tidak diganti");
+    expect(within(shippingPanel).getByPlaceholderText("Cari kecamatan, kota, atau area Biteship")).not.toBeNull();
+    expect(within(shippingPanel).getByPlaceholderText("Alamat asal pengiriman")).not.toBeNull();
+    expect(shippingPanel.textContent).not.toContain("Ganti kunci Biteship tanpa menampilkan nilai saat ini.");
+    expect(shippingPanel.textContent).not.toContain("Opsional jika kode pos atau koordinat peta sudah diatur, tetapi disarankan agar pencocokan area Biteship lebih akurat.");
+    expect(shippingPanel.textContent).not.toContain("Alamat asal yang dikirim ke Biteship.");
     for (const forbiddenPrimaryShippingText of [
       "biteship.api_key",
       "biteship.enabled_couriers",
