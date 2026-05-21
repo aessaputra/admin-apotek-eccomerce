@@ -601,6 +601,7 @@ describe("Biteship runtime API key", () => {
       }),
     };
     const env = { get: vi.fn(() => "env-biteship-key-must-not-be-used") };
+    vi.stubGlobal("Deno", { env });
 
     const apiKey = await resolveBiteshipApiKeyFromRuntimeConfig(adminClient);
 
@@ -608,11 +609,26 @@ describe("Biteship runtime API key", () => {
     expect(env.get).not.toHaveBeenCalled();
   });
 
-  it("fails closed when runtime config is missing instead of using provider env", async () => {
+  it("falls back to the Edge secret when runtime config is missing", async () => {
     const adminClient = {
       rpc: vi.fn(async () => ({ data: [], error: null })),
     };
+    const env = { get: vi.fn(() => "env-biteship-key-sentinel") };
+    vi.stubGlobal("Deno", { env });
+
+    await expect(
+      resolveBiteshipApiKeyFromRuntimeConfig(adminClient),
+    ).resolves.toBe("env-biteship-key-sentinel");
+
+    expect(env.get).toHaveBeenCalledWith("BITESHIP_API_KEY");
+  });
+
+  it("does not fall back to the Edge secret when runtime config is unavailable", async () => {
+    const adminClient = {
+      rpc: vi.fn(async () => ({ data: null, error: { message: "db leaked sentinel" } })),
+    };
     const env = { get: vi.fn(() => "env-biteship-key-must-not-be-used") };
+    vi.stubGlobal("Deno", { env });
 
     await expect(
       resolveBiteshipApiKeyFromRuntimeConfig(adminClient),
@@ -621,16 +637,38 @@ describe("Biteship runtime API key", () => {
     expect(env.get).not.toHaveBeenCalled();
   });
 
-  it("fails closed with a safe error when runtime and provider env Biteship API keys are missing", async () => {
+  it("does not fall back to the Edge secret when runtime config is invalid", async () => {
     const adminClient = {
-      rpc: vi.fn(async () => ({ data: [], error: null })),
+      rpc: vi.fn(async () => ({
+        data: [createRuntimeConfigRow(
+          CONFIG_KEYS.biteshipApiKey,
+          " ",
+          4,
+          "secret",
+        )],
+        error: null,
+      })),
     };
-    const env = { get: vi.fn(() => undefined) };
+    const env = { get: vi.fn(() => "env-biteship-key-must-not-be-used") };
+    vi.stubGlobal("Deno", { env });
 
     await expect(
       resolveBiteshipApiKeyFromRuntimeConfig(adminClient),
     ).rejects.toThrow("Biteship runtime config unavailable");
     expect(env.get).not.toHaveBeenCalled();
+  });
+
+  it("throws a safe error when runtime and Edge secret Biteship API keys are missing", async () => {
+    const adminClient = {
+      rpc: vi.fn(async () => ({ data: [], error: null })),
+    };
+    const env = { get: vi.fn(() => undefined) };
+    vi.stubGlobal("Deno", { env });
+
+    await expect(
+      resolveBiteshipApiKeyFromRuntimeConfig(adminClient),
+    ).rejects.toThrow("Biteship runtime config unavailable");
+    expect(env.get).toHaveBeenCalledWith("BITESHIP_API_KEY");
   });
 
   it("authorizes order creation with the runtime API key without storing it in the snapshot payload", async () => {

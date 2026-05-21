@@ -3,6 +3,9 @@ import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const functionsRoot = join(process.cwd(), "supabase/functions");
+const allowedProviderEnvFallbacks = new Set([
+  "supabase/functions/_shared/biteship.ts: \\bBITESHIP_API_KEY\\b",
+]);
 
 function listRuntimeSources(directory: string): string[] {
   return readdirSync(directory).flatMap((entry) => {
@@ -26,7 +29,7 @@ function listRuntimeSources(directory: string): string[] {
 }
 
 describe("provider environment cutover source guard", () => {
-  it("rejects provider env aliases, reads, and environment object dumps in runtime source", () => {
+  it("rejects unapproved provider env aliases, reads, and environment object dumps in runtime source", () => {
     const forbiddenPatterns = [
       /\bMIDTRANS_[A-Z0-9_]*\b/,
       /\bBITESHIP_API_KEY\b/,
@@ -40,7 +43,7 @@ describe("provider environment cutover source guard", () => {
       return forbiddenPatterns
         .filter((pattern) => pattern.test(source))
         .map((pattern) => `${relativePath}: ${pattern.source}`);
-    });
+    }).filter((violation) => !allowedProviderEnvFallbacks.has(violation));
 
     expect(violations).toEqual([]);
   });

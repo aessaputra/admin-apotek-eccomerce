@@ -174,6 +174,14 @@ interface SupabaseRpcResult {
   error: { message?: string } | null;
 }
 
+type DenoRuntime = typeof globalThis & {
+  Deno?: {
+    env?: {
+      get?: (key: string) => string | undefined;
+    };
+  };
+};
+
 interface BiteshipSnapshotAdminClient extends RuntimeConfigAdminClient {
   rpc: (
     name: string,
@@ -243,6 +251,15 @@ export function getBiteshipAuthorizationHeader(apiKey: string): string {
     : `biteship_test.${apiKey}`;
 }
 
+function readBiteshipApiKeyFromEnv(): string | null {
+  const value = (globalThis as DenoRuntime).Deno?.env?.get?.("BITESHIP_API_KEY");
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  return value.trim() || null;
+}
+
 export async function resolveBiteshipApiKeyFromRuntimeConfig(
   adminClient: RuntimeConfigAdminClient,
 ): Promise<string> {
@@ -262,6 +279,13 @@ export async function resolveBiteshipApiKeyFromRuntimeConfig(
     return apiKeyEntry.value.trim();
   } catch (error) {
     if (error instanceof RuntimeConfigError) {
+      if (error.code === "CONFIG_MISSING") {
+        const fallbackApiKey = readBiteshipApiKeyFromEnv();
+        if (fallbackApiKey) {
+          return fallbackApiKey;
+        }
+      }
+
       throw new BiteshipRuntimeConfigError();
     }
 
