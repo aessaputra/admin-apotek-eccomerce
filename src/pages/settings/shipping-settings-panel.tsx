@@ -152,8 +152,13 @@ export const ShippingSettingsPanel: React.FC = () => {
   });
 
   const rowsByKey = useMemo(
-    () => new Map((summaryQuery.data ?? []).map((row) => [row.key_name, row])),
+    () => new Map((summaryQuery.data?.rows ?? []).map((row) => [row.key_name, row])),
     [summaryQuery.data]
+  );
+
+  const biteshipHealth = summaryQuery.data?.health?.biteship;
+  const showBiteshipHealthAlert = !!biteshipHealth && (
+    !biteshipHealth.requiredConfigComplete || biteshipHealth.apiKeySource !== "runtime_config"
   );
 
   const apiKeyRow = rowsByKey.get("biteship.api_key");
@@ -260,6 +265,23 @@ export const ShippingSettingsPanel: React.FC = () => {
             ) : null}
             {summaryQuery.isLoading ? (
               <Typography.Text>{translate("settings.shipping.summary.loading", {}, "Memuat pengaturan pengiriman...")}</Typography.Text>
+            ) : null}
+            {showBiteshipHealthAlert ? (
+              <Alert
+                type="warning"
+                showIcon
+                message={translate("settings.shipping.health.biteship.title", {}, "Konfigurasi Biteship belum siap")}
+                description={translate(
+                  "settings.shipping.health.biteship.description",
+                  {
+                    count: biteshipHealth.missingKeys.length,
+                    source: biteshipHealth.apiKeySource,
+                  },
+                  biteshipHealth.apiKeySource === "runtime_config"
+                    ? "Lengkapi konfigurasi runtime Biteship sebelum menghitung ongkir."
+                    : "Pindahkan API key Biteship ke runtime_config sebelum menghitung ongkir."
+                )}
+              />
             ) : null}
             {apiKeyRow ? (
               <OperationalConfigRow

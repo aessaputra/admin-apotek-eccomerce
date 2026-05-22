@@ -579,9 +579,33 @@ describe("form pages", () => {
           { key_name: "cors.allowed_origins", display_name: "Allowed Origins", description: "CORS origins", value_kind: "text_array", is_secret: false, is_required: false, is_runtime_required: false, version_id: "version-cors", version_number: 1, status: "active", masked_value: null, value_fingerprint: null, non_secret_value: ["https://admin.example.test"], updated_by: "admin-1", updated_at: "2026-05-19T09:00:00Z" },
         ];
         const requestedKeys = Array.isArray(body.keys) ? body.keys : undefined;
+        const rows = requestedKeys ? summaryRows.filter((row) => requestedKeys.includes(row.key_name)) : summaryRows;
+        const isShippingSummary = requestedKeys?.some((key) => typeof key === "string" && key.startsWith("biteship."));
         return Promise.resolve({
           data: {
-            data: requestedKeys ? summaryRows.filter((row) => requestedKeys.includes(row.key_name)) : summaryRows,
+            data: {
+              rows,
+              ...(isShippingSummary
+                ? {
+                    health: {
+                      biteship: {
+                        provider: "biteship",
+                        apiKeyConfigured: true,
+                        apiKeySource: "runtime_config",
+                        requiredConfigComplete: true,
+                        missingKeys: [],
+                        legacyDrift: {
+                          enabledCouriers: false,
+                          originArea: false,
+                          originPostalCode: false,
+                          originCoordinates: false,
+                        },
+                        diagnostics: [],
+                      },
+                    },
+                  }
+                : {}),
+            },
           },
           error: null,
         });
@@ -1229,6 +1253,81 @@ describe("form pages", () => {
       },
     }));
     expect(onFinish).not.toHaveBeenCalled();
+  });
+
+  it("shipping runtime shows safe Biteship health alert for incomplete runtime config", async () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+    const unsafeSentinels = [
+      "TEST_RAW_BITESHIP_KEY_DO_NOT_RENDER",
+      "vault-secret-id-do-not-render",
+      "biteship_test.secret-looking-token",
+      "Jl. Rahasia 99",
+      "081299988877",
+      "shipper-private@example.test",
+    ];
+    mocks.functionsInvoke.mockImplementation((_name: string, { body }: { body: Record<string, unknown> }) => {
+      if (body.action === "audit") {
+        return Promise.resolve({ data: { data: [] }, error: null });
+      }
+
+      if (body.action !== "summary") {
+        return Promise.resolve({ data: { data: { ok: true } }, error: null });
+      }
+
+      const rows = [
+        { key_name: "biteship.api_key", display_name: "Biteship API Key", description: "Biteship credential", value_kind: "secret", is_secret: true, is_required: true, is_runtime_required: true, version_id: null, version_number: null, status: null, masked_value: null, value_fingerprint: null, non_secret_value: null, updated_by: null, updated_at: null },
+        { key_name: "biteship.enabled_couriers", display_name: "Active Couriers", description: "Courier services", value_kind: "text_array", is_secret: false, is_required: true, is_runtime_required: true, version_id: null, version_number: null, status: null, masked_value: null, value_fingerprint: null, non_secret_value: [], updated_by: null, updated_at: null },
+        { key_name: "biteship.origin_postal_code", display_name: "Postal Code", description: "Origin postal code", value_kind: "string", is_secret: false, is_required: true, is_runtime_required: true, version_id: null, version_number: null, status: null, masked_value: null, value_fingerprint: null, non_secret_value: "", updated_by: null, updated_at: null },
+        { key_name: "biteship.origin_area_id", display_name: "Origin Area", description: "Biteship area", value_kind: "string", is_secret: false, is_required: true, is_runtime_required: true, version_id: null, version_number: null, status: null, masked_value: null, value_fingerprint: null, non_secret_value: "", updated_by: null, updated_at: null },
+        { key_name: "biteship.origin_latitude", display_name: "Latitude", description: "Origin latitude", value_kind: "number", is_secret: false, is_required: true, is_runtime_required: true, version_id: null, version_number: null, status: null, masked_value: null, value_fingerprint: null, non_secret_value: null, updated_by: null, updated_at: null },
+        { key_name: "biteship.origin_longitude", display_name: "Longitude", description: "Origin longitude", value_kind: "number", is_secret: false, is_required: true, is_runtime_required: true, version_id: null, version_number: null, status: null, masked_value: null, value_fingerprint: null, non_secret_value: null, updated_by: null, updated_at: null },
+      ];
+
+      return Promise.resolve({
+        data: {
+          data: {
+            rows,
+            health: {
+              biteship: {
+                provider: "biteship",
+                apiKeyConfigured: false,
+                apiKeySource: "missing",
+                requiredConfigComplete: false,
+                missingKeys: ["biteship.api_key", "biteship.enabled_couriers"],
+                legacyDrift: {
+                  enabledCouriers: true,
+                  originArea: false,
+                  originPostalCode: false,
+                  originCoordinates: false,
+                },
+                diagnostics: unsafeSentinels,
+              },
+            },
+          },
+        },
+        error: null,
+      });
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    const shippingPanel = await screen.findByRole("region", { name: "Pengaturan Pengiriman" });
+    const alert = await within(shippingPanel).findByRole("alert");
+
+    expect(alert.textContent).toContain("Konfigurasi Biteship belum siap");
+    expect(alert.textContent).toContain("Pindahkan API key Biteship ke runtime_config sebelum menghitung ongkir.");
+    for (const unsafeSentinel of unsafeSentinels) {
+      expect(alert.textContent).not.toContain(unsafeSentinel);
+    }
+    expect(alert.textContent).not.toContain("biteship.api_key");
+    expect(alert.textContent).not.toContain("vault");
   });
 
   it("shipping runtime updates use integration config actions and avoid the public settings save path", async () => {

@@ -45,7 +45,7 @@ export const PaymentSettingsPanel: React.FC = () => {
   });
 
   const rowsByKey = useMemo(
-    () => new Map((summaryQuery.data ?? []).map((row) => [row.key_name, row])),
+    () => new Map((summaryQuery.data?.rows ?? []).map((row) => [row.key_name, row])),
     [summaryQuery.data]
   );
 

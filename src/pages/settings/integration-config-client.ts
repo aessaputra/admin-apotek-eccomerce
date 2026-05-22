@@ -41,6 +41,38 @@ export interface IntegrationConfigSummaryRow {
   updated_at: string | null;
 }
 
+export type BiteshipApiKeySource = "runtime_config" | "env_fallback" | "missing";
+
+export type BiteshipHealthMissingKey =
+  | "biteship.api_key"
+  | "biteship.enabled_couriers"
+  | "biteship.origin_area_id"
+  | "biteship.origin_postal_code"
+  | "biteship.origin_latitude"
+  | "biteship.origin_longitude";
+
+export interface BiteshipIntegrationHealth {
+  provider: "biteship";
+  apiKeyConfigured: boolean;
+  apiKeySource: BiteshipApiKeySource;
+  requiredConfigComplete: boolean;
+  missingKeys: BiteshipHealthMissingKey[];
+  legacyDrift: {
+    enabledCouriers: boolean | null;
+    originArea: boolean | null;
+    originPostalCode: boolean | null;
+    originCoordinates: boolean | null;
+  };
+  diagnostics: string[];
+}
+
+export interface IntegrationConfigSummaryResult {
+  rows: IntegrationConfigSummaryRow[];
+  health?: {
+    biteship?: BiteshipIntegrationHealth;
+  };
+}
+
 export interface IntegrationConfigRotateResult {
   key_name: RuntimeConfigKey;
   version_id: string;
@@ -104,7 +136,7 @@ export async function invokeIntegrationConfig<T>(body: IntegrationConfigRequest)
 
 export const integrationConfigClient = {
   summary: (keys?: RuntimeConfigKey[]) =>
-    invokeIntegrationConfig<IntegrationConfigSummaryRow[]>({ action: "summary", keys }),
+    invokeIntegrationConfig<IntegrationConfigSummaryResult>({ action: "summary", keys }),
   rotateSecret: (key: RuntimeConfigKey, secret: string, reason: string) =>
     invokeIntegrationConfig<IntegrationConfigRotateResult>({ action: "rotateSecret", key, secret, reason }),
   updateValue: (key: RuntimeConfigKey, value: unknown, reason: string) =>
