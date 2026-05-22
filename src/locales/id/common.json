@@ -984,26 +984,25 @@
     "saveSuccess": "Pengaturan berhasil disimpan",
     "saveError": "Gagal menyimpan pengaturan",
     "payment": {
-      "description": "Kelola kredensial dan mode pembayaran Midtrans untuk checkout runtime.",
-      "details": "Detail",
+      "description": "Kelola kunci server dan mode pembayaran Midtrans untuk proses checkout.",
       "summary": {
         "loading": "Memuat pengaturan pembayaran...",
         "error": "Pengaturan pembayaran tidak dapat dimuat."
       },
       "serverKey": {
-        "label": "Midtrans Server Key",
-        "description": "",
-        "placeholder": "Kosongkan jika tidak diganti",
-        "saveSuccess": "Midtrans server key tersimpan.",
-        "saveError": "Midtrans server key gagal disimpan."
+        "label": "Kunci Server Midtrans",
+        "description": "Ganti kunci server Midtrans tanpa menampilkan nilai yang sedang aktif.",
+        "placeholder": "Kosongkan untuk memakai kunci saat ini",
+        "saveSuccess": "Kunci server Midtrans tersimpan.",
+        "saveError": "Kunci server Midtrans gagal disimpan."
       },
       "mode": {
-        "label": "Mode Midtrans",
-        "description": "Sandbox untuk uji coba. Produksi untuk transaksi pelanggan.",
+        "label": "Mode Pembayaran Midtrans",
+        "description": "Gunakan Sandbox untuk uji coba. Gunakan Produksi untuk transaksi pelanggan.",
         "sandbox": "Sandbox",
         "production": "Produksi",
-        "saveSuccess": "Mode Midtrans tersimpan.",
-        "saveError": "Mode Midtrans gagal disimpan."
+        "saveSuccess": "Mode pembayaran Midtrans tersimpan.",
+        "saveError": "Mode pembayaran Midtrans gagal disimpan."
       }
     },
     "shipping": {

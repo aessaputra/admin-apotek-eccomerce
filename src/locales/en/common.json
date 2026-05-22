@@ -984,26 +984,25 @@
     "saveSuccess": "Settings saved successfully",
     "saveError": "Failed to save settings",
     "payment": {
-      "description": "Manage Midtrans payment credentials and runtime checkout mode.",
-      "details": "Details",
+      "description": "Manage the Midtrans server key and payment mode for checkout.",
       "summary": {
         "loading": "Loading payment settings...",
         "error": "Payment settings could not be loaded."
       },
       "serverKey": {
         "label": "Midtrans Server Key",
-        "description": "",
-        "placeholder": "Leave blank to keep current",
+        "description": "Replace the Midtrans server key without showing the current value.",
+        "placeholder": "Leave blank to keep the current key",
         "saveSuccess": "Midtrans server key saved.",
         "saveError": "Midtrans server key could not be saved."
       },
       "mode": {
-        "label": "Midtrans Mode",
-        "description": "Sandbox for testing. Production for customer transactions.",
+        "label": "Midtrans Payment Mode",
+        "description": "Use Sandbox for testing. Use Production for customer transactions.",
         "sandbox": "Sandbox",
         "production": "Production",
-        "saveSuccess": "Midtrans mode saved.",
-        "saveError": "Midtrans mode could not be saved."
+        "saveSuccess": "Midtrans payment mode saved.",
+        "saveError": "Midtrans payment mode could not be saved."
       }
     },
     "shipping": {
