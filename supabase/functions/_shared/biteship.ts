@@ -182,6 +182,36 @@ type DenoRuntime = typeof globalThis & {
   };
 };
 
+export type BiteshipApiKeySource = "runtime_config" | "env_fallback" | "missing";
+
+export interface BiteshipRuntimeSettings {
+  apiKeyConfigured: boolean;
+  apiKeySource: BiteshipApiKeySource;
+  enabledCouriers: string[];
+  originAreaId: string;
+  originPostalCode: string;
+  originLatitude?: number;
+  originLongitude?: number;
+  shipperName: string;
+  shipperPhone: string;
+  shipperEmail: string;
+  shipperAddress: string;
+  shipperOrganization: string;
+  diagnostics: string[];
+}
+
+interface BiteshipApiKeyRuntimeState {
+  apiKey: string | null;
+  apiKeyConfigured: boolean;
+  apiKeySource: BiteshipApiKeySource;
+  diagnostics: string[];
+}
+
+type RuntimeConfigReader = Pick<
+  ReturnType<typeof createRuntimeConfigProvider>,
+  "getOptionalConfig"
+>;
+
 interface BiteshipSnapshotAdminClient extends RuntimeConfigAdminClient {
   rpc: (
     name: string,
@@ -219,6 +249,33 @@ const BITESHIP_SNAPSHOT_CONFIG_KEYS = [
   CONFIG_KEYS.shopAddress,
   CONFIG_KEYS.shopOrganization,
 ] as const;
+
+const BITESHIP_RUNTIME_SETTINGS_CONFIG_KEYS = [
+  CONFIG_KEYS.biteshipApiKey,
+  CONFIG_KEYS.biteshipEnabledCouriers,
+  CONFIG_KEYS.biteshipOriginAreaId,
+  CONFIG_KEYS.biteshipOriginLatitude,
+  CONFIG_KEYS.biteshipOriginLongitude,
+  CONFIG_KEYS.biteshipOriginPostalCode,
+  CONFIG_KEYS.shopShipperName,
+  CONFIG_KEYS.shopShipperPhone,
+  CONFIG_KEYS.shopShipperEmail,
+  CONFIG_KEYS.shopAddress,
+  CONFIG_KEYS.shopOrganization,
+] as const;
+
+type BiteshipRuntimeSettingsConfigKey =
+  typeof BITESHIP_RUNTIME_SETTINGS_CONFIG_KEYS[number];
+
+type BiteshipRuntimeNonSecretConfigKey = Exclude<
+  BiteshipRuntimeSettingsConfigKey,
+  typeof CONFIG_KEYS.biteshipApiKey
+>;
+
+const BITESHIP_RUNTIME_NON_SECRET_CONFIG_KEYS =
+  BITESHIP_RUNTIME_SETTINGS_CONFIG_KEYS.filter(
+    (keyName) => keyName !== CONFIG_KEYS.biteshipApiKey,
+  ) as BiteshipRuntimeNonSecretConfigKey[];
 
 type BiteshipSnapshotRuntimeConfigKey =
   typeof BITESHIP_SNAPSHOT_CONFIG_KEYS[number];
@@ -260,6 +317,297 @@ function readBiteshipApiKeyFromEnv(): string | null {
   return value.trim() || null;
 }
 
+async function resolveBiteshipApiKeyRuntimeState(
+  runtimeConfig: RuntimeConfigReader,
+): Promise<BiteshipApiKeyRuntimeState> {
+  const apiKeyEntry = await runtimeConfig.getOptionalConfig(
+    CONFIG_KEYS.biteshipApiKey,
+  );
+  if (apiKeyEntry) {
+    return {
+      apiKey: apiKeyEntry.value as string,
+      apiKeyConfigured: true,
+      apiKeySource: "runtime_config",
+      diagnostics: [],
+    };
+  }
+
+  const fallbackApiKey = readBiteshipApiKeyFromEnv();
+  if (fallbackApiKey) {
+    return {
+      apiKey: fallbackApiKey,
+      apiKeyConfigured: true,
+      apiKeySource: "env_fallback",
+      diagnostics: [
+        "biteship.api_key current version missing; using env fallback",
+      ],
+    };
+  }
+
+  return {
+    apiKey: null,
+    apiKeyConfigured: false,
+    apiKeySource: "missing",
+    diagnostics: [
+      "biteship.api_key current version missing; no env fallback configured",
+    ],
+  };
+}
+
+async function loadOptionalBiteshipRuntimeEntry<K extends RuntimeConfigKey>(
+  runtimeConfig: RuntimeConfigReader,
+  keyName: K,
+): Promise<{ entry: RuntimeConfigEntry<K> | null; diagnostic: string | null }> {
+  try {
+    const entry = await runtimeConfig.getOptionalConfig(keyName);
+    return { entry, diagnostic: null };
+  } catch (error) {
+    if (error instanceof RuntimeConfigError) {
+      return {
+        entry: null,
+        diagnostic: `${keyName} current version invalid or unavailable`,
+      };
+    }
+
+    throw error;
+  }
+}
+
+async function loadBiteshipRuntimeSettingsEntries(
+  runtimeConfig: RuntimeConfigReader,
+): Promise<{
+  entries: Map<RuntimeConfigKey, RuntimeConfigEntry>;
+  diagnostics: string[];
+}> {
+  const loadedEntries = await Promise.all(
+    BITESHIP_RUNTIME_NON_SECRET_CONFIG_KEYS.map(async (keyName) => ({
+      keyName,
+      ...(await loadOptionalBiteshipRuntimeEntry(runtimeConfig, keyName)),
+    })),
+  );
+  const entries = new Map<RuntimeConfigKey, RuntimeConfigEntry>();
+  const diagnostics: string[] = [];
+
+  for (const loadedEntry of loadedEntries) {
+    if (loadedEntry.entry) {
+      entries.set(loadedEntry.keyName, loadedEntry.entry);
+    }
+    if (loadedEntry.diagnostic) {
+      diagnostics.push(loadedEntry.diagnostic);
+    }
+  }
+
+  return { entries, diagnostics };
+}
+
+function getRuntimeSettingsText(
+  entries: Map<RuntimeConfigKey, RuntimeConfigEntry>,
+  keyName: BiteshipRuntimeNonSecretConfigKey,
+): string {
+  const value = entries.get(keyName)?.value;
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function getRuntimeSettingsTextArray(
+  entries: Map<RuntimeConfigKey, RuntimeConfigEntry>,
+  keyName: BiteshipRuntimeNonSecretConfigKey,
+): string[] {
+  const value = entries.get(keyName)?.value;
+  return Array.isArray(value) ? value : [];
+}
+
+function getRuntimeSettingsCoordinate(
+  entries: Map<RuntimeConfigKey, RuntimeConfigEntry>,
+  keyName: BiteshipRuntimeNonSecretConfigKey,
+  minimum: number,
+  maximum: number,
+  diagnostics: string[],
+): number | undefined {
+  const rawCoordinate = getRuntimeSettingsText(entries, keyName);
+  if (!rawCoordinate) {
+    return undefined;
+  }
+
+  const coordinate = normalizeStoreCoordinate(rawCoordinate);
+  if (coordinate === null || coordinate < minimum || coordinate > maximum) {
+    diagnostics.push(`${keyName} current version invalid`);
+    return undefined;
+  }
+
+  return coordinate;
+}
+
+function normalizeRuntimeEnabledCourierSelections(
+  values: string[],
+): EnabledCourierServiceSelection[] {
+  const selections = new Map<string, EnabledCourierServiceSelection>();
+
+  for (const value of values) {
+    for (const selection of parseEnabledCourierServices(value)) {
+      const selectionKey = `${selection.companyCode}:${selection.serviceCode}`;
+      selections.set(selectionKey, selection);
+    }
+  }
+
+  return Array.from(selections.values());
+}
+
+function serializeRuntimeEnabledCourierSelection(
+  selection: EnabledCourierServiceSelection,
+): string {
+  return selection.serviceCode === "*"
+    ? selection.companyCode
+    : `${selection.companyCode}:${selection.serviceCode}`;
+}
+
+function isInstantRuntimeCourierSelection(
+  selection: EnabledCourierServiceSelection,
+): boolean {
+  return shouldUseInstantBiteshipContract(
+    selection.companyCode,
+    selection.serviceCode === "*" ? null : selection.serviceCode,
+  );
+}
+
+function addMissingRuntimeTextDiagnostic(
+  diagnostics: string[],
+  keyName: RuntimeConfigKey,
+  value: string,
+): void {
+  if (!value) {
+    diagnostics.push(`${keyName} current version missing`);
+  }
+}
+
+function appendBiteshipRuntimeSettingsDiagnostics(
+  settings: Omit<BiteshipRuntimeSettings, "apiKeyConfigured" | "apiKeySource" | "diagnostics">,
+  enabledSelections: EnabledCourierServiceSelection[],
+  diagnostics: string[],
+): void {
+  if (settings.enabledCouriers.length === 0) {
+    diagnostics.push("biteship.enabled_couriers current version missing or empty");
+  }
+
+  const hasInstantCourier = enabledSelections.some(isInstantRuntimeCourierSelection);
+  const hasStandardCourier = enabledSelections.some(
+    (selection) => !isInstantRuntimeCourierSelection(selection),
+  );
+
+  if (hasStandardCourier && !settings.originAreaId && !settings.originPostalCode) {
+    diagnostics.push(
+      "standard Biteship rates require biteship.origin_area_id or biteship.origin_postal_code",
+    );
+  }
+
+  if (
+    hasInstantCourier &&
+    (settings.originLatitude === undefined || settings.originLongitude === undefined)
+  ) {
+    diagnostics.push(
+      "instant-capable Biteship couriers require biteship.origin_latitude and biteship.origin_longitude",
+    );
+  }
+
+  addMissingRuntimeTextDiagnostic(
+    diagnostics,
+    CONFIG_KEYS.shopShipperName,
+    settings.shipperName,
+  );
+  addMissingRuntimeTextDiagnostic(
+    diagnostics,
+    CONFIG_KEYS.shopShipperPhone,
+    settings.shipperPhone,
+  );
+  addMissingRuntimeTextDiagnostic(
+    diagnostics,
+    CONFIG_KEYS.shopShipperEmail,
+    settings.shipperEmail,
+  );
+  addMissingRuntimeTextDiagnostic(
+    diagnostics,
+    CONFIG_KEYS.shopAddress,
+    settings.shipperAddress,
+  );
+  addMissingRuntimeTextDiagnostic(
+    diagnostics,
+    CONFIG_KEYS.shopOrganization,
+    settings.shipperOrganization,
+  );
+}
+
+export async function resolveBiteshipRuntimeSettings(
+  adminClient: RuntimeConfigAdminClient,
+): Promise<BiteshipRuntimeSettings> {
+  const runtimeConfig = createRuntimeConfigProvider({
+    adminClient,
+    cacheTtlMs: 0,
+  });
+  const [apiKeyState, runtimeSettingsEntries] = await Promise.all([
+    resolveBiteshipApiKeyRuntimeState(runtimeConfig),
+    loadBiteshipRuntimeSettingsEntries(runtimeConfig),
+  ]);
+  const diagnostics = [
+    ...apiKeyState.diagnostics,
+    ...runtimeSettingsEntries.diagnostics,
+  ];
+  const { entries } = runtimeSettingsEntries;
+  const enabledSelections = normalizeRuntimeEnabledCourierSelections(
+    getRuntimeSettingsTextArray(entries, CONFIG_KEYS.biteshipEnabledCouriers),
+  );
+  const rawOriginPostalCode = getRuntimeSettingsText(
+    entries,
+    CONFIG_KEYS.biteshipOriginPostalCode,
+  );
+  const originPostalCode = normalizeStorePostalCode(rawOriginPostalCode) ?? "";
+  if (rawOriginPostalCode && !originPostalCode) {
+    diagnostics.push("biteship.origin_postal_code current version invalid");
+  }
+
+  const settings = {
+    enabledCouriers: enabledSelections.map(serializeRuntimeEnabledCourierSelection),
+    originAreaId: getRuntimeSettingsText(entries, CONFIG_KEYS.biteshipOriginAreaId),
+    originPostalCode,
+    originLatitude: getRuntimeSettingsCoordinate(
+      entries,
+      CONFIG_KEYS.biteshipOriginLatitude,
+      -90,
+      90,
+      diagnostics,
+    ),
+    originLongitude: getRuntimeSettingsCoordinate(
+      entries,
+      CONFIG_KEYS.biteshipOriginLongitude,
+      -180,
+      180,
+      diagnostics,
+    ),
+    shipperName: getRuntimeSettingsText(entries, CONFIG_KEYS.shopShipperName),
+    shipperPhone: getRuntimeSettingsText(entries, CONFIG_KEYS.shopShipperPhone),
+    shipperEmail: getRuntimeSettingsText(entries, CONFIG_KEYS.shopShipperEmail),
+    shipperAddress: getRuntimeSettingsText(entries, CONFIG_KEYS.shopAddress),
+    shipperOrganization: getRuntimeSettingsText(
+      entries,
+      CONFIG_KEYS.shopOrganization,
+    ),
+  } satisfies Omit<
+    BiteshipRuntimeSettings,
+    "apiKeyConfigured" | "apiKeySource" | "diagnostics"
+  >;
+
+  appendBiteshipRuntimeSettingsDiagnostics(
+    settings,
+    enabledSelections,
+    diagnostics,
+  );
+
+  return {
+    apiKeyConfigured: apiKeyState.apiKeyConfigured,
+    apiKeySource: apiKeyState.apiKeySource,
+    ...settings,
+    diagnostics,
+  };
+}
+
 export async function resolveBiteshipApiKeyFromRuntimeConfig(
   adminClient: RuntimeConfigAdminClient,
 ): Promise<string> {
@@ -269,23 +617,14 @@ export async function resolveBiteshipApiKeyFromRuntimeConfig(
   });
 
   try {
-    const apiKeyEntry = await runtimeConfig.getRequiredConfig(
-      CONFIG_KEYS.biteshipApiKey,
-    );
-    if (typeof apiKeyEntry.value !== "string" || !apiKeyEntry.value.trim()) {
-      throw new BiteshipRuntimeConfigError();
+    const apiKeyState = await resolveBiteshipApiKeyRuntimeState(runtimeConfig);
+    if (apiKeyState.apiKey) {
+      return apiKeyState.apiKey;
     }
 
-    return apiKeyEntry.value.trim();
+    throw new BiteshipRuntimeConfigError();
   } catch (error) {
     if (error instanceof RuntimeConfigError) {
-      if (error.code === "CONFIG_MISSING") {
-        const fallbackApiKey = readBiteshipApiKeyFromEnv();
-        if (fallbackApiKey) {
-          return fallbackApiKey;
-        }
-      }
-
       throw new BiteshipRuntimeConfigError();
     }
 
