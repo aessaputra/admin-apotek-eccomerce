@@ -17,11 +17,30 @@ import { ProductCreate } from "../products/create";
 import { ProductEdit } from "../products/edit";
 
 const mocks = vi.hoisted(() => {
+  type Locale = "en" | "id";
+
+  let locale: Locale = "id";
+  const translations: Record<Locale, Record<string, string>> = {
+    en: {
+      "settings.integration.status.active": "Active",
+      "settings.shipping.shipperName.label": "Shipper Name",
+      "settings.shipping.shipperPhone.label": "Shipper Phone",
+      "settings.shipping.shipperEmail.label": "Shipper Email",
+    },
+    id: {
+      "settings.integration.status.active": "Aktif",
+      "settings.shipping.shipperName.label": "Nama Pengirim",
+      "settings.shipping.shipperPhone.label": "Nomor Telepon Pengirim",
+      "settings.shipping.shipperEmail.label": "Email Pengirim",
+    },
+  };
+
   const translate = vi.fn((key: string, paramsOrFallback?: Record<string, unknown> | string, fallback?: string) => {
     if (typeof paramsOrFallback === "string") {
       return paramsOrFallback;
     }
-    return fallback ?? key;
+
+    return translations[locale][key] ?? fallback ?? key;
   });
   const useForm = vi.fn();
   const useSelect = vi.fn(() => ({ selectProps: { options: [{ label: "Category", value: "cat-1" }] } }));
@@ -72,6 +91,9 @@ const mocks = vi.hoisted(() => {
   });
 
   return {
+    setLocale: (nextLocale: Locale) => {
+      locale = nextLocale;
+    },
     translate,
     useForm,
     useSelect,
@@ -490,6 +512,7 @@ describe("form pages", () => {
   }
 
   beforeEach(() => {
+    mocks.setLocale("id");
     mocks.translate.mockClear();
     mocks.useForm.mockReset();
     mocks.useSelect.mockClear();
@@ -1184,6 +1207,14 @@ describe("form pages", () => {
 
 
   it("shipping runtime renders concise integration-backed controls without duplicate public settings editors", async () => {
+    mocks.setLocale("en");
+    expect(mocks.translate("settings.shipping.shipperName.label", {}, "Shipper Name")).toBe("Shipper Name");
+    expect(mocks.translate("settings.shipping.shipperPhone.label", {}, "Shipper Phone")).toBe("Shipper Phone");
+    expect(mocks.translate("settings.shipping.shipperEmail.label", {}, "Shipper Email")).toBe("Shipper Email");
+    expect(mocks.translate("settings.integration.status.active", {}, "active")).toBe("Active");
+    mocks.setLocale("id");
+    mocks.translate.mockClear();
+
     const onFinish = vi.fn();
     mocks.useForm.mockReturnValue({
       formProps: { onFinish },
@@ -1205,9 +1236,12 @@ describe("form pages", () => {
     expect(within(shippingPanel).getByText("Store Location")).not.toBeNull();
     expect(within(shippingPanel).getByLabelText("Latitude")).not.toBeNull();
     expect(within(shippingPanel).getByLabelText("Longitude")).not.toBeNull();
-    expect(within(shippingPanel).getByLabelText("Shipper Name")).not.toBeNull();
-    expect(within(shippingPanel).getByLabelText("Shipper Phone")).not.toBeNull();
-    expect(within(shippingPanel).getByLabelText("Shipper Email")).not.toBeNull();
+    expect(within(shippingPanel).getByLabelText("Nama Pengirim")).not.toBeNull();
+    expect(within(shippingPanel).getByLabelText("Nomor Telepon Pengirim")).not.toBeNull();
+    expect(within(shippingPanel).getByLabelText("Email Pengirim")).not.toBeNull();
+    expect(within(shippingPanel).queryByLabelText("Shipper Name")).toBeNull();
+    expect(within(shippingPanel).queryByLabelText("Shipper Phone")).toBeNull();
+    expect(within(shippingPanel).queryByLabelText("Shipper Email")).toBeNull();
     expect(within(shippingPanel).getByLabelText("Store Address")).not.toBeNull();
     expect(within(shippingPanel).getByLabelText("Organization")).not.toBeNull();
 
@@ -1373,6 +1407,16 @@ describe("form pages", () => {
     renderWithQueryClient(<Settings />);
 
     const shippingPanel = await screen.findByRole("region", { name: "Pengaturan Pengiriman" });
+    const getRowWithSaveButton = (label: string): HTMLElement => {
+      const labelElement = within(shippingPanel).getByText(label);
+      const saveButton = within(shippingPanel).getAllByRole("button", { name: "Simpan" }).find((button) => {
+        return Boolean(labelElement.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING);
+      });
+
+      expect(saveButton).toBeDefined();
+
+      return saveButton?.parentElement?.parentElement as HTMLElement;
+    };
     const apiKeyInput = await within(shippingPanel).findByLabelText("Biteship API Key") as HTMLInputElement;
     const apiKeyRow = apiKeyInput.closest("div")?.parentElement as HTMLElement;
 
@@ -1395,7 +1439,7 @@ describe("form pages", () => {
     await waitFor(() => expect(apiKeyInput.value).toBe(""));
 
     fireEvent.click(within(shippingPanel).getByRole("button", { name: "CourierPickerModal" }));
-    const courierRow = within(shippingPanel).getByText("Active Couriers").closest("div")?.parentElement as HTMLElement;
+    const courierRow = getRowWithSaveButton("Active Couriers");
     fireEvent.click(within(courierRow).getByRole("button", { name: "Simpan" }));
     await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
       body: {
@@ -1407,7 +1451,7 @@ describe("form pages", () => {
     }));
 
     fireEvent.click(within(shippingPanel).getByRole("button", { name: "BiteshipAreaSearch" }));
-    const areaRow = within(shippingPanel).getByText("Origin Area").closest("div")?.parentElement as HTMLElement;
+    const areaRow = getRowWithSaveButton("Origin Area");
     fireEvent.click(within(areaRow).getByRole("button", { name: "Simpan" }));
     await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
       body: {
@@ -1427,7 +1471,7 @@ describe("form pages", () => {
     }));
 
     fireEvent.click(within(shippingPanel).getByRole("button", { name: "MapLocationPicker" }));
-    const locationRow = within(shippingPanel).getByText("Store Location").closest("div")?.parentElement as HTMLElement;
+    const locationRow = getRowWithSaveButton("Store Location");
     fireEvent.click(within(locationRow).getByRole("button", { name: "Simpan" }));
     await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
       body: {
@@ -1446,7 +1490,7 @@ describe("form pages", () => {
       },
     }));
 
-    const shipperNameInput = within(shippingPanel).getByLabelText("Shipper Name");
+    const shipperNameInput = within(shippingPanel).getByLabelText("Nama Pengirim");
     fireEvent.change(shipperNameInput, { target: { value: "Apotek Runtime" } });
     const shipperNameRow = shipperNameInput.closest("div")?.parentElement as HTMLElement;
     fireEvent.click(within(shipperNameRow).getByRole("button", { name: "Simpan" }));
@@ -1531,14 +1575,25 @@ describe("form pages", () => {
     };
     const runtimeRead = { ...auditRow, id: "runtime-read", action: "runtime_read", request_id: "request-runtime-read" };
 
-    render(
+    const { unmount } = render(
       <OperationalConfigRow
         row={row}
         actions={<ConfigDetailsDisclosure row={row} auditRows={[auditRow]} lastRuntimeRead={runtimeRead} />}
       />
     );
 
-    expect(screen.getByText("Midtrans Server Key")).not.toBeNull();
+    const label = screen.getByText("Midtrans Server Key");
+    const status = screen.getByText("Aktif");
+    const description = screen.getByText("Server credential");
+    const detailsButton = screen.getByRole("button", { name: "Details" });
+
+    expect(label).not.toBeNull();
+    expect(status).not.toBeNull();
+    expect(label.parentElement).toBe(status.parentElement);
+    expect(label.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(description.parentElement).toBe(label.parentElement?.parentElement);
+    expect(detailsButton.parentElement).not.toBe(label.parentElement);
+    expect(document.body.textContent).not.toContain("active");
     expect(document.body.textContent).not.toContain("midtrans.server_key");
     expect(document.body.textContent).not.toContain("Runtime required");
     expect(document.body.textContent).not.toContain("Last runtime read");
@@ -1563,6 +1618,29 @@ describe("form pages", () => {
     expect(document.body.textContent).toContain("Old: SB-Mid-****1234");
     expect(document.body.textContent).toContain("New: SB-Mid-****7890");
     expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
+
+    unmount();
+    mocks.setLocale("en");
+    const englishRender = render(<OperationalConfigRow row={row} />);
+
+    expect(screen.getByText("Active")).not.toBeNull();
+    expect(document.body.textContent).not.toContain("Aktif");
+
+    englishRender.unmount();
+    mocks.setLocale("id");
+    const unknownStatusRender = render(
+      <OperationalConfigRow row={{ ...row, display_name: "Retry Policy", description: "Edge condition", status: "pending_review-now" }} />
+    );
+
+    expect(screen.getByText("Pending Review Now")).not.toBeNull();
+    expect(screen.getByText("Retry Policy").parentElement).toBe(screen.getByText("Pending Review Now").parentElement);
+
+    unknownStatusRender.unmount();
+    render(<OperationalConfigRow row={{ ...row, display_name: "No Status Row", description: null, status: "  " }} />);
+
+    expect(screen.getByText("No Status Row")).not.toBeNull();
+    expect(screen.queryByText("Aktif")).toBeNull();
+    expect(screen.queryByText("Active")).toBeNull();
   });
 
   it("creates blank secret replacement drafts instead of hydrating masked or plaintext values", () => {
@@ -1598,7 +1676,7 @@ describe("form pages", () => {
     expect(advancedPanel.textContent).not.toContain("Mode Midtrans");
     expect(advancedPanel.textContent).not.toContain("Biteship API Key");
     expect(advancedPanel.textContent).not.toContain("Active Couriers");
-    expect(advancedPanel.textContent).not.toContain("Shipper Name");
+    expect(advancedPanel.textContent).not.toContain("Nama Pengirim");
     expect(advancedPanel.textContent).not.toContain("midtrans.server_key");
     expect(advancedPanel.textContent).not.toContain("biteship.api_key");
     expect(advancedPanel.textContent).not.toContain("shop.organization");

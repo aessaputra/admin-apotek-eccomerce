@@ -1,3 +1,4 @@
+import { useTranslation } from "@refinedev/core";
 import { Button, Card, Input, Modal, Space, Tag, Typography, theme } from "antd";
 import { useState } from "react";
 import type { IntegrationConfigAuditRow, IntegrationConfigSummaryRow } from "./integration-config-client";
@@ -50,23 +51,34 @@ export interface OperationalConfigRowProps {
   children?: React.ReactNode;
 }
 
+function formatStatusLabel(status: string): string {
+  return status
+    .replace(/[-_]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export const OperationalConfigRow: React.FC<OperationalConfigRowProps> = ({ row, actions, children }) => {
   const { token } = theme.useToken();
+  const { translate } = useTranslation();
   const displayName = row.display_name?.trim() || "Configuration";
   const description = row.description?.trim();
+  const status = row.status?.trim();
+  const statusLabel = status === "active" ? translate("settings.integration.status.active", {}, "Active") : status ? formatStatusLabel(status) : null;
 
   return (
     <Card size="small" style={{ marginBottom: token.marginSM }}>
       <Space direction="vertical" size={token.marginXS} style={{ width: "100%" }}>
         <Space direction="vertical" size={token.marginXXS}>
-          <Typography.Text strong>{displayName}</Typography.Text>
+          <Space size={token.marginXS} wrap>
+            <Typography.Text strong>{displayName}</Typography.Text>
+            {statusLabel ? <Tag>{statusLabel}</Tag> : null}
+          </Space>
           {description ? <Typography.Text type="secondary">{description}</Typography.Text> : null}
         </Space>
         {children}
-        <Space wrap>
-          {row.status ? <Tag>{row.status}</Tag> : null}
-          {actions}
-        </Space>
+        {actions ? <Space wrap>{actions}</Space> : null}
       </Space>
     </Card>
   );
