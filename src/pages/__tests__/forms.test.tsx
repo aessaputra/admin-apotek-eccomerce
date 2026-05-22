@@ -3,7 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Settings from "../settings";
-import { integrationConfigClient } from "../settings/integration-config-client";
+import shippingPanelSource from "../settings/shipping-settings-panel.tsx?raw";
+import { RUNTIME_CONFIG_KEYS, integrationConfigClient } from "../settings/integration-config-client";
 import { INTEGRATION_CONFIG_OWNERSHIP, getPrimaryOwnerForIntegrationConfigKey } from "../settings/integration-config-ownership";
 import {
   ConfigDetailsDisclosure,
@@ -1513,11 +1514,85 @@ describe("form pages", () => {
       },
     }));
 
+    const shipperPhoneInput = within(shippingPanel).getByLabelText("Nomor Telepon Pengirim");
+    fireEvent.change(shipperPhoneInput, { target: { value: "081200000001" } });
+    const shipperPhoneRow = shipperPhoneInput.closest("div")?.parentElement as HTMLElement;
+    fireEvent.click(within(shipperPhoneRow).getByRole("button", { name: "Simpan" }));
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "updateValue",
+        key: "shop.shipper_phone",
+        value: "081200000001",
+        reason: "settings_shipping_save",
+      },
+    }));
+
+    const shipperEmailInput = within(shippingPanel).getByLabelText("Email Pengirim");
+    fireEvent.change(shipperEmailInput, { target: { value: "runtime@example.test" } });
+    const shipperEmailRow = shipperEmailInput.closest("div")?.parentElement as HTMLElement;
+    fireEvent.click(within(shipperEmailRow).getByRole("button", { name: "Simpan" }));
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "updateValue",
+        key: "shop.shipper_email",
+        value: "runtime@example.test",
+        reason: "settings_shipping_save",
+      },
+    }));
+
+    const addressInput = within(shippingPanel).getByLabelText("Store Address");
+    fireEvent.change(addressInput, { target: { value: "Jl. Runtime 2" } });
+    const addressRow = addressInput.closest("div")?.parentElement as HTMLElement;
+    fireEvent.click(within(addressRow).getByRole("button", { name: "Simpan" }));
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "updateValue",
+        key: "shop.address",
+        value: "Jl. Runtime 2",
+        reason: "settings_shipping_save",
+      },
+    }));
+
+    const organizationInput = within(shippingPanel).getByLabelText("Organization");
+    fireEvent.change(organizationInput, { target: { value: "PT Runtime" } });
+    const organizationRow = organizationInput.closest("div")?.parentElement as HTMLElement;
+    fireEvent.click(within(organizationRow).getByRole("button", { name: "Simpan" }));
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "updateValue",
+        key: "shop.organization",
+        value: "PT Runtime",
+        reason: "settings_shipping_save",
+      },
+    }));
+
     const updateBodies = mocks.functionsInvoke.mock.calls
       .map((call) => call[1]?.body)
       .filter((body) => body?.action === "updateValue" || body?.action === "rotateSecret");
     expect(updateBodies.every((body) => !Object.prototype.hasOwnProperty.call(body, "source"))).toBe(true);
     expect(onFinish).not.toHaveBeenCalled();
+  });
+
+  it("keeps shipping runtime config keys in the client contract and shipping panel source", () => {
+    const shippingRuntimeKeys = [
+      "biteship.origin_area_id",
+      "biteship.origin_postal_code",
+      "biteship.origin_latitude",
+      "biteship.origin_longitude",
+      "biteship.enabled_couriers",
+      "shop.shipper_name",
+      "shop.shipper_phone",
+      "shop.shipper_email",
+      "shop.address",
+      "shop.organization",
+    ];
+    expect(RUNTIME_CONFIG_KEYS).toEqual(expect.arrayContaining(shippingRuntimeKeys));
+    expect(shippingPanelSource).toContain("const SHIPPING_CONFIG_KEYS = INTEGRATION_CONFIG_OWNERSHIP.shipping");
+    expect(shippingPanelSource).toContain("integrationConfigClient.summary([...SHIPPING_CONFIG_KEYS])");
+
+    for (const key of shippingRuntimeKeys) {
+      expect(shippingPanelSource).toContain(key);
+    }
   });
 
   it("defines one primary Settings owner for every runtime integration config key", () => {
