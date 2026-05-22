@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Settings from "../settings";
+import { integrationConfigClient } from "../settings/integration-config-client";
 import { INTEGRATION_CONFIG_OWNERSHIP, getPrimaryOwnerForIntegrationConfigKey } from "../settings/integration-config-ownership";
 import {
   ConfigDetailsDisclosure,
@@ -1085,6 +1086,34 @@ describe("form pages", () => {
         keys: ["midtrans.server_key", "midtrans.is_production"],
       },
     }));
+  });
+
+  it("normalizes deployed legacy summary arrays into settings rows", async () => {
+    const summaryRow = {
+      key_name: "midtrans.server_key" as const,
+      display_name: "Midtrans Server Key",
+      description: "Server credential",
+      value_kind: "secret" as const,
+      is_secret: true,
+      is_required: true,
+      is_runtime_required: true,
+      version_id: "version-secret",
+      version_number: 2,
+      status: "active",
+      masked_value: "SB-Mid-****7890",
+      value_fingerprint: "fingerprint-secret",
+      non_secret_value: null,
+      updated_by: "admin-1",
+      updated_at: "2026-05-19T09:00:00Z",
+    };
+    mocks.functionsInvoke.mockResolvedValueOnce({
+      data: { data: [summaryRow] },
+      error: null,
+    });
+
+    await expect(integrationConfigClient.summary(["midtrans.server_key"])).resolves.toEqual({
+      rows: [summaryRow],
+    });
   });
 
   it("payment settings rotates the Midtrans server key with a hidden reason and clears the replacement input", async () => {

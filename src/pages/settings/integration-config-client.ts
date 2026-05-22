@@ -134,9 +134,20 @@ export async function invokeIntegrationConfig<T>(body: IntegrationConfigRequest)
   return data?.data as T;
 }
 
+function normalizeSummaryResult(
+  result: IntegrationConfigSummaryResult | IntegrationConfigSummaryRow[]
+): IntegrationConfigSummaryResult {
+  if (Array.isArray(result)) {
+    return { rows: result };
+  }
+
+  return result;
+}
+
 export const integrationConfigClient = {
   summary: (keys?: RuntimeConfigKey[]) =>
-    invokeIntegrationConfig<IntegrationConfigSummaryResult>({ action: "summary", keys }),
+    invokeIntegrationConfig<IntegrationConfigSummaryResult | IntegrationConfigSummaryRow[]>({ action: "summary", keys })
+      .then(normalizeSummaryResult),
   rotateSecret: (key: RuntimeConfigKey, secret: string, reason: string) =>
     invokeIntegrationConfig<IntegrationConfigRotateResult>({ action: "rotateSecret", key, secret, reason }),
   updateValue: (key: RuntimeConfigKey, value: unknown, reason: string) =>
