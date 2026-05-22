@@ -96,6 +96,7 @@ vi.mock("../supabase-client", () => ({
   },
 }));
 
+import { ORDER_READ_RESOURCE } from "../../constants/resources";
 import { dataProvider } from "../data";
 
 describe("dataProvider custom deletes", () => {
@@ -151,7 +152,7 @@ describe("dataProvider custom deletes", () => {
 
     expect(mocks.getList).toHaveBeenCalledWith({
       ...params,
-      resource: "order_read_model",
+      resource: ORDER_READ_RESOURCE,
     });
   });
 
@@ -174,7 +175,7 @@ describe("dataProvider custom deletes", () => {
 
     expect(mocks.getMany).toHaveBeenCalledWith({
       ...params,
-      resource: "order_read_model",
+      resource: ORDER_READ_RESOURCE,
     });
   });
 
@@ -433,7 +434,7 @@ describe("dataProvider custom deletes", () => {
     });
 
     expect(mocks.getOne).toHaveBeenCalledWith({
-      resource: "order_read_model",
+      resource: ORDER_READ_RESOURCE,
       id: "order-1",
       meta: { select: "*" },
     });
