@@ -8,7 +8,6 @@ import {
 } from "./integration-config-client";
 import { INTEGRATION_CONFIG_OWNERSHIP } from "./integration-config-ownership";
 import {
-  ConfigDetailsDisclosure,
   OperationalConfigRow,
   SecretReplacementInput,
   createBlankSecretReplacementDraft,
@@ -77,11 +76,11 @@ export const PaymentSettingsPanel: React.FC = () => {
     mutationFn: (value: boolean) =>
       integrationConfigClient.updateValue("midtrans.is_production", value, PAYMENT_SAVE_REASON),
     onSuccess: async () => {
-      messageApi.success(translate("settings.payment.mode.saveSuccess", {}, "Midtrans mode saved."));
+      messageApi.success(translate("settings.payment.mode.saveSuccess", {}, "Mode pembayaran Midtrans tersimpan."));
       await refreshPaymentSummary();
     },
     onError: () => {
-      messageApi.error(translate("settings.payment.mode.saveError", {}, "Midtrans mode could not be saved."));
+      messageApi.error(translate("settings.payment.mode.saveError", {}, "Mode pembayaran Midtrans gagal disimpan."));
     },
   });
 
@@ -96,8 +95,8 @@ export const PaymentSettingsPanel: React.FC = () => {
   };
 
   const paymentPanelLabel = translate("settings.tabs.paymentSettings", {}, "Pengaturan Pembayaran");
-  const serverKeyLabel = translate("settings.payment.serverKey.label", {}, "Midtrans Server Key");
-  const modeLabel = translate("settings.payment.mode.label", {}, "Mode Midtrans");
+  const serverKeyLabel = translate("settings.payment.serverKey.label", {}, "Kunci Server Midtrans");
+  const modeLabel = translate("settings.payment.mode.label", {}, "Mode Pembayaran Midtrans");
 
   return (
     <>
@@ -109,7 +108,7 @@ export const PaymentSettingsPanel: React.FC = () => {
               {translate(
                 "settings.payment.description",
                 {},
-                "Kelola kredensial dan mode pembayaran Midtrans untuk checkout runtime."
+                "Kelola kunci server dan mode pembayaran Midtrans untuk proses checkout."
               )}
             </Typography.Text>
             {summaryQuery.isError ? (
@@ -127,9 +126,8 @@ export const PaymentSettingsPanel: React.FC = () => {
                 row={withPaymentDisplay(
                   serverKeyRow,
                   serverKeyLabel,
-                  translate("settings.payment.serverKey.description", {}, "")
+                  translate("settings.payment.serverKey.description", {}, "Ganti kunci server Midtrans tanpa menampilkan nilai yang sedang aktif.")
                 )}
-                actions={<ConfigDetailsDisclosure row={serverKeyRow} buttonLabel={translate("settings.payment.details", {}, "Detail")} />}
               >
                 <SecretReplacementInput
                   label={serverKeyLabel}
@@ -137,7 +135,7 @@ export const PaymentSettingsPanel: React.FC = () => {
                   onChange={setServerKeyDraft}
                   onSave={saveServerKey}
                   saving={rotateServerKeyMutation.isPending}
-                  placeholder={translate("settings.payment.serverKey.placeholder", {}, "Kosongkan jika tidak diganti")}
+                  placeholder={translate("settings.payment.serverKey.placeholder", {}, "Kosongkan untuk memakai kunci saat ini")}
                   saveLabel={translate("buttons.save", {}, "Simpan")}
                 />
               </OperationalConfigRow>
@@ -147,9 +145,8 @@ export const PaymentSettingsPanel: React.FC = () => {
                 row={withPaymentDisplay(
                   modeRow,
                   modeLabel,
-                  translate("settings.payment.mode.description", {}, "Sandbox untuk uji coba. Produksi untuk transaksi pelanggan.")
+                  translate("settings.payment.mode.description", {}, "Gunakan Sandbox untuk uji coba. Gunakan Produksi untuk transaksi pelanggan.")
                 )}
-                actions={<ConfigDetailsDisclosure row={modeRow} buttonLabel={translate("settings.payment.details", {}, "Detail")} />}
               >
                 <Space direction="vertical" style={{ width: "100%" }}>
                   <Switch

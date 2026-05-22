@@ -1079,21 +1079,31 @@ describe("form pages", () => {
     renderWithQueryClient(<Settings />);
 
     const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
-    expect(await within(paymentPanel).findByText("Midtrans Server Key")).not.toBeNull();
-    expect(within(paymentPanel).getByText("Mode Midtrans")).not.toBeNull();
-    const serverKeyInput = within(paymentPanel).getByLabelText("Midtrans Server Key") as HTMLInputElement;
+    expect(await within(paymentPanel).findByText("Kunci Server Midtrans")).not.toBeNull();
+    expect(within(paymentPanel).getByText("Mode Pembayaran Midtrans")).not.toBeNull();
+    const serverKeyInput = within(paymentPanel).getByLabelText("Kunci Server Midtrans") as HTMLInputElement;
     expect(serverKeyInput.value).toBe("");
-    expect(serverKeyInput.placeholder).toBe("Kosongkan jika tidak diganti");
-    expect(within(paymentPanel).getByRole("switch", { name: "Mode Midtrans" }).getAttribute("aria-checked")).toBe("false");
-    expect(within(paymentPanel).getByText("Sandbox untuk uji coba. Produksi untuk transaksi pelanggan.")).not.toBeNull();
+    expect(serverKeyInput.placeholder).toBe("Kosongkan untuk memakai kunci saat ini");
+    expect(within(paymentPanel).getByRole("switch", { name: "Mode Pembayaran Midtrans" }).getAttribute("aria-checked")).toBe("false");
+    expect(within(paymentPanel).getByText("Gunakan Sandbox untuk uji coba. Gunakan Produksi untuk transaksi pelanggan.")).not.toBeNull();
+    expect(within(paymentPanel).queryByRole("button", { name: "Detail" })).toBeNull();
+    expect(within(paymentPanel).queryByRole("button", { name: "Details" })).toBeNull();
     expect(paymentPanel.textContent).not.toContain("Ganti kunci server tanpa menampilkan nilai saat ini.");
     expect(paymentPanel.textContent).not.toContain("Sandbox untuk uji coba, Produksi untuk transaksi pelanggan.");
+    expect(paymentPanel.textContent).not.toContain("Midtrans Server Key");
+    expect(paymentPanel.textContent).not.toContain("Mode Midtrans");
+    expect(paymentPanel.textContent).not.toContain("checkout runtime");
+    expect(paymentPanel.textContent).not.toContain("Kosongkan jika tidak diganti");
+    expect(paymentPanel.textContent).not.toContain("Midtrans server key");
 
     expect(within(paymentPanel).queryByText("midtrans.server_key")).toBeNull();
     expect(within(paymentPanel).queryByText("midtrans.is_production")).toBeNull();
     expect(within(paymentPanel).queryByText("Tidak diketahui")).toBeNull();
     expect(within(paymentPanel).queryByText("Wajib untuk runtime")).toBeNull();
     expect(within(paymentPanel).queryByText("Terakhir dibaca runtime")).toBeNull();
+    expect(paymentPanel.textContent).not.toContain("Key: midtrans.server_key");
+    expect(paymentPanel.textContent).not.toContain("Version ID:");
+    expect(paymentPanel.textContent).not.toContain("Last runtime read");
     expect(paymentPanel.textContent).not.toContain("version-secret");
     expect(paymentPanel.textContent).not.toContain("version-mode");
     expect(paymentPanel.textContent).not.toContain("request-1");
@@ -1152,7 +1162,7 @@ describe("form pages", () => {
     renderWithQueryClient(<Settings />);
 
     const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
-    const serverKeyInput = await within(paymentPanel).findByLabelText("Midtrans Server Key") as HTMLInputElement;
+    const serverKeyInput = await within(paymentPanel).findByLabelText("Kunci Server Midtrans") as HTMLInputElement;
     const serverKeyRow = serverKeyInput.closest("div")?.parentElement as HTMLElement;
 
     fireEvent.click(within(serverKeyRow).getByRole("button", { name: "Simpan" }));
@@ -1187,7 +1197,7 @@ describe("form pages", () => {
     renderWithQueryClient(<Settings />);
 
     const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
-    const modeSwitch = await within(paymentPanel).findByRole("switch", { name: "Mode Midtrans" });
+    const modeSwitch = await within(paymentPanel).findByRole("switch", { name: "Mode Pembayaran Midtrans" });
     const modeRow = modeSwitch.closest("div")?.parentElement as HTMLElement;
 
     fireEvent.click(modeSwitch);
