@@ -917,6 +917,7 @@
       },
       "status": {
         "unknown": "Unknown",
+        "active": "Active",
         "runtimeRequired": "Runtime required"
       },
       "summary": {

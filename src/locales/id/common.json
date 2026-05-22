@@ -917,6 +917,7 @@
       },
       "status": {
         "unknown": "Tidak diketahui",
+        "active": "Aktif",
         "runtimeRequired": "Wajib untuk runtime"
       },
       "summary": {
@@ -1023,15 +1024,15 @@
         "description": "Pilih titik asal pengiriman pada peta."
       },
       "shipperName": {
-        "label": "Shipper Name",
+        "label": "Nama Pengirim",
         "description": "Nama pengirim pada pesanan Biteship."
       },
       "shipperPhone": {
-        "label": "Shipper Phone",
+        "label": "Nomor Telepon Pengirim",
         "description": "Nomor kontak pengirim untuk kurir."
       },
       "shipperEmail": {
-        "label": "Shipper Email",
+        "label": "Email Pengirim",
         "description": "Email pengirim untuk referensi operasional."
       },
       "address": {
