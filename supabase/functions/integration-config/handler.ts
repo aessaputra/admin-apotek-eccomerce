@@ -1,4 +1,9 @@
 import { corsHeaders } from "../_shared/cors.ts";
+import {
+  type BiteshipApiKeySource,
+  type BiteshipRuntimeSettings,
+  resolveBiteshipRuntimeSettings,
+} from "../_shared/biteship.ts";
 
 const JSON_HEADERS = { ...corsHeaders, "Content-Type": "application/json" };
 const ADMIN_SOURCE = "admin_gateway";
@@ -36,11 +41,54 @@ type ProfilesTableQuery = {
   select: (columns: string) => ProfileSelectQuery;
 };
 
+type SettingsSelectQuery = {
+  eq: (column: string, value: unknown) => SettingsSelectQuery;
+  maybeSingle: () => Promise<{ data: LegacySettingsRecord | null; error: SupabaseError | null }>;
+};
+
+type SettingsTableQuery = {
+  select: (columns: string) => SettingsSelectQuery;
+};
+
+type LegacySettingsRecord = {
+  enabled_couriers?: string | null;
+  origin_area_id?: string | null;
+  origin_postal_code?: string | number | null;
+  origin_latitude?: string | number | null;
+  origin_longitude?: string | number | null;
+};
+
+type BiteshipHealthMissingKey =
+  | "biteship.api_key"
+  | "biteship.enabled_couriers"
+  | "biteship.origin_area_id"
+  | "biteship.origin_postal_code"
+  | "biteship.origin_latitude"
+  | "biteship.origin_longitude";
+
+type BiteshipLegacyDrift = {
+  enabledCouriers: boolean | null;
+  originArea: boolean | null;
+  originPostalCode: boolean | null;
+  originCoordinates: boolean | null;
+};
+
+export type BiteshipIntegrationHealth = {
+  provider: "biteship";
+  apiKeyConfigured: boolean;
+  apiKeySource: BiteshipApiKeySource;
+  requiredConfigComplete: boolean;
+  missingKeys: BiteshipHealthMissingKey[];
+  legacyDrift: BiteshipLegacyDrift;
+  diagnostics: string[];
+};
+
 type IntegrationConfigRpcName =
   | "list_integration_config_summary"
   | "rotate_integration_config_secret"
   | "update_integration_config_value"
-  | "list_integration_config_audit";
+  | "list_integration_config_audit"
+  | "get_runtime_integration_config_versions";
 
 export interface IntegrationConfigAuthClient {
   auth: {
@@ -49,12 +97,39 @@ export interface IntegrationConfigAuthClient {
 }
 
 export interface IntegrationConfigAdminClient {
-  from: (table: "profiles") => ProfilesTableQuery;
+  from: {
+    (table: "profiles"): ProfilesTableQuery;
+    (table: "settings"): SettingsTableQuery;
+  };
   rpc: (
-    fn: IntegrationConfigRpcName,
+    fn: IntegrationConfigRpcName | string,
     args: Record<string, unknown>,
   ) => Promise<{ data: unknown; error: SupabaseError | null }>;
 }
+
+const BITESHIP_HEALTH_KEYS: readonly BiteshipHealthMissingKey[] = [
+  "biteship.api_key",
+  "biteship.enabled_couriers",
+  "biteship.origin_area_id",
+  "biteship.origin_postal_code",
+  "biteship.origin_latitude",
+  "biteship.origin_longitude",
+];
+
+const LEGACY_SETTINGS_COLUMNS = [
+  "enabled_couriers",
+  "origin_area_id",
+  "origin_postal_code",
+  "origin_latitude",
+  "origin_longitude",
+].join(", ");
+
+const UNKNOWN_BITESHIP_LEGACY_DRIFT: BiteshipLegacyDrift = {
+  enabledCouriers: null,
+  originArea: null,
+  originPostalCode: null,
+  originCoordinates: null,
+};
 
 export interface IntegrationConfigHandlerDependencies {
   getAuthClient: () => IntegrationConfigAuthClient;
@@ -162,6 +237,151 @@ function firstRow(data: unknown): unknown {
   return Array.isArray(data) ? data[0] ?? null : data;
 }
 
+function hasRequestedBiteshipKey(keys: string[] | null): boolean {
+  return Array.isArray(keys) && keys.some((key) => key.startsWith("biteship."));
+}
+
+function normalizeLegacyString(value: unknown): string {
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value).trim();
+  }
+
+  return "";
+}
+
+function normalizeLegacyCoordinate(value: unknown): number | null {
+  const normalized = normalizeLegacyString(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const coordinate = Number(normalized);
+  return Number.isFinite(coordinate) ? coordinate : null;
+}
+
+function normalizeLegacyCourierSet(value: unknown): Set<string> {
+  return new Set(
+    normalizeLegacyString(value)
+      .split(",")
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+function normalizeRuntimeCourierSet(values: string[]): Set<string> {
+  return new Set(values.map((item) => item.trim().toLowerCase()).filter(Boolean));
+}
+
+function setsMatch(left: Set<string>, right: Set<string>): boolean {
+  if (left.size !== right.size) {
+    return false;
+  }
+
+  for (const item of left) {
+    if (!right.has(item)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function coordinatesMatch(
+  runtimeLatitude: number | undefined,
+  runtimeLongitude: number | undefined,
+  legacyLatitude: unknown,
+  legacyLongitude: unknown,
+): boolean {
+  const normalizedLegacyLatitude = normalizeLegacyCoordinate(legacyLatitude);
+  const normalizedLegacyLongitude = normalizeLegacyCoordinate(legacyLongitude);
+
+  if (runtimeLatitude === undefined || runtimeLongitude === undefined) {
+    return normalizedLegacyLatitude === null && normalizedLegacyLongitude === null;
+  }
+
+  return normalizedLegacyLatitude === runtimeLatitude && normalizedLegacyLongitude === runtimeLongitude;
+}
+
+function detectMissingBiteshipKeys(settings: BiteshipRuntimeSettings): BiteshipHealthMissingKey[] {
+  return BITESHIP_HEALTH_KEYS.filter((key) => {
+    if (key === "biteship.api_key") return settings.apiKeySource !== "runtime_config";
+    if (key === "biteship.enabled_couriers") return settings.enabledCouriers.length === 0;
+    if (key === "biteship.origin_area_id") return !settings.originAreaId;
+    if (key === "biteship.origin_postal_code") return !settings.originPostalCode;
+    if (key === "biteship.origin_latitude") return settings.originLatitude === undefined;
+    return settings.originLongitude === undefined;
+  });
+}
+
+async function loadLegacySettingsDrift(
+  adminClient: IntegrationConfigAdminClient,
+  runtimeSettings: BiteshipRuntimeSettings,
+): Promise<BiteshipLegacyDrift> {
+  try {
+    const { data, error } = await adminClient
+      .from("settings")
+      .select(LEGACY_SETTINGS_COLUMNS)
+      .eq("id", 1)
+      .maybeSingle();
+
+    if (error || !data) {
+      return UNKNOWN_BITESHIP_LEGACY_DRIFT;
+    }
+
+    return {
+      enabledCouriers: !setsMatch(
+        normalizeRuntimeCourierSet(runtimeSettings.enabledCouriers),
+        normalizeLegacyCourierSet(data.enabled_couriers),
+      ),
+      originArea: runtimeSettings.originAreaId !== normalizeLegacyString(data.origin_area_id),
+      originPostalCode: runtimeSettings.originPostalCode !== normalizeLegacyString(data.origin_postal_code),
+      originCoordinates: !coordinatesMatch(
+        runtimeSettings.originLatitude,
+        runtimeSettings.originLongitude,
+        data.origin_latitude,
+        data.origin_longitude,
+      ),
+    };
+  } catch {
+    return UNKNOWN_BITESHIP_LEGACY_DRIFT;
+  }
+}
+
+async function buildBiteshipIntegrationHealth(
+  adminClient: IntegrationConfigAdminClient,
+): Promise<BiteshipIntegrationHealth> {
+  const runtimeSettings = await resolveBiteshipRuntimeSettings(adminClient);
+  const missingKeys = detectMissingBiteshipKeys(runtimeSettings);
+
+  return {
+    provider: "biteship",
+    apiKeyConfigured: runtimeSettings.apiKeyConfigured,
+    apiKeySource: runtimeSettings.apiKeySource,
+    requiredConfigComplete: missingKeys.length === 0,
+    missingKeys,
+    legacyDrift: await loadLegacySettingsDrift(adminClient, runtimeSettings),
+    diagnostics: runtimeSettings.diagnostics,
+  };
+}
+
+async function buildSummaryResponseData(
+  adminClient: IntegrationConfigAdminClient,
+  keys: string[] | null,
+  data: unknown,
+): Promise<Record<string, unknown>> {
+  const responseData: Record<string, unknown> = {
+    rows: withoutUnsafeResponseFields(data),
+  };
+
+  if (hasRequestedBiteshipKey(keys)) {
+    responseData.health = {
+      biteship: await buildBiteshipIntegrationHealth(adminClient),
+    };
+  }
+
+  return responseData;
+}
+
 function withoutUnsafeResponseFields(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(withoutUnsafeResponseFields);
@@ -252,8 +472,9 @@ export function createIntegrationConfigHandler(dependencies: IntegrationConfigHa
       }
 
       if (body.action === "summary") {
+        const keys = normalizeKeys(body.keys);
         const { data, error } = await adminClient.rpc("list_integration_config_summary", {
-          p_key_names: normalizeKeys(body.keys),
+          p_key_names: keys,
         });
 
         if (error) {
@@ -261,7 +482,7 @@ export function createIntegrationConfigHandler(dependencies: IntegrationConfigHa
           throw new HttpError(500, "Integration config operation failed");
         }
 
-        return jsonResponse({ data: withoutUnsafeResponseFields(data) });
+        return jsonResponse({ data: await buildSummaryResponseData(adminClient, keys, data) });
       }
 
       if (body.action === "rotateSecret") {

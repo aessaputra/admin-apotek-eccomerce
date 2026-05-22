@@ -40,6 +40,9 @@ function createAdminClient(options?: {
   callerLookupError?: boolean;
   rpcData?: unknown;
   rpcError?: { message?: string } | null;
+  rpcImplementation?: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message?: string } | null }>;
+  legacySettings?: Record<string, unknown> | null;
+  legacySettingsError?: { message?: string } | null;
 }) {
   const single = vi.fn(async () => ({
     data: options?.callerLookupError ? null : { role: options?.callerRole ?? "admin" },
@@ -52,17 +55,70 @@ function createAdminClient(options?: {
   profileSelectQuery.eq.mockReturnValue(profileSelectQuery);
   const select = vi.fn(() => profileSelectQuery);
 
-  const rpc = vi.fn(async () => ({
-    data: options?.rpcData ?? [],
-    error: options?.rpcError ?? null,
+  const settingsMaybeSingle = vi.fn(async () => ({
+    data: options?.legacySettings ?? null,
+    error: options?.legacySettingsError ?? null,
   }));
+  const settingsSelectQuery = {
+    eq: vi.fn(),
+    maybeSingle: settingsMaybeSingle,
+  };
+  settingsSelectQuery.eq.mockReturnValue(settingsSelectQuery);
+  const settingsSelect = vi.fn(() => settingsSelectQuery);
 
+  const rpc = vi.fn(async (fn: string, args: Record<string, unknown>) => {
+    if (options?.rpcImplementation) {
+      return options.rpcImplementation(fn, args);
+    }
+
+    return {
+      data: options?.rpcData ?? [],
+      error: options?.rpcError ?? null,
+    };
+  });
+
+  const from = vi.fn((table: "profiles" | "settings") => (table === "profiles" ? { select } : { select: settingsSelect })) as unknown as IntegrationConfigAdminClient["from"];
   const client: IntegrationConfigAdminClient = {
-    from: vi.fn(() => ({ select })),
+    from,
     rpc,
   };
 
-  return { client, rpc, select, single };
+  return { client, rpc, select, single, settingsSelect, settingsMaybeSingle };
+}
+
+function runtimeRow(keyName: string, runtimeValue: unknown, valueKind = "text") {
+  return {
+    key_name: keyName,
+    value_kind: valueKind,
+    is_secret: valueKind === "secret",
+    is_required: true,
+    is_runtime_required: true,
+    version_id: `version-${keyName.replace(/[^a-z0-9]+/g, "-")}`,
+    version_number: 1,
+    status: "active",
+    runtime_value: runtimeValue,
+    masked_value: valueKind === "secret" ? "BS-****SAFE" : null,
+    value_fingerprint: valueKind === "secret" ? "fingerprint" : null,
+    updated_at: "2026-05-21T00:00:00Z",
+  };
+}
+
+function createBiteshipHealthRpc(summaryRows: unknown[], runtimeRows: unknown[]) {
+  return async (fn: string, args: Record<string, unknown>) => {
+    if (fn === "list_integration_config_summary") {
+      return { data: summaryRows, error: null };
+    }
+
+    if (fn === "get_runtime_integration_config_versions") {
+      const requestedKeys = Array.isArray(args.p_key_names) ? args.p_key_names : [];
+      return {
+        data: runtimeRows.filter((row) => requestedKeys.includes((row as { key_name?: string }).key_name)),
+        error: null,
+      };
+    }
+
+    return { data: [], error: null };
+  };
 }
 
 function createHandler(options?: {
@@ -139,10 +195,142 @@ describe("createIntegrationConfigHandler", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(payload).toEqual({ data: [summaryRow] });
+    expect(payload).toEqual({ data: { rows: [summaryRow] } });
     expect(adminMock.rpc).toHaveBeenCalledWith("list_integration_config_summary", {
       p_key_names: ["midtrans.server_key"],
     });
+  });
+
+  it("adds safe Biteship health only when summary requests Biteship keys", async () => {
+    const summaryRow = {
+      key_name: "biteship.api_key",
+      is_secret: true,
+      masked_value: "BS-****9999",
+      non_secret_value: null,
+      version_number: 2,
+      status: "active",
+    };
+    const runtimeRows = [
+      runtimeRow("biteship.api_key", "TEST_BITESHIP_SECRET_DO_NOT_LEAK", "secret"),
+      runtimeRow("biteship.enabled_couriers", ["jne:reg"], "text_array"),
+      runtimeRow("biteship.origin_area_id", "area-runtime"),
+      runtimeRow("biteship.origin_postal_code", "12110"),
+      runtimeRow("biteship.origin_latitude", "-6.2"),
+      runtimeRow("biteship.origin_longitude", "106.8"),
+      runtimeRow("shop.shipper_name", "PRIVATE_SHIPPER_NAME"),
+      runtimeRow("shop.shipper_phone", "08123456789"),
+      runtimeRow("shop.shipper_email", "shipper@example.test"),
+      runtimeRow("shop.address", "PRIVATE STORE ADDRESS"),
+      runtimeRow("shop.organization", "PRIVATE ORGANIZATION"),
+    ];
+    const adminMock = createAdminClient({
+      rpcImplementation: createBiteshipHealthRpc([summaryRow], runtimeRows),
+      legacySettings: {
+        enabled_couriers: "sicepat:reg",
+        origin_area_id: "legacy-area",
+        origin_postal_code: "99999",
+        origin_latitude: "-6.1",
+        origin_longitude: "106.7",
+      },
+    });
+    const { handler } = createHandler({ adminClient: adminMock.client });
+
+    const response = await handler(createRequest({ action: "summary", keys: ["biteship.api_key"] }));
+    const responseBody = await response.text();
+    const payload = JSON.parse(responseBody);
+
+    expect(response.status).toBe(200);
+    expect(payload.data.rows).toEqual([summaryRow]);
+    expect(payload.data.health.biteship).toEqual({
+      provider: "biteship",
+      apiKeyConfigured: true,
+      apiKeySource: "runtime_config",
+      requiredConfigComplete: true,
+      missingKeys: [],
+      legacyDrift: {
+        enabledCouriers: true,
+        originArea: true,
+        originPostalCode: true,
+        originCoordinates: true,
+      },
+      diagnostics: [],
+    });
+    expect(responseBody).not.toContain("TEST_BITESHIP_SECRET_DO_NOT_LEAK");
+    expect(responseBody).not.toContain("PRIVATE_SHIPPER_NAME");
+    expect(responseBody).not.toContain("08123456789");
+    expect(responseBody).not.toContain("shipper@example.test");
+    expect(responseBody).not.toContain("PRIVATE STORE ADDRESS");
+    expect(responseBody).not.toContain("version-biteship-api-key");
+  });
+
+  it("reports missing Biteship runtime keys safely and omits health for non-Biteship summaries", async () => {
+    const summaryRow = { key_name: "biteship.api_key", is_secret: true, masked_value: null };
+    const adminMock = createAdminClient({
+      rpcImplementation: createBiteshipHealthRpc([summaryRow], []),
+      legacySettings: null,
+    });
+    const { handler } = createHandler({ adminClient: adminMock.client });
+
+    const biteshipResponse = await handler(createRequest({ action: "summary", keys: ["biteship.api_key"] }));
+    const biteshipPayload = await biteshipResponse.json();
+    const paymentResponse = await handler(createRequest({ action: "summary", keys: ["midtrans.server_key"] }));
+    const paymentPayload = await paymentResponse.json();
+
+    expect(biteshipPayload.data.health.biteship).toMatchObject({
+      provider: "biteship",
+      apiKeyConfigured: false,
+      apiKeySource: "missing",
+      requiredConfigComplete: false,
+      missingKeys: [
+        "biteship.api_key",
+        "biteship.enabled_couriers",
+        "biteship.origin_area_id",
+        "biteship.origin_postal_code",
+        "biteship.origin_latitude",
+        "biteship.origin_longitude",
+      ],
+      legacyDrift: {
+        enabledCouriers: null,
+        originArea: null,
+        originPostalCode: null,
+        originCoordinates: null,
+      },
+    });
+    expect(JSON.stringify(biteshipPayload)).not.toContain("BITESHIP_API_KEY=");
+    expect(paymentPayload).toEqual({ data: { rows: [summaryRow] } });
+  });
+
+  it("reports unknown legacy drift when the legacy settings lookup fails", async () => {
+    const summaryRow = { key_name: "biteship.api_key", is_secret: true, masked_value: null };
+    const adminMock = createAdminClient({
+      rpcImplementation: createBiteshipHealthRpc([summaryRow], [
+        runtimeRow("biteship.api_key", "TEST_BITESHIP_SECRET_DO_NOT_LEAK", "secret"),
+        runtimeRow("biteship.enabled_couriers", ["jne:reg"], "text_array"),
+        runtimeRow("biteship.origin_area_id", "area-runtime"),
+        runtimeRow("biteship.origin_postal_code", "12110"),
+        runtimeRow("biteship.origin_latitude", "-6.2"),
+        runtimeRow("biteship.origin_longitude", "106.8"),
+        runtimeRow("shop.shipper_name", "PRIVATE_SHIPPER_NAME"),
+        runtimeRow("shop.shipper_phone", "08123456789"),
+        runtimeRow("shop.shipper_email", "shipper@example.test"),
+        runtimeRow("shop.address", "PRIVATE STORE ADDRESS"),
+        runtimeRow("shop.organization", "PRIVATE ORGANIZATION"),
+      ]),
+      legacySettingsError: { message: "legacy settings unavailable" },
+    });
+    const { handler } = createHandler({ adminClient: adminMock.client });
+
+    const response = await handler(createRequest({ action: "summary", keys: ["biteship.api_key"] }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.data.health.biteship.legacyDrift).toEqual({
+      enabledCouriers: null,
+      originArea: null,
+      originPostalCode: null,
+      originCoordinates: null,
+    });
+    expect(JSON.stringify(payload)).not.toContain("legacy settings unavailable");
   });
 
   it("rotates a secret without echoing submitted plaintext", async () => {
