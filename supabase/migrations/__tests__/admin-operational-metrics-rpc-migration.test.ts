@@ -82,3 +82,19 @@ describe("admin operational metrics range cap migration", () => {
     expect(normalizedSql).toContain("extract(year from last_bucket_start)::integer - extract(year from first_bucket_start)::integer + 1");
   });
 });
+
+describe("admin private schema usage restoration migration", () => {
+  const migrationSql = readFileSync(
+    join(migrationsDir, findLatestMigrationFile("_restore_authenticated_private_schema_usage_for_admin_reads.sql")),
+    "utf8",
+  );
+  const normalizedSql = migrationSql.replace(/\s+/g, " ").toLowerCase();
+
+  it("restores only the schema usage needed by authenticated admin read wrappers", () => {
+    expect(normalizedSql).toContain("revoke all on schema private from public, anon");
+    expect(normalizedSql).toContain("grant usage on schema private to authenticated, service_role");
+    expect(normalizedSql).toContain("public admin read wrappers can call explicit private admin-gated functions");
+    expect(normalizedSql).not.toContain("grant select on table private");
+    expect(normalizedSql).not.toContain("grant all on schema private");
+  });
+});
