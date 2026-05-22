@@ -74,7 +74,7 @@ begin
       'orderId', new.id,
       'customerName', customer_profile.full_name,
       'orderStatus', new.status,
-      'paymentStatus', pg_catalog.coalesce(v_payment_status, 'pending'::public.payment_status),
+      'paymentStatus', coalesce(v_payment_status, 'pending'::public.payment_status),
       'createdAt', new.created_at,
       'route', notification_route
     ),

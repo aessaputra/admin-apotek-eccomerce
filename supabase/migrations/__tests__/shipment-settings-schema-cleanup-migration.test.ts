@@ -137,7 +137,7 @@ describe("shipment settings schema cleanup stabilization migration", () => {
     expect(functionSql).toContain("order by payments.updated_at desc, payments.created_at desc");
     expect(functionSql).toContain("limit 1");
     expect(functionSql).toContain("coalesce(v_payment_status, 'pending'::public.payment_status)");
-    expect(functionSql).toContain("'paymentstatus', pg_catalog.coalesce(v_payment_status, 'pending'::public.payment_status)");
+    expect(functionSql).toContain("'paymentstatus', coalesce(v_payment_status, 'pending'::public.payment_status)");
     expect(functionSql).not.toContain(["new", "payment_status"].join("."));
   });
 
