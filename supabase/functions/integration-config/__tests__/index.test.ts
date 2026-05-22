@@ -201,6 +201,38 @@ describe("createIntegrationConfigHandler", () => {
     });
   });
 
+  it("strips unsafe secret fields from Midtrans summary responses", async () => {
+    const summaryRow = {
+      key_name: "midtrans.server_key",
+      is_secret: true,
+      masked_value: "sk-****SAFE",
+      value_fingerprint: "fingerprint",
+      runtime_value: PLACEHOLDER_SECRET,
+      secret: PLACEHOLDER_SECRET,
+      p_secret_value: PLACEHOLDER_SECRET,
+      metadata: {
+        rotation_status: "current",
+        nested: { secret: PLACEHOLDER_SECRET },
+      },
+    };
+    const adminMock = createAdminClient({ rpcData: [summaryRow] });
+    const { handler } = createHandler({ adminClient: adminMock.client });
+
+    const response = await handler(createRequest({ action: "summary", keys: ["midtrans.server_key"] }));
+    const responseBody = await response.text();
+    const payload = JSON.parse(responseBody);
+    const row = payload.data.rows[0];
+
+    expect(response.status).toBe(200);
+    expect(responseBody).not.toContain(PLACEHOLDER_SECRET);
+    expect(row).not.toHaveProperty("runtime_value");
+    expect(row).not.toHaveProperty("secret");
+    expect(row).not.toHaveProperty("p_secret_value");
+    expect(row.metadata.nested).not.toHaveProperty("secret");
+    expect(row.masked_value).toBe("sk-****SAFE");
+    expect(row.value_fingerprint).toBe("fingerprint");
+  });
+
   it("adds safe Biteship health only when summary requests Biteship keys", async () => {
     const summaryRow = {
       key_name: "biteship.api_key",
