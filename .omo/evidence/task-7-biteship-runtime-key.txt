@@ -1,7 +1,0 @@
-2026-05-19T10:18:08Z
-Command: pnpm test supabase/functions/_shared/__tests__/biteship-order.test.ts supabase/functions/_shared/__tests__/biteship-runtime-source.test.ts supabase/functions/_shared/__tests__/webhook-side-effects.test.ts supabase/functions/_shared/__tests__/biteship-rates.test.ts supabase/functions/_shared/__tests__/biteship-public-tracking.test.ts supabase/functions/_shared/__tests__/biteship-postal-code.test.ts
-Result: PASS, 6 files / 74 tests.
-Command: pnpm test supabase/functions/_shared/__tests__/midtrans-runtime-source.test.ts supabase/functions/_shared/__tests__/order-manager-mutation.test.ts
-Result: PASS, 2 files / 9 tests.
-Evidence: runtime helper and fulfillment tests assert `biteship.api_key` is fetched through `get_runtime_integration_config_versions`, Biteship Authorization is built from a placeholder runtime value, immutable snapshot payloads are used for old fulfillment, and persisted task/response output does not contain the placeholder key.
-Secret safety: placeholder-only test values; no real Biteship key recorded.
