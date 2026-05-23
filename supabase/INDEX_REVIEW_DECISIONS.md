@@ -30,6 +30,40 @@ The following indexes were restored because removing them caused `unindexed_fore
 - `shipments_waybill_overridden_by_idx`
 - `idx_order_item_stock_deductions_product_id`
 
+## 2026-05-22 Live Advisor Run: Unused-Index Decisions
+
+Source: `.omo/evidence/task-1-advisor-snapshot.md`, section 7. The live advisor run reported 19 `unused_index` findings, each with `idx_scan = 0`, `idx_tup_read = 0`, `idx_tup_fetch = 0`, and `indisvalid = true` at snapshot time. This section records the investigation-first decision state only; it does not authorize index drops.
+
+Decision vocabulary:
+
+- `keep`: retain because the index supports an FK, currently known operational path, cron/system path, admin path, or customer path.
+- `defer`: retain for now because the advisor signal is insufficient without live query-shape or replacement-index evidence.
+- `drop-candidate`: only for indexes with complete evidence proving no FK/constraint role, no current or expected operational path, and no needed replacement index.
+
+| Schema | Table | Index | Advisor status | Decision | Rationale |
+|---|---|---|---|---|---|
+| `private` | `order_integration_config_snapshots` | `order_integration_config_snapshots_shipment_idx` | `unused_index` | `keep` | Covers the `shipment_id` FK to `public.shipments(id)` on a private service-role snapshot table. Task 1 only proves zero scans at one snapshot, so do not repeat prior FK-support drop mistakes. |
+| `private` | `order_integration_config_snapshots` | `order_integration_config_snapshots_created_idx` | `unused_index` | `defer` | Created for recency ordering on Biteship/runtime configuration snapshots. The table is new, private, and service-role driven; no complete evidence proves the recency index is dead. |
+| `public` | `order_activities` | `idx_order_activities_created_at` | `unused_index` | `defer` | Activity timelines and delivery backfill logic order by `created_at`; existing evidence suggests a future composite replacement might be better than a blind drop. |
+| `private` | `integration_config_versions` | `integration_config_versions_key_status_created_idx` | `unused_index` | `keep` | Runtime configuration lookups filter by key and active/grace status for service-role Edge Function paths. Keep until live query plans prove a replacement or redundancy. |
+| `private` | `integration_config_versions` | `integration_config_versions_vault_secret_idx` | `unused_index` | `keep` | Supports secret-version rows tied to `vault.secrets(id)` and runtime secret resolution. Treat as FK/secret-management support, not a drop candidate. |
+| `private` | `integration_config_audit_logs` | `integration_config_audit_logs_key_created_idx` | `unused_index` | `keep` | Admin integration-config audit RPC filters by `key_name` and orders by recent events, matching this index shape. |
+| `private` | `integration_config_audit_logs` | `integration_config_audit_logs_actor_created_idx` | `unused_index` | `defer` | Actor-based audit investigation is an admin/forensic path. No repo evidence proves it is unnecessary, and audit indexes should not be dropped from advisor output alone. |
+| `private` | `integration_config_audit_logs` | `integration_config_audit_logs_request_idx` | `unused_index` | `defer` | Request-id correlation is an operational debugging path for service-role config changes. Keep pending production log/query evidence. |
+| `public` | `orders` | `orders_customer_completed_by_idx` | `unused_index` | `keep` | Supports the nullable `customer_completed_by` FK to `auth.users(id)` and was added during advisor remediation. Do not mark FK-support indexes as drop candidates. |
+| `private` | `midtrans_payment_config_bindings` | `midtrans_payment_config_bindings_server_key_version_idx` | `unused_index` | `defer` | Related to the server-key version FK and Midtrans config binding service path. It is not a full 3-column FK cover, so defer until a complete covering replacement and query evidence exist. |
+| `private` | `midtrans_payment_config_bindings` | `midtrans_payment_config_bindings_is_production_version_idx` | `unused_index` | `defer` | Related to the is-production version FK and Midtrans config binding service path. It is not a full 3-column FK cover, so defer until a complete covering replacement and query evidence exist. |
+| `public` | `order_items` | `order_items_source_cart_item_id_idx` | `unused_index` | `keep` | Checkout persists selected cart provenance and webhook side-effect cart cleanup validates `order_items.source_cart_item_id`. Keep this operational provenance index. |
+| `public` | `profile_push_tokens` | `profile_push_tokens_user_active_seen_idx` | `unused_index` | `keep` | Push delivery loads active profile push tokens by `user_id`, `revoked_at is null`, ordered by `last_seen_at desc`; this matches the customer/admin notification path. |
+| `public` | `webhook_side_effect_tasks` | `webhook_side_effect_tasks_lease_idx` | `unused_index` | `keep` | Cron and Edge Function processors gate due work on `lease_until`; zero scans are not representative when queue volume is low. |
+| `public` | `orders` | `orders_delivered_completion_idx` | `unused_index` | `keep` | Supports customer completion windows for delivered orders and the customer order bucket lifecycle. Feature traffic may be low, but this is an active customer path. |
+| `public` | `order_item_stock_deductions` | `idx_order_item_stock_deductions_product_id` | `unused_index` | `keep` | Supports the `product_id` FK to `public.products(id)` and was restored after a prior drop caused FK advisor regressions. |
+| `public` | `shipments` | `shipments_waybill_overridden_by_idx` | `unused_index` | `keep` | Supports the nullable `waybill_overridden_by` FK and was restored after a prior drop caused FK advisor regressions. |
+| `public` | `notification_push_deliveries` | `notification_push_deliveries_user_created_idx` | `unused_index` | `keep` | Leading `user_id` supports FK maintenance and user delivery history/audit access on service-role push delivery records. |
+| `public` | `orders` | `orders_payment_status_created_idx` | `unused_index` | `defer` | Admin and customer order flows filter by payment status and order recency through order views/RPCs. Verify live plans before deciding whether this direct orders index is redundant. |
+
+2026-05-22 summary: `keep` = 12, `defer` = 7, `drop-candidate` = 0. No migration should be generated from this advisor signal alone.
+
 ## Decision Table
 
 ### Keep
