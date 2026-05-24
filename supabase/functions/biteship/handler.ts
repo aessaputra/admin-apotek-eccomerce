@@ -228,10 +228,6 @@ function uniqueDiagnostics(diagnostics: string[]): string[] {
   return Array.from(new Set(diagnostics));
 }
 
-function isEnvFallbackDiagnostic(diagnostic: string): boolean {
-  return diagnostic.includes("using env fallback");
-}
-
 function isRatesRuntimeDiagnostic(diagnostic: string): boolean {
   return (
     diagnostic.startsWith("biteship.api_key") ||
@@ -254,12 +250,6 @@ function getActionRuntimeDiagnostics(
     return true;
   });
 
-  if (runtimeSettings.apiKeySource === "missing") {
-    diagnostics.push(
-      "biteship.api_key current version missing; no env fallback configured",
-    );
-  }
-
   if (runtimeSettings.enabledCouriers.length === 0) {
     diagnostics.push("biteship.enabled_couriers current version missing or empty");
   }
@@ -275,9 +265,7 @@ function getBlockingRuntimeDiagnostics(
   runtimeSettings: BiteshipRuntimeSettings,
   action: "rates" | "draft_order",
 ): string[] {
-  return getActionRuntimeDiagnostics(runtimeSettings, action).filter(
-    (diagnostic) => !isEnvFallbackDiagnostic(diagnostic),
-  );
+  return getActionRuntimeDiagnostics(runtimeSettings, action);
 }
 
 function createBiteshipConfigErrorResponse(diagnostics: string[]): Response {
@@ -292,28 +280,6 @@ function createBiteshipConfigErrorResponse(diagnostics: string[]): Response {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     },
   );
-}
-
-function appendRuntimeDiagnostics(
-  responseData: unknown,
-  runtimeSettings: BiteshipRuntimeSettings,
-  action: "rates" | "draft_order",
-): unknown {
-  const diagnostics = getActionRuntimeDiagnostics(runtimeSettings, action).filter(
-    isEnvFallbackDiagnostic,
-  );
-
-  if (diagnostics.length === 0 || !isRecord(responseData)) {
-    return responseData;
-  }
-
-  return {
-    ...responseData,
-    diagnostics: [
-      ...(Array.isArray(responseData.diagnostics) ? responseData.diagnostics : []),
-      ...diagnostics,
-    ],
-  };
 }
 
 export function createBiteshipHandler(
@@ -690,13 +656,7 @@ export function createBiteshipHandler(
         failedRateResponses,
         ratesRequestResult.skipped,
       );
-      const mergedRateResponseBody = appendRuntimeDiagnostics(
-        mergedRateResponse.body,
-        runtimeSettings!,
-        "rates",
-      );
-
-      return new Response(JSON.stringify(mergedRateResponseBody), {
+      return new Response(JSON.stringify(mergedRateResponse.body), {
         status: mergedRateResponse.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -929,14 +889,6 @@ export function createBiteshipHandler(
 
     if (action === "rates") {
       responseData = filterRatesByEnabledServices(responseData, settings!);
-    }
-
-    if (action === "draft_order") {
-      responseData = appendRuntimeDiagnostics(
-        responseData,
-        runtimeSettings!,
-        "draft_order",
-      );
     }
 
     return new Response(JSON.stringify(responseData), {

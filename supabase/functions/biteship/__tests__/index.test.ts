@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CONFIG_KEYS, type RuntimeConfigRow } from "../../_shared/runtime-config.ts";
 
-const envGet = vi.fn((key: string) => {
+const envGet = vi.fn((key: string): string | undefined => {
   if (key === "SUPABASE_URL") return "https://project.supabase.test";
   if (key === "SUPABASE_SERVICE_ROLE_KEY") return "service-role-sentinel";
   return undefined;
@@ -214,12 +214,18 @@ describe("Biteship proxy runtime configuration", () => {
     expect(adminClient.from).not.toHaveBeenCalled();
   });
 
-  it("returns a safe config error without outbound calls when runtime config is incomplete", async () => {
+  it("returns a safe config error without outbound calls when the runtime API key is missing", async () => {
+    envGet.mockImplementation((key: string) => {
+      if (key === "SUPABASE_URL") return "https://project.supabase.test";
+      if (key === "SUPABASE_SERVICE_ROLE_KEY") return "service-role-sentinel";
+      if (key === "BITESHIP_API_KEY") return "env-biteship-key-sentinel";
+      return undefined;
+    });
     const adminClient = createAdminClient(
-      createBiteshipRuntimeRows({ includeApiKey: false, enabledCouriers: [] }),
+      createBiteshipRuntimeRows({ includeApiKey: false }),
     );
     const fetchFn = vi.fn(async () => {
-      throw new Error("Biteship must not be called with incomplete runtime config");
+      throw new Error("Biteship must not be called with missing runtime API key");
     });
     const handler: BiteshipHandler = createBiteshipHandler({
       fetchFn,
@@ -237,12 +243,15 @@ describe("Biteship proxy runtime configuration", () => {
     expect(body).toMatchObject({
       error: "BITESHIP_CONFIG_INCOMPLETE",
       diagnostics: expect.arrayContaining([
-        "biteship.api_key current version missing; no env fallback configured",
-        "biteship.enabled_couriers current version missing or empty",
+        "biteship.api_key runtime config missing or unavailable",
       ]),
     });
     expect(JSON.stringify(body)).not.toContain("runtime-biteship-secret-sentinel");
-    expect(JSON.stringify(body)).not.toContain("BITESHIP_API_KEY=");
+    expect(JSON.stringify(body)).not.toContain("env-biteship-key-sentinel");
+    expect(JSON.stringify(body)).not.toContain("BITESHIP_API_KEY");
+    expect(JSON.stringify(body)).not.toContain("env fallback");
+    expect(JSON.stringify(body)).not.toContain("no env fallback configured");
+    expect(envGet.mock.calls.map(([key]) => key)).not.toContain("BITESHIP_API_KEY");
     expect(fetchFn).not.toHaveBeenCalled();
     expect(adminClient.from).not.toHaveBeenCalled();
   });
