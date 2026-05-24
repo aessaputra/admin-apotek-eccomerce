@@ -41,7 +41,7 @@ export interface IntegrationConfigSummaryRow {
   updated_at: string | null;
 }
 
-export type BiteshipApiKeySource = "runtime_config" | "env_fallback" | "missing";
+export type BiteshipApiKeySource = "runtime_config" | "missing";
 
 export type BiteshipHealthMissingKey =
   | "biteship.api_key"
