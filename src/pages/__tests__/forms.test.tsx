@@ -9,6 +9,7 @@ import { INTEGRATION_CONFIG_OWNERSHIP, getPrimaryOwnerForIntegrationConfigKey } 
 import {
   ConfigDetailsDisclosure,
   OperationalConfigRow,
+  SecretReplacementInput,
   createBlankSecretReplacementDraft,
 } from "../settings/integration-config-primitives";
 import { Profile } from "../profile";
@@ -436,7 +437,7 @@ vi.mock("antd", () => {
     Upload: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Typography,
     theme,
-    Button: ({ children, onClick, htmlType, type, size, icon }: { children?: React.ReactNode; onClick?: () => void; htmlType?: "submit" | "button"; type?: string; size?: string; icon?: React.ReactNode }) => <button type={htmlType ?? "button"} data-type={type} data-size={size} onClick={onClick}>{icon}{children}</button>,
+    Button: ({ children, onClick, htmlType, type, size, icon, disabled }: { children?: React.ReactNode; onClick?: () => void; htmlType?: "submit" | "button"; type?: string; size?: string; icon?: React.ReactNode; disabled?: boolean }) => <button type={htmlType ?? "button"} data-type={type} data-size={size} disabled={disabled} onClick={onClick}>{icon}{children}</button>,
     Space,
     Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
     Divider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -1738,6 +1739,23 @@ describe("form pages", () => {
     expect(draft.value).toBe("");
     expect(JSON.stringify(draft)).not.toContain("SB-Mid-****7890");
     expect(JSON.stringify(draft)).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
+  });
+
+  it("disables secret replacement saves when requested", () => {
+    render(
+      <SecretReplacementInput
+        label="Midtrans Server Key"
+        draft={{ value: "" }}
+        onChange={vi.fn()}
+        onSave={vi.fn()}
+        saveDisabled
+      />
+    );
+
+    const saveButton = screen.getByRole("button", { name: "Save" }) as HTMLButtonElement;
+    expect(saveButton.disabled).toBe(true);
+    const input = screen.getByLabelText("Midtrans Server Key") as HTMLInputElement;
+    expect(input.disabled).toBe(false);
   });
 
   it("advanced section does not render moved domain edit controls", async () => {

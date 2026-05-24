@@ -17,6 +17,7 @@ export interface SecretReplacementInputProps {
   onChange: (draft: SecretReplacementDraft) => void;
   onSave: () => void;
   saving?: boolean;
+  saveDisabled?: boolean;
   placeholder?: string;
   saveLabel?: string;
 }
@@ -27,6 +28,7 @@ export const SecretReplacementInput: React.FC<SecretReplacementInputProps> = ({
   onChange,
   onSave,
   saving = false,
+  saveDisabled = false,
   placeholder = "Leave blank to keep current value",
   saveLabel = "Save",
 }) => (
@@ -39,7 +41,7 @@ export const SecretReplacementInput: React.FC<SecretReplacementInputProps> = ({
       visibilityToggle={false}
       onChange={(event) => onChange({ value: event.target.value })}
     />
-    <Button loading={saving} onClick={onSave}>
+    <Button disabled={saveDisabled || saving} loading={saving} onClick={onSave}>
       {saveLabel}
     </Button>
   </Space>
