@@ -202,7 +202,7 @@ describe("Biteship runtime settings helper", () => {
     const adminClient = createRuntimeConfigClient(
       createBiteshipRuntimeRows({ includeApiKey: false }),
     );
-    const env = { get: vi.fn(() => undefined) };
+    const env = { get: vi.fn(() => "env-biteship-secret-must-not-be-used") };
     vi.stubGlobal("Deno", { env });
 
     const settings = await resolveBiteshipRuntimeSettings(adminClient);
@@ -210,12 +210,13 @@ describe("Biteship runtime settings helper", () => {
     expect(settings.apiKeyConfigured).toBe(false);
     expect(settings.apiKeySource).toBe("missing");
     expect(settings.diagnostics).toContain(
-      "biteship.api_key current version missing; no env fallback configured",
+      "biteship.api_key runtime config missing or unavailable",
     );
-    expect(settings.diagnostics.join(" ")).not.toContain("BITESHIP_API_KEY=");
+    expect(settings.diagnostics.join(" ")).not.toContain("BITESHIP_API_KEY");
     expect(JSON.stringify(settings)).not.toContain("runtime_biteship_secret");
     expect(JSON.stringify(settings)).not.toContain("runtime_value");
-    expect(env.get).toHaveBeenCalledWith("BITESHIP_API_KEY");
+    expect(JSON.stringify(settings)).not.toContain("env-biteship-secret-must-not-be-used");
+    expect(env.get).not.toHaveBeenCalled();
 
     const requestedKeyNames = getRequestedKeyNames(adminClient);
     expect(requestedKeyNames).toHaveLength(requiredBiteshipRuntimeKeys.length);

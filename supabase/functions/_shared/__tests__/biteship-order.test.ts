@@ -579,7 +579,7 @@ describe("Biteship runtime API key", () => {
     vi.unstubAllGlobals();
   });
 
-  it("loads the Biteship API key through runtime config without using env fallback", async () => {
+  it("loads the Biteship API key through runtime config without reading Edge secrets", async () => {
     const apiKeySentinel = "runtime-biteship-key-sentinel";
     const adminClient = {
       rpc: vi.fn(async (name: string, args: Record<string, unknown>) => {
@@ -609,7 +609,7 @@ describe("Biteship runtime API key", () => {
     expect(env.get).not.toHaveBeenCalled();
   });
 
-  it("falls back to the Edge secret when runtime config is missing", async () => {
+  it("rejects a missing runtime API key without consulting the Edge secret", async () => {
     const adminClient = {
       rpc: vi.fn(async () => ({ data: [], error: null })),
     };
@@ -618,9 +618,9 @@ describe("Biteship runtime API key", () => {
 
     await expect(
       resolveBiteshipApiKeyFromRuntimeConfig(adminClient),
-    ).resolves.toBe("env-biteship-key-sentinel");
+    ).rejects.toThrow("Biteship runtime config unavailable");
 
-    expect(env.get).toHaveBeenCalledWith("BITESHIP_API_KEY");
+    expect(env.get).not.toHaveBeenCalled();
   });
 
   it("does not fall back to the Edge secret when runtime config is unavailable", async () => {
@@ -658,7 +658,7 @@ describe("Biteship runtime API key", () => {
     expect(env.get).not.toHaveBeenCalled();
   });
 
-  it("throws a safe error when runtime and Edge secret Biteship API keys are missing", async () => {
+  it("throws a safe error when the runtime Biteship API key is missing", async () => {
     const adminClient = {
       rpc: vi.fn(async () => ({ data: [], error: null })),
     };
@@ -668,7 +668,7 @@ describe("Biteship runtime API key", () => {
     await expect(
       resolveBiteshipApiKeyFromRuntimeConfig(adminClient),
     ).rejects.toThrow("Biteship runtime config unavailable");
-    expect(env.get).toHaveBeenCalledWith("BITESHIP_API_KEY");
+    expect(env.get).not.toHaveBeenCalled();
   });
 
   it("authorizes order creation with the runtime API key without storing it in the snapshot payload", async () => {

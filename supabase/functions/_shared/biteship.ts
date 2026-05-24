@@ -174,15 +174,7 @@ interface SupabaseRpcResult {
   error: { message?: string } | null;
 }
 
-type DenoRuntime = typeof globalThis & {
-  Deno?: {
-    env?: {
-      get?: (key: string) => string | undefined;
-    };
-  };
-};
-
-export type BiteshipApiKeySource = "runtime_config" | "env_fallback" | "missing";
+export type BiteshipApiKeySource = "runtime_config" | "missing";
 
 export interface BiteshipRuntimeSettings {
   apiKeyConfigured: boolean;
@@ -308,15 +300,6 @@ export function getBiteshipAuthorizationHeader(apiKey: string): string {
     : `biteship_test.${apiKey}`;
 }
 
-function readBiteshipApiKeyFromEnv(): string | null {
-  const value = (globalThis as DenoRuntime).Deno?.env?.get?.("BITESHIP_API_KEY");
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  return value.trim() || null;
-}
-
 async function resolveBiteshipApiKeyRuntimeState(
   runtimeConfig: RuntimeConfigReader,
 ): Promise<BiteshipApiKeyRuntimeState> {
@@ -332,24 +315,12 @@ async function resolveBiteshipApiKeyRuntimeState(
     };
   }
 
-  const fallbackApiKey = readBiteshipApiKeyFromEnv();
-  if (fallbackApiKey) {
-    return {
-      apiKey: fallbackApiKey,
-      apiKeyConfigured: true,
-      apiKeySource: "env_fallback",
-      diagnostics: [
-        "biteship.api_key current version missing; using env fallback",
-      ],
-    };
-  }
-
   return {
     apiKey: null,
     apiKeyConfigured: false,
     apiKeySource: "missing",
     diagnostics: [
-      "biteship.api_key current version missing; no env fallback configured",
+      "biteship.api_key runtime config missing or unavailable",
     ],
   };
 }
