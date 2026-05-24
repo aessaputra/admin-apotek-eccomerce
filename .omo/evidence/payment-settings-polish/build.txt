@@ -1,0 +1,55 @@
+
+> admin-apotek-eccomerce@0.1.0 build /home/coder/dev/pharma/admin-panel/.worktrees/payment-settings-polish-remediation
+> tsc && vite build
+
+vite v6.4.1 building for production...
+transforming...
+✓ 6614 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                     1.62 kB │ gzip:   0.73 kB
+dist/assets/index-B6snAd4S.css                      2.97 kB │ gzip:   1.19 kB
+dist/assets/slugify-T7RSojJc.js                     0.16 kB │ gzip:   0.14 kB
+dist/assets/functions-error-CIW9b1Js.js             0.29 kB │ gzip:   0.20 kB
+dist/assets/index-DIT3pOCM.js                       0.61 kB │ gzip:   0.42 kB
+dist/assets/edit-CjO8NeFv.js                        0.96 kB │ gzip:   0.52 kB
+dist/assets/create-DSX1OgGp.js                      0.96 kB │ gzip:   0.52 kB
+dist/assets/show-Hxze1Uhb.js                        0.99 kB │ gzip:   0.50 kB
+dist/assets/useSupabaseUpload-M8mcXmIU.js           1.05 kB │ gzip:   0.65 kB
+dist/assets/edit-B3PvIIH3.js                        1.10 kB │ gzip:   0.67 kB
+dist/assets/list-DAmTzPBh.js                        1.27 kB │ gzip:   0.58 kB
+dist/assets/useBanToggle-BlkpOjDB.js                1.30 kB │ gzip:   0.57 kB
+dist/assets/orders-BGHxgdHv.js                      1.83 kB │ gzip:   0.57 kB
+dist/assets/list-XlRPzR-h.js                        2.07 kB │ gzip:   0.81 kB
+dist/assets/show-6gVE7B4-.js                        2.07 kB │ gzip:   0.72 kB
+dist/assets/login-LRn-IJAD.js                       2.12 kB │ gzip:   1.01 kB
+dist/assets/list-Dslu_msF.js                        2.18 kB │ gzip:   0.75 kB
+dist/assets/show-By_xWWgV.js                        2.21 kB │ gzip:   0.86 kB
+dist/assets/create-DTXaq1-W.js                      3.19 kB │ gzip:   1.39 kB
+dist/assets/couriers-CxMwLyV4.js                    3.37 kB │ gzip:   1.04 kB
+dist/assets/list-BeWE9pHI.js                        3.49 kB │ gzip:   1.58 kB
+dist/assets/edit-D-QZRDhi.js                        3.79 kB │ gzip:   1.59 kB
+dist/assets/mfa-verify-BMDNkZGp.js                  5.14 kB │ gzip:   2.03 kB
+dist/assets/sales-pdf-export-C8boA_cG.js            5.76 kB │ gzip:   2.25 kB
+dist/assets/list-COCGF7OT.js                        5.86 kB │ gzip:   2.25 kB
+dist/assets/useProductSkuField-Dd8otQCN.js          6.33 kB │ gzip:   2.84 kB
+dist/assets/show-0f-PjfxV.js                        9.38 kB │ gzip:   3.21 kB
+dist/assets/sales-C4EOrkqQ.js                      11.15 kB │ gzip:   3.27 kB
+dist/assets/index-BvvGggpg.js                      11.86 kB │ gzip:   4.15 kB
+dist/assets/create-gQOy0KfB.js                     16.77 kB │ gzip:   5.73 kB
+dist/assets/show-BfoXnOim.js                       19.51 kB │ gzip:   6.04 kB
+dist/assets/purify.es-BaNf_EpD.js                  24.29 kB │ gzip:   9.18 kB
+dist/assets/jspdf.plugin.autotable-Cz_YoQo_.js     31.10 kB │ gzip:   9.91 kB
+dist/assets/vendor-CwkMKCNr.js                     36.79 kB │ gzip:  13.34 kB
+dist/assets/i18n-k_s6vO3M.js                       49.13 kB │ gzip:  15.99 kB
+dist/assets/index-YpC2-1ns.js                      65.50 kB │ gzip:  19.88 kB
+dist/assets/index.es-DwXxz0d2.js                  158.85 kB │ gzip:  53.25 kB
+dist/assets/html2canvas.esm-QH1iLAAe.js           202.38 kB │ gzip:  48.04 kB
+dist/assets/index-BmkVMYJS.js                     352.04 kB │ gzip: 110.18 kB
+dist/assets/jspdf.es.min-e9WgUYmq.js              389.36 kB │ gzip: 128.21 kB
+dist/assets/refine-C5drumZH.js                    612.71 kB │ gzip: 189.55 kB
+dist/assets/antd-CgWiZDnw.js                    1,251.48 kB │ gzip: 392.30 kB
+dist/assets/index-TbrmAO50.js                   1,297.37 kB │ gzip: 393.99 kB
+✓ built in 32.83s
+
+[exit_code=0]

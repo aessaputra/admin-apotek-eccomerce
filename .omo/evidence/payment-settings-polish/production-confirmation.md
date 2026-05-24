@@ -1,0 +1,24 @@
+# Payment Settings Browser QA
+
+- URL: http://localhost:5174/settings
+- Dev server: worktree server on port 5174 because port 5173 was already occupied by the root checkout.
+- Playwright MCP note: `skill_mcp` was invoked first, but the MCP Chrome launch lacked `--no-sandbox` in this container. Browser QA was completed with Playwright automation via the installed Chrome using `--no-sandbox`.
+- QA harness: route-auth and Supabase responses were mocked in browser automation only; product source files were not changed.
+- Route: `/settings` opened and the `Pengaturan Pembayaran` tab was reached.
+- Desktop screenshot: .omo/evidence/payment-settings-polish/payment-settings-desktop.png
+- Mobile screenshot: .omo/evidence/payment-settings-polish/payment-settings-mobile.png
+- Desktop horizontal overflow: PASS
+- Mobile horizontal overflow: PASS
+- Keyboard Tab reached server-key input: PASS
+- Whitespace-only server key keeps Save disabled: PASS
+- TEST_NEW_MIDTRANS_SERVER_KEY enables Save: PASS
+- Valid test key was not submitted.
+- Production-mode Save opens confirmation: PASS
+- Escape dismisses confirmation without saving: PASS
+- Cancel dismisses confirmation without saving: PASS
+- Confirmation copy concise and payment-specific: PASS
+- Confirmation internal key/request/version/fingerprint/provider leakage: PASS
+- Payment panel internal key/request/version/fingerprint/provider leakage: PASS
+- Browser console errors: error: WebSocket connection to 'ws://localhost:5001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED | error: WebSocket connection to 'ws://localhost:5001/' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED | error: Warning: [antd: Modal] Static function can not consume context like dynamic theme. Please use 'App' component instead.
+- Payment app console errors after filtering devtools/browser-storage/known AntD static-modal warning: PASS (none)
+- Credentials/data: used only mocked admin/session/config responses and the synthetic `TEST_NEW_MIDTRANS_SERVER_KEY`; no real Midtrans keys, payment data, or production credentials were used.

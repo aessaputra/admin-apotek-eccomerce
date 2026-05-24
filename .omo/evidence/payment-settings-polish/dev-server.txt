@@ -1,0 +1,8 @@
+
+> admin-apotek-eccomerce@0.1.0 dev /home/coder/dev/pharma/admin-panel/.worktrees/payment-settings-polish-remediation
+> vite dev --host 127.0.0.1 --port 5174
+
+
+  VITE v6.4.1  ready in 262 ms
+
+  ➜  Local:   http://127.0.0.1:5174/
