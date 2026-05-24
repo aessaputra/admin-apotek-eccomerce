@@ -97,6 +97,7 @@ export const PaymentSettingsPanel: React.FC = () => {
   const paymentPanelLabel = translate("settings.tabs.paymentSettings", {}, "Pengaturan Pembayaran");
   const serverKeyLabel = translate("settings.payment.serverKey.label", {}, "Kunci Server Midtrans");
   const modeLabel = translate("settings.payment.mode.label", {}, "Mode Pembayaran Midtrans");
+  const serverKeyDraftValue = serverKeyDraft.value.trim();
 
   return (
     <>
@@ -135,6 +136,7 @@ export const PaymentSettingsPanel: React.FC = () => {
                   onChange={setServerKeyDraft}
                   onSave={saveServerKey}
                   saving={rotateServerKeyMutation.isPending}
+                  saveDisabled={!serverKeyDraftValue}
                   placeholder={translate("settings.payment.serverKey.placeholder", {}, "Kosongkan untuk memakai kunci saat ini")}
                   saveLabel={translate("buttons.save", {}, "Simpan")}
                 />

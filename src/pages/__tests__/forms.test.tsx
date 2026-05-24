@@ -1167,11 +1167,16 @@ describe("form pages", () => {
     const serverKeyInput = await within(paymentPanel).findByLabelText("Kunci Server Midtrans") as HTMLInputElement;
     const serverKeyRow = serverKeyInput.closest("div")?.parentElement as HTMLElement;
 
-    fireEvent.click(within(serverKeyRow).getByRole("button", { name: "Simpan" }));
+    const saveButton = within(serverKeyRow).getByRole("button", { name: "Simpan" }) as HTMLButtonElement;
+    expect(saveButton.disabled).toBe(true);
+
+    fireEvent.change(serverKeyInput, { target: { value: "   " } });
+    expect(saveButton.disabled).toBe(true);
     expect(mocks.functionsInvoke.mock.calls.some((call) => call[1]?.body?.action === "rotateSecret")).toBe(false);
 
     fireEvent.change(serverKeyInput, { target: { value: "TEST_NEW_MIDTRANS_SERVER_KEY" } });
-    fireEvent.click(within(serverKeyRow).getByRole("button", { name: "Simpan" }));
+    expect(saveButton.disabled).toBe(false);
+    fireEvent.click(saveButton);
 
     await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
       body: {
