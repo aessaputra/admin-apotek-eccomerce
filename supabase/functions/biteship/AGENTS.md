@@ -24,9 +24,8 @@ Direct `create_order` and direct `track` are disabled for browser clients.
 
 ## RUNTIME CONFIG
 
-- Biteship API key, enabled couriers, origin area/postal/coordinates, and shipper fields resolve through `_shared/runtime-config.ts` and `_shared/biteship.ts`.
-- `BITESHIP_API_KEY` is the only approved provider env grace fallback; it is source-guarded and reported as an `env_fallback` diagnostic until `biteship.api_key` is migrated to runtime config.
-- Handler fails closed when the API key is missing entirely or when non-secret runtime config required for `rates`/`draft_order` is incomplete; the `env_fallback` diagnostic itself is non-blocking.
+- Biteship API key, enabled couriers, origin area/postal/coordinates, and shipper fields resolve through `_shared/runtime-config.ts`, `_shared/biteship.ts`, Admin Settings, and Vault keys such as `biteship.api_key`.
+- Handler fails closed when `biteship.api_key` runtime config is missing or when non-secret runtime config required for `rates`/`draft_order` is incomplete.
 - Legacy `settings` drift is diagnostic only; do not reintroduce legacy settings as the source of truth.
 - Instant courier companies/services are normalized through `_shared/biteship-courier-contract.ts`.
 
@@ -48,7 +47,7 @@ pnpm vitest run supabase/functions/_shared/__tests__/biteship-runtime-source.tes
 ## ANTI-PATTERNS
 
 - **NEVER** expose or return the Biteship API key to clients.
-- **NEVER** add another provider env fallback or broaden the approved `BITESHIP_API_KEY` grace path.
+- **NEVER** add provider env fallbacks for Biteship secrets or broaden runtime config lookup beyond Admin Settings and Vault.
 - **NEVER** call upstream Biteship with missing origin/shipper/runtime config.
 - **NEVER** trust client-provided order IDs without owner/admin checks.
 - **NEVER** save frontend fallback courier rows as live enabled-courier config.

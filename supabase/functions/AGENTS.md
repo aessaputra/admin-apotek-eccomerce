@@ -37,7 +37,7 @@
 - Service-role cron/worker functions must require `Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}` or a vetted Vault/cron path.
 - Public webhooks must validate provider signatures before DB mutation or raw notification persistence.
 - Read Supabase platform env (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) at runtime edges only.
-- Provider secrets should come from `_shared/runtime-config.ts` and database/Vault config. Do not add direct `MIDTRANS_*`, `BITESHIP_*`, or `EXPO_*` env reads; the only approved provider env grace path is the source-guarded `BITESHIP_API_KEY` fallback in `_shared/biteship.ts`.
+- Provider secrets and config must come from `_shared/runtime-config.ts`, Admin Settings, and database/Vault config keys such as `midtrans.server_key`, `midtrans.is_production`, `biteship.api_key`, and `push.expo_access_token`. Do not add direct `MIDTRANS_*`, `BITESHIP_*`, or `EXPO_*` provider env reads.
 
 ## TESTING
 

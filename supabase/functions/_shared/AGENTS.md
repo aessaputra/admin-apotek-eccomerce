@@ -24,7 +24,7 @@
 - Preserve existing normalization helpers instead of reimplementing status/currency/amount/courier logic in functions.
 - Use explicit error messages that tests can assert, but do not include secrets.
 - Runtime config log-safe values may include key name, version, masked value, and fingerprint, never plaintext `runtime_value`.
-- `BITESHIP_API_KEY` in `biteship.ts` is the only approved provider env grace fallback; source-guard tests should reject every other provider env read or broad env dump.
+- Provider secrets and config resolve through runtime config and Vault keys such as `midtrans.server_key`, `midtrans.is_production`, `biteship.api_key`, and `push.expo_access_token`; source-guard tests should reject provider env reads or broad env dumps.
 - When adding a shared helper, add/extend tests in `_shared/__tests__/`.
 - Treat `_shared` edits as deployment-affecting for every importer.
 
@@ -39,7 +39,7 @@
 
 ## TESTING
 
-- Source-guard tests intentionally reject direct provider env reads, except the approved `BITESHIP_API_KEY` grace fallback, and unsafe persistence order.
+- Source-guard tests intentionally reject direct provider env reads and unsafe persistence order.
 - For runtime config changes, run `runtime-config.test.ts` plus provider-specific source tests.
 - For payment changes, run `midtrans.test.ts`, `midtrans-runtime-source.test.ts`, and webhook tests.
 - For Biteship changes, run `biteship-*` tests plus the function-local Biteship tests.

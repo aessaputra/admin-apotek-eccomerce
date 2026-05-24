@@ -61,7 +61,7 @@ npx supabase --workdir "/home/coder/dev/pharma/admin-panel" functions deploy <fu
 - Use Dashboard secrets or `supabase secrets set --env-file <file>` for production secrets; use `supabase secrets list` to verify remote presence without printing values.
 - Local function secrets may live in uncommitted env files passed via `--env-file`; do not commit them.
 - Functions with `verify_jwt = false` must implement their own auth, signature, or service-role validation.
-- Provider runtime secrets should resolve through database-backed runtime config and Vault references. The only approved provider env grace path is the source-guarded `BITESHIP_API_KEY` fallback in `_shared/biteship.ts`.
+- Provider secrets and config must resolve through Admin Settings, database-backed runtime config, and Vault references such as `midtrans.server_key`, `midtrans.is_production`, `biteship.api_key`, and `push.expo_access_token`; do not add provider env fallbacks.
 - Payment/webhook code must preserve idempotency and avoid duplicate stock/cart/shipping side effects.
 - Policy and grant changes must explicitly verify intended roles (`anon`, `authenticated`, `service_role`, `supabase_auth_admin`).
 
