@@ -63,7 +63,7 @@ Use `supabase/functions/create-snap-token/index.ts` as the reference flow.
 - Call Midtrans Snap:
   - Sandbox: `https://app.sandbox.midtrans.com/snap/v1/transactions`
   - Production: `https://app.midtrans.com/snap/v1/transactions`
-- Authenticate with Basic auth using `MIDTRANS_SERVER_KEY`.
+- Authenticate with Basic auth using the resolved `midtrans.server_key` runtime config value from the existing shared Midtrans runtime config helpers.
 - Persist `snap_token`, `snap_redirect_url`, `snap_token_created_at`, and the numeric `gross_amount` back to the order.
 
 ### 2. Incoming payment notification
@@ -113,7 +113,7 @@ const hashBuffer = await crypto.subtle.digest(
 
 Important details:
 
-- Use `MIDTRANS_SERVER_KEY`, not the client key.
+- Use the resolved `midtrans.server_key` runtime config value, not the client key.
 - Use the original `gross_amount` string from Midtrans when computing the signature.
 - Reject invalid signatures with `401`.
 
@@ -237,20 +237,24 @@ Use these practical rules:
 
 Midtrans retries some non-2xx responses, so choose error codes deliberately. If the issue is temporary and should be retried, prefer a retry-friendly status rather than burying the event.
 
-## Environment variables and endpoints
+## Runtime config, bootstrap env, and endpoints
 
-Use the repo’s existing env names:
+Provider config source of truth:
+
+- Resolve `midtrans.server_key` and `midtrans.is_production` through Admin Settings, database-backed runtime config, and the existing shared Midtrans runtime config helpers.
+- Do not read provider config directly from Edge Function env.
+
+Obsolete provider env names, retained here only as cleanup candidates and not current setup guidance:
 
 - `MIDTRANS_SERVER_KEY`
 - `MIDTRANS_IS_PRODUCTION`
+
+Bootstrap Edge Function env names that remain current:
+
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
-Environment switching:
-
-```ts
-const isProduction = Deno.env.get("MIDTRANS_IS_PRODUCTION") === "true";
-```
+Environment switching uses the resolved `midtrans.is_production` runtime config value, not provider env reads.
 
 Snap endpoints:
 
