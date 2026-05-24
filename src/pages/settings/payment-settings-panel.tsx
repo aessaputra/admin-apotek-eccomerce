@@ -1,6 +1,6 @@
 import { useTranslation } from "@refinedev/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Button, Card, Space, Switch, Typography, message, theme } from "antd";
+import { Alert, Button, Card, Modal, Space, Switch, Typography, message, theme } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import {
   integrationConfigClient,
@@ -50,6 +50,8 @@ export const PaymentSettingsPanel: React.FC = () => {
 
   const serverKeyRow = rowsByKey.get("midtrans.server_key");
   const modeRow = rowsByKey.get("midtrans.is_production");
+  const persistedMode = getBooleanValue(modeRow);
+  const modeHasChanged = modeDraft !== persistedMode;
 
   useEffect(() => {
     setModeDraft(getBooleanValue(modeRow));
@@ -91,6 +93,23 @@ export const PaymentSettingsPanel: React.FC = () => {
   };
 
   const saveMode = () => {
+    if (!modeHasChanged) return;
+
+    if (!persistedMode && modeDraft) {
+      Modal.confirm({
+        title: translate("settings.payment.mode.confirmProduction.title", {}, "Aktifkan Produksi?"),
+        content: translate(
+          "settings.payment.mode.confirmProduction.content",
+          {},
+          "Transaksi pelanggan akan memakai Midtrans produksi."
+        ),
+        okText: translate("settings.payment.mode.confirmProduction.ok", {}, "Aktifkan"),
+        cancelText: translate("settings.payment.mode.confirmProduction.cancel", {}, "Batal"),
+        onOk: () => updateModeMutation.mutate(true),
+      });
+      return;
+    }
+
     updateModeMutation.mutate(modeDraft);
   };
 
@@ -158,7 +177,11 @@ export const PaymentSettingsPanel: React.FC = () => {
                     unCheckedChildren={translate("settings.payment.mode.sandbox", {}, "Sandbox")}
                     onChange={setModeDraft}
                   />
-                  <Button loading={updateModeMutation.isPending} onClick={saveMode}>
+                  <Button
+                    loading={updateModeMutation.isPending}
+                    disabled={!modeHasChanged || updateModeMutation.isPending}
+                    onClick={saveMode}
+                  >
                     {translate("buttons.save", {}, "Simpan")}
                   </Button>
                 </Space>

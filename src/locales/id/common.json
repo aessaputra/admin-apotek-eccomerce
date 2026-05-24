@@ -1001,6 +1001,12 @@
         "description": "Gunakan Sandbox untuk uji coba. Gunakan Produksi untuk transaksi pelanggan.",
         "sandbox": "Sandbox",
         "production": "Produksi",
+        "confirmProduction": {
+          "title": "Aktifkan Produksi?",
+          "content": "Transaksi pelanggan akan memakai Midtrans produksi.",
+          "ok": "Aktifkan",
+          "cancel": "Batal"
+        },
         "saveSuccess": "Mode pembayaran Midtrans tersimpan.",
         "saveError": "Mode pembayaran Midtrans gagal disimpan."
       }

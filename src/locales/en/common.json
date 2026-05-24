@@ -1001,6 +1001,12 @@
         "description": "Use Sandbox for testing. Use Production for customer transactions.",
         "sandbox": "Sandbox",
         "production": "Production",
+        "confirmProduction": {
+          "title": "Enable production?",
+          "content": "Customer payments will use Midtrans production.",
+          "ok": "Enable",
+          "cancel": "Cancel"
+        },
         "saveSuccess": "Midtrans payment mode saved.",
         "saveError": "Midtrans payment mode could not be saved."
       }

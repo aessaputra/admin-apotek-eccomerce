@@ -1,6 +1,7 @@
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { Modal } from "antd";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Settings from "../settings";
 import shippingPanelSource from "../settings/shipping-settings-panel.tsx?raw";
@@ -537,6 +538,7 @@ describe("form pages", () => {
     mocks.productImagesInsert.mockClear();
     mocks.mfaListFactors.mockClear();
     mocks.functionsInvoke.mockReset();
+    vi.mocked(Modal.confirm).mockReset();
     mocks.functionsInvoke.mockImplementation((_name: string, { body }: { body: Record<string, unknown> }) => {
       if (body.action === "summary") {
         const summaryRows = [
@@ -1206,9 +1208,26 @@ describe("form pages", () => {
     const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
     const modeSwitch = await within(paymentPanel).findByRole("switch", { name: "Mode Pembayaran Midtrans" });
     const modeRow = modeSwitch.closest("div")?.parentElement as HTMLElement;
+    const saveButton = within(modeRow).getByRole("button", { name: "Simpan" }) as HTMLButtonElement;
+
+    expect(saveButton.disabled).toBe(true);
 
     fireEvent.click(modeSwitch);
-    fireEvent.click(within(modeRow).getByRole("button", { name: "Simpan" }));
+    expect(saveButton.disabled).toBe(false);
+    fireEvent.click(saveButton);
+
+    const confirm = vi.mocked(Modal.confirm);
+    expect(confirm).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Aktifkan Produksi?",
+      content: "Transaksi pelanggan akan memakai Midtrans produksi.",
+      okText: "Aktifkan",
+      cancelText: "Batal",
+      onOk: expect.any(Function),
+    }));
+    expect(mocks.functionsInvoke.mock.calls.some((call) => call[1]?.body?.action === "updateValue")).toBe(false);
+
+    const confirmOptions = confirm.mock.calls[0]?.[0];
+    confirmOptions?.onOk?.();
 
     await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
       body: {
@@ -1220,6 +1239,32 @@ describe("form pages", () => {
     }));
     const updateBody = mocks.functionsInvoke.mock.calls.find((call) => call[1]?.body?.action === "updateValue")?.[1]?.body;
     expect(updateBody).not.toHaveProperty("source");
+  });
+
+  it("payment settings does not save production mode when confirmation is cancelled", async () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
+    const modeSwitch = await within(paymentPanel).findByRole("switch", { name: "Mode Pembayaran Midtrans" });
+    const modeRow = modeSwitch.closest("div")?.parentElement as HTMLElement;
+    const saveButton = within(modeRow).getByRole("button", { name: "Simpan" });
+
+    fireEvent.click(modeSwitch);
+    fireEvent.click(saveButton);
+
+    const confirmOptions = vi.mocked(Modal.confirm).mock.calls[0]?.[0];
+    confirmOptions?.onCancel?.();
+
+    expect(mocks.functionsInvoke.mock.calls.some((call) => call[1]?.body?.action === "updateValue")).toBe(false);
   });
 
 
