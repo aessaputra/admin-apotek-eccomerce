@@ -987,6 +987,7 @@
       "description": "Kelola kunci server dan mode pembayaran Midtrans untuk proses checkout.",
       "summary": {
         "loading": "Memuat pengaturan pembayaran...",
+        "empty": "Pengaturan pembayaran belum tersedia.",
         "error": "Pengaturan pembayaran tidak dapat dimuat."
       },
       "serverKey": {

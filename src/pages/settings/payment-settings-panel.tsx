@@ -117,6 +117,7 @@ export const PaymentSettingsPanel: React.FC = () => {
   const serverKeyLabel = translate("settings.payment.serverKey.label", {}, "Kunci Server Midtrans");
   const modeLabel = translate("settings.payment.mode.label", {}, "Mode Pembayaran Midtrans");
   const serverKeyDraftValue = serverKeyDraft.value.trim();
+  const paymentRowsEmpty = !summaryQuery.isLoading && !summaryQuery.isError && !serverKeyRow && !modeRow;
 
   return (
     <>
@@ -140,6 +141,9 @@ export const PaymentSettingsPanel: React.FC = () => {
             ) : null}
             {summaryQuery.isLoading ? (
               <Typography.Text>{translate("settings.payment.summary.loading", {}, "Memuat pengaturan pembayaran...")}</Typography.Text>
+            ) : null}
+            {paymentRowsEmpty ? (
+              <Typography.Text type="secondary">{translate("settings.payment.summary.empty", {}, "Pengaturan pembayaran belum tersedia.")}</Typography.Text>
             ) : null}
             {serverKeyRow ? (
               <OperationalConfigRow

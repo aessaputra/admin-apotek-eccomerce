@@ -1125,6 +1125,47 @@ describe("form pages", () => {
     }));
   });
 
+  it("payment settings shows a safe empty state when payment summary rows are absent", async () => {
+    mocks.useForm.mockReturnValue({
+      formProps: {},
+      saveButtonProps: {},
+      form: {
+        setFieldValue: mocks.setFieldValue,
+        getFieldValue: mocks.getFieldValue,
+      },
+    });
+    mocks.functionsInvoke.mockImplementation((_name: string, { body }: { body: Record<string, unknown> }) => {
+      if (body.action === "summary" && Array.isArray(body.keys) && body.keys.every((key) => typeof key === "string" && key.startsWith("midtrans."))) {
+        return Promise.resolve({ data: { data: { rows: [] } }, error: null });
+      }
+
+      if (body.action === "summary") {
+        return Promise.resolve({ data: { data: { rows: [] } }, error: null });
+      }
+
+      if (body.action === "audit") {
+        return Promise.resolve({ data: { data: [] }, error: null });
+      }
+
+      return Promise.resolve({ data: { data: { ok: true } }, error: null });
+    });
+
+    renderWithQueryClient(<Settings />);
+
+    const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
+    expect(await within(paymentPanel).findByText("Pengaturan pembayaran belum tersedia.")).not.toBeNull();
+
+    for (const internalText of [
+      "midtrans.server_key",
+      "midtrans.is_production",
+      "Version ID:",
+      "request-",
+      "PLAINTEXT_SENTINEL_DO_NOT_RENDER",
+    ]) {
+      expect(paymentPanel.textContent).not.toContain(internalText);
+    }
+  });
+
   it("normalizes deployed legacy summary arrays into settings rows", async () => {
     const summaryRow = {
       key_name: "midtrans.server_key" as const,

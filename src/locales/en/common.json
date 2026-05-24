@@ -987,6 +987,7 @@
       "description": "Manage the Midtrans server key and payment mode for checkout.",
       "summary": {
         "loading": "Loading payment settings...",
+        "empty": "No payment settings found.",
         "error": "Payment settings could not be loaded."
       },
       "serverKey": {
