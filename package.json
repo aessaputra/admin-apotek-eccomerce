@@ -35,6 +35,7 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.4.1",
+    "@vitest/coverage-v8": "4.0.18",
     "eslint": "^9.25.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
@@ -50,7 +51,12 @@
     "build": "tsc && vite build",
     "start": "vite preview",
     "refine": "refine",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:edge": "vitest run supabase/functions",
+    "test:edge:payments": "vitest run supabase/functions/cancel-user-order supabase/functions/confirm-midtrans-payment supabase/functions/create-snap-token supabase/functions/midtrans-webhook supabase/functions/reconcile-pending-midtrans-payments",
+    "test:edge:ops": "vitest run supabase/functions/biteship supabase/functions/cleanup-orphan-storage supabase/functions/confirm-order-received supabase/functions/create-checkout-order supabase/functions/order-manager supabase/functions/process-webhook-side-effects supabase/functions/push",
+    "test:coverage": "vitest run --coverage supabase/functions",
+    "test:edge-smoke": "vitest run scripts/edge-runtime-smoke.ts"
   },
   "browserslist": {
     "production": [
