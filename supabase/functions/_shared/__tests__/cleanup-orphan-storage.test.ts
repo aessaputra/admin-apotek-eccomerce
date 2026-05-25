@@ -262,14 +262,17 @@ describe("getCleanupRequestError", () => {
     });
   });
 
-  it("accepts exact service-role bearer tokens and reports misconfiguration", () => {
+  it("accepts exact service-role bearer tokens and reports misconfiguration without naming secret env vars", () => {
     const headers = new Headers({ Authorization: "Bearer service-role" });
 
     expect(getCleanupRequestError({ method: "POST", headers }, "service-role")).toBeNull();
-    expect(getCleanupRequestError({ method: "POST", headers }, undefined)).toEqual({
+    const requestError = getCleanupRequestError({ method: "POST", headers }, undefined);
+    expect(requestError).toEqual({
       status: 500,
-      body: { error: "SUPABASE_SERVICE_ROLE_KEY is not configured" },
+      body: { error: "Cleanup service is not configured" },
     });
+    expect(JSON.stringify(requestError?.body)).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+    expect(JSON.stringify(requestError?.body)).not.toContain("SERVICE_ROLE");
   });
 });
 

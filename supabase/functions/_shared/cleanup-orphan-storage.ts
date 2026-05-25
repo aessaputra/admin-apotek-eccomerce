@@ -183,7 +183,7 @@ export function getCleanupRequestError(
   if (!serviceRoleKey) {
     return {
       status: 500,
-      body: { error: "SUPABASE_SERVICE_ROLE_KEY is not configured" },
+      body: { error: "Cleanup service is not configured" },
     };
   }
 
