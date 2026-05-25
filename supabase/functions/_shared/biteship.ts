@@ -1524,7 +1524,7 @@ export async function persistBiteshipShipment(
     .insert(activityPayload);
 
   if (activityError) {
-    console.error("[biteship] Failed to log shipping activity:", activityError);
+    console.error("[biteship] biteship_shipping_activity_log_failed");
   }
 }
 
@@ -1561,6 +1561,7 @@ function assertBiteshipOrderMatchesRequest(
 async function retrieveBiteshipOrder(
   orderId: string,
   authKey: string,
+  options: { signal?: AbortSignal } = {},
 ): Promise<BiteshipOrderResponse> {
   const response = await fetch(
     `https://api.biteship.com${buildOrderEndpoint(orderId)}`,
@@ -1569,6 +1570,7 @@ async function retrieveBiteshipOrder(
       headers: {
         Authorization: authKey,
       },
+      signal: options.signal,
     },
   );
 
@@ -1576,9 +1578,7 @@ async function retrieveBiteshipOrder(
     BiteshipApiErrorResponse;
 
   if (!response.ok) {
-    throw new Error(
-      result.message || result.error || "Failed to retrieve Biteship order",
-    );
+    throw new Error("biteship_order_retrieve_failed");
   }
 
   return result;
@@ -1666,6 +1666,7 @@ export const createBiteshipOrder = async (
   order: Order,
   apiKey: string,
   snapshot?: BiteshipOrderConfigSnapshot,
+  options: { signal?: AbortSignal } = {},
 ): Promise<BiteshipOrderResponse> => {
   const BITESHIP_BASE_URL = "https://api.biteship.com/v1";
   const payload = snapshot
@@ -1683,13 +1684,19 @@ export const createBiteshipOrder = async (
       Authorization: authKey,
     },
     body: JSON.stringify(payload),
+    signal: options.signal,
   });
 
   const result = (await response.json()) as BiteshipOrderResponse &
     BiteshipApiErrorResponse;
 
   if (!response.ok) {
-    console.error(`[biteship] API Error:`, JSON.stringify(result));
+    console.error("[biteship] API Error:", {
+      code: "biteship_order_create_failed",
+      status: response.status,
+      providerCode: result.code ?? null,
+      hasDuplicateOrderId: Boolean(result.details?.order_id),
+    });
 
     if (result.code === 40002060 && result.details?.order_id) {
       console.warn(
@@ -1698,14 +1705,13 @@ export const createBiteshipOrder = async (
       const existingOrder = await retrieveBiteshipOrder(
         result.details.order_id,
         authKey,
+        options,
       );
       assertBiteshipOrderMatchesRequest(order, existingOrder);
       return existingOrder;
     }
 
-    throw new Error(
-      result.message || result.error || "Failed to create Biteship order",
-    );
+    throw new Error("biteship_order_create_failed");
   }
 
   const biteshipOrder = result as BiteshipOrderResponse;
