@@ -1,3 +1,5 @@
+import { corsHeaders } from "../_shared/cors.ts";
+import { resolveRequestId, withRequestIdResponse } from "../_shared/request-id.ts";
 import {
   CONFIG_KEYS,
   RuntimeConfigError,
@@ -89,6 +91,12 @@ type PushTokenTarget = {
   source: "profile_push_tokens" | "profiles";
 };
 
+type PushLogContext = {
+  action: string;
+  requestId: string;
+  notificationType?: string;
+};
+
 type PushDeliveryRow = {
   notification_id: string;
   user_id: string;
@@ -175,7 +183,7 @@ export interface PushHandlerDependencies {
   fetchFn?: typeof fetch;
 }
 
-const JSON_HEADERS = { "Content-Type": "application/json" };
+const JSON_HEADERS = { ...corsHeaders, "Content-Type": "application/json" };
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const EXPO_RECEIPTS_URL = "https://exp.host/--/api/v2/push/getReceipts";
 const EXPO_PUSH_TOKEN_PATTERN = /^(ExponentPushToken|ExpoPushToken)\[[^\]]+\]$/;
@@ -223,6 +231,34 @@ function hasExpoApiErrors(response: ExpoApiResponse): boolean {
   return Array.isArray(response.errors) && response.errors.length > 0;
 }
 
+function getExpoResponseType(response: ExpoApiResponse): string {
+  if (Array.isArray(response)) {
+    return "array";
+  }
+
+  return response === null ? "null" : typeof response;
+}
+
+function countExpoApiErrors(response: ExpoApiResponse): number {
+  return Array.isArray(response.errors) ? response.errors.length : 0;
+}
+
+function countExpoTickets(response: ExpoPushResponse): number {
+  return toTicketList(response).length;
+}
+
+function countExpoReceipts(response: ExpoReceiptResponse): number {
+  return response.data && typeof response.data === "object"
+    ? Object.keys(response.data).length
+    : 0;
+}
+
+function getErrorName(error: unknown): string {
+  return error instanceof Error && error.name.trim()
+    ? error.name.trim()
+    : "NonErrorThrown";
+}
+
 function createExpoApiHeaders(
   expoAccessToken: string | undefined
 ): Record<string, string> {
@@ -240,6 +276,7 @@ function createExpoApiHeaders(
 
 async function resolveExpoAccessTokenFromRuntimeConfig(
   adminClient: RuntimeConfigAdminClient,
+  logContext: PushLogContext,
 ): Promise<string | undefined> {
   const runtimeConfig = createRuntimeConfigProvider({
     adminClient,
@@ -257,10 +294,10 @@ async function resolveExpoAccessTokenFromRuntimeConfig(
       : undefined;
   } catch (error) {
     if (error instanceof RuntimeConfigError) {
-      console.error(
-        "[push] Expo access token runtime config lookup failed",
-        error.toLogSafe()
-      );
+      console.error("[push] expo_access_token_runtime_config_lookup_failed", {
+        ...logContext,
+        category: "runtime_config_lookup_failed",
+      });
       return undefined;
     }
 
@@ -341,7 +378,8 @@ function toExpoErrorMessage(
 
 async function loadLegacyProfileExpoToken(
   adminClient: PushAdminClient,
-  notification: NotificationRecord
+  notification: NotificationRecord,
+  logContext: PushLogContext,
 ): Promise<{ token: PushTokenTarget | null; profileLookupFailed: boolean }> {
   const { data: profile, error: profileError } = await adminClient
     .from("profiles")
@@ -350,10 +388,11 @@ async function loadLegacyProfileExpoToken(
     .maybeSingle<{ expo_push_token?: string | null }>();
 
   if (profileError) {
-    console.error(
-      "[push] Failed to load recipient legacy push token:",
-      profileError.message
-    );
+    console.error("[push] recipient_legacy_token_lookup_failed", {
+      ...logContext,
+      category: "profile_lookup_failed",
+      source: "profiles",
+    });
     return { token: null, profileLookupFailed: true };
   }
 
@@ -372,7 +411,8 @@ async function loadLegacyProfileExpoToken(
 
 async function loadPushTargets(
   adminClient: PushAdminClient,
-  notification: NotificationRecord
+  notification: NotificationRecord,
+  logContext: PushLogContext,
 ): Promise<{
   tokens: PushTokenTarget[];
   lookupFailed: boolean;
@@ -386,10 +426,11 @@ async function loadPushTargets(
     .order("last_seen_at", { ascending: false });
 
   if (tokenError) {
-    console.error(
-      "[push] Failed to load active recipient push tokens:",
-      tokenError.message
-    );
+    console.error("[push] recipient_active_token_lookup_failed", {
+      ...logContext,
+      category: "token_lookup_failed",
+      source: "profile_push_tokens",
+    });
     return {
       tokens: [],
       lookupFailed: true,
@@ -426,7 +467,8 @@ async function loadPushTargets(
 
   const legacyTokenResult = await loadLegacyProfileExpoToken(
     adminClient,
-    notification
+    notification,
+    logContext,
   );
 
   if (legacyTokenResult.profileLookupFailed) {
@@ -546,7 +588,8 @@ function buildDeliveryRows(
 
 async function persistDeliveries(
   adminClient: PushAdminClient,
-  deliveryRows: PushDeliveryRow[]
+  deliveryRows: PushDeliveryRow[],
+  logContext: PushLogContext,
 ): Promise<void> {
   if (deliveryRows.length === 0) {
     return;
@@ -557,8 +600,10 @@ async function persistDeliveries(
     .upsert(deliveryRows, { onConflict: "notification_id,expo_push_token" });
 
   if (deliveryError) {
-    console.error("[push] Failed to persist Expo delivery tickets", {
-      message: deliveryError.message,
+    console.error("[push] delivery_persistence_failed", {
+      ...logContext,
+      category: "delivery_persistence_failed",
+      deliveryCount: deliveryRows.length,
     });
   }
 }
@@ -566,7 +611,8 @@ async function persistDeliveries(
 async function revokePushTarget(
   adminClient: PushAdminClient,
   userId: string,
-  target: PushTokenTarget
+  target: PushTokenTarget,
+  logContext: PushLogContext,
 ): Promise<void> {
   const revokedAt = new Date().toISOString();
 
@@ -585,9 +631,11 @@ async function revokePushTarget(
     const { error: tokenRevokeError } = await revokeQuery;
 
     if (tokenRevokeError) {
-      console.error("[push] Failed to revoke stale profile push token", {
-        userId,
-        message: tokenRevokeError.message,
+      console.error("[push] token_revoke_failed", {
+        ...logContext,
+        category: "token_revoke_failed",
+        source: "profile_push_tokens",
+        tokenCount: 1,
       });
     }
   }
@@ -602,9 +650,11 @@ async function revokePushTarget(
     .eq("expo_push_token", target.expoPushToken);
 
   if (legacyCleanupError) {
-    console.error("[push] Failed to clear matching legacy Expo push token", {
-      userId,
-      message: legacyCleanupError.message,
+    console.error("[push] legacy_token_cleanup_failed", {
+      ...logContext,
+      category: "legacy_token_cleanup_failed",
+      source: "profiles",
+      tokenCount: 1,
     });
   }
 }
@@ -612,13 +662,14 @@ async function revokePushTarget(
 async function revokeMatchingTokenByValue(
   adminClient: PushAdminClient,
   userId: string,
-  expoPushToken: string
+  expoPushToken: string,
+  logContext: PushLogContext,
 ): Promise<void> {
   await revokePushTarget(adminClient, userId, {
     id: null,
     expoPushToken,
     source: "profile_push_tokens",
-  });
+  }, logContext);
 }
 
 function createReceiptUpdate(
@@ -662,8 +713,14 @@ function createReceiptUpdate(
 async function processReceipts(
   adminClient: PushAdminClient,
   fetchFn: typeof fetch,
-  limit: number
+  limit: number,
+  requestId: string,
 ): Promise<Response> {
+  const logContext: PushLogContext = {
+    action: "process_receipts",
+    requestId,
+  };
+
   const { data: pendingDeliveries, error: pendingError } = await adminClient
     .from("notification_push_deliveries")
     .select<PendingDeliveryRow[]>(
@@ -678,10 +735,10 @@ async function processReceipts(
     .limit(limit);
 
   if (pendingError) {
-    console.error(
-      "[push] Failed to load pending Expo tickets",
-      pendingError.message
-    );
+    console.error("[push] pending_receipt_lookup_failed", {
+      ...logContext,
+      category: "receipt_lookup_failed",
+    });
     return jsonResponse({ processed: false, reason: "receipt_lookup_failed" });
   }
 
@@ -698,7 +755,8 @@ async function processReceipts(
   }
 
   const expoAccessToken = await resolveExpoAccessTokenFromRuntimeConfig(
-    adminClient
+    adminClient,
+    logContext,
   );
   const ticketIds = deliveries
     .map((delivery) => delivery.ticket_id)
@@ -719,8 +777,13 @@ async function processReceipts(
 
     if (!response.ok) {
       console.error("[push] Expo receipt API request failed", {
+        action: "process_receipts",
+        category: "provider_http_error",
+        requestId,
         status: response.status,
-        response: receiptResponse,
+        responseType: getExpoResponseType(receiptResponse),
+        errorCount: countExpoApiErrors(receiptResponse),
+        receiptCount: countExpoReceipts(receiptResponse),
       });
       return jsonResponse({
         processed: false,
@@ -730,7 +793,12 @@ async function processReceipts(
 
     if (hasExpoApiErrors(receiptResponse)) {
       console.error("[push] Expo receipt API returned errors", {
-        response: receiptResponse,
+        action: "process_receipts",
+        category: "provider_response_error",
+        requestId,
+        responseType: getExpoResponseType(receiptResponse),
+        errorCount: countExpoApiErrors(receiptResponse),
+        receiptCount: countExpoReceipts(receiptResponse),
       });
       return jsonResponse({
         processed: false,
@@ -739,7 +807,10 @@ async function processReceipts(
     }
   } catch (error: unknown) {
     console.error("[push] Expo receipt API network error", {
-      message: error instanceof Error ? error.message : String(error),
+      action: "process_receipts",
+      category: "provider_network_error",
+      requestId,
+      errorName: getErrorName(error),
     });
     return jsonResponse({
       processed: false,
@@ -772,9 +843,11 @@ async function processReceipts(
       .eq("ticket_id", ticketId);
 
     if (updateError) {
-      console.error("[push] Failed to update Expo receipt status", {
-        ticketId,
-        message: updateError.message,
+      console.error("[push] receipt_update_failed", {
+        ...logContext,
+        category: "receipt_update_failed",
+        receiptCount: 1,
+        updatedCount,
       });
       continue;
     }
@@ -785,7 +858,8 @@ async function processReceipts(
       await revokeMatchingTokenByValue(
         adminClient,
         delivery.user_id,
-        delivery.expo_push_token
+        delivery.expo_push_token,
+        logContext,
       );
     }
   }
@@ -797,9 +871,19 @@ async function sendPushNotification(
   adminClient: PushAdminClient,
   fetchFn: typeof fetch,
   notification: NotificationRecord,
-  options: { persistDeliveryRows: boolean }
+  options: { persistDeliveryRows: boolean },
+  requestId: string,
 ): Promise<Response> {
-  const pushTargetsResult = await loadPushTargets(adminClient, notification);
+  const logContext: PushLogContext = {
+    action: "send_push",
+    notificationType: notification.type,
+    requestId,
+  };
+  const pushTargetsResult = await loadPushTargets(
+    adminClient,
+    notification,
+    logContext,
+  );
 
   if (pushTargetsResult.lookupFailed) {
     return jsonResponse({
@@ -809,9 +893,10 @@ async function sendPushNotification(
   }
 
   if (pushTargetsResult.tokens.length === 0) {
-    console.info("[push] Recipient has no Expo push token", {
-      notificationId: notification.id,
-      userId: notification.user_id,
+    console.info("[push] recipient_missing_push_token", {
+      ...logContext,
+      category: "missing_token",
+      tokenCount: 0,
     });
     return jsonResponse({ delivered: false, reason: "missing_token" });
   }
@@ -821,21 +906,22 @@ async function sendPushNotification(
   );
 
   if (invalidTargets.length > 0) {
-    console.warn("[push] Recipient push token format is invalid", {
-      notificationId: notification.id,
-      userId: notification.user_id,
-      invalidTokenCount: invalidTargets.length,
+    console.warn("[push] recipient_push_token_format_invalid", {
+      ...logContext,
+      category: "invalid_token_format",
+      tokenCount: invalidTargets.length,
     });
 
     if (options.persistDeliveryRows) {
       await persistDeliveries(
         adminClient,
-        buildInvalidTokenDeliveryRows(notification, invalidTargets)
+        buildInvalidTokenDeliveryRows(notification, invalidTargets),
+        logContext,
       );
     }
 
     for (const target of invalidTargets) {
-      await revokePushTarget(adminClient, notification.user_id, target);
+      await revokePushTarget(adminClient, notification.user_id, target, logContext);
     }
   }
 
@@ -847,7 +933,8 @@ async function sendPushNotification(
   }
 
   const expoAccessToken = await resolveExpoAccessTokenFromRuntimeConfig(
-    adminClient
+    adminClient,
+    logContext,
   );
 
   let expoResponse: ExpoPushResponse;
@@ -865,9 +952,14 @@ async function sendPushNotification(
 
     if (!response.ok) {
       console.error("[push] Expo Push API request failed", {
-        notificationId: notification.id,
+        action: "send_push",
+        category: "provider_http_error",
+        requestId,
+        notificationType: notification.type,
         status: response.status,
-        response: expoResponse,
+        responseType: getExpoResponseType(expoResponse),
+        errorCount: countExpoApiErrors(expoResponse),
+        ticketCount: countExpoTickets(expoResponse),
       });
       return jsonResponse({
         delivered: false,
@@ -877,8 +969,13 @@ async function sendPushNotification(
 
     if (hasExpoApiErrors(expoResponse)) {
       console.error("[push] Expo Push API returned errors", {
-        notificationId: notification.id,
-        response: expoResponse,
+        action: "send_push",
+        category: "provider_response_error",
+        requestId,
+        notificationType: notification.type,
+        responseType: getExpoResponseType(expoResponse),
+        errorCount: countExpoApiErrors(expoResponse),
+        ticketCount: countExpoTickets(expoResponse),
       });
       return jsonResponse({
         delivered: false,
@@ -887,8 +984,11 @@ async function sendPushNotification(
     }
   } catch (error: unknown) {
     console.error("[push] Expo Push API network error", {
-      notificationId: notification.id,
-      message: error instanceof Error ? error.message : String(error),
+      action: "send_push",
+      category: "provider_network_error",
+      requestId,
+      notificationType: notification.type,
+      errorName: getErrorName(error),
     });
     return jsonResponse({ delivered: false, reason: "expo_network_error" });
   }
@@ -898,7 +998,8 @@ async function sendPushNotification(
   if (options.persistDeliveryRows) {
     await persistDeliveries(
       adminClient,
-      buildDeliveryRows(notification, validTargets, tickets)
+      buildDeliveryRows(notification, validTargets, tickets),
+      logContext,
     );
   }
 
@@ -916,7 +1017,7 @@ async function sendPushNotification(
 
     const target = validTargets[index];
     if (target) {
-      await revokePushTarget(adminClient, notification.user_id, target);
+      await revokePushTarget(adminClient, notification.user_id, target, logContext);
     }
   }
 
@@ -925,15 +1026,17 @@ async function sendPushNotification(
 
     if (expoErrorCode !== "DeviceNotRegistered") {
       console.error("[push] Expo ticket returned an error", {
-        notificationId: notification.id,
-        ticket: indexedErrorTicket.ticket,
+        action: "send_push",
+        category: "provider_ticket_error",
+        requestId,
+        notificationType: notification.type,
+        errorCode: expoErrorCode ?? "expo_ticket_error",
       });
     }
 
     return jsonResponse({
       delivered: false,
       reason: expoErrorCode ?? "expo_ticket_error",
-      tickets,
     });
   }
 
@@ -973,6 +1076,13 @@ export function createPushHandler(dependencies: PushHandlerDependencies) {
   const fetchFn = dependencies.fetchFn ?? fetch;
 
   return async (req: Request) => {
+    const requestId = resolveRequestId(req.headers);
+
+    const handleRequest = async (): Promise<Response> => {
+    if (req.method === "OPTIONS") {
+      return new Response("ok", { headers: corsHeaders });
+    }
+
     if (req.method !== "POST") {
       return jsonResponse({ error: "Method Not Allowed" }, 405);
     }
@@ -1014,7 +1124,11 @@ export function createPushHandler(dependencies: PushHandlerDependencies) {
       const supabaseKey = dependencies.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
       if (!supabaseUrl || !supabaseKey) {
-        console.error("[push] Missing Supabase admin client configuration");
+        console.error("[push] missing_supabase_admin_client_configuration", {
+          action: "handle_push_request",
+          category: "missing_admin_config",
+          requestId,
+        });
         return jsonResponse({ delivered: false, reason: "internal_error" });
       }
 
@@ -1037,7 +1151,8 @@ export function createPushHandler(dependencies: PushHandlerDependencies) {
           adminClient,
           fetchFn,
           createTestNotification(userId),
-          { persistDeliveryRows: false }
+          { persistDeliveryRows: false },
+          requestId,
         );
       }
 
@@ -1045,7 +1160,8 @@ export function createPushHandler(dependencies: PushHandlerDependencies) {
         return processReceipts(
           adminClient,
           fetchFn,
-          normalizeReceiptLimit(receiptPayload.limit)
+          normalizeReceiptLimit(receiptPayload.limit),
+          requestId,
         );
       }
 
@@ -1063,12 +1179,20 @@ export function createPushHandler(dependencies: PushHandlerDependencies) {
         adminClient,
         fetchFn,
         notification,
-        { persistDeliveryRows: true }
+        { persistDeliveryRows: true },
+        requestId,
       );
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      console.error("[push] Internal error:", message);
+      console.error("[push] Internal error", {
+        action: "handle_push_request",
+        category: "internal_error",
+        requestId,
+        errorName: getErrorName(error),
+      });
       return jsonResponse({ delivered: false, reason: "internal_error" });
     }
+    };
+
+    return withRequestIdResponse(await handleRequest(), requestId);
   };
 }

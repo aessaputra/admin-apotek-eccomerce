@@ -1228,6 +1228,7 @@ describe("form pages", () => {
         secret: "TEST_NEW_MIDTRANS_SERVER_KEY",
         reason: "settings_payment_save",
       },
+      headers: { "x-request-id": expect.stringMatching(/^[A-Za-z0-9._:/=-]{1,128}$/) },
     }));
     const rotateBody = mocks.functionsInvoke.mock.calls.find((call) => call[1]?.body?.action === "rotateSecret")?.[1]?.body;
     expect(rotateBody).not.toHaveProperty("source");
@@ -1277,6 +1278,7 @@ describe("form pages", () => {
         value: true,
         reason: "settings_payment_save",
       },
+      headers: { "x-request-id": expect.stringMatching(/^[A-Za-z0-9._:/=-]{1,128}$/) },
     }));
     const updateBody = mocks.functionsInvoke.mock.calls.find((call) => call[1]?.body?.action === "updateValue")?.[1]?.body;
     expect(updateBody).not.toHaveProperty("source");
@@ -1536,6 +1538,7 @@ describe("form pages", () => {
         secret: "TEST_NEW_BITESHIP_API_KEY",
         reason: "settings_shipping_save",
       },
+      headers: { "x-request-id": expect.stringMatching(/^[A-Za-z0-9._:/=-]{1,128}$/) },
     }));
     const rotateBody = mocks.functionsInvoke.mock.calls.find((call) => call[1]?.body?.key === "biteship.api_key")?.[1]?.body;
     expect(rotateBody).not.toHaveProperty("source");
@@ -1551,6 +1554,7 @@ describe("form pages", () => {
         value: ["jne:reg"],
         reason: "settings_shipping_save",
       },
+      headers: { "x-request-id": expect.stringMatching(/^[A-Za-z0-9._:/=-]{1,128}$/) },
     }));
 
     fireEvent.click(within(shippingPanel).getByRole("button", { name: "BiteshipAreaSearch" }));
@@ -1563,6 +1567,7 @@ describe("form pages", () => {
         value: "area-runtime-1",
         reason: "settings_shipping_save",
       },
+      headers: { "x-request-id": expect.stringMatching(/^[A-Za-z0-9._:/=-]{1,128}$/) },
     }));
     await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
       body: {
@@ -1571,6 +1576,7 @@ describe("form pages", () => {
         value: "12110",
         reason: "settings_shipping_save",
       },
+      headers: { "x-request-id": expect.stringMatching(/^[A-Za-z0-9._:/=-]{1,128}$/) },
     }));
 
     fireEvent.click(within(shippingPanel).getByRole("button", { name: "MapLocationPicker" }));
@@ -1583,6 +1589,7 @@ describe("form pages", () => {
         value: "-6.244100",
         reason: "settings_shipping_save",
       },
+      headers: { "x-request-id": expect.stringMatching(/^[A-Za-z0-9._:/=-]{1,128}$/) },
     }));
     await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
       body: {
@@ -1591,6 +1598,7 @@ describe("form pages", () => {
         value: "106.799500",
         reason: "settings_shipping_save",
       },
+      headers: { "x-request-id": expect.stringMatching(/^[A-Za-z0-9._:/=-]{1,128}$/) },
     }));
 
     const shipperNameInput = within(shippingPanel).getByLabelText("Nama Pengirim");
@@ -1604,6 +1612,7 @@ describe("form pages", () => {
         value: "Apotek Runtime",
         reason: "settings_shipping_save",
       },
+      headers: { "x-request-id": expect.stringMatching(/^[A-Za-z0-9._:/=-]{1,128}$/) },
     }));
 
     const shipperPhoneInput = within(shippingPanel).getByLabelText("Nomor Telepon Pengirim");
@@ -1617,6 +1626,7 @@ describe("form pages", () => {
         value: "081200000001",
         reason: "settings_shipping_save",
       },
+      headers: { "x-request-id": expect.stringMatching(/^[A-Za-z0-9._:/=-]{1,128}$/) },
     }));
 
     const shipperEmailInput = within(shippingPanel).getByLabelText("Email Pengirim");
@@ -1630,6 +1640,7 @@ describe("form pages", () => {
         value: "runtime@example.test",
         reason: "settings_shipping_save",
       },
+      headers: { "x-request-id": expect.stringMatching(/^[A-Za-z0-9._:/=-]{1,128}$/) },
     }));
 
     const addressInput = within(shippingPanel).getByLabelText("Store Address");
@@ -1643,6 +1654,7 @@ describe("form pages", () => {
         value: "Jl. Runtime 2",
         reason: "settings_shipping_save",
       },
+      headers: { "x-request-id": expect.stringMatching(/^[A-Za-z0-9._:/=-]{1,128}$/) },
     }));
 
     const organizationInput = within(shippingPanel).getByLabelText("Organization");
@@ -1656,6 +1668,7 @@ describe("form pages", () => {
         value: "PT Runtime",
         reason: "settings_shipping_save",
       },
+      headers: { "x-request-id": expect.stringMatching(/^[A-Za-z0-9._:/=-]{1,128}$/) },
     }));
 
     const updateBodies = mocks.functionsInvoke.mock.calls
@@ -1960,6 +1973,7 @@ describe("form pages", () => {
         secret: "TEST_NEW_EXPO_ACCESS_TOKEN",
         reason: "settings_technical_save",
       },
+      headers: { "x-request-id": expect.stringMatching(/^[A-Za-z0-9._:/=-]{1,128}$/) },
     }));
     const rotateBody = mocks.functionsInvoke.mock.calls.find((call) => call[1]?.body?.key === "push.expo_access_token")?.[1]?.body;
     expect(rotateBody).not.toHaveProperty("source");
@@ -1994,6 +2008,7 @@ describe("form pages", () => {
         value: ["https://admin.example.test", "https://ops.example.test"],
         reason: "settings_technical_save",
       },
+      headers: { "x-request-id": expect.stringMatching(/^[A-Za-z0-9._:/=-]{1,128}$/) },
     }));
     const updateBody = mocks.functionsInvoke.mock.calls.find((call) => call[1]?.body?.key === "cors.allowed_origins")?.[1]?.body;
     expect(updateBody).not.toHaveProperty("source");

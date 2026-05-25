@@ -135,6 +135,9 @@ function createPushClientMock(options?: {
   profileToken?: string | null;
   profileError?: string | null;
   pendingDeliveries?: PendingDeliveryFixture[];
+  pendingError?: string | null;
+  deliveryUpsertError?: string | null;
+  updateErrors?: Record<string, string | null | undefined>;
   authUserId?: string | null;
   authError?: string | null;
   runtimeExpoAccessToken?: string | null;
@@ -199,7 +202,7 @@ function createPushClientMock(options?: {
       if (table === "notification_push_deliveries") {
         const builder = new MockQueryBuilder<Row>(() => ({
           data: (options?.pendingDeliveries ?? []) as Row,
-          error: null,
+          error: options?.pendingError ? { message: options.pendingError } : null,
         }));
         selectQueries.push({ table, filters: builder.filters });
         return builder;
@@ -220,7 +223,9 @@ function createPushClientMock(options?: {
     update: (values: Record<string, unknown>) => {
       const builder = new MockQueryBuilder<unknown>(() => ({
         data: null,
-        error: null,
+        error: options?.updateErrors?.[table]
+          ? { message: options.updateErrors[table] }
+          : null,
       }));
       const originalThen = builder.then.bind(builder);
 
@@ -241,7 +246,11 @@ function createPushClientMock(options?: {
       values: Record<string, unknown> | Array<Record<string, unknown>>
     ) => {
       upserts.push({ table, values });
-      return { error: null };
+      return {
+        error: table === "notification_push_deliveries" && options?.deliveryUpsertError
+          ? { message: options.deliveryUpsertError }
+          : null,
+      };
     },
   });
 
@@ -272,12 +281,13 @@ function createNotification(overrides?: Partial<Record<string, unknown>>) {
   };
 }
 
-function createWebhookRequest(record = createNotification()) {
+function createWebhookRequest(record = createNotification(), headers?: Record<string, string>) {
   return new Request("https://example.test/functions/v1/push", {
     method: "POST",
     headers: {
       Authorization: "Bearer service-role",
       "Content-Type": "application/json",
+      ...headers,
     },
     body: JSON.stringify({
       type: "INSERT",
@@ -301,6 +311,26 @@ function createTestNotificationRequest(headers?: Record<string, string>) {
   });
 }
 
+function expectCorsHeaders(response: Response) {
+  expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  expect(response.headers.get("Access-Control-Allow-Headers")).toBe(
+    "authorization, x-client-info, apikey, content-type, x-request-id"
+  );
+}
+
+function serializeConsoleErrorCalls(): string {
+  return JSON.stringify(
+    vi.mocked(console.error).mock.calls,
+    (_key, value) => value instanceof Error ? { name: value.name } : value
+  );
+}
+
+function findConsoleErrorMetadata(message: string): Record<string, unknown> | undefined {
+  return vi.mocked(console.error).mock.calls.find(([logMessage]) =>
+    logMessage === message
+  )?.[1] as Record<string, unknown> | undefined;
+}
+
 describe("createPushHandler", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -310,6 +340,122 @@ describe("createPushHandler", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("answers browser preflight without auth", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+    });
+    const { client } = createPushClientMock();
+    const createClientFn = vi.fn(() => client);
+    const fetchFn = vi.fn();
+    const handler = createPushHandler({ createClientFn, env, fetchFn });
+
+    const response = await handler(
+      new Request("https://example.test/functions/v1/push", {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://admin.example.test",
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "authorization, content-type",
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("ok");
+    expectCorsHeaders(response);
+    expect(response.headers.get("x-request-id")).toBeTruthy();
+    expect(response.headers.get("Access-Control-Allow-Methods")).toContain(
+      "OPTIONS"
+    );
+    expect(createClientFn).not.toHaveBeenCalled();
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("keeps service-role delivery bearer required and includes CORS on auth failure", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+    });
+    const { client } = createPushClientMock();
+    const createClientFn = vi.fn(() => client);
+    const fetchFn = vi.fn();
+    const handler = createPushHandler({ createClientFn, env, fetchFn });
+
+    const response = await handler(
+      new Request("https://example.test/functions/v1/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "INSERT",
+          table: "notifications",
+          schema: "public",
+          record: createNotification(),
+          old_record: null,
+        }),
+      })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(payload).toEqual({ error: "Unauthorized" });
+    expectCorsHeaders(response);
+    expect(createClientFn).not.toHaveBeenCalled();
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("includes CORS headers on unsupported webhook validation responses", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+    });
+    const { client } = createPushClientMock();
+    const createClientFn = vi.fn(() => client);
+    const fetchFn = vi.fn();
+    const handler = createPushHandler({ createClientFn, env, fetchFn });
+
+    const response = await handler(
+      new Request("https://example.test/functions/v1/push", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer service-role",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ type: "UPDATE", table: "notifications" }),
+      })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({
+      skipped: true,
+      reason: "Unsupported webhook payload",
+    });
+    expectCorsHeaders(response);
+    expect(createClientFn).not.toHaveBeenCalled();
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("includes CORS headers on internal configuration errors", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: undefined,
+    });
+    const { client } = createPushClientMock();
+    const createClientFn = vi.fn(() => client);
+    const fetchFn = vi.fn();
+    const handler = createPushHandler({ createClientFn, env, fetchFn });
+
+    const response = await handler(createWebhookRequest());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({ delivered: false, reason: "internal_error" });
+    expectCorsHeaders(response);
+    expect(createClientFn).not.toHaveBeenCalled();
+    expect(fetchFn).not.toHaveBeenCalled();
   });
 
   it("sends an authenticated mobile test notification without notification inserts", async () => {
@@ -349,6 +495,7 @@ describe("createPushHandler", () => {
     const expoBody = JSON.parse(String(requestInit.body));
 
     expect(response.status).toBe(200);
+    expectCorsHeaders(response);
     expect(payload).toMatchObject({ delivered: true });
     expect(authGetUser).toHaveBeenCalledWith("user-jwt");
     expect(createClientFn).toHaveBeenCalledWith(
@@ -406,6 +553,7 @@ describe("createPushHandler", () => {
 
     expect(response.status).toBe(401);
     expect(payload).toEqual({ error: "Unauthorized" });
+    expectCorsHeaders(response);
     expect(authGetUser).not.toHaveBeenCalled();
     expect(fetchFn).not.toHaveBeenCalled();
   });
@@ -448,11 +596,13 @@ describe("createPushHandler", () => {
 
     const handler = createPushHandler({ createClientFn, env, fetchFn });
 
-    const response = await handler(createTestNotificationRequest());
+    const response = await handler(createTestNotificationRequest({ "x-request-id": "push-missing-token-1" }));
     const payload = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("x-request-id")).toBe("push-missing-token-1");
     expect(payload).toEqual({ delivered: false, reason: "missing_token" });
+    expect(JSON.stringify(vi.mocked(console.info).mock.calls)).toContain("push-missing-token-1");
     expect(fetchFn).not.toHaveBeenCalled();
     expect(upserts).toEqual([]);
   });
@@ -504,6 +654,70 @@ describe("createPushHandler", () => {
         }),
       ])
     );
+  });
+
+  it("logs token revoke and cleanup failures with safe structured correlation metadata", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+    });
+    const { client } = createPushClientMock({
+      tokenRows: [
+        {
+          id: "token-row-secret",
+          expo_push_token: "not-an-expo-token-secret",
+          device_id: "ios-device",
+          platform: "ios",
+        },
+      ],
+      updateErrors: {
+        profile_push_tokens: "token revoke DB leak for user-secret-4 not-an-expo-token-secret",
+        profiles: "legacy cleanup DB leak for user-secret-4 not-an-expo-token-secret",
+      },
+    });
+    const fetchFn = vi.fn();
+    const handler = createPushHandler({
+      createClientFn: vi.fn(() => client),
+      env,
+      fetchFn,
+    });
+
+    const response = await handler(createWebhookRequest(createNotification({
+      user_id: "user-secret-4",
+      title: "Revoke Private Title",
+      body: "Revoke Private Body",
+    }), { "x-request-id": "push-revoke-1" }));
+    const payload = await response.json();
+    const errorLogs = serializeConsoleErrorCalls();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({
+      delivered: false,
+      reason: "invalid_token_format",
+    });
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(findConsoleErrorMetadata("[push] token_revoke_failed")).toMatchObject({
+      action: "send_push",
+      category: "token_revoke_failed",
+      notificationType: "order_created",
+      requestId: "push-revoke-1",
+      source: "profile_push_tokens",
+      tokenCount: 1,
+    });
+    expect(findConsoleErrorMetadata("[push] legacy_token_cleanup_failed")).toMatchObject({
+      action: "send_push",
+      category: "legacy_token_cleanup_failed",
+      notificationType: "order_created",
+      requestId: "push-revoke-1",
+      source: "profiles",
+      tokenCount: 1,
+    });
+    expect(errorLogs).not.toContain("token revoke DB leak");
+    expect(errorLogs).not.toContain("legacy cleanup DB leak");
+    expect(errorLogs).not.toContain("user-secret-4");
+    expect(errorLogs).not.toContain("not-an-expo-token-secret");
+    expect(errorLogs).not.toContain("Revoke Private Title");
+    expect(errorLogs).not.toContain("Revoke Private Body");
   });
 
   it("skips admin dashboard notifications before profile lookup or Expo access", async () => {
@@ -622,6 +836,57 @@ describe("createPushHandler", () => {
         }),
       ])
     );
+  });
+
+  it("logs delivery persistence failures with safe structured correlation metadata", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+    });
+    const { client } = createPushClientMock({
+      deliveryUpsertError: "delivery upsert DB leak for user-secret-3 ExpoPushToken[secret-token] ticket-secret",
+      runtimeExpoAccessToken,
+      tokenRows: [
+        {
+          id: "token-row-1",
+          expo_push_token: "ExpoPushToken[secret-token]",
+          device_id: "ios-device",
+          platform: "ios",
+        },
+      ],
+    });
+    const handler = createPushHandler({
+      createClientFn: vi.fn(() => client),
+      env,
+      fetchFn: vi.fn(async () => new Response(
+        JSON.stringify({ data: { status: "ok", id: "ticket-secret" } }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      )),
+    });
+
+    const response = await handler(createWebhookRequest(createNotification({
+      user_id: "user-secret-3",
+      title: "Delivery Private Title",
+      body: "Delivery Private Body",
+    }), { "x-request-id": "push-delivery-persist-1" }));
+    const payload = await response.json();
+    const errorLogs = serializeConsoleErrorCalls();
+
+    expect(response.status).toBe(200);
+    expect(payload).toMatchObject({ delivered: true });
+    expect(findConsoleErrorMetadata("[push] delivery_persistence_failed")).toMatchObject({
+      action: "send_push",
+      category: "delivery_persistence_failed",
+      deliveryCount: 1,
+      notificationType: "order_created",
+      requestId: "push-delivery-persist-1",
+    });
+    expect(errorLogs).not.toContain("delivery upsert DB leak");
+    expect(errorLogs).not.toContain("user-secret-3");
+    expect(errorLogs).not.toContain("ExpoPushToken[secret-token]");
+    expect(errorLogs).not.toContain("ticket-secret");
+    expect(errorLogs).not.toContain("Delivery Private Title");
+    expect(errorLogs).not.toContain("Delivery Private Body");
   });
 
   it("sends notifications without Expo authorization when push security is not configured", async () => {
@@ -801,19 +1066,61 @@ describe("createPushHandler", () => {
 
     const handler = createPushHandler({ createClientFn, env, fetchFn });
 
-    const response = await handler(createWebhookRequest());
+    const response = await handler(createWebhookRequest(createNotification(), { "x-request-id": "push-provider-1" }));
     const payload = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("x-request-id")).toBe("push-provider-1");
     expect(payload).toEqual({
       delivered: false,
       reason: "expo_response_error",
     });
+    expectCorsHeaders(response);
+    const errorLogs = serializeConsoleErrorCalls();
+    expect(errorLogs).toContain("send_push");
+    expect(errorLogs).toContain("push-provider-1");
+    expect(errorLogs).not.toContain("Expo service unavailable");
+    expect(errorLogs).not.toContain("message");
+    expect(errorLogs).not.toContain(runtimeExpoAccessToken);
     expect(upserts).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ table: "notification_push_deliveries" }),
       ])
     );
+  });
+
+  it("replaces unsafe request IDs in push provider failure responses and logs", async () => {
+    const unsafeRequestId = "x".repeat(129);
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+    });
+    const { client } = createPushClientMock({
+      runtimeExpoAccessToken,
+      tokenRows: [
+        {
+          id: "token-row-1",
+          expo_push_token: "ExpoPushToken[token-one]",
+          device_id: "ios-device",
+          platform: "ios",
+        },
+      ],
+    });
+    const handler = createPushHandler({
+      createClientFn: vi.fn(() => client),
+      env,
+      fetchFn: vi.fn(async () => new Response(JSON.stringify({ errors: [{ message: "provider down" }] }), { status: 200 })),
+    });
+
+    const response = await handler(createWebhookRequest(createNotification(), { "x-request-id": unsafeRequestId }));
+    const effectiveRequestId = response.headers.get("x-request-id");
+    const errorLogs = serializeConsoleErrorCalls();
+
+    expect(response.status).toBe(200);
+    expect(effectiveRequestId).toBeTruthy();
+    expect(effectiveRequestId).not.toBe(unsafeRequestId);
+    expect(errorLogs).toContain(String(effectiveRequestId));
+    expect(errorLogs).not.toContain(unsafeRequestId);
   });
 
   it("records retryable Expo ticket errors as terminal send failures", async () => {
@@ -858,10 +1165,17 @@ describe("createPushHandler", () => {
     )?.values;
 
     expect(response.status).toBe(200);
-    expect(payload).toMatchObject({
+    expect(payload).toEqual({
       delivered: false,
       reason: "MessageRateExceeded",
     });
+    expectCorsHeaders(response);
+    const errorLogs = serializeConsoleErrorCalls();
+    expect(errorLogs).toContain("send_push");
+    expect(errorLogs).toContain("MessageRateExceeded");
+    expect(errorLogs).not.toContain("Rate limit exceeded");
+    expect(errorLogs).not.toContain("details");
+    expect(errorLogs).not.toContain(runtimeExpoAccessToken);
     expect(deliveryRows).toEqual([
       expect.objectContaining({
         status: "error",
@@ -937,6 +1251,91 @@ describe("createPushHandler", () => {
       reason: "profile_lookup_failed",
     });
     expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("logs active token lookup failures with safe structured correlation metadata", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+    });
+    const { client } = createPushClientMock({
+      tokenError: "active token DB leak for user-secret-1 ExpoPushToken[secret-token] ticket-secret",
+    });
+    const handler = createPushHandler({
+      createClientFn: vi.fn(() => client),
+      env,
+      fetchFn: vi.fn(),
+    });
+
+    const response = await handler(createWebhookRequest(createNotification({
+      user_id: "user-secret-1",
+      title: "Private Title",
+      body: "Private Body",
+    }), { "x-request-id": "push-token-lookup-1" }));
+    const payload = await response.json();
+    const errorLogs = serializeConsoleErrorCalls();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({
+      delivered: false,
+      reason: "token_lookup_failed",
+    });
+    expect(findConsoleErrorMetadata("[push] recipient_active_token_lookup_failed")).toMatchObject({
+      action: "send_push",
+      category: "token_lookup_failed",
+      notificationType: "order_created",
+      requestId: "push-token-lookup-1",
+      source: "profile_push_tokens",
+    });
+    expect(errorLogs).not.toContain("active token DB leak");
+    expect(errorLogs).not.toContain("user-secret-1");
+    expect(errorLogs).not.toContain("ExpoPushToken[secret-token]");
+    expect(errorLogs).not.toContain("ticket-secret");
+    expect(errorLogs).not.toContain("Private Title");
+    expect(errorLogs).not.toContain("Private Body");
+  });
+
+  it("logs legacy token lookup failures with safe structured correlation metadata", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+    });
+    const { client } = createPushClientMock({
+      tokenRows: [],
+      profileError: "legacy profile DB leak for user-secret-2 ExpoPushToken[legacy-secret] ticket-legacy",
+    });
+    const handler = createPushHandler({
+      createClientFn: vi.fn(() => client),
+      env,
+      fetchFn: vi.fn(),
+    });
+
+    const response = await handler(createWebhookRequest(createNotification({
+      user_id: "user-secret-2",
+      title: "Legacy Private Title",
+      body: "Legacy Private Body",
+    }), { "x-request-id": "push-legacy-lookup-1" }));
+    const payload = await response.json();
+    const errorLogs = serializeConsoleErrorCalls();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({
+      delivered: false,
+      reason: "profile_lookup_failed",
+    });
+    expect(findConsoleErrorMetadata("[push] recipient_legacy_token_lookup_failed")).toMatchObject({
+      action: "send_push",
+      category: "profile_lookup_failed",
+      notificationType: "order_created",
+      requestId: "push-legacy-lookup-1",
+      source: "profiles",
+    });
+    expect(errorLogs).not.toContain("legacy profile DB leak");
+    expect(errorLogs).not.toContain("user-secret-2");
+    expect(errorLogs).not.toContain("ExpoPushToken[legacy-secret]");
+    expect(errorLogs).not.toContain("ticket-legacy");
+    expect(errorLogs).not.toContain("Legacy Private Title");
+    expect(errorLogs).not.toContain("Legacy Private Body");
   });
 
   it("revokes only the token row and matching legacy value for DeviceNotRegistered", async () => {
@@ -1159,6 +1558,105 @@ describe("createPushHandler", () => {
     );
   });
 
+  it("logs pending receipt lookup failures with safe structured correlation metadata", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+    });
+    const { client } = createPushClientMock({
+      pendingError: "pending receipt DB leak for user-secret-5 ExpoPushToken[receipt-secret] ticket-secret",
+    });
+    const handler = createPushHandler({
+      createClientFn: vi.fn(() => client),
+      env,
+      fetchFn: vi.fn(),
+    });
+
+    const response = await handler(
+      new Request("https://example.test/functions/v1/push", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer service-role",
+          "Content-Type": "application/json",
+          "x-request-id": "push-pending-receipts-1",
+        },
+        body: JSON.stringify({ action: "process_receipts" }),
+      })
+    );
+    const payload = await response.json();
+    const errorLogs = serializeConsoleErrorCalls();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({ processed: false, reason: "receipt_lookup_failed" });
+    expect(findConsoleErrorMetadata("[push] pending_receipt_lookup_failed")).toMatchObject({
+      action: "process_receipts",
+      category: "receipt_lookup_failed",
+      requestId: "push-pending-receipts-1",
+    });
+    expect(errorLogs).not.toContain("pending receipt DB leak");
+    expect(errorLogs).not.toContain("user-secret-5");
+    expect(errorLogs).not.toContain("ExpoPushToken[receipt-secret]");
+    expect(errorLogs).not.toContain("ticket-secret");
+  });
+
+  it("logs receipt update failures with safe structured correlation metadata", async () => {
+    const env = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+    });
+    const { client } = createPushClientMock({
+      runtimeExpoAccessToken,
+      pendingDeliveries: [
+        {
+          notification_id: "notif-secret",
+          user_id: "user-secret-6",
+          expo_push_token: "ExpoPushToken[receipt-secret]",
+          ticket_id: "ticket-secret-update",
+          attempt_count: 1,
+        },
+      ],
+      updateErrors: {
+        notification_push_deliveries: "receipt update DB leak for user-secret-6 ExpoPushToken[receipt-secret] ticket-secret-update",
+      },
+    });
+    const handler = createPushHandler({
+      createClientFn: vi.fn(() => client),
+      env,
+      fetchFn: vi.fn(async () => new Response(
+        JSON.stringify({ data: { "ticket-secret-update": { status: "ok" } } }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      )),
+    });
+
+    const response = await handler(
+      new Request("https://example.test/functions/v1/push", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer service-role",
+          "Content-Type": "application/json",
+          "x-request-id": "push-receipt-update-1",
+        },
+        body: JSON.stringify({ action: "process_receipts" }),
+      })
+    );
+    const payload = await response.json();
+    const errorLogs = serializeConsoleErrorCalls();
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({ processed: true, receipts: 0 });
+    expect(findConsoleErrorMetadata("[push] receipt_update_failed")).toMatchObject({
+      action: "process_receipts",
+      category: "receipt_update_failed",
+      receiptCount: 1,
+      requestId: "push-receipt-update-1",
+      updatedCount: 0,
+    });
+    expect(errorLogs).not.toContain("receipt update DB leak");
+    expect(errorLogs).not.toContain("user-secret-6");
+    expect(errorLogs).not.toContain("ExpoPushToken[receipt-secret]");
+    expect(errorLogs).not.toContain("ticket-secret-update");
+  });
+
   it("polls receipts without Expo authorization when push security is not configured", async () => {
     const env = createEnvMock({
       SUPABASE_SERVICE_ROLE_KEY: "service-role",
@@ -1259,7 +1757,96 @@ describe("createPushHandler", () => {
       processed: false,
       reason: "expo_receipt_response_error",
     });
+    const errorLogs = serializeConsoleErrorCalls();
+    expect(errorLogs).toContain("process_receipts");
+    expect(errorLogs).not.toContain("Expo receipt outage");
+    expect(errorLogs).not.toContain("message");
+    expect(errorLogs).not.toContain(runtimeExpoAccessToken);
     expect(updates).toHaveLength(0);
+  });
+
+  it("redacts Expo send and receipt network error log details", async () => {
+    const sendEnv = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+    });
+    const { client: sendClient } = createPushClientMock({
+      runtimeExpoAccessToken,
+      tokenRows: [
+        {
+          id: "token-row-1",
+          expo_push_token: "ExpoPushToken[token-one]",
+          device_id: "ios-device",
+          platform: "ios",
+        },
+      ],
+    });
+    const sendHandler = createPushHandler({
+      createClientFn: vi.fn(() => sendClient),
+      env: sendEnv,
+      fetchFn: vi.fn(async () => {
+        throw new Error("Expo send socket leaked raw message");
+      }),
+    });
+
+    const sendResponse = await sendHandler(createWebhookRequest());
+
+    expect(sendResponse.status).toBe(200);
+    expect(await sendResponse.json()).toEqual({
+      delivered: false,
+      reason: "expo_network_error",
+    });
+    expectCorsHeaders(sendResponse);
+
+    const receiptEnv = createEnvMock({
+      SUPABASE_SERVICE_ROLE_KEY: "service-role",
+      SUPABASE_URL: "https://demo.supabase.co",
+    });
+    const { client: receiptClient } = createPushClientMock({
+      runtimeExpoAccessToken,
+      pendingDeliveries: [
+        {
+          notification_id: "notif-1",
+          user_id: "user-1",
+          expo_push_token: "ExpoPushToken[token-one]",
+          ticket_id: "ticket-one",
+          attempt_count: 1,
+        },
+      ],
+    });
+    const receiptHandler = createPushHandler({
+      createClientFn: vi.fn(() => receiptClient),
+      env: receiptEnv,
+      fetchFn: vi.fn(async () => {
+        throw new Error("Expo receipt socket leaked raw message");
+      }),
+    });
+
+    const receiptResponse = await receiptHandler(
+      new Request("https://example.test/functions/v1/push", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer service-role",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "process_receipts" }),
+      })
+    );
+
+    expect(receiptResponse.status).toBe(200);
+    expect(await receiptResponse.json()).toEqual({
+      processed: false,
+      reason: "expo_receipt_network_error",
+    });
+    expectCorsHeaders(receiptResponse);
+
+    const errorLogs = serializeConsoleErrorCalls();
+    expect(errorLogs).toContain("send_push");
+    expect(errorLogs).toContain("process_receipts");
+    expect(errorLogs).toContain("Error");
+    expect(errorLogs).not.toContain("Expo send socket leaked raw message");
+    expect(errorLogs).not.toContain("Expo receipt socket leaked raw message");
+    expect(errorLogs).not.toContain(runtimeExpoAccessToken);
   });
 
   it("keeps retryable receipt errors eligible for the next receipt poll", async () => {
