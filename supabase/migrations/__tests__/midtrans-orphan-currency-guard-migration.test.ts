@@ -38,29 +38,43 @@ describe("Midtrans orphan notification currency guard migration", () => {
   const normalizedSql = normalizeSql(migrationSql);
   const functionSql = extractFunctionSql(migrationSql);
 
-  it("rejects missing, non-IDR, and mismatched notification currency before transition", () => {
-    expect(functionSql).toContain("v_notification_currency text");
-    expect(functionSql).toContain("v_expected_currency text");
-    expect(functionSql).toContain("raw_notification->>'currency'");
-    expect(functionSql).toContain("coalesce(rec.expected_currency, 'idr')");
-    expect(functionSql).toContain("v_notification_currency is null");
-    expect(functionSql).toContain("v_notification_currency <> 'idr'");
-    expect(functionSql).toContain("v_notification_currency <> v_expected_currency");
-
-    const currencyGuardIndex = functionSql.indexOf("v_notification_currency is null");
-    const transitionIndex = functionSql.indexOf(
-      "public.apply_midtrans_webhook_transition",
-    );
-
-    expect(currencyGuardIndex).toBeGreaterThan(-1);
-    expect(transitionIndex).toBeGreaterThan(currencyGuardIndex);
-  });
-
-  it("preserves service-role-only intent for the orphan reconciliation RPC", () => {
+  it("keeps orphan reconciliation as a guarded safe no-op", () => {
     expect(functionSql).toContain("security definer");
     expect(functionSql).toContain("set search_path = ''");
     expect(functionSql).toContain("auth.role()");
     expect(functionSql).toContain("service_role required");
+    expect(functionSql).toContain("v_processed integer := 0");
+    expect(functionSql).toContain("return v_processed");
+    expect(functionSql).not.toContain("join public.payments canonical_payment");
+    expect(functionSql).not.toContain(
+      "canonical_payment.midtrans_order_id = orphan_payment.midtrans_order_id",
+    );
+    expect(functionSql).not.toContain("public.apply_midtrans_webhook_transition");
+  });
+
+  it("rejects legacy order payment columns in the active reconciliation function", () => {
+    const legacyOrderJoin = "join public.orders o on " +
+      ["o", "midtrans_order_id"].join(".") +
+      " = " +
+      ["orphan_payment", "midtrans_order_id"].join(".");
+    const legacyOrderMidtransColumn = ["orders", "midtrans_order_id"].join(".");
+    const legacyOrderAliasMidtransColumn = ["o", "midtrans_order_id"].join(".");
+
+    expect(functionSql).not.toContain(legacyOrderJoin);
+    expect(functionSql).not.toContain(legacyOrderMidtransColumn);
+    expect(functionSql).not.toContain(legacyOrderAliasMidtransColumn);
+  });
+
+  it("documents why true orphan notifications cannot be reconciled here", () => {
+    expect(normalizedSql).toContain(
+      "true orphan payments cannot be mapped to an order from midtrans_order_id after legacy orders.midtrans_order_id was dropped",
+    );
+    expect(normalizedSql).toContain(
+      "attachment must happen in order/session persistence paths",
+    );
+  });
+
+  it("preserves service-role-only grants for the orphan reconciliation RPC", () => {
     expect(normalizedSql).toContain(
       "revoke all on function public.reconcile_midtrans_orphan_notifications(integer) from public, anon, authenticated",
     );
