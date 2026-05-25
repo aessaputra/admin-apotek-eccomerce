@@ -71,6 +71,7 @@ export interface Order {
   status: string;
   payment_status: PaymentStatus;
   payment_type?: string | null;
+  currency?: string | null;
   total_amount: number | string;
   shipping_cost?: number | string | null;
   gross_amount?: number | string | null;

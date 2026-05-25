@@ -1,0 +1,73 @@
+name: Edge Function Validation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/edge-functions.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/**"
+      - "src/**"
+      - "supabase/functions/**"
+      - "vitest.config.ts"
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - ".github/workflows/edge-functions.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/**"
+      - "src/**"
+      - "supabase/functions/**"
+      - "vitest.config.ts"
+
+permissions:
+  contents: read
+
+jobs:
+  edge-functions:
+    name: Build, Test, Coverage, Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.3
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Run full Vitest suite
+        run: pnpm test
+
+      - name: Run all Edge Function suites
+        run: pnpm test:edge
+
+      - name: Run payment Edge Function suite
+        run: pnpm test:edge:payments
+
+      - name: Run operations Edge Function suite
+        run: pnpm test:edge:ops
+
+      - name: Run Edge Function coverage
+        run: pnpm test:coverage
+
+      - name: Run mock-only Edge smoke validation
+        run: pnpm test:edge-smoke

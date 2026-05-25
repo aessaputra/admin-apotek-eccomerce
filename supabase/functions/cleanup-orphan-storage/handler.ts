@@ -72,6 +72,15 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   });
 }
 
+function summarizeInvalidReferenceCategories(
+  invalidReferences: Array<{ reason: string }>,
+): Record<string, number> {
+  return invalidReferences.reduce<Record<string, number>>((categories, reference) => {
+    categories[reference.reason] = (categories[reference.reason] ?? 0) + 1;
+    return categories;
+  }, {});
+}
+
 function clampPositiveInteger(value: unknown, fallback: number, max: number): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return fallback;
@@ -252,7 +261,7 @@ export function createCleanupHandler(dependencies: CleanupHandlerDependencies) {
           error: "Cleanup aborted because invalid storage references were detected",
           runId,
           invalidReferenceCount: referenceResult.invalidReferenceCount,
-          invalidReferences: referenceResult.invalidReferences,
+          invalidReferenceCategories: summarizeInvalidReferenceCategories(referenceResult.invalidReferences),
           orphanCount: orphans.length,
           referencedCount: referenceResult.paths.size,
           mode,
@@ -282,7 +291,7 @@ export function createCleanupHandler(dependencies: CleanupHandlerDependencies) {
           orphanSamples,
           referencedCount: referenceResult.paths.size,
           invalidReferenceCount: referenceResult.invalidReferenceCount,
-          invalidReferences: referenceResult.invalidReferences,
+          invalidReferenceCategories: summarizeInvalidReferenceCategories(referenceResult.invalidReferences),
           minimumOrphanAgeHours,
           message: "Orphan cleanup dry-run completed",
         };
@@ -358,7 +367,7 @@ export function createCleanupHandler(dependencies: CleanupHandlerDependencies) {
         quarantineSamples,
         referencedCount: referenceResult.paths.size,
         invalidReferenceCount: referenceResult.invalidReferenceCount,
-        invalidReferences: referenceResult.invalidReferences,
+        invalidReferenceCategories: summarizeInvalidReferenceCategories(referenceResult.invalidReferences),
         minimumOrphanAgeHours,
         message: "Orphan cleanup quarantine completed",
       };
@@ -378,16 +387,16 @@ export function createCleanupHandler(dependencies: CleanupHandlerDependencies) {
 
       log({ action: "cleanup_orphan_storage", mode, runId, orphanCount: orphans.length, quarantinedCount: deletedCount });
       return jsonResponse(response);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unexpected cleanup error";
+    } catch {
+      log({ action: "cleanup_orphan_storage_failed", mode, runId, errorCategory: "execution_failed" });
 
       await finalizeCleanupRun(supabase, runId, {
         status: "failed",
         finished_at: now().toISOString(),
-        error_message: message,
+        error_message: "cleanup_execution_failed",
       });
 
-      return jsonResponse({ error: message, runId }, 500);
+      return jsonResponse({ error: "Cleanup failed", runId }, 500);
     }
   };
 }

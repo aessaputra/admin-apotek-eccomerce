@@ -34,6 +34,7 @@ type PaymentRow = {
   status: PaymentStatus;
   updated_at: string;
   created_at: string;
+  currency?: string | null;
   payment_type?: string | null;
   gross_amount?: number | null;
   paid_at?: string | null;
@@ -174,6 +175,7 @@ function createPayment(overrides: Partial<PaymentRow> = {}): PaymentRow {
     status: "pending",
     updated_at: "2026-05-20T00:00:00.000Z",
     created_at: "2026-05-20T00:00:00.000Z",
+    currency: "IDR",
     payment_type: "bank_transfer",
     gross_amount: 100000,
     paid_at: null,
@@ -238,6 +240,20 @@ describe("getOrderAggregateById payment precedence", () => {
 
     expect(aggregate?.payment_status).toBe("settlement");
     expect(aggregate?.paid_at).toBe("2026-05-20T00:10:00.000Z");
+  });
+
+  it("hydrates currency from the latest payment snapshot", async () => {
+    const { aggregate, adminClient } = await getAggregatePaymentStatus([
+      createPayment({
+        status: "settlement",
+        currency: "USD",
+        updated_at: "2026-05-20T00:10:00.000Z",
+      }),
+    ]);
+
+    expect(aggregate?.currency).toBe("USD");
+    expect(adminClient.queries.find((query) => query.table === "payments")?.selectedColumns)
+      .toContain("currency");
   });
 
   it("matches order_read_model by using updated_at desc, created_at desc for multiple payment attempts", async () => {

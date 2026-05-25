@@ -120,8 +120,29 @@ interface GatewayResponse<T> {
   error?: string;
 }
 
+function createBrowserRequestId(): string {
+  if (typeof crypto?.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  const randomValues = new Uint8Array(16);
+  if (typeof crypto?.getRandomValues === "function") {
+    crypto.getRandomValues(randomValues);
+    return `req-${Array.from(randomValues, (value) => value.toString(16).padStart(2, "0")).join("")}`;
+  }
+
+  return `req-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function shouldSendRequestId(body: IntegrationConfigRequest): boolean {
+  return body.action === "rotateSecret" || body.action === "updateValue";
+}
+
 export async function invokeIntegrationConfig<T>(body: IntegrationConfigRequest): Promise<T> {
-  const { data, error } = await supabaseClient.functions.invoke<GatewayResponse<T>>("integration-config", { body });
+  const { data, error } = await supabaseClient.functions.invoke<GatewayResponse<T>>("integration-config", {
+    body,
+    ...(shouldSendRequestId(body) ? { headers: { "x-request-id": createBrowserRequestId() } } : {}),
+  });
 
   if (error) {
     throw new Error(await getFunctionsErrorMessage(error, "Integration config request failed"));

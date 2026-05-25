@@ -64,6 +64,27 @@ Decision vocabulary:
 
 2026-05-22 summary: `keep` = 12, `defer` = 7, `drop-candidate` = 0. No migration should be generated from this advisor signal alone.
 
+## 2026-05-25 Task 11 Review: 26 Unused-Index Advisor Signals
+
+Source: `.omo/evidence/task-9-production-readonly-audit.md`, lines 77-81 and 108-115. That evidence preserves only a redacted table-level summary of 26 `unused_index` INFO lints from the 2026-05-24 read-only production audit; it does not preserve every index name. This Task 11 pass therefore records conservative table-level decisions and follow-up requirements rather than authorizing any migration.
+
+Decision state for this sanitized signal:
+
+| Surface | Advisor signal | Decision | Rationale |
+|---|---|---|---|
+| `private.order_integration_config_snapshots` | `unused_index` | `keep/defer` | Snapshot rows support service-role Biteship/Midtrans provenance and include FK-backed shipment/creator relationships plus recency/debug lookup paths. Keep FK support; defer non-FK recency indexes until an index-level advisor export and query plan review prove redundancy. |
+| `private.integration_config_versions` and `private.integration_config_current_versions` | `unused_index` | `keep/defer` | Runtime config resolution is service-role critical for Edge Functions and Vault-backed config. FK support for creator/active-version relationships and active/grace lookup paths is more important than one low-traffic stats window. |
+| `private.integration_config_audit_logs` | `unused_index` | `keep/defer` | Admin audit and incident-debug paths filter by config key, actor, request ID, and version. These are low-frequency forensic paths; advisor usage counters alone are insufficient to drop them. |
+| `private.midtrans_payment_config_bindings` | `unused_index` | `keep/defer` | Payment verification binds Midtrans transactions to runtime config versions. Keep exact FK-covering indexes and defer older partial binding indexes until a replacement plan is reviewed. |
+| `public.order_activities` | `unused_index` | `defer` | Admin/customer timelines and payment/shipment investigations use order activity history. Current evidence suggests a future `(order_id, created_at desc)` replacement may be better than dropping `created_at`-only support. |
+| `public.orders` | `unused_index` | `keep/defer` | Order status, payment status, customer completion, cancellation cron, and admin/customer read-model paths are active or low-frequency operational flows. FK support such as `customer_completed_by` stays kept. |
+| `public.order_items` and `public.order_item_stock_deductions` | `unused_index` | `keep` | Checkout provenance, cart cleanup validation, stock-deduction audit, and product FK maintenance rely on these tables. Product/source-cart indexes must not be dropped without FK and cleanup-path proof. |
+| `public.profile_push_tokens` and `public.notification_push_deliveries` | `unused_index` | `keep` | Push delivery loads active tokens by user/recency and records delivery history. These support service-role push operations, token cleanup, receipt checks, and FK/user history paths. |
+| `public.webhook_side_effect_tasks` | `unused_index` | `keep` | Cron/worker retry and lease pickup are bursty and may show low scan counts when the queue is empty. Keep lease/retry support for settlement fulfillment reliability. |
+| `public.shipments` | `unused_index` | `keep/defer` | Shipment admin/debug flows and nullable waybill override FK support require care. Prior drops already caused FK-support regressions, so no shipment index should be dropped from `unused_index` alone. |
+
+Task 11 conclusion: no 2026-05-25 index migration is warranted. A future approved review must first capture a redacted index-level advisor export, map every index to FK constraints and query paths, sample `pg_stat_statements`/`EXPLAIN` for candidate replacements, then update this document before creating any drop migration.
+
 ## Decision Table
 
 ### Keep

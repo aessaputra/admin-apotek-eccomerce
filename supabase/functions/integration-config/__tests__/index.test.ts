@@ -9,13 +9,17 @@ import {
 const ADMIN_ID = "11111111-1111-4111-8111-111111111111";
 const PLACEHOLDER_SECRET = "TEST_SENTINEL_SECRET_DO_NOT_LEAK";
 
-function createRequest(body: Record<string, unknown>, authorization = "Bearer admin-token") {
+function createRequest(
+  body: Record<string, unknown>,
+  authorization = "Bearer admin-token",
+  requestId = "request-1",
+) {
   return new Request("https://example.test/functions/v1/integration-config", {
     method: "POST",
     headers: {
       Authorization: authorization,
       "Content-Type": "application/json",
-      "x-request-id": "request-1",
+      "x-request-id": requestId,
     },
     body: JSON.stringify(body),
   });
@@ -195,6 +199,7 @@ describe("createIntegrationConfigHandler", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("x-request-id")).toBe("request-1");
     expect(payload).toEqual({ data: { rows: [summaryRow] } });
     expect(adminMock.rpc).toHaveBeenCalledWith("list_integration_config_summary", {
       p_key_names: ["midtrans.server_key"],
@@ -486,8 +491,64 @@ describe("createIntegrationConfigHandler", () => {
     const logArguments = JSON.stringify(logError.mock.calls);
     expect(logError).toHaveBeenCalledWith(
       "[integration-config] rotateSecret RPC failed",
-      { message: "Operation failed" },
+      expect.objectContaining({
+        action: "rotateSecret",
+        message: "Operation failed",
+        requestId: "request-1",
+      }),
     );
     expect(logArguments).not.toContain(PLACEHOLDER_SECRET);
+  });
+
+  it("returns sanitized summary RPC failures without logging raw database details", async () => {
+    const adminMock = createAdminClient({
+      rpcError: { message: "private.integration_config_versions policy leaked TEST_SENTINEL_SECRET_DO_NOT_LEAK" },
+    });
+    const { handler, logError } = createHandler({ adminClient: adminMock.client });
+
+    const response = await handler(createRequest({ action: "summary", keys: ["midtrans.server_key"] }));
+    const responseBody = await response.text();
+    const logArguments = JSON.stringify(logError.mock.calls);
+
+    expect(response.status).toBe(500);
+    expect(responseBody).toBe(JSON.stringify({ error: "Integration config operation failed" }));
+    expect(responseBody).not.toContain("integration_config_versions");
+    expect(responseBody).not.toContain(PLACEHOLDER_SECRET);
+    expect(logError).toHaveBeenCalledWith(
+      "[integration-config] summary RPC failed",
+      expect.objectContaining({
+        action: "summary",
+        message: "Operation failed",
+        requestId: "request-1",
+      }),
+    );
+    expect(logArguments).not.toContain("integration_config_versions");
+    expect(logArguments).not.toContain(PLACEHOLDER_SECRET);
+  });
+
+  it("replaces unsafe request IDs before RPC audit fields, responses, and logs", async () => {
+    const unsafeRequestId = "x".repeat(129);
+    const adminMock = createAdminClient({ rpcError: { message: "database failed" } });
+    const { handler, logError } = createHandler({ adminClient: adminMock.client });
+
+    const response = await handler(
+      createRequest({
+        action: "rotateSecret",
+        key: "midtrans.server_key",
+        secret: PLACEHOLDER_SECRET,
+        reason: "scheduled rotation",
+      }, "Bearer admin-token", unsafeRequestId),
+    );
+    const effectiveRequestId = response.headers.get("x-request-id");
+    const logArguments = JSON.stringify(logError.mock.calls);
+
+    expect(response.status).toBe(500);
+    expect(effectiveRequestId).toBeTruthy();
+    expect(effectiveRequestId).not.toBe(unsafeRequestId);
+    expect(adminMock.rpc).toHaveBeenCalledWith("rotate_integration_config_secret", expect.objectContaining({
+      p_request_id: effectiveRequestId,
+    }));
+    expect(logArguments).toContain(String(effectiveRequestId));
+    expect(logArguments).not.toContain(unsafeRequestId);
   });
 });

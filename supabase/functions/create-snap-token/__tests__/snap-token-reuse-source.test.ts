@@ -67,4 +67,25 @@ describe("create-snap-token Snap token reuse source shape", () => {
       expect(block).toContain(`sourcePaymentId: ${paymentId}`);
     }
   });
+  it("uses safe provider and lock failure messages instead of raw Midtrans/RPC details", () => {
+    expect(source).toContain('"Midtrans token creation failed"');
+    expect(source).not.toContain("midtransData.error_messages?.[0]");
+    expect(source).not.toContain("midtransData.status_message");
+    expect(source).not.toContain("releaseLockResponse.error.message");
+    expect(source).not.toContain('console.error("[create-snap-token] Internal error:", message)');
+  });
+
+  it("logs create-snap-token failures with stable categories only", () => {
+    expect(source).toContain("snap_token_provider_unavailable");
+    expect(source).toContain("snap_token_lock_release_failed");
+    expect(source).toContain("snap_token_internal_error");
+    expect(source).not.toMatch(/console\.error\([^)]*error\.message/);
+  });
+
+  it("resolves and returns a sanitized request ID for every response path", () => {
+    expect(source).toContain("resolveRequestId(req.headers)");
+    expect(source).toContain("withRequestIdResponse(response, requestId)");
+    expect(source).toContain("requestId");
+  });
+
 });

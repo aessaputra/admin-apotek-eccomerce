@@ -3,9 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildSnapPayload,
   calculateMidtransGrossAmount,
+  DEFAULT_MIDTRANS_ORDER_CURRENCY,
   isIgnorableMidtransNoop,
   resolveMidtransTransactionRuntimeConfig,
   resolveMidtransWebhookRuntimeConfig,
+  validateMidtransTransitionCurrency,
   verifyMidtransTransaction,
 } from "../midtrans.ts";
 import type { AuthUser, Order } from "../types.ts";
@@ -214,6 +216,50 @@ describe("isIgnorableMidtransNoop", () => {
   it("keeps the legacy payment-only fallback when order status is unavailable", () => {
     expect(isIgnorableMidtransNoop("settlement", "cancel")).toBe(true);
     expect(isIgnorableMidtransNoop("pending", "settlement")).toBe(false);
+  });
+});
+
+describe("validateMidtransTransitionCurrency", () => {
+  it("defaults the expected order currency to IDR and normalizes inputs", () => {
+    expect(
+      validateMidtransTransitionCurrency({
+        orderId: "MIDTRANS-CURRENCY-ORDER",
+        expectedOrderCurrency: undefined,
+        payloadCurrency: " idr ",
+        verifiedCurrency: "idr",
+      }),
+    ).toBe(DEFAULT_MIDTRANS_ORDER_CURRENCY);
+  });
+
+  it("fails closed when the verified Midtrans currency is missing", () => {
+    expect(() =>
+      validateMidtransTransitionCurrency({
+        orderId: "MIDTRANS-MISSING-CURRENCY",
+        expectedOrderCurrency: "IDR",
+        payloadCurrency: "IDR",
+        verifiedCurrency: " ",
+      })
+    ).toThrow("Currency validation failed");
+  });
+
+  it("rejects payload and expected order currency mismatches", () => {
+    expect(() =>
+      validateMidtransTransitionCurrency({
+        orderId: "MIDTRANS-PAYLOAD-CURRENCY-MISMATCH",
+        expectedOrderCurrency: "IDR",
+        payloadCurrency: "USD",
+        verifiedCurrency: "IDR",
+      })
+    ).toThrow("Currency mismatch");
+
+    expect(() =>
+      validateMidtransTransitionCurrency({
+        orderId: "MIDTRANS-ORDER-CURRENCY-MISMATCH",
+        expectedOrderCurrency: "USD",
+        payloadCurrency: "IDR",
+        verifiedCurrency: "IDR",
+      })
+    ).toThrow("Currency mismatch");
   });
 });
 

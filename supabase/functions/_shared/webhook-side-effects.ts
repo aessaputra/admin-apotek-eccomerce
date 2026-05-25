@@ -24,8 +24,17 @@ declare const Deno: {
 };
 
 const SIDE_EFFECT_LEASE_MS = 10 * 60 * 1000;
-const BITESHIP_CALL_TIMEOUT_MS = 45_000;
-const DEFAULT_PROCESSOR_BATCH_SIZE = 3;
+export const WEBHOOK_BITESHIP_CALL_TIMEOUT_MS = 4_000;
+export const WEBHOOK_BITESHIP_MAX_ATTEMPTS = 2;
+export const WEBHOOK_BITESHIP_RETRY_DELAY_MS = 250;
+export const DEFAULT_PROCESSOR_BATCH_SIZE = 3;
+export const WEBHOOK_SIDE_EFFECTS_BATCH_BUDGET_MS = 30_000;
+export const WEBHOOK_SIDE_EFFECTS_EDGE_RUNTIME_RISK_MS = 50_000;
+export const WEBHOOK_BITESHIP_WORST_CASE_SINGLE_TASK_MS =
+  WEBHOOK_BITESHIP_CALL_TIMEOUT_MS * WEBHOOK_BITESHIP_MAX_ATTEMPTS +
+  WEBHOOK_BITESHIP_RETRY_DELAY_MS * (WEBHOOK_BITESHIP_MAX_ATTEMPTS - 1);
+export const WEBHOOK_BITESHIP_WORST_CASE_BATCH_MS =
+  WEBHOOK_BITESHIP_WORST_CASE_SINGLE_TASK_MS * DEFAULT_PROCESSOR_BATCH_SIZE;
 const MAX_RETRY_DELAY_MS = 60 * 60 * 1000;
 
 export interface SideEffectTask {
@@ -140,6 +149,41 @@ function getBiteshipSnapshotErrorDetails(error: unknown): {
   };
 }
 
+function isSafeCartCleanupValidationMessage(message: string): boolean {
+  return (
+    message.startsWith("Missing user for order ") &&
+      message.includes(" Cart cleanup requires order ownership validation.")
+  ) ||
+    (
+      message.startsWith("Missing selected cart item provenance for order ") &&
+      message.includes(" Cart cleanup requires ")
+    ) ||
+    (
+      message.startsWith("Invalid selected cart item provenance for order ") &&
+      message.includes(" does not belong to the order user.")
+    );
+}
+
+function isSafeCartCleanupValidationError(
+  error: unknown,
+  classification: SideEffectErrorClassification,
+): error is Error {
+  return classification.permanent &&
+    error instanceof Error &&
+    isSafeCartCleanupValidationMessage(error.message);
+}
+
+function getSafeCartCleanupErrorMessage(
+  error: unknown,
+  classification: SideEffectErrorClassification,
+): string {
+  if (isSafeCartCleanupValidationError(error, classification)) {
+    return error.message;
+  }
+
+  return "cart_cleanup_failed";
+}
+
 function getNextRetryAtIso(retryCount: number): string {
   const safeRetryCount = Math.max(1, retryCount);
   const delayMs = Math.min(
@@ -154,12 +198,14 @@ async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
   timeoutMessage: string,
+  onTimeout?: () => void,
 ): Promise<T> {
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
   try {
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutHandle = setTimeout(() => {
+        onTimeout?.();
         reject(new Error(timeoutMessage));
       }, timeoutMs);
     });
@@ -170,6 +216,22 @@ async function withTimeout<T>(
       clearTimeout(timeoutHandle);
     }
   }
+}
+
+async function createBiteshipOrderWithBudget(
+  order: Order,
+  biteshipKey: string,
+  biteshipSnapshot: BiteshipOrderConfigSnapshot,
+): Promise<BiteshipOrderResponse> {
+  const controller = new AbortController();
+  return await withTimeout(
+    createBiteshipOrder(order, biteshipKey, biteshipSnapshot, {
+      signal: controller.signal,
+    }),
+    WEBHOOK_BITESHIP_CALL_TIMEOUT_MS,
+    "Biteship request timeout",
+    () => controller.abort(),
+  );
 }
 
 function getRequiredOrderItemQuantity(
@@ -285,13 +347,36 @@ export async function saveSideEffectTask(
   }
 }
 
+type EnsureSettlementSideEffectsQueuedOptions = {
+  transitionApplied?: boolean;
+};
+
+function isIncompleteSideEffectTask(task: SideEffectTask | null): boolean {
+  return Boolean(
+    task &&
+      !task.failed_permanently_at &&
+      (task.needs_cart_cleanup ||
+        task.needs_stock ||
+        task.needs_biteship ||
+        task.pending_biteship_order_id),
+  );
+}
+
 export async function ensureSettlementSideEffectsQueued(
   adminClient: ReturnType<typeof getSupabaseAdminClient>,
   orderId: string,
   paymentStatus: string,
+  options: EnsureSettlementSideEffectsQueuedOptions = {},
 ): Promise<boolean> {
-  const order = await getOrderAggregateById(adminClient, orderId);
   const existingSideEffectTask = await getSideEffectTask(adminClient, orderId);
+  const transitionApplied = options.transitionApplied ?? true;
+
+  if (!transitionApplied) {
+    return paymentStatus === "settlement" &&
+      isIncompleteSideEffectTask(existingSideEffectTask);
+  }
+
+  const order = await getOrderAggregateById(adminClient, orderId);
   const nextSideEffects = order
     ? deriveSettlementSideEffectFlags({
         paymentStatus,
@@ -447,6 +532,32 @@ async function persistPendingBiteshipResult(
     throw new Error(
       `Failed to persist pending Biteship result: ${error.message}`,
     );
+  }
+}
+
+async function clearCompletedBiteshipRetryState(
+  adminClient: ReturnType<typeof getSupabaseAdminClient>,
+  orderId: string,
+  leaseOwner: string,
+): Promise<void> {
+  const { error } = await adminClient
+    .from("webhook_side_effect_tasks")
+    .update({
+      needs_cart_cleanup: false,
+      needs_stock: false,
+      needs_biteship: false,
+      last_error: null,
+      last_error_code: null,
+      failed_permanently_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("order_id", orderId)
+    .eq("lease_owner", leaseOwner);
+
+  if (error) {
+    console.error("[process-webhook-side-effects] completed Biteship retry state update failed", {
+      code: "completed_biteship_retry_state_update_failed",
+    });
   }
 }
 
@@ -670,14 +781,18 @@ export async function processWebhookSideEffectTask(
         needsCartCleanup = false;
       } catch (cartCleanupError: unknown) {
         const classification = classifySideEffectError(cartCleanupError);
-        lastError =
-          cartCleanupError instanceof Error
-            ? cartCleanupError.message
-            : "Failed to clear selected cart items after settlement";
-        lastErrorCode = classification.permanent
+        const safePermanentValidation = isSafeCartCleanupValidationError(
+          cartCleanupError,
+          classification,
+        );
+        lastError = getSafeCartCleanupErrorMessage(
+          cartCleanupError,
+          classification,
+        );
+        lastErrorCode = safePermanentValidation
           ? classification.code
           : "cart_cleanup_failed";
-        permanentFailure = permanentFailure || classification.permanent;
+        permanentFailure = permanentFailure || safePermanentValidation;
       }
     }
 
@@ -708,10 +823,11 @@ export async function processWebhookSideEffectTask(
 
           if (attempt === 2) {
             console.error(
-              "[process-webhook-side-effects] Stock reduction failed for",
-              item.product_id,
-              ":",
-              rpcError.message,
+              "[process-webhook-side-effects] Stock reduction failed:",
+              {
+                code: "stock_deduction_failed",
+                productId: item.product_id,
+              },
             );
           } else {
             await sleep(250 * (attempt + 1));
@@ -720,7 +836,7 @@ export async function processWebhookSideEffectTask(
 
         if (!stockReduced) {
           stockFailed = true;
-          lastError = "Failed to reduce stock after retries";
+          lastError = "stock_deduction_failed";
           lastErrorCode = "stock_deduction_failed";
         }
       }
@@ -765,51 +881,70 @@ export async function processWebhookSideEffectTask(
         pendingBiteshipOrderId = null;
         pendingTrackingId = null;
         pendingWaybillNumber = null;
-      } catch (persistPendingError: unknown) {
-        lastError = `Failed to persist pending Biteship result: ${persistPendingError instanceof Error ? persistPendingError.message : String(persistPendingError)}`;
+      } catch {
+        lastError = "persist_pending_biteship_failed";
         lastErrorCode = "persist_pending_biteship_failed";
       }
     }
 
-    if (needsBiteship && biteshipSnapshot && !order.biteship_order_id) {
+    if (
+      needsBiteship &&
+      biteshipSnapshot &&
+      !order.biteship_order_id &&
+      !pendingBiteshipOrderId
+    ) {
       await renewSideEffectTaskLease(adminClient, orderId, leaseOwner);
       let biteshipResponse: BiteshipOrderResponse | null = null;
       let biteshipKey: string;
+      const priorLastError = lastError;
+      const priorLastErrorCode = lastErrorCode;
+      const priorPermanentFailure = permanentFailure;
+      let hadTransientBiteshipRetry = false;
 
       try {
         biteshipKey = await resolveBiteshipApiKeyFromRuntimeConfig(adminClient);
-      } catch (configError: unknown) {
+      } catch {
         lastError = "Biteship runtime config unavailable";
         lastErrorCode = "biteship_config_unavailable";
         biteshipKey = "";
       }
 
-      for (let attempt = 0; biteshipKey && attempt < 3; attempt += 1) {
+      for (
+        let attempt = 0;
+        biteshipKey && attempt < WEBHOOK_BITESHIP_MAX_ATTEMPTS;
+        attempt += 1
+      ) {
         try {
           await renewSideEffectTaskLease(adminClient, orderId, leaseOwner);
-          biteshipResponse = (await withTimeout(
-            createBiteshipOrder(order, biteshipKey, biteshipSnapshot),
-            BITESHIP_CALL_TIMEOUT_MS,
-            "Biteship request timeout",
-          )) as BiteshipOrderResponse;
+          biteshipResponse = await createBiteshipOrderWithBudget(
+            order,
+            biteshipKey,
+            biteshipSnapshot,
+          );
           break;
         } catch (biteshipError: unknown) {
-          const message =
-            biteshipError instanceof Error
-              ? biteshipError.message
-              : "Unknown Biteship error";
           const classification = classifySideEffectError(biteshipError);
-          lastError = message;
+          lastError = classification.permanent
+            ? "biteship_permanent_validation_failed"
+            : "biteship_order_create_failed";
           lastErrorCode = classification.code;
           permanentFailure = permanentFailure || classification.permanent;
+          hadTransientBiteshipRetry ||= !classification.permanent;
 
-          if (attempt === 2 || classification.permanent) {
+          if (
+            attempt === WEBHOOK_BITESHIP_MAX_ATTEMPTS - 1 ||
+            classification.permanent
+          ) {
             console.error(
               "[process-webhook-side-effects] Biteship automation failed:",
-              message,
+              {
+                code: lastError,
+                errorCode: classification.code,
+                permanent: classification.permanent,
+              },
             );
           } else {
-            await sleep(350 * (attempt + 1));
+            await sleep(WEBHOOK_BITESHIP_RETRY_DELAY_MS);
           }
 
           if (classification.permanent) {
@@ -848,9 +983,19 @@ export async function processWebhookSideEffectTask(
           pendingBiteshipOrderId = null;
           pendingTrackingId = null;
           pendingWaybillNumber = null;
-        } catch (updateOrderError: unknown) {
+          if (hadTransientBiteshipRetry) {
+            lastError = priorLastError;
+            lastErrorCode = priorLastErrorCode;
+            permanentFailure = priorPermanentFailure;
+            await clearCompletedBiteshipRetryState(
+              adminClient,
+              orderId,
+              leaseOwner,
+            );
+          }
+        } catch {
           needsBiteship = true;
-          lastError = `Failed to persist Biteship result: ${updateOrderError instanceof Error ? updateOrderError.message : String(updateOrderError)}`;
+          lastError = "persist_biteship_result_failed";
           lastErrorCode = "persist_biteship_result_failed";
           pendingBiteshipOrderId = biteshipResponse.id;
           pendingTrackingId = biteshipResponse.courier?.tracking_id || null;
@@ -881,7 +1026,7 @@ export async function processWebhookSideEffectTask(
     );
 
     const needsRetry =
-      (needsCartCleanup && !permanentFailure) || needsStock || needsBiteship;
+      ((needsCartCleanup || needsBiteship) && !permanentFailure) || needsStock;
 
     return {
       processed: true,
@@ -892,10 +1037,7 @@ export async function processWebhookSideEffectTask(
           : "Fulfillment side effects processed",
     };
   } catch (error: unknown) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Unknown side effect processor error";
+    const message = "side_effect_processing_failed";
     const classification = classifySideEffectError(error);
 
     await saveSideEffectTask(
@@ -939,21 +1081,14 @@ export function triggerWebhookSideEffectProcessor(orderId: string): void {
     },
     body: JSON.stringify({ orderId, limit: 1 }),
   })
-    .then(async (response) => {
+    .then((response) => {
       if (!response.ok) {
-        const errorBody = await response.text().catch(() => "");
-        console.error(
-          "[webhook-side-effects] Processor trigger returned non-OK response:",
-          response.status,
-          errorBody,
-        );
+        console.error("[webhook-side-effects] webhook_side_effect_processor_trigger_failed", {
+          status: response.status,
+        });
       }
     })
-    .catch((error) => {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(
-        "[webhook-side-effects] Failed to trigger side effect processor:",
-        message,
-      );
+    .catch(() => {
+      console.error("[webhook-side-effects] webhook_side_effect_processor_trigger_error");
     });
 }

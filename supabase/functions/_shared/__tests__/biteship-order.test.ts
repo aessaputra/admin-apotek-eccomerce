@@ -571,6 +571,45 @@ describe("persistBiteshipShipment", () => {
     expect(upsert).toHaveBeenCalledTimes(1);
     expect(insert).toHaveBeenCalledTimes(1);
   });
+
+  it("redacts shipping activity insert errors while keeping shipment persistence non-blocking", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const upsert = vi.fn(async () => ({ error: null }));
+    const insert = vi.fn(async () => ({
+      error: {
+        message: "shipping-activity-secret-sentinel order_activities permission denied policy stack",
+      },
+    }));
+    const from = vi.fn((table: string) => {
+      if (table === "shipments") {
+        return { upsert };
+      }
+
+      expect(table).toBe("order_activities");
+      return { insert };
+    });
+    const adminClient = { from } as Parameters<typeof persistBiteshipShipment>[0];
+
+    await expect(
+      persistBiteshipShipment(adminClient, {
+        orderId: "order-activity-redaction",
+        biteshipOrderId: "biteship-activity-redaction",
+        trackingId: "tracking-activity-redaction",
+        waybillNumber: "waybill-activity-redaction",
+        actorType: "system",
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(upsert).toHaveBeenCalledTimes(1);
+    expect(insert).toHaveBeenCalledTimes(1);
+    const logOutput = JSON.stringify(consoleError.mock.calls);
+    expect(logOutput).toContain("biteship_shipping_activity_log_failed");
+    expect(logOutput).not.toContain("shipping-activity-secret-sentinel");
+    expect(logOutput).not.toContain("order_activities");
+    expect(logOutput).not.toContain("permission denied");
+    expect(logOutput).not.toContain("policy stack");
+    consoleError.mockRestore();
+  });
 });
 
 describe("Biteship runtime API key", () => {
@@ -699,5 +738,56 @@ describe("Biteship runtime API key", () => {
     ).resolves.toMatchObject({ id: "biteship-order-1" });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("redacts provider error bodies when Biteship order creation fails", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({
+        success: false,
+        message: "Buyer Private 0811999000 rejected by provider secret-sentinel",
+        error: "APT-provider-order-secret",
+        details: {
+          reference_id: "order-1",
+          buyer_phone: "0811999000",
+        },
+      }), { status: 502 })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      createBiteshipOrder(baseOrder, "runtime-biteship-key-sentinel", baseSnapshot),
+    ).rejects.toThrow("biteship_order_create_failed");
+
+    const logOutput = JSON.stringify(consoleError.mock.calls);
+    expect(logOutput).toContain("biteship_order_create_failed");
+    expect(logOutput).not.toContain("Buyer Private");
+    expect(logOutput).not.toContain("0811999000");
+    expect(logOutput).not.toContain("secret-sentinel");
+    expect(logOutput).not.toContain("APT-provider-order-secret");
+    consoleError.mockRestore();
+  });
+
+  it("redacts provider error bodies when duplicate Biteship order retrieval fails", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith("/orders")) {
+        return new Response(JSON.stringify({
+          success: false,
+          code: 40002060,
+          details: { order_id: "duplicate-provider-order-id" },
+        }), { status: 409 });
+      }
+
+      return new Response(JSON.stringify({
+        success: false,
+        message: "Duplicate Buyer Private 0811999000 secret-duplicate-sentinel",
+        error: "duplicate-provider-error",
+      }), { status: 502 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      createBiteshipOrder(baseOrder, "runtime-biteship-key-sentinel", baseSnapshot),
+    ).rejects.toThrow("biteship_order_retrieve_failed");
   });
 });

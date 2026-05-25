@@ -1,4 +1,5 @@
 import { corsHeaders } from "../_shared/cors.ts";
+import { resolveRequestId, withRequestIdResponse } from "../_shared/request-id.ts";
 
 const JSON_HEADERS = { ...corsHeaders, "Content-Type": "application/json" };
 const CANONICAL_UUID_PATTERN =
@@ -27,11 +28,26 @@ type CheckoutAggregateResult = {
   checkout_idempotency_key?: string;
 };
 
+type CustomerPolicyProfile = {
+  is_banned?: boolean | null;
+};
+
+type CustomerPolicySelectQuery = {
+  eq: (column: "id", value: string) => {
+    single: () => Promise<{ data: CustomerPolicyProfile | null; error: CheckoutRpcError | null }>;
+  };
+};
+
+type ProfilesTableQuery = {
+  select: (columns: "is_banned") => CustomerPolicySelectQuery;
+};
+
 export interface CheckoutRpcError {
   message?: string;
 }
 
 export interface CheckoutAdminClient {
+  from: (table: "profiles") => ProfilesTableQuery;
   rpc: (
     fn: "create_checkout_order_aggregate",
     args: Record<string, unknown>,
@@ -41,7 +57,7 @@ export interface CheckoutAdminClient {
 export interface CreateCheckoutOrderHandlerDependencies {
   getAuthenticatedUserId: (req: Request) => Promise<string>;
   getAdminClient: () => CheckoutAdminClient;
-  logError?: (message: string) => void;
+  logError?: (message: string, context?: Record<string, string>) => void;
 }
 
 export class HttpError extends Error {
@@ -80,6 +96,19 @@ function normalizePositiveNumber(value: unknown): number | null {
     : null;
 }
 
+async function isCustomerBanned(
+  adminClient: CheckoutAdminClient,
+  userId: string,
+): Promise<boolean> {
+  const { data, error } = await adminClient.from("profiles").select("is_banned").eq("id", userId).single();
+
+  if (error) {
+    throw new HttpError(500, "Customer policy could not be verified");
+  }
+
+  return data?.is_banned === true;
+}
+
 function normalizeSelectedCartItemIds(body: CreateCheckoutOrderRequest): string[] {
   if (!Object.prototype.hasOwnProperty.call(body, "selected_cart_item_ids")) {
     throw new HttpError(400, "selected_cart_item_ids is required");
@@ -115,9 +144,16 @@ function normalizeSelectedCartItemIds(body: CreateCheckoutOrderRequest): string[
 }
 
 export function createCheckoutOrderHandler(dependencies: CreateCheckoutOrderHandlerDependencies) {
-  const logError = dependencies.logError ?? ((message: string) => console.error(message));
+  const logError = dependencies.logError ??
+    ((message: string, context?: Record<string, string>) => console.error("[create-checkout-order] safe_failure", {
+      action: message,
+      ...context,
+    }));
 
   return async (req: Request) => {
+    const requestId = resolveRequestId(req.headers);
+
+    const handleRequest = async (): Promise<Response> => {
     if (req.method === "OPTIONS") {
       return new Response("ok", { headers: corsHeaders });
     }
@@ -160,6 +196,10 @@ export function createCheckoutOrderHandler(dependencies: CreateCheckoutOrderHand
       }
 
       const adminClient = dependencies.getAdminClient();
+      if (await isCustomerBanned(adminClient, userId)) {
+        throw new HttpError(403, "Customer account is not allowed to create checkout orders");
+      }
+
       const { data, error } = await adminClient.rpc("create_checkout_order_aggregate", {
         p_user_id: userId,
         p_shipping_address_id: shippingAddressId,
@@ -174,7 +214,8 @@ export function createCheckoutOrderHandler(dependencies: CreateCheckoutOrderHand
       });
 
       if (error) {
-        throw new HttpError(500, error.message || "Failed to create checkout order");
+        logError("[create-checkout-order] checkout_rpc_failed", { action: "checkout_rpc_failed", requestId });
+        throw new HttpError(500, "Checkout order could not be created");
       }
 
       const row = (Array.isArray(data) ? data[0] : data) as CheckoutAggregateResult | null;
@@ -199,9 +240,11 @@ export function createCheckoutOrderHandler(dependencies: CreateCheckoutOrderHand
         return jsonResponse({ error: error.message }, error.status);
       }
 
-      const message = error instanceof Error ? error.message : "Unknown error";
-      logError(`[create-checkout-order] Internal error: ${message}`);
+      logError("[create-checkout-order] internal_error", { action: "internal_error", requestId });
       return jsonResponse({ error: "Internal server error" }, 500);
     }
+    };
+
+    return withRequestIdResponse(await handleRequest(), requestId);
   };
 }

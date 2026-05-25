@@ -10,7 +10,9 @@ const targetRuntimeFiles = [
   "supabase/functions/confirm-midtrans-payment/index.ts",
   "supabase/functions/reconcile-pending-midtrans-payments/index.ts",
   "supabase/functions/order-manager/index.ts",
+  "supabase/functions/order-manager/handler.ts",
   "supabase/functions/cancel-user-order/index.ts",
+  "supabase/functions/cancel-user-order/handler.ts",
 ];
 
 describe("Midtrans runtime config source migration", () => {
@@ -25,14 +27,19 @@ describe("Midtrans runtime config source migration", () => {
 
   it("uses transaction-bound runtime config before Midtrans status or cancel calls", () => {
     for (const relativePath of [
-      "supabase/functions/confirm-midtrans-payment/index.ts",
-      "supabase/functions/reconcile-pending-midtrans-payments/index.ts",
-      "supabase/functions/order-manager/index.ts",
-      "supabase/functions/cancel-user-order/index.ts",
+      "supabase/functions/confirm-midtrans-payment/handler.ts",
+      "supabase/functions/reconcile-pending-midtrans-payments/handler.ts",
+      "supabase/functions/order-manager/handler.ts",
+      "supabase/functions/cancel-user-order/handler.ts",
     ]) {
       const source = readSource(relativePath);
       const runtimeLookupIndex = source.indexOf("resolveMidtransTransactionRuntimeConfig");
-      const statusCheckIndex = source.indexOf("verifyMidtransTransaction(");
+      const directStatusCheckIndex = source.indexOf("verifyMidtransTransaction(");
+      const injectedStatusCheckIndex = source.indexOf("verifyTransaction(");
+      const statusCheckIndex = Math.max(
+        directStatusCheckIndex,
+        injectedStatusCheckIndex,
+      );
 
       expect(runtimeLookupIndex, relativePath).toBeGreaterThan(-1);
       expect(statusCheckIndex, relativePath).toBeGreaterThan(runtimeLookupIndex);

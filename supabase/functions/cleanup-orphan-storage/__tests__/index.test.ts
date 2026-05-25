@@ -30,20 +30,19 @@ function createStorageCleanupRunsTable() {
 
   const table: CleanupRunTable = {
     select: () => {
-      const query = {
-        eq: () => query,
-        gte: () => query,
-        limit: () => query,
-        range: async () => ({ data: [], error: null }),
-        maybeSingle: async <T>() => ({
-          data: (activeRunId ? ({ id: activeRunId } as T) : null),
-          error: null,
-        }),
-        single: async <T>() => ({
-          data: { id: "run-1" } as T,
-          error: null,
-        }),
-      } satisfies CleanupRunQuery;
+      const query = {} as CleanupRunQuery;
+      query.eq = () => query;
+      query.gte = () => query;
+      query.limit = () => query;
+      query.range = async () => ({ data: [], error: null });
+      query.maybeSingle = async <T,>() => ({
+        data: (activeRunId ? ({ id: activeRunId } as T) : null),
+        error: null,
+      });
+      query.single = async <T,>() => ({
+        data: { id: "run-1" } as T,
+        error: null,
+      });
 
       return query;
     },
@@ -51,14 +50,13 @@ function createStorageCleanupRunsTable() {
       insertedRows.push(values);
       return {
         select: () => {
-          const query = {
-            eq: () => query,
-            gte: () => query,
-            limit: () => query,
-            range: async () => ({ data: [], error: null }),
-            maybeSingle: async <T>() => ({ data: null, error: null }),
-            single: async <T>() => ({ data: { id: "run-1" } as T, error: null }),
-          } satisfies CleanupRunQuery;
+          const query = {} as CleanupRunQuery;
+          query.eq = () => query;
+          query.gte = () => query;
+          query.limit = () => query;
+          query.range = async () => ({ data: [], error: null });
+          query.maybeSingle = async () => ({ data: null, error: null });
+          query.single = async <T,>() => ({ data: { id: "run-1" } as T, error: null });
 
           return query;
         },
@@ -171,6 +169,7 @@ describe("createCleanupHandler", () => {
         invalidReferenceCount: 2,
         invalidReferences: [
           { table: "home_banners", column: "media_path", rowId: "banner-1", rawValue: "../bad.png", reason: "unsafe_relative_path" },
+          { table: "profiles", column: "avatar_url", rowId: "user-1", rawValue: "../avatar.png", reason: "unsafe_relative_path" },
         ],
       })),
       listAllPathsFn: vi.fn<() => Promise<CleanupCandidate[]>>(async () => [
@@ -191,9 +190,74 @@ describe("createCleanupHandler", () => {
       }),
     );
 
+    const payload = await response.json();
+    const payloadText = JSON.stringify(payload);
+
     expect(response.status).toBe(409);
+    expect(payload).toMatchObject({
+      error: "Cleanup aborted because invalid storage references were detected",
+      invalidReferenceCount: 2,
+      invalidReferenceCategories: { unsafe_relative_path: 2 },
+    });
+    expect(payload).not.toHaveProperty("invalidReferences");
+    expect(payloadText).not.toContain("home_banners");
+    expect(payloadText).not.toContain("media_path");
+    expect(payloadText).not.toContain("banner-1");
+    expect(payloadText).not.toContain("../bad.png");
     expect(removeSpy).not.toHaveBeenCalled();
     expect(runs.updatedRows.at(-1)?.values).toMatchObject({ status: "failed", invalid_reference_count: 2 });
+  });
+
+  it("redacts cleanup execution failures from caller responses", async () => {
+    const runs = createStorageCleanupRunsTable();
+    const log = vi.fn();
+    const handler = createCleanupHandler({
+      createClientFn: () => createClientMock({ runsTable: runs.table }),
+      env: TEST_ENV,
+      collectReferencedMediaPathsFn: vi.fn(async () => {
+        throw new Error("Failed to load home_banners media references: permission denied for table storage.objects");
+      }),
+      listAllPathsFn: vi.fn(),
+      now: () => new Date("2026-04-16T12:00:00.000Z"),
+      log,
+    });
+
+    const response = await handler(
+      new Request("https://example.test/functions/v1/cleanup-orphan-storage", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer service-role",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ mode: "dry-run" }),
+      }),
+    );
+
+    const payload = await response.json();
+    const payloadText = JSON.stringify(payload);
+
+    expect(response.status).toBe(500);
+    expect(payload).toEqual({ error: "Cleanup failed", runId: "run-1" });
+    expect(payloadText).not.toContain("home_banners");
+    expect(payloadText).not.toContain("storage.objects");
+    expect(payloadText).not.toContain("permission denied");
+    const loggedText = JSON.stringify(log.mock.calls);
+    expect(loggedText).toContain("cleanup_orphan_storage_failed");
+    expect(loggedText).toContain("execution_failed");
+    expect(loggedText).not.toContain("home_banners");
+    expect(loggedText).not.toContain("storage.objects");
+    expect(loggedText).not.toContain("permission denied");
+    expect(loggedText).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+    const finalRunValues = runs.updatedRows.at(-1)?.values;
+    expect(finalRunValues).toMatchObject({
+      status: "failed",
+      error_message: "cleanup_execution_failed",
+    });
+    const persistedText = JSON.stringify(finalRunValues);
+    expect(persistedText).not.toContain("home_banners");
+    expect(persistedText).not.toContain("storage.objects");
+    expect(persistedText).not.toContain("permission denied");
+    expect(persistedText).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
   });
 
   it("skips execution when another run is still active", async () => {
