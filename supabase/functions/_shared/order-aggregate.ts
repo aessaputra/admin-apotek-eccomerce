@@ -23,6 +23,7 @@ type PaymentSnapshotRow = {
   midtrans_order_id?: string | null;
   midtrans_transaction_id?: string | null;
   status?: Order["payment_status"] | null;
+  currency?: string | null;
   payment_type?: string | null;
   gross_amount?: number | string | null;
   paid_at?: string | null;
@@ -84,6 +85,7 @@ function mergeOrderAggregate(
   return {
     ...order,
     payment_status: payment?.status ?? "pending",
+    currency: payment?.currency ?? null,
     payment_type: payment?.payment_type ?? null,
     gross_amount: payment?.gross_amount ?? null,
     expired_at: payment?.expiry_time ?? null,
@@ -114,7 +116,7 @@ async function getLatestPaymentForOrder(
   const { data, error } = await adminClient
     .from("payments")
     .select(
-      "order_id, checkout_idempotency_key, midtrans_order_id, midtrans_transaction_id, status, payment_type, gross_amount, paid_at, expiry_time, snap_token, redirect_url, snap_token_created_at",
+      "order_id, checkout_idempotency_key, midtrans_order_id, midtrans_transaction_id, status, currency, payment_type, gross_amount, paid_at, expiry_time, snap_token, redirect_url, snap_token_created_at",
     )
     .eq("order_id", orderId)
     .order("updated_at", { ascending: false })
