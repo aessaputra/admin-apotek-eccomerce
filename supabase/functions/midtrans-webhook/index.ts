@@ -40,6 +40,9 @@ declare const Deno: {
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
 type SupabaseAdminClient = ReturnType<typeof getSupabaseAdminClient>;
+type VerifiedMidtransWebhookPayload = MidtransWebhookPayload & {
+  status_api_verified: boolean;
+};
 
 async function getDefaultAdminClient(): Promise<SupabaseAdminClient> {
   const supabaseModule = await import("../_shared/supabase.ts");
@@ -60,6 +63,90 @@ function errorResponse(message: string, status = 500): Response {
 function toNumericAmount(value: string | number | null | undefined): number {
   if (value == null) return 0;
   return Number.parseFloat(String(value));
+}
+
+function toRoundedAmount(value: string | number | null | undefined): number | null {
+  if (value == null) return null;
+
+  const amount = Number.parseFloat(String(value));
+  return Number.isFinite(amount) ? Math.round(amount) : null;
+}
+
+function normalizeComparableText(value: string | null | undefined): string | null {
+  const normalizedValue = value?.trim().toLowerCase();
+  return normalizedValue ? normalizedValue : null;
+}
+
+function hasVerifiedRawNotification(rawNotification: unknown): boolean {
+  return !!rawNotification &&
+    typeof rawNotification === "object" &&
+    (rawNotification as { status_api_verified?: unknown }).status_api_verified === true;
+}
+
+function buildVerifiedRawNotification(
+  payload: MidtransWebhookPayload,
+): VerifiedMidtransWebhookPayload {
+  return { ...payload, status_api_verified: true };
+}
+
+function isRawNotificationCorroboratedByStatus(
+  payload: MidtransWebhookPayload,
+  verifiedStatus: MidtransStatusResponse,
+): boolean {
+  if (verifiedStatus.order_id && verifiedStatus.order_id !== payload.order_id) {
+    return false;
+  }
+
+  if (payload.transaction_status !== verifiedStatus.transaction_status) {
+    return false;
+  }
+
+  if (
+    (payload.transaction_status === "capture" ||
+      verifiedStatus.transaction_status === "capture") &&
+    normalizeComparableText(payload.fraud_status) !==
+      normalizeComparableText(verifiedStatus.fraud_status)
+  ) {
+    return false;
+  }
+
+  if (
+    payload.status_code &&
+    verifiedStatus.status_code &&
+    payload.status_code !== verifiedStatus.status_code
+  ) {
+    return false;
+  }
+
+  if (toRoundedAmount(payload.gross_amount) !== toRoundedAmount(verifiedStatus.gross_amount)) {
+    return false;
+  }
+
+  if (
+    normalizeComparableText(payload.currency) !==
+      normalizeComparableText(verifiedStatus.currency)
+  ) {
+    return false;
+  }
+
+  if (
+    payload.transaction_id &&
+    verifiedStatus.transaction_id &&
+    payload.transaction_id !== verifiedStatus.transaction_id
+  ) {
+    return false;
+  }
+
+  if (
+    payload.payment_type &&
+    verifiedStatus.payment_type &&
+    normalizeComparableText(payload.payment_type) !==
+      normalizeComparableText(verifiedStatus.payment_type)
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 function buildWebhookEventKey(payload: MidtransWebhookPayload): string {
@@ -167,6 +254,42 @@ async function persistRawNotificationEarly(
   adminClient: SupabaseAdminClient,
   payload: MidtransWebhookPayload,
 ): Promise<void> {
+  const rawNotification = { ...payload, status_api_verified: false };
+
+  const { data: existingPayment, error: lookupError } = await adminClient
+    .from("payments")
+    .select("order_id, raw_notification")
+    .eq("midtrans_order_id", payload.order_id)
+    .maybeSingle();
+
+  if (lookupError) {
+    console.error(
+      "[midtrans-webhook] Failed to persist raw notification:",
+      { code: "midtrans_raw_notification_persist_failed" },
+    );
+    return;
+  }
+
+  if (hasVerifiedRawNotification(existingPayment?.raw_notification)) {
+    return;
+  }
+
+  if (existingPayment?.order_id) {
+    const { error } = await adminClient
+      .from("payments")
+      .update({ raw_notification: rawNotification })
+      .eq("midtrans_order_id", payload.order_id);
+
+    if (error) {
+      console.error(
+        "[midtrans-webhook] Failed to persist raw notification:",
+        { code: "midtrans_raw_notification_persist_failed" },
+      );
+    }
+
+    return;
+  }
+
   const currency = assertMidtransCurrencyConsistency(
     payload.currency,
     payload.currency,
@@ -181,12 +304,29 @@ async function persistRawNotificationEarly(
     status_code: payload.status_code || null,
     gross_amount: toNumericAmount(payload.gross_amount),
     currency,
-    raw_notification: payload,
+    raw_notification: rawNotification,
   };
 
   const { error } = await adminClient
     .from("payments")
     .upsert(rawRecord, { onConflict: "midtrans_order_id" });
+
+  if (error) {
+    console.error(
+      "[midtrans-webhook] Failed to persist raw notification:",
+      { code: "midtrans_raw_notification_persist_failed" },
+    );
+  }
+}
+
+async function markRawNotificationStatusVerified(
+  adminClient: SupabaseAdminClient,
+  payload: MidtransWebhookPayload,
+): Promise<void> {
+  const { error } = await adminClient
+    .from("payments")
+    .update({ raw_notification: buildVerifiedRawNotification(payload) })
+    .eq("midtrans_order_id", payload.order_id);
 
   if (error) {
     console.error(
@@ -270,6 +410,7 @@ async function upsertPaymentRecord(
     nextPaymentStatus: status,
     existingPaidAt: existingPayment?.paid_at,
   });
+  paymentPayload.raw_notification = buildVerifiedRawNotification(payload);
 
   const { error } = await adminClient
     .from("payments")
@@ -352,6 +493,8 @@ export function createMidtransWebhookHandler(dependencies: {
 
     const webhookEventKey = buildWebhookEventKey(payload);
 
+    await persistRawNotificationEarly(adminClient, payload);
+
     // Verify transaction status with Midtrans API for accurate state.
     let verifiedStatus: MidtransStatusResponse;
     try {
@@ -364,16 +507,6 @@ export function createMidtransWebhookHandler(dependencies: {
         code: "midtrans_status_verification_failed",
       });
       return errorResponse("Status verification failed, retry later", 503);
-    }
-
-    const order = await getOrderWithRetry(
-      adminClient,
-      payload.order_id,
-    );
-
-    if (!order) {
-      console.warn("[midtrans-webhook] Order not found for:", payload.order_id);
-      return errorResponse("Order not found, retry later", 503);
     }
 
     const verifiedFraudStatus =
@@ -398,6 +531,30 @@ export function createMidtransWebhookHandler(dependencies: {
         verifiedStatus.transaction_status,
       );
       return errorResponse("Midtrans status not confirmed yet", 503);
+    }
+
+    if (!isRawNotificationCorroboratedByStatus(payload, verifiedStatus)) {
+      console.warn(
+        "[midtrans-webhook] Raw notification was not corroborated by Midtrans status API for order:",
+        payload.order_id,
+        "payload_status:",
+        payload.transaction_status,
+        "verified_status:",
+        verifiedStatus.transaction_status,
+      );
+      return errorResponse("Midtrans status not corroborated yet", 503);
+    }
+
+    await markRawNotificationStatusVerified(adminClient, payload);
+
+    const order = await getOrderWithRetry(
+      adminClient,
+      payload.order_id,
+    );
+
+    if (!order) {
+      console.warn("[midtrans-webhook] Order not found for:", payload.order_id);
+      return errorResponse("Order not found, retry later", 503);
     }
 
     if (
@@ -447,8 +604,6 @@ export function createMidtransWebhookHandler(dependencies: {
       payloadCurrency: payload.currency,
       verifiedCurrency: verifiedStatus.currency,
     });
-
-    await persistRawNotificationEarly(adminClient, payload);
 
     const { data: transitionResult, error: transitionError } =
       await adminClient.rpc("apply_midtrans_webhook_transition", {

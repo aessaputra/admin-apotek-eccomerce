@@ -53,9 +53,23 @@ describe("Midtrans runtime config source migration", () => {
     const runtimeSignatureIndex = source.indexOf("await resolveMidtransWebhookRuntimeConfig");
     const invalidSignatureIndex = source.indexOf("Invalid signature");
     const persistRawIndex = source.indexOf("await persistRawNotificationEarly");
+    const verifyStatusIndex = source.indexOf(
+      "verifiedStatus = await verifyMidtransTransactionWithRetry",
+    );
+    const getOrderIndex = source.indexOf("const order = await getOrderWithRetry");
+    const validateCurrencyIndex = source.indexOf(
+      "const paymentCurrency = validateMidtransTransitionCurrency",
+    );
+    const transitionIndex = source.indexOf(
+      "apply_midtrans_webhook_transition",
+    );
 
     expect(runtimeSignatureIndex).toBeGreaterThan(-1);
     expect(invalidSignatureIndex).toBeGreaterThan(runtimeSignatureIndex);
     expect(persistRawIndex).toBeGreaterThan(invalidSignatureIndex);
+    expect(verifyStatusIndex).toBeGreaterThan(persistRawIndex);
+    expect(getOrderIndex).toBeGreaterThan(persistRawIndex);
+    expect(validateCurrencyIndex).toBeGreaterThan(persistRawIndex);
+    expect(transitionIndex).toBeGreaterThan(persistRawIndex);
   });
 });

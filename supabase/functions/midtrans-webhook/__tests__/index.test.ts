@@ -101,37 +101,64 @@ function createRuntimeRows() {
 function createWebhookFlowAdminClient(options: {
   orderOverrides?: Record<string, unknown>;
   paymentSnapshotOverrides?: Record<string, unknown>;
+  existingPaymentOrderId?: string | null;
+  existingRawNotification?: Record<string, unknown> | null;
+  paymentByMidtransOrderId?: string | null;
   rawPaymentUpsertError?: { message: string };
+  statefulPaymentWrites?: boolean;
   transitionError?: { message: string };
   transitionResult?: Record<string, unknown>;
 } = {}) {
-  const paymentsUpsert = vi.fn<() => Promise<{ error: { message: string } | null }>>(
-    async () => ({ error: null }),
-  );
-  if (options.rawPaymentUpsertError) {
-    paymentsUpsert
-      .mockResolvedValueOnce({ error: options.rawPaymentUpsertError })
-      .mockResolvedValue({ error: null });
-  }
+  const paymentSnapshot = {
+    order_id: "order-1",
+    status: "pending",
+    payment_type: "bank_transfer",
+    gross_amount: 150000,
+    currency: "IDR",
+    midtrans_order_id: "MIDTRANS-WEBHOOK-ORDER",
+    ...options.paymentSnapshotOverrides,
+  };
+  const paymentUpsertErrors = options.rawPaymentUpsertError
+    ? [options.rawPaymentUpsertError]
+    : [];
+  const paymentsUpsert = vi.fn(async (values?: Record<string, unknown>) => {
+    if (options.statefulPaymentWrites && values) {
+      Object.assign(paymentSnapshot, values);
+    }
+
+    return { error: paymentUpsertErrors.shift() ?? null };
+  });
+  const paymentsUpdate = vi.fn((values: Record<string, unknown>) => ({
+    eq: vi.fn(async () => {
+      if (options.statefulPaymentWrites) {
+        Object.assign(paymentSnapshot, values);
+      }
+
+      return { error: null };
+    }),
+  }));
   const orderActivitiesInsert = vi.fn(async () => ({ error: null }));
   const notificationsInsert = vi.fn(async () => ({ error: null }));
   const paymentByMidtransMaybeSingle = vi.fn(async () => ({
-    data: { order_id: "order-1" },
+    data: options.paymentByMidtransOrderId === null
+      ? null
+      : { order_id: options.paymentByMidtransOrderId ?? "order-1" },
     error: null,
   }));
   const paymentSnapshotMaybeSingle = vi.fn(async () => ({
-    data: {
-      order_id: "order-1",
-      status: "pending",
-      payment_type: "bank_transfer",
-      gross_amount: 150000,
-      currency: "IDR",
-      midtrans_order_id: "MIDTRANS-WEBHOOK-ORDER",
-      ...options.paymentSnapshotOverrides,
-    },
+    data: paymentSnapshot,
     error: null,
   }));
   const existingPaymentMaybeSingle = vi.fn(async () => ({ data: null, error: null }));
+  const existingPaymentOrderMaybeSingle = vi.fn(async () => ({
+    data: options.existingPaymentOrderId === undefined && options.existingRawNotification === undefined
+      ? null
+      : {
+        order_id: options.existingPaymentOrderId ?? null,
+        raw_notification: options.existingRawNotification ?? null,
+      },
+    error: null,
+  }));
   const orderMaybeSingle = vi.fn(async () => ({
     data: {
       id: "order-1",
@@ -147,11 +174,11 @@ function createWebhookFlowAdminClient(options: {
   }));
   const shipmentMaybeSingle = vi.fn(async () => ({ data: null, error: null }));
 
-  const buildPaymentSelect = () => ({
+  const buildPaymentSelect = (columns?: string) => ({
     eq: (column: string) => {
       const terminal = {
         maybeSingle: column === "midtrans_order_id"
-          ? existingPaymentMaybeSingle
+          ? (columns?.includes("order_id") ? existingPaymentOrderMaybeSingle : existingPaymentMaybeSingle)
           : paymentSnapshotMaybeSingle,
         order: () => ({
           order: () => ({
@@ -174,6 +201,7 @@ function createWebhookFlowAdminClient(options: {
     if (tableName === "payments") {
       return {
         select: vi.fn(buildPaymentSelect),
+        update: paymentsUpdate,
         upsert: paymentsUpsert,
       };
     }
@@ -241,6 +269,7 @@ function createWebhookFlowAdminClient(options: {
     from,
     rpc,
     paymentsUpsert,
+    paymentsUpdate,
     orderActivitiesInsert,
     notificationsInsert,
   };
@@ -527,7 +556,7 @@ describe("midtrans-webhook Task 4 log redaction", () => {
 
   it("redacts status verification provider failures from logs and retry response", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const { adminClient } = createWebhookFlowAdminClient();
+    const { adminClient, paymentsUpsert } = createWebhookFlowAdminClient();
     const payload = makePayload("");
     payload.signature_key = await makeSignature(payload);
     vi.stubGlobal("fetch", vi.fn(async () =>
@@ -552,6 +581,7 @@ describe("midtrans-webhook Task 4 log redaction", () => {
     expect(logs).toContain("midtrans_status_verification_failed");
     expect(logs).not.toContain("midtrans-provider-secret-sentinel");
     expect(logs).not.toContain("upstream stack");
+    expect(paymentsUpsert).toHaveBeenCalledTimes(1);
     consoleError.mockRestore();
   });
 
@@ -606,6 +636,144 @@ describe("midtrans-webhook Task 4 log redaction", () => {
 
 
 describe("midtrans-webhook transition currency validation", () => {
+  it("does not verify or transition a success-like raw notification when Midtrans status is still pending", async () => {
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { adminClient, rpc, paymentsUpsert, paymentsUpdate, orderActivitiesInsert } =
+      createWebhookFlowAdminClient();
+    const payload = makePayload("");
+    payload.signature_key = await makeSignature(payload);
+    stubVerifiedMidtransStatus(payload, {
+      transaction_status: "pending",
+      fraud_status: undefined,
+      status_code: "201",
+    });
+    const handler = createMidtransWebhookHandler({
+      getAdminClient: () => adminClient as never,
+    });
+
+    const response = await handler(createRequest(payload));
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({ error: "Midtrans status not confirmed yet" });
+    expect(paymentsUpsert).toHaveBeenCalledTimes(1);
+    expect(paymentsUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        midtrans_order_id: payload.order_id,
+        raw_notification: { ...payload, status_api_verified: false },
+      }),
+      { onConflict: "midtrans_order_id" },
+    );
+    expect(paymentsUpdate).not.toHaveBeenCalled();
+    expect(rpc.mock.calls.some((call) => call[0] === "apply_midtrans_webhook_transition"))
+      .toBe(false);
+    expect(orderActivitiesInsert).not.toHaveBeenCalled();
+    expect(webhookSideEffects.ensureSettlementSideEffectsQueued).not.toHaveBeenCalled();
+    expect(webhookSideEffects.triggerWebhookSideEffectProcessor).not.toHaveBeenCalled();
+    consoleWarn.mockRestore();
+  });
+
+  it("does not downgrade an already verified orphan notification when status verification fails", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { adminClient, paymentsUpsert, paymentsUpdate } = createWebhookFlowAdminClient({
+      existingPaymentOrderId: null,
+      existingRawNotification: {
+        order_id: "MIDTRANS-WEBHOOK-ORDER",
+        transaction_status: "settlement",
+        status_api_verified: true,
+      },
+    });
+    const payload = makePayload("");
+    payload.signature_key = await makeSignature(payload);
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response(JSON.stringify({ status_message: "temporary provider outage" }), {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      })
+    ));
+    const handler = createMidtransWebhookHandler({
+      getAdminClient: () => adminClient as never,
+    });
+
+    const response = await handler(createRequest(payload));
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({ error: "Status verification failed, retry later" });
+    expect(paymentsUpsert).not.toHaveBeenCalled();
+    expect(paymentsUpdate).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("does not downgrade an already verified canonical payment when status verification fails", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { adminClient, paymentsUpsert, paymentsUpdate } = createWebhookFlowAdminClient({
+      existingPaymentOrderId: "order-1",
+      existingRawNotification: {
+        order_id: "MIDTRANS-WEBHOOK-ORDER",
+        transaction_status: "settlement",
+        status_api_verified: true,
+      },
+    });
+    const payload = makePayload("");
+    payload.signature_key = await makeSignature(payload);
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response(JSON.stringify({ status_message: "temporary provider outage" }), {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      })
+    ));
+    const handler = createMidtransWebhookHandler({
+      getAdminClient: () => adminClient as never,
+    });
+
+    const response = await handler(createRequest(payload));
+    const body = await response.json();
+
+    const downgradedRawNotification = paymentsUpdate.mock.calls.some(([values]) =>
+      (values as { raw_notification?: { status_api_verified?: boolean } }).raw_notification
+        ?.status_api_verified === false
+    );
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({ error: "Status verification failed, retry later" });
+    expect(downgradedRawNotification).toBe(false);
+    expect(paymentsUpsert).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("marks a corroborated orphan notification verified before returning an order lookup retry", async () => {
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const { adminClient, rpc, paymentsUpsert, paymentsUpdate } = createWebhookFlowAdminClient({
+      paymentByMidtransOrderId: null,
+    });
+    const payload = makePayload("");
+    payload.signature_key = await makeSignature(payload);
+    stubVerifiedMidtransStatus(payload);
+    const handler = createMidtransWebhookHandler({
+      getAdminClient: () => adminClient as never,
+    });
+
+    const response = await handler(createRequest(payload));
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({ error: "Order not found, retry later" });
+    expect(paymentsUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        midtrans_order_id: payload.order_id,
+        raw_notification: { ...payload, status_api_verified: false },
+      }),
+      { onConflict: "midtrans_order_id" },
+    );
+    expect(paymentsUpdate).toHaveBeenCalledWith({
+      raw_notification: { ...payload, status_api_verified: true },
+    });
+    expect(rpc.mock.calls.some((call) => call[0] === "apply_midtrans_webhook_transition"))
+      .toBe(false);
+    consoleWarn.mockRestore();
+  });
+
   it("rejects verified and payload USD for an IDR order before transition or side effects", async () => {
     webhookSideEffects.ensureSettlementSideEffectsQueued.mockClear();
     webhookSideEffects.triggerWebhookSideEffectProcessor.mockClear();
@@ -646,7 +814,7 @@ describe("midtrans-webhook transition currency validation", () => {
     expect(responseBody).toEqual({ error: "Currency mismatch" });
     expect(rpc.mock.calls.some((call) => call[0] === "apply_midtrans_webhook_transition"))
       .toBe(false);
-    expect(paymentsUpsert).not.toHaveBeenCalled();
+    expect(paymentsUpsert).toHaveBeenCalledTimes(1);
     expect(orderActivitiesInsert).not.toHaveBeenCalled();
     expect(webhookSideEffects.ensureSettlementSideEffectsQueued).not.toHaveBeenCalled();
     expect(webhookSideEffects.triggerWebhookSideEffectProcessor).not.toHaveBeenCalled();
@@ -661,9 +829,9 @@ describe("midtrans-webhook settlement side-effect queueing", () => {
     webhookSideEffects.triggerWebhookSideEffectProcessor.mockClear();
   });
 
-  it("queues and triggers fulfillment once for an applied settlement transition", async () => {
+  it("queues and triggers fulfillment once for an applied settlement transition while preserving the verified raw marker", async () => {
     webhookSideEffects.ensureSettlementSideEffectsQueued.mockResolvedValueOnce(true);
-    const { adminClient } = createWebhookFlowAdminClient();
+    const { adminClient, paymentsUpsert } = createWebhookFlowAdminClient();
     const payload = makePayload("");
     payload.signature_key = await makeSignature(payload);
     stubVerifiedMidtransStatus(payload);
@@ -674,6 +842,12 @@ describe("midtrans-webhook settlement side-effect queueing", () => {
     const response = await handler(createRequest(payload));
 
     expect(response.status).toBe(200);
+    expect(paymentsUpsert).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      raw_notification: { ...payload, status_api_verified: false },
+    }), { onConflict: "midtrans_order_id" });
+    expect(paymentsUpsert).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      raw_notification: { ...payload, status_api_verified: true },
+    }), { onConflict: "midtrans_order_id" });
     expect(webhookSideEffects.ensureSettlementSideEffectsQueued).toHaveBeenCalledTimes(1);
     expect(webhookSideEffects.ensureSettlementSideEffectsQueued).toHaveBeenCalledWith(
       expect.anything(),
@@ -772,7 +946,7 @@ describe("midtrans-webhook settlement side-effect queueing", () => {
     expect(webhookSideEffects.triggerWebhookSideEffectProcessor).not.toHaveBeenCalled();
   });
 
-  it("rejects an amount mismatch before transition or side-effect queueing", async () => {
+  it("rejects raw and verified amount disagreement before transition or side-effect queueing", async () => {
     const { adminClient, rpc, paymentsUpsert, orderActivitiesInsert } =
       createWebhookFlowAdminClient();
     const payload = makePayload("");
@@ -785,11 +959,46 @@ describe("midtrans-webhook settlement side-effect queueing", () => {
     const response = await handler(createRequest(payload));
     const body = await response.json();
 
-    expect(response.status).toBe(409);
-    expect(body).toEqual({ error: "Amount mismatch recorded" });
+    expect(response.status).toBe(503);
+    expect(body).toEqual({ error: "Midtrans status not corroborated yet" });
     expect(rpc.mock.calls.some((call) => call[0] === "apply_midtrans_webhook_transition"))
       .toBe(false);
+    expect(paymentsUpsert).toHaveBeenCalledTimes(1);
+    expect(orderActivitiesInsert).not.toHaveBeenCalled();
+    expect(webhookSideEffects.ensureSettlementSideEffectsQueued).not.toHaveBeenCalled();
+    expect(webhookSideEffects.triggerWebhookSideEffectProcessor).not.toHaveBeenCalled();
+  });
+
+  it("keeps canonical payment amount immutable while auditing a signed amount mismatch", async () => {
+    const { adminClient, rpc, paymentsUpsert, paymentsUpdate, orderActivitiesInsert } =
+      createWebhookFlowAdminClient({
+        existingPaymentOrderId: "order-1",
+        statefulPaymentWrites: true,
+      });
+    const payload = {
+      ...makePayload(""),
+      gross_amount: "150001.00",
+    };
+    payload.signature_key = await makeSignature(payload);
+    stubVerifiedMidtransStatus(payload);
+    const handler = createMidtransWebhookHandler({
+      getAdminClient: () => adminClient as never,
+    });
+
+    const response = await handler(createRequest(payload));
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body).toEqual({ error: "Amount mismatch recorded" });
+    expect(paymentsUpdate).toHaveBeenNthCalledWith(1, {
+      raw_notification: { ...payload, status_api_verified: false },
+    });
+    expect(paymentsUpdate).toHaveBeenNthCalledWith(2, {
+      raw_notification: { ...payload, status_api_verified: true },
+    });
     expect(paymentsUpsert).not.toHaveBeenCalled();
+    expect(rpc.mock.calls.some((call) => call[0] === "apply_midtrans_webhook_transition"))
+      .toBe(false);
     expect(orderActivitiesInsert).not.toHaveBeenCalled();
     expect(webhookSideEffects.ensureSettlementSideEffectsQueued).not.toHaveBeenCalled();
     expect(webhookSideEffects.triggerWebhookSideEffectProcessor).not.toHaveBeenCalled();
