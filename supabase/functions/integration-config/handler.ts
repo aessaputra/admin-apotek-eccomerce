@@ -1,4 +1,5 @@
 import { corsHeaders } from "../_shared/cors.ts";
+import { resolveRequestId, withRequestIdResponse } from "../_shared/request-id.ts";
 import {
   type BiteshipApiKeySource,
   type BiteshipRuntimeSettings,
@@ -161,10 +162,6 @@ function normalizeString(value: unknown): string {
 function nullableString(value: unknown): string | null {
   const normalized = normalizeString(value);
   return normalized || null;
-}
-
-function getRequestId(req: Request): string | null {
-  return nullableString(req.headers.get("x-request-id"));
 }
 
 function isIntegrationConfigAction(value: unknown): value is IntegrationConfigAction {
@@ -403,8 +400,12 @@ function withoutUnsafeResponseFields(value: unknown): unknown {
   return sanitized;
 }
 
-function safeLogError(logError: (message: string, error?: unknown) => void, message: string): void {
-  logError(message, { message: "Operation failed" });
+function safeLogError(
+  logError: (message: string, error?: unknown) => void,
+  message: string,
+  context: { action: IntegrationConfigAction | "internal"; requestId: string },
+): void {
+  logError(message, { message: "Operation failed", ...context });
 }
 
 async function loadProfileRole(
@@ -453,6 +454,9 @@ export function createIntegrationConfigHandler(dependencies: IntegrationConfigHa
   const logError = dependencies.logError ?? (() => undefined);
 
   return async (req: Request): Promise<Response> => {
+    const requestId = resolveRequestId(req.headers);
+
+    const handleRequest = async (): Promise<Response> => {
     if (req.method === "OPTIONS") {
       return new Response("ok", { headers: corsHeaders });
     }
@@ -478,7 +482,7 @@ export function createIntegrationConfigHandler(dependencies: IntegrationConfigHa
         });
 
         if (error) {
-          safeLogError(logError, "[integration-config] summary RPC failed");
+          safeLogError(logError, "[integration-config] summary RPC failed", { action: "summary", requestId });
           throw new HttpError(500, "Integration config operation failed");
         }
 
@@ -495,11 +499,11 @@ export function createIntegrationConfigHandler(dependencies: IntegrationConfigHa
           p_actor_id: caller.id,
           p_reason: reason,
           p_source: ADMIN_SOURCE,
-          p_request_id: getRequestId(req),
+          p_request_id: requestId,
         });
 
         if (error) {
-          safeLogError(logError, "[integration-config] rotateSecret RPC failed");
+          safeLogError(logError, "[integration-config] rotateSecret RPC failed", { action: "rotateSecret", requestId });
           throw new HttpError(500, "Integration config operation failed");
         }
 
@@ -516,11 +520,11 @@ export function createIntegrationConfigHandler(dependencies: IntegrationConfigHa
           p_actor_id: caller.id,
           p_reason: reason,
           p_source: ADMIN_SOURCE,
-          p_request_id: getRequestId(req),
+          p_request_id: requestId,
         });
 
         if (error) {
-          safeLogError(logError, "[integration-config] updateValue RPC failed");
+          safeLogError(logError, "[integration-config] updateValue RPC failed", { action: "updateValue", requestId });
           throw new HttpError(500, "Integration config operation failed");
         }
 
@@ -533,7 +537,7 @@ export function createIntegrationConfigHandler(dependencies: IntegrationConfigHa
       });
 
       if (error) {
-        safeLogError(logError, "[integration-config] audit RPC failed");
+        safeLogError(logError, "[integration-config] audit RPC failed", { action: "audit", requestId });
         throw new HttpError(500, "Integration config operation failed");
       }
 
@@ -543,8 +547,11 @@ export function createIntegrationConfigHandler(dependencies: IntegrationConfigHa
         return jsonResponse({ error: error.message }, error.status);
       }
 
-      safeLogError(logError, "[integration-config] Internal error");
+      safeLogError(logError, "[integration-config] Internal error", { action: "internal", requestId });
       return jsonResponse({ error: "Internal server error" }, 500);
     }
+    };
+
+    return withRequestIdResponse(await handleRequest(), requestId);
   };
 }
