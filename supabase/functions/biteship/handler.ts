@@ -23,10 +23,17 @@ import {
   type RatesExecutionSuccess,
 } from "../_shared/biteship-rates.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { resolveRequestId, withRequestIdResponse } from "../_shared/request-id.ts";
 import type { RuntimeConfigAdminClient } from "../_shared/runtime-config.ts";
 
 const BITESHIP_API_URL = "https://api.biteship.com";
 const BITESHIP_CONFIG_INCOMPLETE = "BITESHIP_CONFIG_INCOMPLETE";
+const DRAFT_ORDER_AUTHORIZATION_ERROR = "Unauthorized";
+const BITESHIP_PROVIDER_UNAVAILABLE = "BITESHIP_PROVIDER_UNAVAILABLE";
+
+declare const Deno:
+  | { env: { get: (key: string) => string | undefined } }
+  | undefined;
 
 export interface BiteshipAdminClient extends RuntimeConfigAdminClient {
   from: (table: string) => any;
@@ -104,22 +111,6 @@ function getNestedString(data: unknown, path: string[]): string | undefined {
   return typeof current === "string" ? current : undefined;
 }
 
-function getLoggablePayload(payload: unknown): unknown {
-  if (!isRecord(payload)) {
-    return payload;
-  }
-
-  const {
-    token: _token,
-    auth: _auth,
-    authorization: _authorization,
-    api_key: _apiKey,
-    ...safePayload
-  } = payload;
-
-  return safePayload;
-}
-
 async function resolveBiteshipAuthKey(
   adminClient: BiteshipAdminClient,
 ): Promise<string> {
@@ -129,6 +120,10 @@ async function resolveBiteshipAuthKey(
 
 function isBiteshipRuntimeConfigError(error: unknown): boolean {
   return error instanceof Error && error.name === "BiteshipRuntimeConfigError";
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 function withServerShipperAndOriginFields(
@@ -282,6 +277,89 @@ function createBiteshipConfigErrorResponse(diagnostics: string[]): Response {
   );
 }
 
+function createDraftOrderAuthorizationErrorResponse(): Response {
+  return new Response(JSON.stringify({ error: DRAFT_ORDER_AUTHORIZATION_ERROR }), {
+    status: 403,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function createBiteshipProviderErrorResponse(status: number): Response {
+  return new Response(
+    JSON.stringify({ error: BITESHIP_PROVIDER_UNAVAILABLE, status }),
+    {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
+  );
+}
+
+function getSafeBiteshipEndpointLabel(action: string, endpoint: string): string {
+  switch (action) {
+    case "rates":
+      return "/v1/rates/couriers";
+    case "maps":
+      return "/v1/maps/areas";
+    case "track":
+      return "/v1/track";
+    case "track_public":
+      return "/v1/public-track";
+    case "draft_order":
+      return "/v1/draft_orders";
+    case "create_order":
+      return "/v1/orders";
+    case "couriers":
+      return "/v1/couriers";
+    default: {
+      const [pathOnly] = endpoint.split("?", 1);
+      return pathOnly || "unknown";
+    }
+  }
+}
+
+function getServiceRoleKey(): string {
+  if (typeof Deno === "undefined") {
+    return "";
+  }
+
+  return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim() ?? "";
+}
+
+function isServiceRoleBearerToken(token: string): boolean {
+  const serviceRoleKey = getServiceRoleKey();
+  return serviceRoleKey.length > 0 && token === serviceRoleKey;
+}
+
+async function loadCallerProfileRole(
+  adminClient: BiteshipAdminClient,
+  userId: string,
+): Promise<string | null> {
+  const { data, error } = await adminClient
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .single();
+
+  if (error || !isRecord(data)) {
+    return null;
+  }
+
+  return typeof data.role === "string" ? data.role : null;
+}
+
+async function canCreateDraftOrder(
+  adminClient: BiteshipAdminClient,
+  userId: string,
+  isServiceRoleBearer: boolean,
+): Promise<boolean> {
+  if (isServiceRoleBearer) {
+    return true;
+  }
+
+  const role = await loadCallerProfileRole(adminClient, userId);
+  return role === "admin";
+}
+
 export function createBiteshipHandler(
   dependencies: BiteshipHandlerDependencies,
 ): (req: Request) => Promise<Response> {
@@ -294,6 +372,9 @@ export function createBiteshipHandler(
   } = dependencies;
 
   return async (req: Request) => {
+    const requestId = resolveRequestId(req.headers);
+
+    const handleRequest = async (): Promise<Response> => {
     let adminClient: BiteshipAdminClient | undefined;
     const getAdminClientOnce = () => {
       adminClient ??= getAdminClient();
@@ -327,23 +408,28 @@ export function createBiteshipHandler(
       );
     }
 
-    let userId: string;
-    try {
-      userId = await verifyUserId(token);
-      if (!userId) {
+    const isServiceRoleBearer = isServiceRoleBearerToken(token);
+    let userId = "";
+    if (!isServiceRoleBearer) {
+      try {
+        userId = await verifyUserId(token);
+        if (!userId) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch {
+        console.error("[biteship] jwt_verification_failed", {
+          action: "authenticate_request",
+          errorCategory: "unauthorized",
+          requestId,
+        });
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-    } catch (error: unknown) {
-      console.error("[biteship] JWT verification failed", {
-        message: error instanceof Error ? error.message : String(error),
-      });
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
 
     // 4. Parse request
@@ -366,6 +452,7 @@ export function createBiteshipHandler(
 
     const isRatesAction = action === "rates";
     const isCreateOrderAction = action === "create_order";
+    const isDraftOrderAction = action === "draft_order";
     const isTrackAction = action === "track";
     const isTrackPublicAction = action === "track_public";
     let publicTrackingPayload: Record<string, unknown> | undefined;
@@ -395,6 +482,10 @@ export function createBiteshipHandler(
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       );
+    }
+
+    if (isServiceRoleBearer && !isDraftOrderAction) {
+      return createDraftOrderAuthorizationErrorResponse();
     }
 
     if (isTrackPublicAction) {
@@ -456,6 +547,18 @@ export function createBiteshipHandler(
       };
     }
 
+    if (isDraftOrderAction) {
+      const isAuthorized = await canCreateDraftOrder(
+        getAdminClientOnce(),
+        userId,
+        isServiceRoleBearer,
+      );
+
+      if (!isAuthorized) {
+        return createDraftOrderAuthorizationErrorResponse();
+      }
+    }
+
     // 7. Build Biteship request
     let endpoint = "";
     let method = "POST";
@@ -466,13 +569,17 @@ export function createBiteshipHandler(
 
     let settings: StoreSettings | undefined;
     let runtimeSettings: BiteshipRuntimeSettings | undefined;
-    const needsRuntimeSettings = isRatesAction || action === "draft_order";
+    const needsRuntimeSettings = isRatesAction || isDraftOrderAction;
 
     if (needsRuntimeSettings) {
       try {
         runtimeSettings = await resolveRuntimeSettings(getAdminClientOnce());
-      } catch (error: unknown) {
-        console.error("[biteship] Failed to resolve runtime settings:", error);
+      } catch {
+        console.error("[biteship] biteship_runtime_settings_unavailable", {
+          action: "resolve_runtime_settings",
+          errorCategory: "runtime_config_unavailable",
+          requestId,
+        });
         return createBiteshipConfigErrorResponse(
           ["Biteship runtime config unavailable"],
         );
@@ -592,11 +699,14 @@ export function createBiteshipHandler(
       const failedRateResponses: RatesExecutionFailure[] = [];
 
       for (const rateRequest of ratesRequestResult.requests) {
-        console.log(
-          `[biteship] rates ${rateRequest.group} payload:`,
-          JSON.stringify(getLoggablePayload(rateRequest.payload)),
-        );
-        console.log(`[biteship] Calling: POST ${biteshipUrl}`);
+        console.log("[biteship] provider_call", {
+          action: "rates",
+          endpoint: getSafeBiteshipEndpointLabel("rates", endpoint),
+          group: rateRequest.group,
+          method: "POST",
+          provider: "biteship",
+          requestId,
+        });
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 10000);
@@ -615,14 +725,18 @@ export function createBiteshipHandler(
           const rateResponseData: unknown = await biteshipResponse.json();
 
           if (!biteshipResponse.ok) {
-            console.error(
-              `[biteship] Biteship API error — action: rates, group: ${rateRequest.group}, status: ${biteshipResponse.status}, payload: ${JSON.stringify(getLoggablePayload(rateRequest.payload))}, body: ${JSON.stringify(rateResponseData)}`,
-            );
+            console.error("[biteship] biteship_provider_unavailable", {
+              action: "rates",
+              group: rateRequest.group,
+              requestId,
+              status: biteshipResponse.status,
+              responseType: isRecord(rateResponseData) ? "object" : typeof rateResponseData,
+            });
             failedRateResponses.push({
               group: rateRequest.group,
               couriers: rateRequest.couriers,
               status: biteshipResponse.status,
-              error: rateResponseData,
+              error: BITESHIP_PROVIDER_UNAVAILABLE,
             });
             continue;
           }
@@ -634,17 +748,13 @@ export function createBiteshipHandler(
             data: filterRatesByEnabledServices(rateResponseData, settings!),
           });
         } catch (error: unknown) {
-          const isAbortError =
-            error instanceof DOMException && error.name === "AbortError";
           failedRateResponses.push({
             group: rateRequest.group,
             couriers: rateRequest.couriers,
-            status: isAbortError ? 504 : 502,
-            error: isAbortError
+            status: isAbortError(error) ? 504 : 502,
+            error: isAbortError(error)
               ? "Biteship rates request timed out."
-              : error instanceof Error
-                ? error.message
-                : "Biteship rates request failed.",
+              : "Biteship rates request failed.",
           });
         } finally {
           clearTimeout(timeout);
@@ -701,7 +811,7 @@ export function createBiteshipHandler(
       requestPayload = withServerShipperAndOriginFields(safePayload, settings!);
     }
 
-    if (action === "draft_order") {
+    if (isDraftOrderAction) {
       try {
         assertCompleteStoreSettings(settings!);
       } catch (error: unknown) {
@@ -807,33 +917,48 @@ export function createBiteshipHandler(
       fetchOptions.body = JSON.stringify(requestPayload);
     }
 
-    if (action === "rates") {
-      console.log(
-        "[biteship] rates payload:",
-        JSON.stringify(getLoggablePayload(requestPayload)),
-      );
-    }
-
-    console.log(`[biteship] Calling: ${method} ${biteshipUrl}`);
+    console.log("[biteship] provider_call", {
+      action,
+      endpoint: getSafeBiteshipEndpointLabel(action, endpoint),
+      method,
+      provider: "biteship",
+      requestId,
+    });
 
     // 8. Add timeout to prevent hanging
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
     fetchOptions.signal = controller.signal;
 
-    const biteshipResponse = await fetchFn(biteshipUrl, fetchOptions);
-    clearTimeout(timeout);
+    let biteshipResponse: Response;
+    try {
+      biteshipResponse = await fetchFn(biteshipUrl, fetchOptions);
+    } catch (error: unknown) {
+      if (isAbortError(error)) {
+        console.error("[biteship] biteship_provider_unavailable", {
+          action,
+          errorCategory: "provider_timeout",
+          requestId,
+          status: 504,
+        });
+        return createBiteshipProviderErrorResponse(504);
+      }
+
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
 
     const data: unknown = await biteshipResponse.json();
 
     if (!biteshipResponse.ok) {
-      console.error(
-        `[biteship] Biteship API error — action: ${action}, status: ${biteshipResponse.status}, payload: ${JSON.stringify(getLoggablePayload(requestPayload))}, body: ${JSON.stringify(data)}`,
-      );
-      return new Response(JSON.stringify({ error: data }), {
+      console.error("[biteship] biteship_provider_unavailable", {
+        action,
+        requestId,
         status: biteshipResponse.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        responseType: isRecord(data) ? "object" : typeof data,
       });
+      return createBiteshipProviderErrorResponse(biteshipResponse.status);
     }
 
     let responseData = data;
@@ -896,19 +1021,19 @@ export function createBiteshipHandler(
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-
-      // Log full error internally for debugging
-      console.error("[biteship] Internal error:", {
-        message,
-        error: String(error),
+      console.error("[biteship] internal_error", {
+        action: "request_failed",
+        errorCategory: "unexpected_failure",
+        requestId,
       });
 
-      // Return generic error message to client - never leak internal error details
       return new Response(JSON.stringify({ error: "Internal server error" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
       });
     }
+    };
+
+    return withRequestIdResponse(await handleRequest(), requestId);
   };
 }
