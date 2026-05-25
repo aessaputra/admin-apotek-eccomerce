@@ -96,6 +96,7 @@ const STALE_PAYMENT_STATUS_MAP: Record<PaymentStatus, PaymentStatus[]> = {
 };
 
 const DEFAULT_COUNTRY_CODE = "IDN";
+export const DEFAULT_MIDTRANS_ORDER_CURRENCY = "IDR";
 
 const trimToUndefined = (
   value: string | null | undefined,
@@ -187,6 +188,13 @@ export class MidtransRuntimeConfigError extends Error {
   constructor(message = "Midtrans runtime config unavailable") {
     super(message);
     this.name = "MidtransRuntimeConfigError";
+  }
+}
+
+export class MidtransCurrencyValidationError extends Error {
+  constructor(message: "Currency validation failed" | "Currency mismatch") {
+    super(message);
+    this.name = "MidtransCurrencyValidationError";
   }
 }
 
@@ -636,6 +644,40 @@ export const normalizeMidtransCurrency = (
   return normalizedValue ? normalizedValue : null;
 };
 
+export const getExpectedMidtransOrderCurrency = (
+  orderCurrency: string | null | undefined,
+): string => {
+  return normalizeMidtransCurrency(orderCurrency) ?? DEFAULT_MIDTRANS_ORDER_CURRENCY;
+};
+
+export const validateMidtransTransitionCurrency = ({
+  expectedOrderCurrency,
+  payloadCurrency,
+  verifiedCurrency,
+}: {
+  orderId: string;
+  expectedOrderCurrency?: string | null;
+  payloadCurrency?: string | null;
+  verifiedCurrency?: string | null;
+}): string => {
+  const expectedCurrency = getExpectedMidtransOrderCurrency(expectedOrderCurrency);
+  const normalizedVerifiedCurrency = normalizeMidtransCurrency(verifiedCurrency);
+  const normalizedPayloadCurrency = normalizeMidtransCurrency(payloadCurrency);
+
+  if (!normalizedVerifiedCurrency) {
+    throw new MidtransCurrencyValidationError("Currency validation failed");
+  }
+
+  if (
+    normalizedVerifiedCurrency !== expectedCurrency ||
+    (normalizedPayloadCurrency && normalizedPayloadCurrency !== normalizedVerifiedCurrency)
+  ) {
+    throw new MidtransCurrencyValidationError("Currency mismatch");
+  }
+
+  return normalizedVerifiedCurrency;
+};
+
 export const getRequiredMidtransCurrency = (
   primaryValue: string | null | undefined,
   secondaryValue: string | null | undefined,
@@ -727,11 +769,12 @@ export const buildMidtransPaymentRecord = ({
     verifiedStatus.order_id ||
     order.midtrans_order_id ||
     order.id;
-  const currency = assertMidtransCurrencyConsistency(
-    verifiedStatus.currency,
-    payload?.currency,
-    orderReference,
-  );
+  const currency = validateMidtransTransitionCurrency({
+    orderId: orderReference,
+    expectedOrderCurrency: order.currency,
+    payloadCurrency: payload?.currency,
+    verifiedCurrency: verifiedStatus.currency,
+  });
   const paymentType = normalizeMidtransPaymentType(
     verifiedStatus.payment_type || payload?.payment_type || order.payment_type,
   );

@@ -1,3 +1,4 @@
+import type { getSupabaseAdminClient } from "../_shared/supabase.ts";
 import {
   assertMidtransCurrencyConsistency,
   buildMidtransPaymentRecord,
@@ -7,7 +8,9 @@ import {
   mapMidtransStatus,
   normalizeMidtransPaymentType,
   resolveMidtransWebhookRuntimeConfig,
+  MidtransCurrencyValidationError,
   MidtransRuntimeConfigError,
+  validateMidtransTransitionCurrency,
   verifyMidtransTransaction,
   type MidtransRuntimeConfig,
 } from "../_shared/midtrans.ts";
@@ -36,13 +39,7 @@ declare const Deno: {
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
-type SupabaseAdminClient = {
-  from: (tableName: string) => any;
-  rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{
-    data: unknown;
-    error: { message?: string } | null;
-  }>;
-};
+type SupabaseAdminClient = ReturnType<typeof getSupabaseAdminClient>;
 
 async function getDefaultAdminClient(): Promise<SupabaseAdminClient> {
   const supabaseModule = await import("../_shared/supabase.ts");
@@ -194,7 +191,7 @@ async function persistRawNotificationEarly(
   if (error) {
     console.error(
       "[midtrans-webhook] Failed to persist raw notification:",
-      error.message,
+      { code: "midtrans_raw_notification_persist_failed" },
     );
   }
 }
@@ -302,8 +299,10 @@ export function createMidtransWebhookHandler(dependencies: {
 
     try {
       payload = JSON.parse(bodyText) as MidtransWebhookPayload;
-    } catch (parseError) {
-      console.error("[midtrans-webhook] Invalid JSON:", parseError);
+    } catch {
+      console.error("[midtrans-webhook] Invalid JSON:", {
+        code: "midtrans_invalid_json",
+      });
       return errorResponse("Invalid JSON payload", 400);
     }
 
@@ -314,7 +313,11 @@ export function createMidtransWebhookHandler(dependencies: {
       !payload.signature_key
     ) {
       console.error(
-        "[midtrans-webhook] Invalid payload: missing required fields",
+        "[midtrans-webhook] Invalid payload:",
+        {
+          code: "midtrans_invalid_payload",
+          reason: "missing_required_fields",
+        },
       );
       return errorResponse("Invalid payload", 400);
     }
@@ -347,10 +350,6 @@ export function createMidtransWebhookHandler(dependencies: {
       return errorResponse("Invalid signature", 401);
     }
 
-    // Persist raw notification immediately after signature validation for audit trail
-    // This ensures we have the payload even if order not found or amount mismatch
-    await persistRawNotificationEarly(adminClient, payload);
-
     const webhookEventKey = buildWebhookEventKey(payload);
 
     // Verify transaction status with Midtrans API for accurate state.
@@ -360,12 +359,10 @@ export function createMidtransWebhookHandler(dependencies: {
         payload.order_id,
         runtimeConfig,
       );
-    } catch (verificationError) {
-      const message =
-        verificationError instanceof Error
-          ? verificationError.message
-          : "Unknown verification error";
-      console.error("[midtrans-webhook] Status verification failed:", message);
+    } catch {
+      console.error("[midtrans-webhook] Status verification failed:", {
+        code: "midtrans_status_verification_failed",
+      });
       return errorResponse("Status verification failed, retry later", 503);
     }
 
@@ -444,11 +441,14 @@ export function createMidtransWebhookHandler(dependencies: {
     const paymentType = normalizeMidtransPaymentType(
       verifiedStatus.payment_type || payload.payment_type || order.payment_type,
     );
-    const paymentCurrency = assertMidtransCurrencyConsistency(
-      verifiedStatus.currency,
-      payload.currency,
-      payload.order_id,
-    );
+    const paymentCurrency = validateMidtransTransitionCurrency({
+      orderId: payload.order_id,
+      expectedOrderCurrency: order.currency,
+      payloadCurrency: payload.currency,
+      verifiedCurrency: verifiedStatus.currency,
+    });
+
+    await persistRawNotificationEarly(adminClient, payload);
 
     const { data: transitionResult, error: transitionError } =
       await adminClient.rpc("apply_midtrans_webhook_transition", {
@@ -469,7 +469,7 @@ export function createMidtransWebhookHandler(dependencies: {
     if (transitionError) {
       console.error(
         "[midtrans-webhook] Transition error:",
-        transitionError.message,
+        { code: "midtrans_transition_failed" },
       );
       return errorResponse("Transition error logged", 503);
     }
@@ -532,6 +532,7 @@ export function createMidtransWebhookHandler(dependencies: {
       adminClient,
       order.id,
       persistedPaymentStatus,
+      { transitionApplied: applied },
     );
 
     if (!shouldRunFulfillment) {
@@ -566,8 +567,14 @@ export function createMidtransWebhookHandler(dependencies: {
 
     return jsonResponse({ status: "ok" }, 200);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("[midtrans-webhook] Internal error:", message);
+    console.error("[midtrans-webhook] Internal error:", {
+      code: "midtrans_webhook_internal_error",
+    });
+
+    if (error instanceof MidtransCurrencyValidationError) {
+      return errorResponse(error.message, 409);
+    }
+
     return errorResponse("Internal error", 500);
   }
   };
