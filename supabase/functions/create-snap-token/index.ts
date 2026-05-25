@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 // @ts-expect-error Deno Edge Runtime resolves npm specifiers at deploy time.
 import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
 import { corsHeaders } from "../_shared/cors.ts";
+import { resolveRequestId, withRequestIdResponse } from "../_shared/request-id.ts";
 import { buildSnapPayload } from "../_shared/midtrans.ts";
 import {
   CONFIG_KEYS,
@@ -65,11 +66,6 @@ function ensureMidtransOrderId(order: Order): string {
   const timestamp = Date.now();
   return `APT-${shortId}-${timestamp}`;
 }
-
-type MidtransSnapError = {
-  error_messages?: string[];
-  status_message?: string;
-};
 
 type MidtransSnapRuntimeConfig = {
   serverKey: string;
@@ -144,6 +140,10 @@ function requireRuntimeVersionNumber(entry: RuntimeConfigEntry): number {
 }
 
 Deno.serve(async (req: Request) => {
+  const requestId = resolveRequestId(req.headers);
+  const respond = (response: Response) => withRequestIdResponse(response, requestId);
+
+  const handleRequest = async (): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -418,20 +418,19 @@ Deno.serve(async (req: Request) => {
         throw error;
       }
 
-      const midtransData =
-        (await midtransResponse.json()) as Partial<SnapResponse> &
-          MidtransSnapError;
+      const midtransData = (await midtransResponse.json()) as Partial<SnapResponse>;
       if (
         !midtransResponse.ok ||
         !midtransData.token ||
         !midtransData.redirect_url
       ) {
-        throw new HttpError(
-          502,
-          midtransData.error_messages?.[0] ||
-            midtransData.status_message ||
-            "Midtrans token creation failed",
-        );
+        console.error("[create-snap-token] snap_token_provider_unavailable", {
+          action: "create_snap_token",
+          requestId,
+          status: midtransResponse.status,
+          responseType: typeof midtransData,
+        });
+        throw new HttpError(502, "Midtrans token creation failed");
       }
 
       const nowIso = new Date().toISOString();
@@ -459,10 +458,11 @@ Deno.serve(async (req: Request) => {
       );
 
       if (releaseLockResponse.error) {
-        console.error(
-          "[create-snap-token] Failed to release payment token lock:",
-          releaseLockResponse.error.message,
-        );
+        console.error("[create-snap-token] snap_token_lock_release_failed", {
+          action: "release_snap_token_generation_lock",
+          errorCategory: "rpc_failed",
+          requestId,
+        });
       }
     }
   } catch (error: unknown) {
@@ -470,8 +470,14 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: error.message }, error.status);
     }
 
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("[create-snap-token] Internal error:", message);
+    console.error("[create-snap-token] snap_token_internal_error", {
+      action: "create_snap_token",
+      errorCategory: "unexpected_failure",
+      requestId,
+    });
     return jsonResponse({ error: "Internal server error" }, 500);
   }
+  };
+
+  return respond(await handleRequest());
 });
