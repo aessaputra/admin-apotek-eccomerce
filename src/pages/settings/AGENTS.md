@@ -9,7 +9,8 @@
 | `index.tsx` | Settings shell, store branding/location, tab orchestration |
 | `payment-settings-panel.tsx` | Midtrans server key and production-mode runtime config UI |
 | `shipping-settings-panel.tsx` | Biteship key/origin/courier/shop shipper runtime config UI |
-| `integration-config-panel.tsx` | Technical config for push token, CORS, audit |
+| `integration-config-panel.tsx` | Technical config for push token and CORS |
+| `integration-audit-panel.tsx` | Centralized runtime config audit history across payment, shipping, and technical owners |
 | `integration-config-client.ts` | Browser client for `integration-config` Edge Function |
 | `integration-config-ownership.ts` | Primary owner and secret-key registry for every runtime config key |
 | `integration-config-primitives.tsx` | Shared masked-value/audit/secret replacement UI |
@@ -37,7 +38,7 @@
 
 - Keep payment, shipping, and technical tabs aligned with ownership groups.
 - Use AntD `message`, `Alert`, `Modal`, and `Card` patterns already in these panels.
-- After payment or shipping mutations, invalidate that owner summary query; technical mutations invalidate both technical summary and audit queries. If another owner gains an audit view, invalidate its audit query too.
+- Payment, shipping, and technical mutations invalidate only their owner summary query; the audit panel is manually loaded/refreshed by the admin.
 - Fallback courier data is read-only in the shipping panel; do not let admins save fallback as live Biteship config.
 - Store branding upload still uses `useSupabaseUpload`; runtime config secrets use `SecretReplacementInput`.
 
