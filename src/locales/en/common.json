@@ -959,7 +959,29 @@
         "error": "Audit trail could not be loaded.",
         "oldValue": "Old",
         "newValue": "New",
-        "open": "View technical audit"
+        "open": "View technical audit",
+        "actions": {
+          "runtimeRead": "Runtime read",
+          "secretRotated": "Secret rotated",
+          "valueUpdated": "Value updated"
+        },
+        "fallback": {
+          "technical": "Technical configuration"
+        },
+        "fields": {
+          "action": "Action",
+          "actorId": "Actor ID",
+          "actorRole": "Actor role",
+          "key": "Key",
+          "newValue": "New",
+          "oldValue": "Old",
+          "reason": "Reason",
+          "request": "Request",
+          "source": "Source",
+          "timestamp": "Timestamp",
+          "version": "Version",
+          "versionId": "Version ID"
+        }
       },
       "details": {
         "action": "Details"

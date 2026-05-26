@@ -959,7 +959,29 @@
         "error": "Jejak audit tidak dapat dimuat.",
         "oldValue": "Lama",
         "newValue": "Baru",
-        "open": "Lihat audit teknis"
+        "open": "Lihat audit teknis",
+        "actions": {
+          "runtimeRead": "Dibaca runtime",
+          "secretRotated": "Secret dirotasi",
+          "valueUpdated": "Nilai diperbarui"
+        },
+        "fallback": {
+          "technical": "Konfigurasi teknis"
+        },
+        "fields": {
+          "action": "Aksi",
+          "actorId": "ID aktor",
+          "actorRole": "Peran aktor",
+          "key": "Key",
+          "newValue": "Baru",
+          "oldValue": "Lama",
+          "reason": "Alasan",
+          "request": "Request",
+          "source": "Sumber",
+          "timestamp": "Waktu",
+          "version": "Versi",
+          "versionId": "ID versi"
+        }
       },
       "details": {
         "action": "Detail"
