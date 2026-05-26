@@ -5,7 +5,8 @@ import { Modal } from "antd";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Settings from "../settings";
 import shippingPanelSource from "../settings/shipping-settings-panel.tsx?raw";
-import { RUNTIME_CONFIG_KEYS, integrationConfigClient } from "../settings/integration-config-client";
+import { RUNTIME_CONFIG_KEYS, integrationConfigClient, type IntegrationConfigAuditRow } from "../settings/integration-config-client";
+import { IntegrationAuditPanel } from "../settings/integration-audit-panel";
 import { INTEGRATION_CONFIG_OWNERSHIP, getPrimaryOwnerForIntegrationConfigKey } from "../settings/integration-config-ownership";
 import {
   ConfigDetailsDisclosure,
@@ -406,7 +407,38 @@ vi.mock("antd", () => {
         onChange={(event) => onChange?.(event.currentTarget.value === "" ? null : Number(event.currentTarget.value))}
       />
     ),
-    Select: ({ options, placeholder }: { options?: Array<{ label: string; value: string | boolean }>; placeholder?: string }) => <div>{placeholder ?? options?.map((option) => String(option.label)).join(",")}</div>,
+    Select: ({
+      "aria-label": ariaLabel,
+      disabled,
+      onChange,
+      options = [],
+      placeholder,
+      value,
+    }: {
+      "aria-label"?: string;
+      disabled?: boolean;
+      onChange?: (value: string | number | boolean) => void;
+      options?: Array<{ label: React.ReactNode; value: string | number | boolean }>;
+      placeholder?: string;
+      value?: string | number | boolean;
+    }) => (
+      <select
+        aria-label={ariaLabel ?? placeholder ?? "select"}
+        disabled={disabled}
+        value={value === undefined || value === null ? "" : String(value)}
+        onChange={(event) => {
+          const selectedOption = options.find((option) => String(option.value) === event.currentTarget.value);
+          onChange?.(selectedOption?.value ?? event.currentTarget.value);
+        }}
+      >
+        {placeholder ? <option value="">{placeholder}</option> : null}
+        {options.map((option) => (
+          <option key={String(option.value)} value={String(option.value)}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    ),
     Switch: ({ checked, onChange, checkedChildren, unCheckedChildren, "aria-label": ariaLabel }: { checked?: boolean; onChange?: (checked: boolean) => void; checkedChildren?: React.ReactNode; unCheckedChildren?: React.ReactNode; "aria-label"?: string }) => (
       <button type="button" role="switch" aria-checked={checked ? "true" : "false"} aria-label={ariaLabel ?? "switch"} onClick={() => onChange?.(!checked)}>
         {checked ? checkedChildren : unCheckedChildren}
@@ -1083,12 +1115,14 @@ describe("form pages", () => {
     expect(screen.getByRole("tab", { name: "Pengaturan Pengiriman" })).not.toBeNull();
     expect(screen.getByRole("tab", { name: "Pengaturan Pembayaran" })).not.toBeNull();
     expect(screen.getByRole("tab", { name: "Teknis" })).not.toBeNull();
+    expect(screen.getByRole("tab", { name: "Audit Konfigurasi" })).not.toBeNull();
     expect(screen.queryByRole("tab", { name: "Konfigurasi Integrasi" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Integration Config" })).toBeNull();
 
     expect(await screen.findByRole("region", { name: "Pengaturan Pengiriman" })).not.toBeNull();
     expect(await screen.findByRole("region", { name: "Pengaturan Pembayaran" })).not.toBeNull();
     expect(await screen.findByRole("region", { name: "Teknis" })).not.toBeNull();
+    expect(await screen.findByRole("region", { name: "Audit Konfigurasi" })).not.toBeNull();
   });
 
   it("scopes the public settings save affordance to the Store Profile tab", async () => {
@@ -1805,6 +1839,314 @@ describe("form pages", () => {
     expect(getPrimaryOwnerForIntegrationConfigKey("cors.allowed_origins")).toBe("technical");
   });
 
+  function getAuditRequestBodies(): Array<{ action: "audit"; key?: string; limit?: number }> {
+    return mocks.functionsInvoke.mock.calls
+      .map((call) => call[1]?.body)
+      .filter((body): body is { action: "audit"; key?: string; limit?: number } => body?.action === "audit");
+  }
+
+  function createAuditRow(
+    overrides: Pick<IntegrationConfigAuditRow, "id" | "key_name" | "action" | "created_at"> &
+      Partial<IntegrationConfigAuditRow>
+  ): IntegrationConfigAuditRow {
+    return {
+      version_id: null,
+      actor_id: "admin-audit",
+      actor_role: "admin",
+      source: "admin_gateway",
+      request_id: `request-${overrides.id}`,
+      reason: "audit reason",
+      old_version_number: 1,
+      new_version_number: 2,
+      old_masked_value: "old-masked",
+      new_masked_value: "new-masked",
+      value_fingerprint: null,
+      metadata: null,
+      ...overrides,
+    };
+  }
+
+  function mockAuditRows(rows: IntegrationConfigAuditRow[]) {
+    mocks.functionsInvoke.mockImplementation((_name: string, { body }: { body: Record<string, unknown> }) => {
+      if (body.action === "audit") {
+        const requestedAuditKey = typeof body.key === "string" ? body.key : undefined;
+
+        return Promise.resolve({
+          data: {
+            data: requestedAuditKey ? rows.filter((row) => row.key_name === requestedAuditKey) : rows,
+          },
+          error: null,
+        });
+      }
+
+      return Promise.resolve({ data: { data: { ok: true } }, error: null });
+    });
+  }
+
+  it("Audit Konfigurasi manually loads all owner audit keys after clicking Muat audit", async () => {
+    render(<IntegrationAuditPanel />);
+
+    expect(screen.getByRole("region", { name: "Audit Konfigurasi" })).not.toBeNull();
+    expect(screen.getByLabelText("Area")).not.toBeNull();
+    expect(screen.getByLabelText("Konfigurasi")).not.toBeNull();
+    expect(screen.getByLabelText("Aksi")).not.toBeNull();
+    expect(screen.getByLabelText("Limit")).not.toBeNull();
+    expect(screen.getByText("Pilih filter, lalu muat audit konfigurasi.")).not.toBeNull();
+    expect(mocks.functionsInvoke.mock.calls.some((call) => call[1]?.body?.action === "audit")).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Muat audit" }));
+
+    const allOwnedKeys = Object.values(INTEGRATION_CONFIG_OWNERSHIP).flat();
+    await waitFor(() => expect(getAuditRequestBodies().length).toBe(allOwnedKeys.length));
+    expect(getAuditRequestBodies()).toEqual(expect.arrayContaining(
+      allOwnedKeys.map((key) => ({ action: "audit", key, limit: 50 }))
+    ));
+    await waitFor(() => expect(screen.getAllByText("Allowed Origins").length).toBeGreaterThan(0));
+    expect(screen.getAllByText("Expo Push Token").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Kunci Server Midtrans").length).toBeGreaterThan(0);
+    expect(document.body.textContent).toContain("Keycors.allowed_origins");
+    expect(document.body.textContent).toContain("Requestrequest-cors-origins");
+    expect(document.body.textContent).toContain("Nilai diperbarui");
+    expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
+    expect(document.body.textContent).not.toContain("metadata");
+
+    const bodyText = document.body.textContent ?? "";
+    expect(bodyText.indexOf("Requestrequest-cors-origins")).toBeLessThan(bodyText.indexOf("Requestrequest-push-token"));
+    expect(bodyText.indexOf("Requestrequest-push-token")).toBeLessThan(bodyText.indexOf("Requestrequest-runtime-read"));
+  });
+
+  it("Audit Konfigurasi loads owner-specific keys and explicit key filters only", async () => {
+    render(<IntegrationAuditPanel />);
+
+    fireEvent.change(screen.getByLabelText("Area"), { target: { value: "shipping" } });
+    fireEvent.click(screen.getByRole("button", { name: "Muat audit" }));
+
+    await waitFor(() => expect(getAuditRequestBodies().length).toBe(INTEGRATION_CONFIG_OWNERSHIP.shipping.length));
+    expect(getAuditRequestBodies()).toEqual(expect.arrayContaining(
+      INTEGRATION_CONFIG_OWNERSHIP.shipping.map((key) => ({ action: "audit", key, limit: 50 }))
+    ));
+    expect(getAuditRequestBodies().some((body) => body.key === "midtrans.server_key")).toBe(false);
+
+    mocks.functionsInvoke.mockClear();
+    fireEvent.change(screen.getByLabelText("Konfigurasi"), { target: { value: "biteship.api_key" } });
+    fireEvent.change(screen.getByLabelText("Limit"), { target: { value: "100" } });
+    fireEvent.click(screen.getByRole("button", { name: "Muat audit" }));
+
+    await waitFor(() => expect(getAuditRequestBodies()).toEqual([
+      { action: "audit", key: "biteship.api_key", limit: 100 },
+    ]));
+  });
+
+  it("Audit Konfigurasi loads only payment owner keys", async () => {
+    render(<IntegrationAuditPanel />);
+
+    fireEvent.change(screen.getByLabelText("Area"), { target: { value: "payment" } });
+    fireEvent.click(screen.getByRole("button", { name: "Muat audit" }));
+
+    await waitFor(() => expect(getAuditRequestBodies()).toEqual(
+      INTEGRATION_CONFIG_OWNERSHIP.payment.map((key) => ({ action: "audit", key, limit: 50 }))
+    ));
+    expect(getAuditRequestBodies().some((body) => INTEGRATION_CONFIG_OWNERSHIP.shipping.includes(body.key as never))).toBe(false);
+    expect(getAuditRequestBodies().some((body) => INTEGRATION_CONFIG_OWNERSHIP.technical.includes(body.key as never))).toBe(false);
+  });
+
+  it("Audit Konfigurasi loads only technical owner keys", async () => {
+    render(<IntegrationAuditPanel />);
+
+    fireEvent.change(screen.getByLabelText("Area"), { target: { value: "technical" } });
+    fireEvent.click(screen.getByRole("button", { name: "Muat audit" }));
+
+    await waitFor(() => expect(getAuditRequestBodies()).toEqual(
+      INTEGRATION_CONFIG_OWNERSHIP.technical.map((key) => ({ action: "audit", key, limit: 50 }))
+    ));
+    expect(getAuditRequestBodies().some((body) => INTEGRATION_CONFIG_OWNERSHIP.payment.includes(body.key as never))).toBe(false);
+    expect(getAuditRequestBodies().some((body) => INTEGRATION_CONFIG_OWNERSHIP.shipping.includes(body.key as never))).toBe(false);
+  });
+
+  it("Audit Konfigurasi loads only the explicit Midtrans server key", async () => {
+    render(<IntegrationAuditPanel />);
+
+    fireEvent.change(screen.getByLabelText("Konfigurasi"), { target: { value: "midtrans.server_key" } });
+    fireEvent.click(screen.getByRole("button", { name: "Muat audit" }));
+
+    await waitFor(() => expect(getAuditRequestBodies()).toEqual([
+      { action: "audit", key: "midtrans.server_key", limit: 50 },
+    ]));
+  });
+
+  it("Audit Konfigurasi filters actions after fetch and before the final limit", async () => {
+    mockAuditRows([
+      createAuditRow({ id: "runtime-read", key_name: "midtrans.server_key", action: "runtime_read", request_id: "request-runtime-read-filter", reason: "runtime read content", created_at: "2026-05-20T10:00:00Z" }),
+      createAuditRow({ id: "value-updated", key_name: "midtrans.server_key", action: "value_updated", request_id: "request-value-updated-filter", reason: "value updated content", created_at: "2026-05-20T11:00:00Z" }),
+      createAuditRow({ id: "secret-1", key_name: "midtrans.server_key", action: "secret_rotated", request_id: "request-secret-rotated-filter", reason: "secret rotated content", created_at: "2026-05-20T12:00:00Z" }),
+    ]);
+    render(<IntegrationAuditPanel />);
+
+    fireEvent.change(screen.getByLabelText("Konfigurasi"), { target: { value: "midtrans.server_key" } });
+    fireEvent.change(screen.getByLabelText("Aksi"), { target: { value: "secret_rotated" } });
+    fireEvent.click(screen.getByRole("button", { name: "Muat audit" }));
+
+    expect(await screen.findByText("request-secret-rotated-filter")).not.toBeNull();
+    expect(document.body.textContent).toContain("secret rotated content");
+    expect(document.body.textContent).not.toContain("runtime read content");
+    expect(document.body.textContent).not.toContain("value updated content");
+    expect(getAuditRequestBodies()).toEqual([{ action: "audit", key: "midtrans.server_key", limit: 50 }]);
+  });
+
+  it("Audit Konfigurasi sorts visible rows newest first", async () => {
+    mockAuditRows([
+      createAuditRow({ id: "oldest", key_name: "midtrans.server_key", action: "secret_rotated", request_id: "request-sort-oldest", created_at: "2026-05-20T08:00:00Z" }),
+      createAuditRow({ id: "newest", key_name: "midtrans.server_key", action: "secret_rotated", request_id: "request-sort-newest", created_at: "2026-05-20T12:00:00Z" }),
+      createAuditRow({ id: "middle", key_name: "midtrans.server_key", action: "secret_rotated", request_id: "request-sort-middle", created_at: "2026-05-20T10:00:00Z" }),
+    ]);
+    render(<IntegrationAuditPanel />);
+
+    fireEvent.change(screen.getByLabelText("Konfigurasi"), { target: { value: "midtrans.server_key" } });
+    fireEvent.click(screen.getByRole("button", { name: "Muat audit" }));
+
+    await screen.findByText("request-sort-newest");
+    const bodyText = document.body.textContent ?? "";
+    expect(bodyText.indexOf("request-sort-newest")).toBeLessThan(bodyText.indexOf("request-sort-middle"));
+    expect(bodyText.indexOf("request-sort-middle")).toBeLessThan(bodyText.indexOf("request-sort-oldest"));
+  });
+
+  it("Audit Konfigurasi displays no more rows than the selected limit", async () => {
+    mockAuditRows(Array.from({ length: 55 }, (_, index) => createAuditRow({
+      id: `limit-${index + 1}`,
+      key_name: "midtrans.server_key",
+      action: "secret_rotated",
+      request_id: `request-limit-${String(index + 1).padStart(2, "0")}`,
+      created_at: new Date(Date.UTC(2026, 4, 20, 12, 0, 0) - index * 60_000).toISOString(),
+    })));
+    render(<IntegrationAuditPanel />);
+
+    fireEvent.change(screen.getByLabelText("Konfigurasi"), { target: { value: "midtrans.server_key" } });
+    fireEvent.click(screen.getByRole("button", { name: "Muat audit" }));
+
+    await waitFor(() => expect(screen.getAllByText(/^request-limit-/)).toHaveLength(50));
+    expect(document.body.textContent).toContain("request-limit-50");
+    expect(document.body.textContent).not.toContain("request-limit-51");
+  });
+
+  it("Audit Konfigurasi renders missing values as dashes and uses only masked old and new values", async () => {
+    mockAuditRows([
+      createAuditRow({
+        id: "missing-values",
+        key_name: "midtrans.server_key",
+        action: "secret_rotated",
+        actor_id: null,
+        actor_role: "",
+        source: null,
+        request_id: "",
+        reason: null,
+        old_masked_value: null,
+        new_masked_value: "",
+        value_fingerprint: "fingerprint-must-not-render",
+        metadata: { old_masked_value: "metadata-old-must-not-render", new_masked_value: "metadata-new-must-not-render" },
+        created_at: "2026-05-20T12:00:00Z",
+      }),
+    ]);
+    render(<IntegrationAuditPanel />);
+
+    fireEvent.change(screen.getByLabelText("Konfigurasi"), { target: { value: "midtrans.server_key" } });
+    fireEvent.click(screen.getByRole("button", { name: "Muat audit" }));
+
+    await screen.findByText("Kunci Server Midtrans");
+    expect(screen.getAllByText("-").length).toBeGreaterThanOrEqual(6);
+    expect(document.body.textContent).not.toContain("fingerprint-must-not-render");
+    expect(document.body.textContent).not.toContain("metadata-old-must-not-render");
+    expect(document.body.textContent).not.toContain("metadata-new-must-not-render");
+  });
+
+  it("Audit Konfigurasi renders unknown action labels as safe text", async () => {
+    const unsafeAction = "<img src=x onerror=alert(1)>";
+    mockAuditRows([
+      createAuditRow({
+        id: "unknown-action",
+        key_name: "midtrans.server_key",
+        action: unsafeAction,
+        request_id: "request-unknown-action",
+        created_at: "2026-05-20T12:00:00Z",
+      }),
+    ]);
+    render(<IntegrationAuditPanel />);
+
+    fireEvent.change(screen.getByLabelText("Konfigurasi"), { target: { value: "midtrans.server_key" } });
+    fireEvent.click(screen.getByRole("button", { name: "Muat audit" }));
+
+    expect(await screen.findByText(unsafeAction)).not.toBeNull();
+    expect(document.body.querySelector("img")).toBeNull();
+  });
+
+  it("Audit Konfigurasi clears an incompatible payment key when owner switches to shipping", async () => {
+    render(<IntegrationAuditPanel />);
+
+    fireEvent.change(screen.getByLabelText("Area"), { target: { value: "payment" } });
+    fireEvent.change(screen.getByLabelText("Konfigurasi"), { target: { value: "midtrans.server_key" } });
+    expect((screen.getByLabelText("Konfigurasi") as HTMLSelectElement).value).toBe("midtrans.server_key");
+
+    fireEvent.change(screen.getByLabelText("Area"), { target: { value: "shipping" } });
+    expect((screen.getByLabelText("Konfigurasi") as HTMLSelectElement).value).toBe("all");
+
+    fireEvent.click(screen.getByRole("button", { name: "Muat audit" }));
+
+    await waitFor(() => expect(getAuditRequestBodies().length).toBe(INTEGRATION_CONFIG_OWNERSHIP.shipping.length));
+    expect(getAuditRequestBodies()).toEqual(expect.arrayContaining(
+      INTEGRATION_CONFIG_OWNERSHIP.shipping.map((key) => ({ action: "audit", key, limit: 50 }))
+    ));
+    expect(getAuditRequestBodies().some((body) => body.key === "midtrans.server_key")).toBe(false);
+  });
+
+  it("Audit Konfigurasi discards partial rows and shows a generic error when any key fails", async () => {
+    mocks.functionsInvoke.mockImplementation((_name: string, { body }: { body: Record<string, unknown> }) => {
+      if (body.action === "audit" && body.key === "biteship.api_key") {
+        return Promise.reject(new Error("raw gateway failure PLAINTEXT_SENTINEL_DO_NOT_RENDER vault-secret-id-do-not-render"));
+      }
+
+      if (body.action === "audit") {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                id: "partial-row",
+                key_name: body.key,
+                version_id: "partial-version",
+                action: "value_updated",
+                actor_id: "partial-admin",
+                actor_role: "admin",
+                source: "admin_gateway",
+                request_id: "request-partial-success",
+                reason: "partial success should not render",
+                old_version_number: 1,
+                new_version_number: 2,
+                old_masked_value: "old-partial",
+                new_masked_value: "new-partial",
+                value_fingerprint: null,
+                metadata: { note: "PLAINTEXT_SENTINEL_DO_NOT_RENDER" },
+                created_at: "2026-05-19T14:00:00Z",
+              },
+            ],
+          },
+          error: null,
+        });
+      }
+
+      return Promise.resolve({ data: { data: { ok: true } }, error: null });
+    });
+
+    render(<IntegrationAuditPanel />);
+    fireEvent.change(screen.getByLabelText("Area"), { target: { value: "shipping" } });
+    fireEvent.click(screen.getByRole("button", { name: "Muat audit" }));
+
+    expect(await screen.findByRole("alert")).not.toBeNull();
+    expect(document.body.textContent).toContain("Jejak audit konfigurasi tidak dapat dimuat.");
+    expect(document.body.textContent).not.toContain("raw gateway failure");
+    expect(document.body.textContent).not.toContain("vault-secret-id-do-not-render");
+    expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
+    expect(document.body.textContent).not.toContain("request-partial-success");
+    expect(document.body.textContent).not.toContain("partial success should not render");
+  });
+
   it("provides primitive rows that hide raw metadata until details are requested", () => {
     const row = {
       key_name: "midtrans.server_key" as const,
@@ -1953,9 +2295,14 @@ describe("form pages", () => {
     renderWithQueryClient(<Settings />);
 
     const advancedPanel = await screen.findByRole("region", { name: "Teknis" });
+    expect(advancedPanel.textContent).toContain("Kelola token push dan CORS. Audit konfigurasi tersedia di tab Audit Konfigurasi.");
+    expect(advancedPanel.textContent).not.toMatch(/audit\s+teknis/i);
     expect(await within(advancedPanel).findByLabelText("Expo Push Token")).not.toBeNull();
     expect(within(advancedPanel).getByLabelText("Allowed Origins")).not.toBeNull();
-    expect(within(advancedPanel).getByRole("button", { name: "Lihat audit teknis" })).not.toBeNull();
+    expect(within(advancedPanel).getAllByRole("button", { name: "Simpan" }).length).toBeGreaterThanOrEqual(2);
+    expect(within(advancedPanel).queryByRole("button", { name: /audit\s+teknis/i })).toBeNull();
+    expect(within(advancedPanel).queryByRole("button", { name: "Detail" })).toBeNull();
+    expect(within(advancedPanel).queryByRole("button", { name: "Details" })).toBeNull();
 
     expect(advancedPanel.textContent).not.toContain("Midtrans Server Key");
     expect(advancedPanel.textContent).not.toContain("Mode Midtrans");
@@ -1980,65 +2327,6 @@ describe("form pages", () => {
         keys: ["push.expo_access_token", "cors.allowed_origins"],
       },
     }));
-  });
-
-  it("technical audit loads on demand and shows sanitized technical metadata only", async () => {
-    mocks.useForm.mockReturnValue({
-      formProps: {},
-      saveButtonProps: {},
-      form: {
-        setFieldValue: mocks.setFieldValue,
-        getFieldValue: mocks.getFieldValue,
-      },
-    });
-
-    renderWithQueryClient(<Settings />);
-
-    const advancedPanel = await screen.findByRole("region", { name: "Teknis" });
-    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
-      body: {
-        action: "summary",
-        keys: ["push.expo_access_token", "cors.allowed_origins"],
-      },
-    }));
-    expect(mocks.functionsInvoke.mock.calls.some((call) => call[1]?.body?.action === "audit")).toBe(false);
-    expect(document.body.textContent).not.toContain("request-1");
-    expect(document.body.textContent).not.toContain("request-runtime-read");
-    expect(document.body.textContent).not.toContain("version-secret");
-    expect(document.body.textContent).not.toContain("admin_gateway");
-    expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
-
-    fireEvent.click(within(advancedPanel).getByRole("button", { name: "Lihat audit teknis" }));
-
-    await waitFor(() => expect(mocks.functionsInvoke.mock.calls.some((call) => call[1]?.body?.action === "audit")).toBe(true));
-    const auditRequestBodies = mocks.functionsInvoke.mock.calls
-      .map((call) => call[1]?.body)
-      .filter((body): body is Record<string, unknown> => body?.action === "audit");
-    expect(auditRequestBodies).toEqual(expect.arrayContaining([
-      { action: "audit", key: "push.expo_access_token", limit: 50 },
-      { action: "audit", key: "cors.allowed_origins", limit: 50 },
-    ]));
-    expect(auditRequestBodies.every((body) => typeof body.key === "string")).toBe(true);
-    expect(screen.getByRole("dialog")).not.toBeNull();
-    await waitFor(() => expect(document.body.textContent).toContain("Secret dirotasi"));
-    expect(document.body.textContent).toContain("Expo Push Token");
-    expect(document.body.textContent).toContain("Allowed Origins");
-    expect(document.body.textContent).toContain("Nilai diperbarui");
-    expect(document.body.textContent).toContain("Keypush.expo_access_token");
-    expect(document.body.textContent).toContain("Keycors.allowed_origins");
-    expect(document.body.textContent).toContain("Requestrequest-push-token");
-    expect(document.body.textContent).toContain("Requestrequest-cors-origins");
-    expect(document.body.textContent).toContain("Alasantechnical rotation");
-    expect(document.body.textContent).toContain("Alasantechnical CORS update");
-    expect(document.body.textContent).toContain("LamaExpo****1111");
-    expect(document.body.textContent).toContain("BaruExpo****2222");
-    expect(document.body.textContent).not.toContain("Payment configuration");
-    expect(document.body.textContent).not.toContain("midtrans.server_key");
-    expect(document.body.textContent).not.toContain("request-1");
-    expect(document.body.textContent).not.toContain("request-runtime-read");
-    expect(document.body.textContent).not.toContain("version-secret");
-    expect(document.body.textContent).not.toContain("admin-1");
-    expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
   });
 
   it("advanced technical settings rotates the Expo push token with a hidden reason", async () => {

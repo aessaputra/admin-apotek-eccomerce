@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useSupabaseUpload } from "../../hooks/useSupabaseUpload";
 import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 import { STORE_BRANDING_QUERY_KEY } from "../../hooks/useStoreBranding";
+import { IntegrationAuditPanel } from "./integration-audit-panel";
 import { IntegrationConfigPanel } from "./integration-config-panel";
 import { PaymentSettingsPanel } from "./payment-settings-panel";
 import { ShippingSettingsPanel } from "./shipping-settings-panel";
@@ -152,6 +153,11 @@ export const Settings: React.FC = () => {
       key: "integrationConfig",
       label: translate("settings.tabs.integrationConfig", {}, "Teknis"),
       children: <IntegrationConfigPanel />,
+    },
+    {
+      key: "integrationAudit",
+      label: translate("settings.tabs.integrationAudit", {}, "Audit Konfigurasi"),
+      children: <IntegrationAuditPanel />,
     },
   ];
 
