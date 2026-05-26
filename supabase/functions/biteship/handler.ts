@@ -504,7 +504,7 @@ export function createBiteshipHandler(
       const adminClient = getAdminClientOnce();
       const { data: order, error: orderError } = await adminClient
         .from("order_read_model")
-        .select("id, user_id, waybill_number, courier_code, status")
+        .select("id, user_id, biteship_tracking_id, waybill_number, courier_code, status")
         .eq("id", orderId)
         .eq("user_id", userId)
         .single();
@@ -516,35 +516,54 @@ export function createBiteshipHandler(
         });
       }
 
-      if (!order.waybill_number?.trim()) {
-        return new Response(
-          JSON.stringify({
-            error: "Waybill number is not available for this order yet",
-          }),
-          {
-            status: 409,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
-      }
+      const trackingId =
+        typeof order.biteship_tracking_id === "string"
+          ? order.biteship_tracking_id.trim()
+          : "";
 
-      if (!order.courier_code?.trim()) {
-        return new Response(
-          JSON.stringify({
-            error: "Courier code is not available for this order",
-          }),
-          {
-            status: 409,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
-      }
+      if (trackingId) {
+        publicTrackingPayload = {
+          order_id: order.id,
+          tracking_id: trackingId,
+        };
+      } else {
+        const waybillId =
+          typeof order.waybill_number === "string"
+            ? order.waybill_number.trim()
+            : "";
+        const courierCode =
+          typeof order.courier_code === "string" ? order.courier_code.trim() : "";
 
-      publicTrackingPayload = {
-        order_id: order.id,
-        waybill_id: order.waybill_number,
-        courier_code: order.courier_code,
-      };
+        if (!waybillId) {
+          return new Response(
+            JSON.stringify({
+              error: "Waybill number is not available for this order yet",
+            }),
+            {
+              status: 409,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
+
+        if (!courierCode) {
+          return new Response(
+            JSON.stringify({
+              error: "Courier code is not available for this order",
+            }),
+            {
+              status: 409,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
+
+        publicTrackingPayload = {
+          order_id: order.id,
+          waybill_id: waybillId,
+          courier_code: courierCode,
+        };
+      }
     }
 
     if (isDraftOrderAction) {
@@ -853,14 +872,20 @@ export function createBiteshipHandler(
         method = "GET";
         break;
       case "track_public": {
-        endpoint = buildPublicTrackingEndpoint(
-          typeof requestPayload?.waybill_id === "string"
-            ? requestPayload.waybill_id
-            : "",
-          typeof requestPayload?.courier_code === "string"
-            ? requestPayload.courier_code
-            : "",
-        );
+        const trackingId =
+          typeof requestPayload?.tracking_id === "string"
+            ? requestPayload.tracking_id.trim()
+            : "";
+        endpoint = trackingId
+          ? buildTrackingEndpoint(trackingId)
+          : buildPublicTrackingEndpoint(
+              typeof requestPayload?.waybill_id === "string"
+                ? requestPayload.waybill_id
+                : "",
+              typeof requestPayload?.courier_code === "string"
+                ? requestPayload.courier_code
+                : "",
+            );
         method = "GET";
         break;
       }
@@ -1000,6 +1025,22 @@ export function createBiteshipHandler(
             },
           );
         }
+      }
+    }
+
+    if (action === "track_public" && isRecord(data)) {
+      const providerWaybillId = getNestedString(data, ["waybill_id"])?.trim();
+      const fallbackWaybillId =
+        getNestedString(data, ["waybill"])?.trim() ||
+        (typeof requestPayload?.waybill_id === "string"
+          ? requestPayload.waybill_id.trim()
+          : "");
+
+      if (!providerWaybillId && fallbackWaybillId) {
+        responseData = {
+          ...data,
+          waybill_id: fallbackWaybillId,
+        };
       }
     }
 

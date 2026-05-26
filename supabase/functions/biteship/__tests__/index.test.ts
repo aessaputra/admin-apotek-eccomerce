@@ -21,6 +21,7 @@ type ProfileRow = { role: string | null };
 type OrderReadModelRow = {
   id: string;
   user_id: string | null;
+  biteship_tracking_id?: string | null;
   waybill_number?: string | null;
   courier_code?: string | null;
 };
@@ -487,6 +488,51 @@ describe("Biteship proxy runtime configuration", () => {
     } finally {
       consoleLogSpy.mockRestore();
     }
+  });
+
+  it("uses stored Biteship tracking ID for Biteship-created shipments", async () => {
+    const trackingId = "biteship-tracking-stored-123";
+    const waybillNumber = "WYB-BITESHIP-CREATED-123";
+    const adminClient = createAdminClient(createBiteshipRuntimeRows(), {
+      orders: [{
+        id: "order-biteship-created",
+        user_id: "user-1",
+        biteship_tracking_id: trackingId,
+        waybill_number: waybillNumber,
+        courier_code: "jne",
+      }],
+    });
+    const providerBody = {
+      id: trackingId,
+      waybill_id: waybillNumber,
+      status: "delivered",
+      courier: { company: "jne" },
+      history: [{
+        status: "delivered",
+        note: "Package delivered",
+        updated_at: "2026-05-25T10:00:00.000Z",
+      }],
+    };
+    const fetchFn = vi.fn(async () => {
+      return new Response(JSON.stringify(providerBody), { status: 200 });
+    });
+    const handler: BiteshipHandler = createBiteshipHandler({
+      fetchFn,
+      getAdminClient: () => adminClient,
+      verifyUserId: async () => "user-1",
+    });
+
+    const response = await handler(createRequest("track_public", {
+      order_id: "order-biteship-created",
+    }));
+
+    await expect(readJson(response)).resolves.toMatchObject(providerBody);
+    expect(response.status).toBe(200);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(fetchFn).toHaveBeenCalledWith(
+      `https://api.biteship.com/v1/trackings/${trackingId}`,
+      expect.objectContaining({ method: "GET" }),
+    );
   });
 
   it("denies draft orders without admin role or order id before runtime config or provider fetch", async () => {
