@@ -535,6 +535,60 @@ describe("Biteship proxy runtime configuration", () => {
     );
   });
 
+  it("returns a safe not-ready response when Biteship public tracking is unavailable", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const trackingId = "tracking-not-ready-123";
+    const waybillNumber = "WYB-NOT-READY-123";
+    const adminClient = createAdminClient(createBiteshipRuntimeRows(), {
+      orders: [{
+        id: "order-tracking-not-ready",
+        user_id: "user-1",
+        biteship_tracking_id: trackingId,
+        waybill_number: waybillNumber,
+        courier_code: "jne",
+      }],
+    });
+    const fetchFn = vi.fn(async () => {
+      return new Response(JSON.stringify({
+        code: 40003002,
+        message: "Courier tracking not available",
+      }), { status: 400 });
+    });
+    const handler: BiteshipHandler = createBiteshipHandler({
+      fetchFn,
+      getAdminClient: () => adminClient,
+      verifyUserId: async () => "user-1",
+    });
+
+    try {
+      const response = await handler(createRequest("track_public", {
+        order_id: "order-tracking-not-ready",
+      }));
+      const body = await readJson(response);
+      const responseText = JSON.stringify(body);
+      const loggedText = JSON.stringify(consoleErrorSpy.mock.calls);
+
+      expect(response.status).toBe(200);
+      expect(body).toMatchObject({
+        tracking_unavailable: true,
+        message: "Courier tracking is not available yet.",
+        waybill_id: waybillNumber,
+      });
+      expect(responseText).not.toContain("BITESHIP_PROVIDER_UNAVAILABLE");
+      expect(responseText).not.toContain("runtime-biteship-secret-sentinel");
+      expect(responseText).not.toContain("Courier tracking not available");
+      expect(loggedText).not.toContain("runtime-biteship-secret-sentinel");
+      expect(loggedText).not.toContain("Courier tracking not available");
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(fetchFn).toHaveBeenCalledWith(
+        `https://api.biteship.com/v1/trackings/${trackingId}`,
+        expect.objectContaining({ method: "GET" }),
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
   it("denies draft orders without admin role or order id before runtime config or provider fetch", async () => {
     const adminClient = createAdminClient(createBiteshipRuntimeRows(), {
       profileRole: "customer",

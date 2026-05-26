@@ -111,6 +111,61 @@ function getNestedString(data: unknown, path: string[]): string | undefined {
   return typeof current === "string" ? current : undefined;
 }
 
+function getProviderCode(data: unknown): string {
+  if (!isRecord(data)) {
+    return "";
+  }
+
+  const code = data.code;
+  if (typeof code === "number" && Number.isFinite(code)) {
+    return String(code);
+  }
+
+  return typeof code === "string" ? code.trim() : "";
+}
+
+function isCourierTrackingUnavailable(data: unknown): boolean {
+  return getProviderCode(data) === "40003002";
+}
+
+function createPublicTrackingUnavailableResponse(
+  requestPayload: Record<string, unknown> | undefined,
+): Response {
+  const trackingId =
+    typeof requestPayload?.tracking_id === "string"
+      ? requestPayload.tracking_id.trim()
+      : "";
+  const waybillId =
+    typeof requestPayload?.waybill_id === "string"
+      ? requestPayload.waybill_id.trim()
+      : "";
+  const courierCode =
+    typeof requestPayload?.courier_code === "string"
+      ? requestPayload.courier_code.trim()
+      : "";
+  const orderId =
+    typeof requestPayload?.order_id === "string"
+      ? requestPayload.order_id.trim()
+      : undefined;
+
+  return new Response(
+    JSON.stringify({
+      id: trackingId || waybillId,
+      waybill_id: waybillId,
+      status: "confirmed",
+      message: "Courier tracking is not available yet.",
+      tracking_unavailable: true,
+      order_id: orderId,
+      courier: { company: courierCode || "unknown" },
+      history: [],
+    }),
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
+  );
+}
+
 async function resolveBiteshipAuthKey(
   adminClient: BiteshipAdminClient,
 ): Promise<string> {
@@ -522,9 +577,18 @@ export function createBiteshipHandler(
           : "";
 
       if (trackingId) {
+        const waybillId =
+          typeof order.waybill_number === "string"
+            ? order.waybill_number.trim()
+            : "";
+        const courierCode =
+          typeof order.courier_code === "string" ? order.courier_code.trim() : "";
+
         publicTrackingPayload = {
           order_id: order.id,
           tracking_id: trackingId,
+          waybill_id: waybillId,
+          courier_code: courierCode,
         };
       } else {
         const waybillId =
@@ -977,6 +1041,20 @@ export function createBiteshipHandler(
     const data: unknown = await biteshipResponse.json();
 
     if (!biteshipResponse.ok) {
+      if (
+        action === "track_public" &&
+        biteshipResponse.status === 400 &&
+        isCourierTrackingUnavailable(data)
+      ) {
+        console.warn("[biteship] public_tracking_unavailable", {
+          action,
+          errorCategory: "tracking_not_ready",
+          requestId,
+          status: biteshipResponse.status,
+        });
+        return createPublicTrackingUnavailableResponse(requestPayload);
+      }
+
       console.error("[biteship] biteship_provider_unavailable", {
         action,
         requestId,
