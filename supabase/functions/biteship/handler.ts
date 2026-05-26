@@ -125,7 +125,7 @@ function getProviderCode(data: unknown): string {
 }
 
 function isCourierTrackingUnavailable(data: unknown): boolean {
-  return getProviderCode(data) === "40003002";
+  return ["40003001", "40003002"].includes(getProviderCode(data));
 }
 
 function createPublicTrackingUnavailableResponse(
