@@ -823,6 +823,7 @@
       "storeProfile": "Store Profile",
       "shippingSettings": "Shipping Settings",
       "integrationConfig": "Technical",
+      "integrationAudit": "Configuration Audit",
       "paymentSettings": "Payment Settings"
     },
     "fields": {
@@ -959,7 +960,7 @@
         "error": "Audit trail could not be loaded.",
         "oldValue": "Old",
         "newValue": "New",
-        "open": "View technical audit",
+        "open": "View configuration audit",
         "actions": {
           "runtimeRead": "Runtime read",
           "secretRotated": "Secret rotated",
@@ -983,11 +984,35 @@
           "versionId": "Version ID"
         }
       },
+      "auditPanel": {
+        "description": "Review runtime configuration changes for payment, shipping, and technical settings.",
+        "ownerLabel": "Area",
+        "keyLabel": "Configuration",
+        "actionLabel": "Action",
+        "limitLabel": "Limit",
+        "load": "Load audit",
+        "initial": "Choose filters, then load the configuration audit.",
+        "loading": "Loading configuration audit...",
+        "empty": "No audit entries for this filter yet.",
+        "error": "Configuration audit trail could not be loaded.",
+        "owners": {
+          "all": "All",
+          "payment": "Payment",
+          "shipping": "Shipping",
+          "technical": "Technical"
+        },
+        "actions": {
+          "all": "All"
+        },
+        "keys": {
+          "all": "All"
+        }
+      },
       "details": {
         "action": "Details"
       },
       "technical": {
-        "description": "Manage push token, CORS, and technical audit. Payment and shipping live in their own tabs.",
+        "description": "Manage push token and CORS. Configuration audit is available in the Configuration Audit tab.",
         "saveSuccess": "Technical settings saved.",
         "saveError": "Technical settings could not be saved.",
         "pushToken": {
