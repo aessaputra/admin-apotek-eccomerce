@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "@refinedev/core";
-import { Alert, Button, Card, Input, Modal, Space, Typography, message, theme } from "antd";
+import { Alert, Button, Card, Descriptions, Input, Modal, Space, Typography, message, theme } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import {
   integrationConfigClient,
@@ -56,36 +56,108 @@ function formatDate(value: string | null | undefined): string {
   return value ? new Date(value).toLocaleString("id-ID") : "-";
 }
 
-function getAuditDisplayName(row: IntegrationConfigAuditRow, rowsByKey: Map<RuntimeConfigKey, IntegrationConfigSummaryRow>): string {
+function getAuditDisplayName(
+  row: IntegrationConfigAuditRow,
+  rowsByKey: Map<RuntimeConfigKey, IntegrationConfigSummaryRow>,
+  translate: ReturnType<typeof useTranslation>["translate"]
+): string {
   const knownRow = rowsByKey.get(row.key_name as RuntimeConfigKey);
   if (knownRow?.display_name?.trim()) return knownRow.display_name.trim();
-  if (row.key_name.startsWith("midtrans.")) return "Payment configuration";
-  if (row.key_name.startsWith("biteship.") || row.key_name.startsWith("shop.")) return "Shipping configuration";
-  return "Technical configuration";
+  return translate("settings.integration.audit.fallback.technical", {}, "Technical configuration");
 }
+
+function formatActionLabel(action: string, translate: ReturnType<typeof useTranslation>["translate"]): string {
+  if (action === "runtime_read") {
+    return translate("settings.integration.audit.actions.runtimeRead", {}, "Runtime read");
+  }
+
+  if (action === "secret_rotated") {
+    return translate("settings.integration.audit.actions.secretRotated", {}, "Secret rotated");
+  }
+
+  if (action === "value_updated") {
+    return translate("settings.integration.audit.actions.valueUpdated", {}, "Value updated");
+  }
+
+  return action;
+}
+
+async function loadTechnicalAuditRows(): Promise<IntegrationConfigAuditRow[]> {
+  const auditRowsByKey = await Promise.all(
+    TECHNICAL_CONFIG_KEYS.map((key) => integrationConfigClient.audit(key, 50))
+  );
+
+  return auditRowsByKey
+    .flat()
+    .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at))
+    .slice(0, 50);
+}
+
+const wrapValueStyle: React.CSSProperties = {
+  overflowWrap: "anywhere",
+  wordBreak: "break-word",
+};
+
+const AuditValue: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <Typography.Text style={wrapValueStyle}>{children}</Typography.Text>
+);
 
 const TechnicalAuditRow: React.FC<{
   row: IntegrationConfigAuditRow;
   rowsByKey: Map<RuntimeConfigKey, IntegrationConfigSummaryRow>;
-}> = ({ row, rowsByKey }) => (
-  <Card size="small">
-    <Space direction="vertical" size="small" style={{ width: "100%" }}>
-      <Typography.Text strong>{getAuditDisplayName(row, rowsByKey)}</Typography.Text>
-      <Typography.Text>{row.action}</Typography.Text>
-      <Typography.Text type="secondary">Key: {row.key_name}</Typography.Text>
-      {row.version_id ? <Typography.Text type="secondary">Version ID: {row.version_id}</Typography.Text> : null}
-      {row.new_version_number ? <Typography.Text type="secondary">Version: {row.new_version_number}</Typography.Text> : null}
-      <Typography.Text type="secondary">Request: {row.request_id || "-"}</Typography.Text>
-      <Typography.Text type="secondary">Actor role: {row.actor_role || "-"}</Typography.Text>
-      <Typography.Text type="secondary">Actor ID: {row.actor_id || "-"}</Typography.Text>
-      <Typography.Text type="secondary">Source: {row.source || "-"}</Typography.Text>
-      <Typography.Text type="secondary">Reason: {row.reason || "-"}</Typography.Text>
-      <Typography.Text type="secondary">{formatDate(row.created_at)}</Typography.Text>
-      <Typography.Text type="secondary">Old: {row.old_masked_value || "-"}</Typography.Text>
-      <Typography.Text type="secondary">New: {row.new_masked_value || "-"}</Typography.Text>
-    </Space>
-  </Card>
-);
+}> = ({ row, rowsByKey }) => {
+  const { translate } = useTranslation();
+
+  return (
+    <Card size="small">
+      <Space direction="vertical" size="small" style={{ width: "100%" }}>
+        <Space direction="vertical" size={0}>
+          <Typography.Text strong>{getAuditDisplayName(row, rowsByKey, translate)}</Typography.Text>
+          <Typography.Text type="secondary">{formatActionLabel(row.action, translate)}</Typography.Text>
+        </Space>
+        <Descriptions column={1} size="small" bordered>
+          <Descriptions.Item label={translate("settings.integration.audit.fields.key", {}, "Key")}>
+            <AuditValue>{row.key_name}</AuditValue>
+          </Descriptions.Item>
+          {row.version_id ? (
+            <Descriptions.Item label={translate("settings.integration.audit.fields.versionId", {}, "Version ID")}>
+              <AuditValue>{row.version_id}</AuditValue>
+            </Descriptions.Item>
+          ) : null}
+          {row.new_version_number ? (
+            <Descriptions.Item label={translate("settings.integration.audit.fields.version", {}, "Version")}>
+              <AuditValue>{row.new_version_number}</AuditValue>
+            </Descriptions.Item>
+          ) : null}
+          <Descriptions.Item label={translate("settings.integration.audit.fields.request", {}, "Request")}>
+            <AuditValue>{row.request_id || "-"}</AuditValue>
+          </Descriptions.Item>
+          <Descriptions.Item label={translate("settings.integration.audit.fields.actorRole", {}, "Actor role")}>
+            <AuditValue>{row.actor_role || "-"}</AuditValue>
+          </Descriptions.Item>
+          <Descriptions.Item label={translate("settings.integration.audit.fields.actorId", {}, "Actor ID")}>
+            <AuditValue>{row.actor_id || "-"}</AuditValue>
+          </Descriptions.Item>
+          <Descriptions.Item label={translate("settings.integration.audit.fields.source", {}, "Source")}>
+            <AuditValue>{row.source || "-"}</AuditValue>
+          </Descriptions.Item>
+          <Descriptions.Item label={translate("settings.integration.audit.fields.reason", {}, "Reason")}>
+            <AuditValue>{row.reason || "-"}</AuditValue>
+          </Descriptions.Item>
+          <Descriptions.Item label={translate("settings.integration.audit.fields.timestamp", {}, "Timestamp")}>
+            <AuditValue>{formatDate(row.created_at)}</AuditValue>
+          </Descriptions.Item>
+          <Descriptions.Item label={translate("settings.integration.audit.fields.oldValue", {}, "Old")}>
+            <AuditValue>{row.old_masked_value || "-"}</AuditValue>
+          </Descriptions.Item>
+          <Descriptions.Item label={translate("settings.integration.audit.fields.newValue", {}, "New")}>
+            <AuditValue>{row.new_masked_value || "-"}</AuditValue>
+          </Descriptions.Item>
+        </Descriptions>
+      </Space>
+    </Card>
+  );
+};
 
 export const IntegrationConfigPanel: React.FC = () => {
   const { translate } = useTranslation();
@@ -103,7 +175,8 @@ export const IntegrationConfigPanel: React.FC = () => {
 
   const auditQuery = useQuery({
     queryKey: TECHNICAL_AUDIT_QUERY_KEY,
-    queryFn: () => integrationConfigClient.audit(undefined, 50),
+    queryFn: loadTechnicalAuditRows,
+    enabled: auditOpen,
   });
 
   const rowsByKey = useMemo(
@@ -118,6 +191,7 @@ export const IntegrationConfigPanel: React.FC = () => {
     () => (auditQuery.data ?? []).filter((row) => TECHNICAL_CONFIG_KEY_SET.has(row.key_name as RuntimeConfigKey)),
     [auditQuery.data]
   );
+  const isAuditLoading = auditQuery.isPending || auditQuery.isFetching;
 
   useEffect(() => {
     if (allowedOriginsRow) {
@@ -269,12 +343,12 @@ export const IntegrationConfigPanel: React.FC = () => {
         footer={null}
       >
         <Space direction="vertical" size={token.marginSM} style={{ width: "100%" }}>
-          {auditQuery.isLoading ? <Typography.Text>{translate("settings.integration.audit.loading", {}, "Loading audit trail...")}</Typography.Text> : null}
+          {isAuditLoading ? <Typography.Text>{translate("settings.integration.audit.loading", {}, "Loading audit trail...")}</Typography.Text> : null}
           {auditQuery.isError ? <Alert type="error" showIcon message={translate("settings.integration.audit.error", {}, "Audit trail could not be loaded.")} /> : null}
-          {!auditQuery.isLoading && (auditQuery.data?.length ?? 0) === 0 ? (
+          {!isAuditLoading && auditQuery.isFetched && technicalAuditRows.length === 0 ? (
             <Typography.Text type="secondary">{translate("settings.integration.audit.empty", {}, "No audit events yet.")}</Typography.Text>
           ) : null}
-          {(auditQuery.data ?? []).map((row) => (
+          {technicalAuditRows.map((row) => (
             <TechnicalAuditRow key={row.id} row={row} rowsByKey={rowsByKey} />
           ))}
         </Space>

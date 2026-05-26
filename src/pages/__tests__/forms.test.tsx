@@ -26,12 +26,40 @@ const mocks = vi.hoisted(() => {
   const translations: Record<Locale, Record<string, string>> = {
     en: {
       "settings.integration.status.active": "Active",
+      "settings.integration.audit.actions.runtimeRead": "Runtime read",
+      "settings.integration.audit.actions.secretRotated": "Secret rotated",
+      "settings.integration.audit.actions.valueUpdated": "Value updated",
+      "settings.integration.audit.fields.key": "Key",
+      "settings.integration.audit.fields.versionId": "Version ID",
+      "settings.integration.audit.fields.version": "Version",
+      "settings.integration.audit.fields.request": "Request",
+      "settings.integration.audit.fields.actorRole": "Actor role",
+      "settings.integration.audit.fields.actorId": "Actor ID",
+      "settings.integration.audit.fields.source": "Source",
+      "settings.integration.audit.fields.reason": "Reason",
+      "settings.integration.audit.fields.timestamp": "Timestamp",
+      "settings.integration.audit.fields.oldValue": "Old",
+      "settings.integration.audit.fields.newValue": "New",
       "settings.shipping.shipperName.label": "Shipper Name",
       "settings.shipping.shipperPhone.label": "Shipper Phone",
       "settings.shipping.shipperEmail.label": "Shipper Email",
     },
     id: {
       "settings.integration.status.active": "Aktif",
+      "settings.integration.audit.actions.runtimeRead": "Runtime dibaca",
+      "settings.integration.audit.actions.secretRotated": "Secret dirotasi",
+      "settings.integration.audit.actions.valueUpdated": "Nilai diperbarui",
+      "settings.integration.audit.fields.key": "Key",
+      "settings.integration.audit.fields.versionId": "Version ID",
+      "settings.integration.audit.fields.version": "Version",
+      "settings.integration.audit.fields.request": "Request",
+      "settings.integration.audit.fields.actorRole": "Actor role",
+      "settings.integration.audit.fields.actorId": "Actor ID",
+      "settings.integration.audit.fields.source": "Source",
+      "settings.integration.audit.fields.reason": "Alasan",
+      "settings.integration.audit.fields.timestamp": "Timestamp",
+      "settings.integration.audit.fields.oldValue": "Lama",
+      "settings.integration.audit.fields.newValue": "Baru",
       "settings.shipping.shipperName.label": "Nama Pengirim",
       "settings.shipping.shipperPhone.label": "Nomor Telepon Pengirim",
       "settings.shipping.shipperEmail.label": "Email Pengirim",
@@ -422,6 +450,17 @@ vi.mock("antd", () => {
     },
     Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Alert: ({ message, description }: { message: React.ReactNode; description?: React.ReactNode }) => <div role="alert">{message}{description}</div>,
+    Descriptions: Object.assign(
+      ({ children }: { children: React.ReactNode }) => <dl>{children}</dl>,
+      {
+        Item: ({ children, label }: { children: React.ReactNode; label?: React.ReactNode }) => (
+          <div>
+            <dt>{label}</dt>
+            <dd>{children}</dd>
+          </div>
+        ),
+      }
+    ),
     List: Object.assign(
       ({ dataSource = [], renderItem, locale }: { dataSource?: Array<{ id: string }>; renderItem?: (item: { id: string }, index: number) => React.ReactNode; locale?: { emptyText?: React.ReactNode } }) => (
         <div>{dataSource.length > 0 ? dataSource.map((item, index) => <div key={item.id}>{renderItem?.(item, index)}</div>) : locale?.emptyText}</div>
@@ -640,46 +679,85 @@ describe("form pages", () => {
       }
 
       if (body.action === "audit") {
+        const auditRows = [
+          {
+            id: "audit-1",
+            key_name: "midtrans.server_key",
+            version_id: "version-secret",
+            action: "secret_rotated",
+            actor_id: "admin-1",
+            actor_role: "admin",
+            source: "admin_gateway",
+            request_id: "request-1",
+            reason: "scheduled rotation",
+            old_version_number: 1,
+            new_version_number: 2,
+            old_masked_value: "SB-Mid-****1234",
+            new_masked_value: "SB-Mid-****7890",
+            value_fingerprint: "fingerprint-secret",
+            metadata: { note: "PLAINTEXT_SENTINEL_DO_NOT_RENDER" },
+            created_at: "2026-05-19T10:00:00Z",
+          },
+          {
+            id: "audit-runtime-read",
+            key_name: "midtrans.server_key",
+            version_id: "version-secret",
+            action: "runtime_read",
+            actor_id: null,
+            actor_role: "service_role",
+            source: "edge_function",
+            request_id: "request-runtime-read",
+            reason: null,
+            old_version_number: null,
+            new_version_number: 2,
+            old_masked_value: null,
+            new_masked_value: "SB-Mid-****7890",
+            value_fingerprint: "fingerprint-secret",
+            metadata: { note: "PLAINTEXT_SENTINEL_DO_NOT_RENDER" },
+            created_at: "2026-05-19T11:00:00Z",
+          },
+          {
+            id: "audit-push-token",
+            key_name: "push.expo_access_token",
+            version_id: "version-push",
+            action: "secret_rotated",
+            actor_id: "admin-technical",
+            actor_role: "admin",
+            source: "admin_gateway",
+            request_id: "request-push-token",
+            reason: "technical rotation",
+            old_version_number: 1,
+            new_version_number: 2,
+            old_masked_value: "Expo****1111",
+            new_masked_value: "Expo****2222",
+            value_fingerprint: "fingerprint-push",
+            metadata: { note: "PLAINTEXT_SENTINEL_DO_NOT_RENDER" },
+            created_at: "2026-05-19T12:00:00Z",
+          },
+          {
+            id: "audit-cors-origins",
+            key_name: "cors.allowed_origins",
+            version_id: "version-cors",
+            action: "value_updated",
+            actor_id: "admin-technical",
+            actor_role: "admin",
+            source: "admin_gateway",
+            request_id: "request-cors-origins",
+            reason: "technical CORS update",
+            old_version_number: 1,
+            new_version_number: 2,
+            old_masked_value: "https://old-admin.example.test",
+            new_masked_value: "https://admin.example.test",
+            value_fingerprint: null,
+            metadata: { note: "PLAINTEXT_SENTINEL_DO_NOT_RENDER" },
+            created_at: "2026-05-19T13:00:00Z",
+          },
+        ];
+        const requestedAuditKey = typeof body.key === "string" ? body.key : undefined;
+
         return Promise.resolve({
           data: {
-            data: [
-              {
-                id: "audit-1",
-                key_name: "midtrans.server_key",
-                version_id: "version-secret",
-                action: "secret_rotated",
-                actor_id: "admin-1",
-                actor_role: "admin",
-                source: "admin_gateway",
-                request_id: "request-1",
-                reason: "scheduled rotation",
-                old_version_number: 1,
-                new_version_number: 2,
-                old_masked_value: "SB-Mid-****1234",
-                new_masked_value: "SB-Mid-****7890",
-                value_fingerprint: "fingerprint-secret",
-                metadata: { note: "PLAINTEXT_SENTINEL_DO_NOT_RENDER" },
-                created_at: "2026-05-19T10:00:00Z",
-              },
-              {
-                id: "audit-runtime-read",
-                key_name: "midtrans.server_key",
-                version_id: "version-secret",
-                action: "runtime_read",
-                actor_id: null,
-                actor_role: "service_role",
-                source: "edge_function",
-                request_id: "request-runtime-read",
-                reason: null,
-                old_version_number: null,
-                new_version_number: 2,
-                old_masked_value: null,
-                new_masked_value: "SB-Mid-****7890",
-                value_fingerprint: "fingerprint-secret",
-                metadata: { note: "PLAINTEXT_SENTINEL_DO_NOT_RENDER" },
-                created_at: "2026-05-19T11:00:00Z",
-              },
-            ],
+            data: requestedAuditKey ? auditRows.filter((row) => row.key_name === requestedAuditKey) : auditRows,
           },
           error: null,
         });
@@ -1904,7 +1982,7 @@ describe("form pages", () => {
     }));
   });
 
-  it("details drawer shows sanitized metadata only", async () => {
+  it("technical audit loads on demand and shows sanitized technical metadata only", async () => {
     mocks.useForm.mockReturnValue({
       formProps: {},
       saveButtonProps: {},
@@ -1917,6 +1995,13 @@ describe("form pages", () => {
     renderWithQueryClient(<Settings />);
 
     const advancedPanel = await screen.findByRole("region", { name: "Teknis" });
+    await waitFor(() => expect(mocks.functionsInvoke).toHaveBeenCalledWith("integration-config", {
+      body: {
+        action: "summary",
+        keys: ["push.expo_access_token", "cors.allowed_origins"],
+      },
+    }));
+    expect(mocks.functionsInvoke.mock.calls.some((call) => call[1]?.body?.action === "audit")).toBe(false);
     expect(document.body.textContent).not.toContain("request-1");
     expect(document.body.textContent).not.toContain("request-runtime-read");
     expect(document.body.textContent).not.toContain("version-secret");
@@ -1925,22 +2010,34 @@ describe("form pages", () => {
 
     fireEvent.click(within(advancedPanel).getByRole("button", { name: "Lihat audit teknis" }));
 
+    await waitFor(() => expect(mocks.functionsInvoke.mock.calls.some((call) => call[1]?.body?.action === "audit")).toBe(true));
+    const auditRequestBodies = mocks.functionsInvoke.mock.calls
+      .map((call) => call[1]?.body)
+      .filter((body): body is Record<string, unknown> => body?.action === "audit");
+    expect(auditRequestBodies).toEqual(expect.arrayContaining([
+      { action: "audit", key: "push.expo_access_token", limit: 50 },
+      { action: "audit", key: "cors.allowed_origins", limit: 50 },
+    ]));
+    expect(auditRequestBodies.every((body) => typeof body.key === "string")).toBe(true);
     expect(screen.getByRole("dialog")).not.toBeNull();
-    expect(document.body.textContent).toContain("Payment configuration");
-    expect(document.body.textContent).toContain("secret_rotated");
-    expect(document.body.textContent).toContain("Key: midtrans.server_key");
-    expect(document.body.textContent).toContain("Version ID: version-secret");
-    expect(document.body.textContent).toContain("Version: 2");
-    expect(document.body.textContent).toContain("Request: request-1");
-    expect(document.body.textContent).toContain("Request: request-runtime-read");
-    expect(document.body.textContent).toContain("Actor role: admin");
-    expect(document.body.textContent).toContain("Actor ID: admin-1");
-    expect(document.body.textContent).toContain("Actor role: service_role");
-    expect(document.body.textContent).toContain("Source: admin_gateway");
-    expect(document.body.textContent).toContain("Source: edge_function");
-    expect(document.body.textContent).toContain("Reason: scheduled rotation");
-    expect(document.body.textContent).toContain("Old: SB-Mid-****1234");
-    expect(document.body.textContent).toContain("New: SB-Mid-****7890");
+    await waitFor(() => expect(document.body.textContent).toContain("Secret dirotasi"));
+    expect(document.body.textContent).toContain("Expo Push Token");
+    expect(document.body.textContent).toContain("Allowed Origins");
+    expect(document.body.textContent).toContain("Nilai diperbarui");
+    expect(document.body.textContent).toContain("Keypush.expo_access_token");
+    expect(document.body.textContent).toContain("Keycors.allowed_origins");
+    expect(document.body.textContent).toContain("Requestrequest-push-token");
+    expect(document.body.textContent).toContain("Requestrequest-cors-origins");
+    expect(document.body.textContent).toContain("Alasantechnical rotation");
+    expect(document.body.textContent).toContain("Alasantechnical CORS update");
+    expect(document.body.textContent).toContain("LamaExpo****1111");
+    expect(document.body.textContent).toContain("BaruExpo****2222");
+    expect(document.body.textContent).not.toContain("Payment configuration");
+    expect(document.body.textContent).not.toContain("midtrans.server_key");
+    expect(document.body.textContent).not.toContain("request-1");
+    expect(document.body.textContent).not.toContain("request-runtime-read");
+    expect(document.body.textContent).not.toContain("version-secret");
+    expect(document.body.textContent).not.toContain("admin-1");
     expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
   });
 
