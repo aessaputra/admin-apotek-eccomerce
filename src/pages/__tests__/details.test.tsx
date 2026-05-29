@@ -137,7 +137,11 @@ vi.mock("antd", async () => {
   };
 
   const Space = (props: MockSpaceProps) => {
-    const { children, direction: _direction, size: _size, wrap: _wrap, ...domProps } = props;
+    const { children, ...domProps } = props;
+
+    delete domProps.direction;
+    delete domProps.size;
+    delete domProps.wrap;
 
     return <div {...domProps}>{children}</div>;
   };
@@ -203,9 +207,15 @@ vi.mock("antd", async () => {
     ),
     Tooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Alert: ({ message, description }: { message?: React.ReactNode; description?: React.ReactNode }) => <div role="alert">{message}{description}</div>,
-    Skeleton: ({ active: _active, paragraph: _paragraph, title: _title, ...domProps }: React.HTMLAttributes<HTMLDivElement> & { active?: boolean; paragraph?: unknown; title?: unknown }) => (
-      <div {...domProps} data-testid="skeleton" />
-    ),
+    Skeleton: (props: React.HTMLAttributes<HTMLDivElement> & { active?: boolean; paragraph?: unknown; title?: unknown }) => {
+      const domProps = { ...props };
+
+      delete domProps.active;
+      delete domProps.paragraph;
+      delete domProps.title;
+
+      return <div {...domProps} data-testid="skeleton" />;
+    },
     Table,
     Descriptions,
     Empty,
@@ -648,7 +658,8 @@ describe("detail and dashboard pages", () => {
     expect(screen.getByText("dashboard.kpis.paymentSuccessRate:100")).not.toBeNull();
     expect(screen.getByText("dashboard.kpis.averageOrderValue:25000")).not.toBeNull();
     expect(screen.getByText("dashboard.kpis.fulfillmentRisk:1")).not.toBeNull();
-    expect(screen.getByText("dashboard.kpis.lowStockSkus:8")).not.toBeNull();
+    expect(screen.queryByText("dashboard.kpis.lowStockSkus:8")).toBeNull();
+    expect(screen.getByText("dashboard.lowStockAlerts")).not.toBeNull();
     expect(screen.getByText("order-1")).not.toBeNull();
     expect(screen.getByText("Vitamin C")).not.toBeNull();
 

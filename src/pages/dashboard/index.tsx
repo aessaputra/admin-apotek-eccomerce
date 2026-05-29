@@ -5,7 +5,6 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   ShoppingCartOutlined,
-  InboxOutlined,
   BankOutlined,
   PercentageOutlined,
   WarningOutlined,
@@ -222,7 +221,6 @@ export const Dashboard: React.FC = () => {
     kpiMetricsQuery?.isLoading || activeTrendMetricsQuery?.isLoading || lowStockQuery?.isLoading,
   );
   const isKpiMetricsLoading = Boolean(kpiMetricsQuery?.isLoading);
-  const isLowStockLoading = Boolean(lowStockQuery?.isLoading);
   const operationalAlertsSucceeded =
     !operationalAlertsLoading &&
     !kpiMetricsQuery?.isError &&
@@ -265,6 +263,18 @@ export const Dashboard: React.FC = () => {
       description={translate("dashboard.alerts.lowStockError.description")}
     />
   ) : translate("dashboard.noLowStock");
+  const handleMetricsRetry = (): void => {
+    const shouldRetryKpiMetrics = Boolean(kpiMetricsQuery?.isError);
+    const shouldRetryActiveTrendMetrics = Boolean(activeTrendMetricsQuery?.isError && activeTrendMetricsQuery !== kpiMetricsQuery);
+
+    if (shouldRetryKpiMetrics) {
+      kpiMetricsQuery?.refetch?.();
+    }
+
+    if (shouldRetryActiveTrendMetrics) {
+      activeTrendMetricsQuery?.refetch?.();
+    }
+  };
 
   return (
     <>
@@ -288,6 +298,13 @@ export const Dashboard: React.FC = () => {
                 const labels = getOperationalAlertLabels(alert, translate);
                 const compactAlert = alert.kind === "no-risk";
 
+                const retryAction =
+                  alert.kind === "metrics-error" ? (
+                    <Button size="small" onClick={handleMetricsRetry}>
+                      {translate("dashboard.retry")}
+                    </Button>
+                  ) : undefined;
+
                 return (
                   <Alert
                     showIcon
@@ -295,6 +312,7 @@ export const Dashboard: React.FC = () => {
                     type={alert.severity}
                     message={labels.message}
                     description={compactAlert ? undefined : labels.description}
+                    action={retryAction}
                   />
                 );
               })}
@@ -309,17 +327,6 @@ export const Dashboard: React.FC = () => {
                     value={dashboardKpis.fulfillmentRisk}
                     loading={isKpiMetricsLoading}
                     prefix={<ClockCircleOutlined aria-hidden="true" style={{ color: token.colorWarning }} />}
-                    valueStyle={secondaryKpiValueStyle}
-                  />
-                </Card>
-              </Col>
-              <Col xs={24} sm={12} lg={24} xl={12} style={{ display: "flex" }}>
-                <Card style={{ ...secondaryKpiCardStyle, flex: 1, width: "100%" }}>
-                  <Statistic
-                    title={translate("dashboard.kpis.lowStockSkus")}
-                    value={dashboardKpis.lowStockRisk}
-                    loading={isLowStockLoading}
-                    prefix={<InboxOutlined aria-hidden="true" style={{ color: token.colorWarning }} />}
                     valueStyle={secondaryKpiValueStyle}
                   />
                 </Card>
@@ -408,6 +415,10 @@ export const Dashboard: React.FC = () => {
               zeroValueSummary: translate("dashboard.monthlyTrends.zeroValueSummary"),
               chartAriaLabel: translate("dashboard.monthlyTrends.chartAriaLabel"),
               chartDescription: translate("dashboard.monthlyTrends.chartDescription"),
+              revenueTrendTitle: translate("dashboard.monthlyTrends.revenueTrendTitle"),
+              revenueTrendAriaLabel: translate("dashboard.monthlyTrends.revenueTrendAriaLabel"),
+              revenueTrendDescription: translate("dashboard.monthlyTrends.revenueTrendDescription"),
+              retryAction: translate("dashboard.retry"),
               dataTableLabel: translate("dashboard.monthlyTrends.dataTableLabel"),
               periodColumn: translate("dashboard.monthlyTrends.periodColumn"),
               incomingColumn: translate("dashboard.monthlyTrends.incomingColumn"),
