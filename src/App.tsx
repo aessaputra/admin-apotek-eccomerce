@@ -34,6 +34,7 @@ import { Header } from "./components/header";
 import { AppSider } from "./components/layout/app-sider";
 import { AuthTitle } from "./components/layout/auth-title";
 import { Title } from "./components/layout/title";
+import { useStoreBranding } from "./hooks/useStoreBranding";
 import { ORDER_READ_RESOURCE } from "./constants/resources";
 import authProvider from "./providers/auth";
 import { dataProvider } from "./providers/data";
@@ -231,23 +232,7 @@ function App() {
                 </Suspense>
                 <RefineKbar />
                 <UnsavedChangesNotifier />
-                <DocumentTitleHandler
-                  handler={({ resource, action, params }) => {
-                    const resourceLabel = resource?.name ? t(`resources.${resource.name}`) : "Dashboard";
-                    const id = params?.id ?? "";
-
-                    const actionPrefixMatcher: Record<string, string> = {
-                      create: `${t("actions.create")} ${resourceLabel}`,
-                      clone: `#${id} ${resourceLabel}`,
-                      edit: `#${id} ${t("actions.edit")} ${resourceLabel}`,
-                      show: `#${id} ${t("actions.show")} ${resourceLabel}`,
-                      list: resourceLabel,
-                    };
-
-                    const title = actionPrefixMatcher[action || "list"] ?? resourceLabel;
-                    return `${title} | Pharmacy`;
-                  }}
-                />
+                <BrandedDocumentTitleHandler />
               </Refine>
               {import.meta.env.DEV && <DevtoolsPanel />}
             </DevtoolsProvider>
@@ -257,5 +242,31 @@ function App() {
     </BrowserRouter>
   );
 }
+
+const BrandedDocumentTitleHandler: React.FC = () => {
+  const { t } = useTranslation();
+  const { storeName } = useStoreBranding();
+  const appTitle = storeName ?? t("app.title");
+
+  return (
+    <DocumentTitleHandler
+      handler={({ resource, action, params }) => {
+        const resourceLabel = resource?.name ? t(`resources.${resource.name}`) : t("resources.dashboard", "Dashboard");
+        const id = params?.id ?? "";
+
+        const actionPrefixMatcher: Record<string, string> = {
+          create: `${t("actions.create")} ${resourceLabel}`,
+          clone: `#${id} ${resourceLabel}`,
+          edit: `#${id} ${t("actions.edit")} ${resourceLabel}`,
+          show: `#${id} ${t("actions.show")} ${resourceLabel}`,
+          list: resourceLabel,
+        };
+
+        const title = actionPrefixMatcher[action || "list"] ?? resourceLabel;
+        return `${title} | ${appTitle}`;
+      }}
+    />
+  );
+};
 
 export default App;

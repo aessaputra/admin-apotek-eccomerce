@@ -9,10 +9,27 @@ const captured: {
   routes: Array<{ path?: string; elementName?: string }>;
 } = { routes: [] };
 
+interface StoreBrandingMockResult {
+  storeName: string | null;
+  primaryLogoUrl: string | null;
+}
+
+const createStoreBrandingMockResult = (storeName: string | null): StoreBrandingMockResult => ({
+  storeName,
+  primaryLogoUrl: null,
+});
+
+const storeBrandingMocks = vi.hoisted(() => ({
+  useStoreBranding: vi.fn((): StoreBrandingMockResult => createStoreBrandingMockResult("Sinar Farma")),
+}));
+
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string, defaultMessageOrOptions?: string | Record<string, unknown>) =>
-      typeof defaultMessageOrOptions === "string" ? defaultMessageOrOptions : key,
+    t: (key: string, defaultMessageOrOptions?: string | Record<string, unknown>) => {
+      if (key === "app.title") return "Pharmacy";
+
+      return typeof defaultMessageOrOptions === "string" ? defaultMessageOrOptions : key;
+    },
     i18n: {
       language: "id",
       resolvedLanguage: "id",
@@ -90,6 +107,9 @@ vi.mock("../contexts/color-mode", () => ({
 vi.mock("../components/header", () => ({ Header: () => <div>Header</div> }));
 vi.mock("../components/layout/auth-title", () => ({ AuthTitle: () => <div>AuthTitle</div> }));
 vi.mock("../components/layout/title", () => ({ Title: () => <div>Title</div> }));
+vi.mock("../hooks/useStoreBranding", () => ({
+  useStoreBranding: () => storeBrandingMocks.useStoreBranding(),
+}));
 vi.mock("../pages/auth/login", () => ({ Login: () => <div>Login</div> }));
 vi.mock("../pages/auth/mfa-verify", () => ({ MfaVerify: () => <div>MfaVerify</div> }));
 vi.mock("../providers/auth", () => ({ default: { auth: true } }));
@@ -119,6 +139,7 @@ vi.mock("../pages/home-banners/show", () => ({ HomeBannerShow: () => <div>HomeBa
 describe("App", () => {
   it("registers core Refine resources and document title behavior", () => {
     captured.routes = [];
+    storeBrandingMocks.useStoreBranding.mockReturnValue(createStoreBrandingMockResult("Sinar Farma"));
     render(<App />);
 
     const resources = (captured.refineProps?.resources as Array<{ name: string }>) ?? [];
@@ -160,6 +181,7 @@ describe("App", () => {
   });
 
   it("builds document titles from resource, action, and params", () => {
+    storeBrandingMocks.useStoreBranding.mockReturnValue(createStoreBrandingMockResult("Sinar Farma"));
     render(<App />);
 
     const handler = captured.documentTitleHandler;
@@ -169,8 +191,22 @@ describe("App", () => {
       throw new Error("Document title handler was not captured");
     }
 
-    expect(handler({ resource: { name: "orders" }, action: "show", params: { id: "123" } })).toBe("#123 actions.show resources.orders | Pharmacy");
-    expect(handler({ resource: { name: "products" }, action: "create", params: {} })).toBe("actions.create resources.products | Pharmacy");
-    expect(handler({})).toBe("Dashboard | Pharmacy");
+    expect(handler({ resource: { name: "orders" }, action: "show", params: { id: "123" } })).toBe("#123 actions.show resources.orders | Sinar Farma");
+    expect(handler({ resource: { name: "products" }, action: "create", params: {} })).toBe("actions.create resources.products | Sinar Farma");
+    expect(handler({})).toBe("Dashboard | Sinar Farma");
+  });
+
+  it("falls back to the translated app title when store branding is unavailable", () => {
+    storeBrandingMocks.useStoreBranding.mockReturnValue(createStoreBrandingMockResult(null));
+    render(<App />);
+
+    const handler = captured.documentTitleHandler;
+    expect(handler).toBeTypeOf("function");
+
+    if (!handler) {
+      throw new Error("Document title handler was not captured");
+    }
+
+    expect(handler({ resource: { name: "orders" }, action: "list", params: {} })).toBe("resources.orders | Pharmacy");
   });
 });
