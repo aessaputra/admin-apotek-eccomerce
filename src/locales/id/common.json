@@ -4,7 +4,7 @@
     "titleShort": "PH"
   },
   "resources": {
-    "dashboard": "Dashboard",
+    "dashboard": "Dasbor",
     "orders": "Pesanan",
     "customers": "Pelanggan",
     "profiles": "Pelanggan",
@@ -33,9 +33,10 @@
     "actions": "Aksi"
   },
   "dashboard": {
-    "dashboard": "Dashboard",
+    "dashboard": "Dasbor",
+    "retry": "Coba lagi",
     "overview": {
-      "title": "Ringkasan Operasional",
+      "title": "Performa Toko",
       "subtitle": "Pantau pesanan, penjualan, stok, dan antrean yang perlu ditindaklanjuti dalam 30 hari terakhir."
     },
     "kpis": {
@@ -46,13 +47,18 @@
       "fulfillmentRisk": "Pesanan Dibayar Belum Terkirim",
       "lowStockSkus": "Produk Stok Menipis",
       "unavailable": "Tidak tersedia",
-      "periodNote": "Angka ringkasan memakai data 30 hari terakhir. Grafik tren mengikuti periode yang dipilih."
+      "periodNote": "Angka ringkasan memakai data 30 hari terakhir. Grafik tren mengikuti periode yang dipilih.",
+      "revenue30dContext": "Omzet hanya menghitung pesanan dibayar yang sudah settlement.",
+      "orders30dContext": "Pesanan masuk yang dibuat dalam 30 hari terakhir.",
+      "paymentSuccessRateContext": "Pesanan dibayar dibagi pesanan masuk.",
+      "averageOrderValueContext": "Omzet dibagi pesanan dibayar.",
+      "fulfillmentRiskContext": "Pesanan dibayar dikurangi pesanan terkirim."
     },
     "alerts": {
       "title": "Butuh Tindak Lanjut",
       "metricsError": {
         "message": "Ringkasan belum tersedia",
-        "description": "Sebagian angka ringkasan belum termuat. Cek panel tren atau coba lagi sebentar lagi."
+        "description": "Sebagian angka ringkasan belum termuat. Coba lagi dari dashboard atau cek panel tren."
       },
       "lowStockError": {
         "message": "Gagal memuat data stok menipis",
@@ -63,8 +69,8 @@
         "description": "Daftar pesanan belum termuat. Muat ulang sebelum menganggap antrean kosong."
       },
       "fulfillmentRisk": {
-        "message": "{{count}} pesanan dibayar belum terkirim",
-        "description": "Buka daftar pesanan untuk melanjutkan proses, pengiriman, atau pembaruan status terkirim."
+        "message": "{{count}} pesanan dibayar menunggu pengiriman",
+        "description": "Buka daftar pesanan untuk meninjau pesanan dibayar yang belum mencapai status Terkirim."
       },
       "lowStockRisk": {
         "message": "{{count}} produk aktif stok menipis",
@@ -128,7 +134,10 @@
       "errorMessage": "Gagal memuat tren pesanan.",
       "zeroValueSummary": "Semua angka tren pesanan masih 0.",
       "chartAriaLabel": "Grafik tren pesanan: masuk, dibayar, dan terkirim",
-      "chartDescription": "Jumlah pesanan masuk, dibayar, dan terkirim sesuai periode yang dipilih."
+      "chartDescription": "Jumlah pesanan masuk, dibayar, dan terkirim sesuai periode yang dipilih.",
+      "revenueTrendTitle": "Tren Omzet",
+      "revenueTrendAriaLabel": "Grafik garis tren omzet",
+      "revenueTrendDescription": "Omzet dari pesanan dibayar yang settlement sesuai periode yang dipilih."
     }
   },
   "salesReports": {

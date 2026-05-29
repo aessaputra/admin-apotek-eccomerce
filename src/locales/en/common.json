@@ -34,25 +34,31 @@
   },
   "dashboard": {
     "dashboard": "Dashboard",
+    "retry": "Try again",
     "overview": {
-      "title": "Operations Overview",
+      "title": "Store Performance",
       "subtitle": "Monitor orders, sales, stock, and follow-up queues from the last 30 days."
     },
     "kpis": {
       "revenue30d": "30-Day Sales",
       "orders30d": "30-Day Orders",
-      "paymentSuccessRate": "Paid Orders",
+      "paymentSuccessRate": "Paid Order Rate",
       "averageOrderValue": "Average Order Value",
-      "fulfillmentRisk": "Paid Orders Not Delivered",
+      "fulfillmentRisk": "Paid Orders Pending Delivery",
       "lowStockSkus": "Low-Stock Products",
       "unavailable": "Unavailable",
-      "periodNote": "Summary figures use the last 30 days. The trend chart follows the selected period."
+      "periodNote": "Summary figures use the last 30 days. The trend chart follows the selected period.",
+      "revenue30dContext": "Sales counts settled paid orders only.",
+      "orders30dContext": "Incoming orders created in the last 30 days.",
+      "paymentSuccessRateContext": "Paid orders divided by incoming orders.",
+      "averageOrderValueContext": "Sales divided by paid orders.",
+      "fulfillmentRiskContext": "Paid orders minus delivered orders."
     },
     "alerts": {
       "title": "Needs Follow-Up",
       "metricsError": {
         "message": "Summary unavailable",
-        "description": "Some summary figures could not be loaded. Check the trend panel or retry shortly."
+        "description": "Some summary figures could not be loaded. Retry the dashboard or check the trend panel."
       },
       "lowStockError": {
         "message": "Couldn’t load low-stock data",
@@ -63,8 +69,8 @@
         "description": "The order list has not loaded. Refresh before treating the queue as empty."
       },
       "fulfillmentRisk": {
-        "message": "{{count}} paid orders are not delivered",
-        "description": "Open the orders list to continue processing, shipping, or delivery status updates."
+        "message": "{{count}} paid orders are pending delivery",
+        "description": "Open the orders list to review paid orders that have not reached Delivered status."
       },
       "lowStockRisk": {
         "message": "{{count}} active products are low on stock",
@@ -128,7 +134,10 @@
       "errorMessage": "Failed to load order trends.",
       "zeroValueSummary": "All order trend figures are still zero.",
       "chartAriaLabel": "Order trend line chart: incoming, paid, and delivered orders",
-      "chartDescription": "Incoming, paid, and delivered order counts for the selected period."
+      "chartDescription": "Incoming, paid, and delivered order counts for the selected period.",
+      "revenueTrendTitle": "Revenue Trend",
+      "revenueTrendAriaLabel": "Revenue trend line chart",
+      "revenueTrendDescription": "Sales from settled paid orders across the selected period."
     }
   },
   "salesReports": {

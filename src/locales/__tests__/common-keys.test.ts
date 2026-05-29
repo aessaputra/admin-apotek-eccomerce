@@ -67,6 +67,11 @@ const REQUIRED_DASHBOARD_KEYS = [
   "dashboard.kpis.lowStockSkus",
   "dashboard.kpis.unavailable",
   "dashboard.kpis.periodNote",
+  "dashboard.kpis.revenue30dContext",
+  "dashboard.kpis.orders30dContext",
+  "dashboard.kpis.paymentSuccessRateContext",
+  "dashboard.kpis.averageOrderValueContext",
+  "dashboard.kpis.fulfillmentRiskContext",
   "dashboard.alerts.title",
   "dashboard.alerts.metricsError.message",
   "dashboard.alerts.metricsError.description",
@@ -125,6 +130,10 @@ const REQUIRED_DASHBOARD_KEYS = [
   "dashboard.monthlyTrends.zeroValueSummary",
   "dashboard.monthlyTrends.chartAriaLabel",
   "dashboard.monthlyTrends.chartDescription",
+  "dashboard.monthlyTrends.revenueTrendTitle",
+  "dashboard.monthlyTrends.revenueTrendAriaLabel",
+  "dashboard.monthlyTrends.revenueTrendDescription",
+  "dashboard.retry",
 ];
 
 const REQUIRED_ORDER_KEYS = [
@@ -185,5 +194,14 @@ describe("locale files", () => {
     expect(enValue, `missing in en/common.json: ${key}`).toBeTypeOf("string");
     expect(String(idValue).trim().length, `empty in id/common.json: ${key}`).toBeGreaterThan(0);
     expect(String(enValue).trim().length, `empty in en/common.json: ${key}`).toBeGreaterThan(0);
+  });
+
+  it("uses the approved dashboard page and overview labels", () => {
+    expect(getValue(idCommon, "resources.dashboard")).toBe("Dasbor");
+    expect(getValue(idCommon, "dashboard.dashboard")).toBe("Dasbor");
+    expect(getValue(idCommon, "dashboard.overview.title")).toBe("Performa Toko");
+    expect(getValue(enCommon, "resources.dashboard")).toBe("Dashboard");
+    expect(getValue(enCommon, "dashboard.dashboard")).toBe("Dashboard");
+    expect(getValue(enCommon, "dashboard.overview.title")).toBe("Store Performance");
   });
 });
