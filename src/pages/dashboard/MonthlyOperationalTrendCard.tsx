@@ -1,5 +1,5 @@
 import { Line } from "@ant-design/charts";
-import { Alert, Card, Col, Empty, Radio, Row, Skeleton, Space, Statistic, Tooltip, Typography, theme } from "antd";
+import { Alert, Button, Card, Col, Empty, Radio, Row, Skeleton, Space, Statistic, Tooltip, Typography, theme } from "antd";
 import type { RadioChangeEvent } from "antd";
 import { useId, useMemo } from "react";
 import type {
@@ -15,11 +15,20 @@ import {
 } from "./styles";
 
 type CountMetricKey = "orderCount" | "paidOrderCount" | "completedOrderCount";
+type RevenueMetricKey = "revenue";
 
 interface CountTrendChartPoint {
   monthStart: string;
   monthLabel: string;
   metric: CountMetricKey;
+  seriesLabel: string;
+  value: number;
+}
+
+interface RevenueTrendChartPoint {
+  monthStart: string;
+  monthLabel: string;
+  metric: RevenueMetricKey;
   seriesLabel: string;
   value: number;
 }
@@ -37,6 +46,10 @@ export interface MonthlyOperationalTrendCardLabels {
   zeroValueSummary: string;
   chartAriaLabel: string;
   chartDescription: string;
+  revenueTrendTitle: string;
+  revenueTrendAriaLabel: string;
+  revenueTrendDescription: string;
+  retryAction: string;
   dataTableLabel: string;
   periodColumn: string;
   incomingColumn: string;
@@ -60,6 +73,7 @@ export interface MonthlyOperationalTrendCardProps {
   granularity: OperationalTrendGranularity;
   granularityOptions: readonly MonthlyOperationalTrendGranularityOption[];
   onGranularityChange: (granularity: OperationalTrendGranularity) => void;
+  onRetry?: () => void;
   locale?: string;
 }
 
@@ -78,10 +92,12 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
   granularity,
   granularityOptions,
   onGranularityChange,
+  onRetry,
   locale = "id-ID",
 }) => {
   const { token } = theme.useToken();
   const chartDescriptionId = useId();
+  const revenueChartDescriptionId = useId();
   const compactNumberFormatter = useMemo(
     () =>
       new Intl.NumberFormat(locale, {
@@ -152,6 +168,10 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
       labels.paidOrders,
     ],
   );
+  const revenueChartData = useMemo<RevenueTrendChartPoint[]>(
+    () => mapRevenuePoints(data.revenueChartPoints, labels.revenue),
+    [data.revenueChartPoints, labels.revenue],
+  );
   const metricColorRange = useMemo(
     () => [token.colorPrimary, token.colorSuccess, token.colorInfo],
     [token.colorInfo, token.colorPrimary, token.colorSuccess],
@@ -167,6 +187,10 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
   const countTickFormatter = useMemo(
     () => createCompactCountTickFormatter(compactNumberFormatter),
     [compactNumberFormatter],
+  );
+  const revenueTickFormatter = useMemo(
+    () => createCurrencyTickFormatter(currencyFormatter),
+    [currencyFormatter],
   );
   const chartConfig = useMemo(
     () => ({
@@ -212,12 +236,48 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
     }),
     [countChartData, countTickFormatter, metricColorRange, metricDomain, monthTickFormatter],
   );
+  const revenueChartConfig = useMemo(
+    () => ({
+      data: revenueChartData,
+      xField: "monthLabel",
+      yField: "value",
+      colorField: "seriesLabel",
+      seriesField: "seriesLabel",
+      style: {
+        lineWidth: 2,
+      },
+      point: {
+        sizeField: 4,
+      },
+      height: 240,
+      autoFit: true,
+      axis: {
+        x: {
+          labelFormatter: monthTickFormatter,
+          tickCount: 6,
+        },
+        y: {
+          labelFormatter: revenueTickFormatter,
+        },
+      },
+      legend: {
+        color: {
+          position: "bottom",
+        },
+      },
+      tooltip: {
+        title: "monthLabel",
+      },
+    }),
+    [monthTickFormatter, revenueChartData, revenueTickFormatter],
+  );
   const hasRows = data.rows.length > 0;
   const hasOnlyZeroValues =
     totals.orderCount === 0 &&
     totals.paidOrderCount === 0 &&
     totals.completedOrderCount === 0 &&
     totals.revenue === 0;
+  const shouldRenderRevenueTrend = revenueChartData.length > 1;
 
   const handleGranularityChange = (event: RadioChangeEvent): void => {
     onGranularityChange(event.target.value as OperationalTrendGranularity);
@@ -257,7 +317,12 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
           <Typography.Text>{labels.loading}</Typography.Text>
         </Space>
       ) : error ? (
-        <Alert type="error" showIcon message={labels.errorMessage} />
+        <Alert
+          type="error"
+          showIcon
+          message={labels.errorMessage}
+          action={onRetry ? <Button onClick={onRetry}>{labels.retryAction}</Button> : undefined}
+        />
       ) : !hasRows ? (
         <Empty description={labels.emptyDescription} />
       ) : (
@@ -312,6 +377,22 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
             <Line {...chartConfig} />
           </div>
 
+          {shouldRenderRevenueTrend ? (
+            <Space direction="vertical" size={token.marginXXS} style={{ width: "100%" }}>
+              <Typography.Text strong>{labels.revenueTrendTitle}</Typography.Text>
+              <Typography.Paragraph
+                id={revenueChartDescriptionId}
+                type="secondary"
+                style={{ marginBottom: 0, fontSize: token.fontSizeSM }}
+              >
+                {labels.revenueTrendDescription}
+              </Typography.Paragraph>
+              <div role="img" aria-label={labels.revenueTrendAriaLabel} aria-describedby={revenueChartDescriptionId}>
+                <Line {...revenueChartConfig} />
+              </div>
+            </Space>
+          ) : null}
+
           <div style={visuallyHiddenStyle}>
             <table aria-label={labels.dataTableLabel}>
               <caption>{labels.dataTableLabel}</caption>
@@ -356,6 +437,18 @@ const mapCountPoints = (
     value,
   }));
 
+const mapRevenuePoints = (
+  points: readonly MonthlyOperationalTrendChartPoint[],
+  seriesLabel: string,
+): RevenueTrendChartPoint[] =>
+  points.map(({ monthStart, monthLabel, value }) => ({
+    monthStart,
+    monthLabel,
+    metric: "revenue",
+    seriesLabel,
+    value,
+  }));
+
 const getMetricPattern = (metric: CountMetricKey | undefined): { lineDash?: number[]; opacity: number; shape: string } =>
   metric ? TREND_METRIC_PATTERNS[metric] : TREND_METRIC_PATTERNS.orderCount;
 
@@ -372,6 +465,12 @@ const createCompactMonthTickFormatter = (locale: string) => (monthLabel: string)
 };
 
 const createCompactCountTickFormatter = (formatter: Intl.NumberFormat) => (value: number | string): string => {
+  const numericValue = typeof value === "number" ? value : Number(value);
+
+  return Number.isFinite(numericValue) ? formatter.format(numericValue) : String(value);
+};
+
+const createCurrencyTickFormatter = (formatter: Intl.NumberFormat) => (value: number | string): string => {
   const numericValue = typeof value === "number" ? value : Number(value);
 
   return Number.isFinite(numericValue) ? formatter.format(numericValue) : String(value);

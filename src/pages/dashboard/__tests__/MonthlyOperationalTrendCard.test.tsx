@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MonthlyOperationalTrendCard, type MonthlyOperationalTrendCardProps } from "../MonthlyOperationalTrendCard";
 import {
@@ -74,7 +74,13 @@ vi.mock("@ant-design/charts", async () => {
 });
 
 vi.mock("antd", () => ({
-  Alert: ({ message }: { message?: React.ReactNode }) => <div role="alert">{message}</div>,
+  Alert: ({ action, message }: { action?: React.ReactNode; message?: React.ReactNode }) => (
+    <div role="alert">
+      {message}
+      {action ? <div>{action}</div> : null}
+    </div>
+  ),
+  Button: ({ children, onClick }: { children?: React.ReactNode; onClick?: () => void }) => <button type="button" onClick={onClick}>{children}</button>,
   Card: ({ title, extra, children }: { title?: React.ReactNode; extra?: React.ReactNode; children?: React.ReactNode }) => (
     <section>
       <h2>{title}</h2>
@@ -152,6 +158,10 @@ const labels = {
   chartAriaLabel: "Order trend line chart: incoming, paid, and delivered orders",
   chartDescription: "Incoming, paid, and delivered order counts for the selected period.",
   dataTableLabel: "Order trend data table",
+  revenueTrendTitle: "Revenue Trend",
+  revenueTrendAriaLabel: "Revenue trend line chart",
+  revenueTrendDescription: "Sales from settled paid orders across the selected period.",
+  retryAction: "Try again",
   periodColumn: "Period",
   incomingColumn: "Incoming",
   paidColumn: "Paid",
@@ -211,15 +221,26 @@ const renderCard = (props: Partial<MonthlyOperationalTrendCardProps> = {}) => {
       granularity={props.granularity ?? "month"}
       granularityOptions={props.granularityOptions ?? granularityOptions}
       onGranularityChange={props.onGranularityChange ?? vi.fn()}
+      onRetry={props.onRetry}
     />,
   );
 };
 
-const getLineProps = (): LineMockProps => {
+const getCountLineProps = (): LineMockProps => {
   const lineProps = chartMocks.line.mock.calls[0]?.[0];
 
   if (!lineProps) {
-    throw new Error("Line chart was not rendered");
+    throw new Error("Count line chart was not rendered");
+  }
+
+  return lineProps;
+};
+
+const getRevenueLineProps = (): LineMockProps => {
+  const lineProps = chartMocks.line.mock.calls[1]?.[0];
+
+  if (!lineProps) {
+    throw new Error("Revenue line chart was not rendered");
   }
 
   return lineProps;
@@ -244,7 +265,7 @@ describe("MonthlyOperationalTrendCard", () => {
     chartMocks.line.mockClear();
   });
 
-  it("renders populated operational trends with a count-only line chart and IDR revenue statistic", () => {
+  it("renders populated operational trends with count and revenue line charts", () => {
     renderCard();
 
     expect(screen.getByText(labels.title)).not.toBeNull();
@@ -258,9 +279,12 @@ describe("MonthlyOperationalTrendCard", () => {
     expect(document.getElementById(chartDescriptionId ?? "")?.textContent).toContain(labels.chartDescription);
     expect(screen.getByText(labels.chartDescription)).not.toBeNull();
     expect(screen.getByRole("table", { name: labels.dataTableLabel })).not.toBeNull();
+    expect(screen.getByRole("img", { name: labels.revenueTrendAriaLabel })).not.toBeNull();
+    expect(screen.getByText(labels.revenueTrendTitle)).not.toBeNull();
+    expect(screen.getByText(labels.revenueTrendDescription)).not.toBeNull();
     expect(document.querySelector("caption")?.textContent).toBe(labels.dataTableLabel);
 
-    const lineProps = getLineProps();
+    const lineProps = getCountLineProps();
 
     expect(lineProps.xField).toBe("monthLabel");
     expect(lineProps.yField).toBe("value");
@@ -281,6 +305,12 @@ describe("MonthlyOperationalTrendCard", () => {
     expect(new Set(lineProps.data.map((point) => point.seriesLabel))).toEqual(
       new Set([labels.orderCount, labels.paidOrders, labels.completedOrders]),
     );
+
+    const revenueLineProps = getRevenueLineProps();
+
+    expect(revenueLineProps.data).toHaveLength(populatedTrendData.revenueChartPoints.length);
+    expect(revenueLineProps.data.every((point) => point.metric === "revenue")).toBe(true);
+    expect(revenueLineProps.axis?.y?.labelFormatter?.(125000).replace(/\u00a0/g, " ")).toContain("Rp");
   });
 
   it("exposes a hidden data table with user-facing period labels for screen readers", () => {
@@ -307,8 +337,9 @@ describe("MonthlyOperationalTrendCard", () => {
     expect(screen.getByRole("button", { name: "Weekly" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Monthly" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Yearly" })).not.toBeNull();
-    expect(chartMocks.line).toHaveBeenCalledTimes(1);
-    expect(getLineProps().data.some((point) => point.metric === "revenue")).toBe(false);
+    expect(chartMocks.line).toHaveBeenCalledTimes(2);
+    expect(getCountLineProps().data.some((point) => point.metric === "revenue")).toBe(false);
+    expect(getRevenueLineProps().data.every((point) => point.metric === "revenue")).toBe(true);
   });
 
   it("renders a deterministic loading state before chart content", () => {
@@ -325,6 +356,15 @@ describe("MonthlyOperationalTrendCard", () => {
     expect(screen.getByRole("alert").textContent).toBe(labels.errorMessage);
     expect(screen.queryByText("database connection leaked details")).toBeNull();
     expect(chartMocks.line).not.toHaveBeenCalled();
+  });
+
+  it("runs the retry action when trend loading fails", () => {
+    const retry = vi.fn();
+
+    renderCard({ error: new Error("database connection leaked details"), onRetry: retry });
+    fireEvent.click(screen.getByRole("button", { name: labels.retryAction }));
+
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 
   it("renders an empty state when transformed rows are absent", () => {
@@ -344,6 +384,7 @@ describe("MonthlyOperationalTrendCard", () => {
     expect(screen.getByRole("alert").textContent).toBe(labels.zeroValueSummary);
     expect(screen.queryByText(labels.emptyDescription)).toBeNull();
     expect(document.body.textContent).toContain(currencyFormatter.format(0));
-    expect(getLineProps().data.every((point) => point.value === 0)).toBe(true);
+    expect(getCountLineProps().data.every((point) => point.value === 0)).toBe(true);
+    expect(getRevenueLineProps().data.every((point) => point.value === 0)).toBe(true);
   });
 });
