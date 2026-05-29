@@ -125,6 +125,7 @@ const mocks = vi.hoisted(() => {
     return params?.count !== undefined ? translated.replace(/\{\{count\}\}/g, String(params.count)) : translated;
   });
   const navigateList = vi.fn();
+  const col = vi.fn<(props: { xs?: number; sm?: number; lg?: number; xl?: number }) => void>();
   const line = vi.fn<(props: LineMockProps) => void>();
   const tableColumn = vi.fn<(props: { dataIndex?: string | readonly string[]; responsive?: readonly string[] }) => void>();
 
@@ -132,6 +133,7 @@ const mocks = vi.hoisted(() => {
     useList,
     translate,
     navigateList,
+    col,
     line,
     tableColumn,
   };
@@ -183,6 +185,14 @@ vi.mock("antd", async () => {
     dataSource?: Record<string, unknown>[];
     locale?: { emptyText?: React.ReactNode };
     "aria-label"?: string;
+  }
+
+  interface ColProps {
+    children?: React.ReactNode;
+    xs?: number;
+    sm?: number;
+    lg?: number;
+    xl?: number;
   }
 
   const getRecordValue = (record: Record<string, unknown>, dataIndex?: DataIndex): unknown => {
@@ -247,7 +257,11 @@ vi.mock("antd", async () => {
         {children}
       </section>
     ),
-    Col: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    Col: ({ children, xs, sm, lg, xl }: ColProps) => {
+      mocks.col({ xs, sm, lg, xl });
+
+      return <div>{children}</div>;
+    },
     Row: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
     Radio: {
       Group: ({
@@ -489,6 +503,7 @@ describe("Dashboard", () => {
     mocks.useList.mockReset();
     mocks.translate.mockClear();
     mocks.navigateList.mockReset();
+    mocks.col.mockClear();
     mocks.line.mockClear();
     mocks.tableColumn.mockClear();
   });
@@ -750,6 +765,15 @@ describe("Dashboard", () => {
     expect(screen.queryByText("Total Revenue")).toBeNull();
     expect(screen.queryByText("dashboard.overview.title")).toBeNull();
     expect(screen.queryByText("dashboard.alerts.title")).toBeNull();
+  });
+
+  it("lets the fulfillment-risk KPI fill the attention panel at extra-large widths", () => {
+    setupDashboardQueries();
+
+    render(<Dashboard />);
+
+    expect(screen.getByText("Paid Orders Pending Delivery")).not.toBeNull();
+    expect(mocks.col).toHaveBeenCalledWith({ xs: 24, sm: 12, lg: 24, xl: 24 });
   });
 
   it("renders zero-denominator KPI values without NaN or Infinity", () => {

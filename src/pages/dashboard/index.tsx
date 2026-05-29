@@ -320,7 +320,7 @@ export const Dashboard: React.FC = () => {
           </Col>
           <Col xs={24} lg={10}>
             <Row gutter={[16, 16]} style={{ height: "100%" }} align="stretch">
-              <Col xs={24} sm={12} lg={24} xl={12} style={{ display: "flex" }}>
+              <Col xs={24} sm={12} lg={24} xl={24} style={{ display: "flex" }}>
                 <Card style={{ ...secondaryKpiCardStyle, flex: 1, width: "100%" }}>
                   <Statistic
                     title={translate("dashboard.kpis.fulfillmentRisk")}
