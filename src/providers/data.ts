@@ -16,6 +16,13 @@ const PRODUCT_READ_RESOURCE = "admin_products";
 const OPERATIONAL_METRICS_RESOURCE = "admin_operational_metrics";
 const PRODUCT_IMAGE_CLEANUP_SELECT = "id, product_images(url)";
 
+// Explicit column list for product mutations (INSERT/UPDATE RETURNING).
+// The `sku` column has column-level SELECT revoked from `authenticated` to
+// protect it from customer reads, so `RETURNING *` fails with 42501.
+// Mutations list every column except `sku` to avoid the permission error.
+const PRODUCT_MUTATION_SELECT =
+  "id, category_id, name, slug, description, price, stock, is_active, weight, created_at, updated_at";
+
 type DataProviderGetListParams = Parameters<NonNullable<DataProvider["getList"]>>[0];
 type DataProviderGetManyParams = Parameters<NonNullable<DataProvider["getMany"]>>[0];
 
@@ -278,6 +285,24 @@ async function deleteBannerMediaIfUnreferenced(
 
 export const dataProvider: DataProvider = {
   ...baseDataProvider,
+  create: async (params) => {
+    if (params.resource === "products") {
+      return baseDataProvider.create({
+        ...params,
+        meta: { ...params.meta, select: PRODUCT_MUTATION_SELECT },
+      });
+    }
+    return baseDataProvider.create(params);
+  },
+  update: async (params) => {
+    if (params.resource === "products") {
+      return baseDataProvider.update({
+        ...params,
+        meta: { ...params.meta, select: PRODUCT_MUTATION_SELECT },
+      });
+    }
+    return baseDataProvider.update(params);
+  },
   getList: async <TData extends BaseRecord = BaseRecord>(
     params: DataProviderGetListParams,
   ): Promise<GetListResponse<TData>> => {
