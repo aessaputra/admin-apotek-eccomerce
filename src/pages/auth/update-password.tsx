@@ -16,8 +16,7 @@ export function UpdatePassword() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Memeriksa apakah pengguna memerlukan MFA sebelum mengganti kata sandi
-    async function checkMfaRequirement() {
+    async function enforceMfaRequirement() {
       const { data: { user } } = await supabaseClient.auth.getUser();
       if (!user) return;
 
@@ -34,7 +33,7 @@ export function UpdatePassword() {
       }
     }
     
-    void checkMfaRequirement();
+    void enforceMfaRequirement();
   }, [navigate]);
 
   async function handleSubmit() {
