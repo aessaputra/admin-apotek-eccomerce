@@ -46,10 +46,10 @@ export function ForgotPassword() {
         <Space direction="vertical" size={24} style={{ width: "100%" }}>
           <AuthTitle />
           <Typography.Title level={3} style={{ margin: 0 }}>
-            {translate("forgotPassword.title", {}, "Forgot Password?")}
+            {translate("pages.forgotPassword.title", {}, "Forgot Password?")}
           </Typography.Title>
           <Typography.Paragraph style={{ margin: 0 }}>
-            {translate("forgotPassword.description", {}, "Enter your email address and we'll send you instructions to reset your password.")}
+            {translate("pages.forgotPassword.description", {}, "Enter your email address and we'll send you instructions to reset your password.")}
           </Typography.Paragraph>
 
           {error && <Alert type="error" showIcon message={error} />}
@@ -57,7 +57,7 @@ export function ForgotPassword() {
             <Alert
               type="success"
               showIcon
-              message={translate("forgotPassword.success", {}, "Password reset instructions have been sent to your email.")}
+              message={translate("pages.forgotPassword.success", {}, "Password reset instructions have been sent to your email.")}
             />
           )}
 
@@ -69,7 +69,7 @@ export function ForgotPassword() {
           >
             <Space direction="vertical" size={16} style={{ width: "100%" }}>
               <label>
-                <span>{translate("forgotPassword.fields.email", {}, "Email")}</span>
+                <span>{translate("pages.forgotPassword.fields.email", {}, "Email")}</span>
                 <Input
                   autoComplete="email"
                   name="email"
@@ -82,12 +82,12 @@ export function ForgotPassword() {
               </label>
 
               <Button htmlType="submit" type="primary" loading={loading} style={{ width: "100%", marginTop: 8 }}>
-                {translate("forgotPassword.buttons.submit", {}, "Send Reset Instructions")}
+                {translate("pages.forgotPassword.buttons.submit", {}, "Send Reset Instructions")}
               </Button>
 
               <div style={{ textAlign: "center", marginTop: 8 }}>
-                <span>{translate("forgotPassword.buttons.haveAccount", {}, "Already have an account? ")}</span>
-                <Link to="/login">{translate("forgotPassword.signin", {}, "Sign in")}</Link>
+                <span>{translate("pages.forgotPassword.buttons.haveAccount", {}, "Already have an account? ")}</span>
+                <Link to="/login">{translate("pages.forgotPassword.signin", {}, "Sign in")}</Link>
               </div>
             </Space>
           </form>
