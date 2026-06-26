@@ -651,6 +651,7 @@
       "fullNamePlaceholder": "Masukkan nama lengkap"
     },
     "changePassword": "Ganti Kata Sandi",
+    "newPasswordDescription": "Silakan masukkan kata sandi baru yang kuat untuk mengamankan akun Anda.",
     "newPassword": "Kata Sandi Baru",
     "confirmPassword": "Konfirmasi Kata Sandi",
     "newPasswordPlaceholder": "Masukkan kata sandi baru",

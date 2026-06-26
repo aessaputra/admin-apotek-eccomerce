@@ -651,6 +651,7 @@
       "fullNamePlaceholder": "Enter full name"
     },
     "changePassword": "Change Password",
+    "newPasswordDescription": "Please enter a strong new password to secure your account.",
     "newPassword": "New Password",
     "confirmPassword": "Confirm Password",
     "newPasswordPlaceholder": "Enter new password",

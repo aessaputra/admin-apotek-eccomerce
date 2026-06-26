@@ -31,6 +31,7 @@ import { BrowserRouter, Outlet, Route, Routes } from "react-router";
 import { useTranslation } from "react-i18next";
 import { ColorModeContextProvider } from "./contexts/color-mode";
 import { Header } from "./components/header";
+import { AuthInterceptor } from "./components/auth/auth-interceptor";
 import { AppSider } from "./components/layout/app-sider";
 import { AuthTitle } from "./components/layout/auth-title";
 import { Title } from "./components/layout/title";
@@ -62,6 +63,7 @@ const HomeBannerEdit = lazy(() => import("./pages/home-banners/edit").then(({ Ho
 const HomeBannerShow = lazy(() => import("./pages/home-banners/show").then(({ HomeBannerShow }) => ({ default: HomeBannerShow })));
 const MfaVerify = lazy(() => import("./pages/auth/mfa-verify").then(({ MfaVerify }) => ({ default: MfaVerify })));
 const Login = lazy(() => import("./pages/auth/login").then(({ Login }) => ({ default: Login })));
+const UpdatePassword = lazy(() => import("./pages/auth/update-password").then(({ UpdatePassword }) => ({ default: UpdatePassword })));
 
 function App() {
   const { t, i18n } = useTranslation();
@@ -83,6 +85,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <AuthInterceptor />
       {import.meta.env.DEV && <GitHubBanner />}
       <RefineKbarProvider>
         <ColorModeContextProvider>
@@ -226,7 +229,7 @@ function App() {
                   >
                     <Route path="/login" element={<Login />} />
                     <Route path="/forgot-password" element={<AuthPage type="forgotPassword" title={<AuthTitle />} />} />
-                    <Route path="/update-password" element={<AuthPage type="updatePassword" title={<AuthTitle />} />} />
+                    <Route path="/update-password" element={<UpdatePassword />} />
                   </Route>
                 </Routes>
                 </Suspense>
