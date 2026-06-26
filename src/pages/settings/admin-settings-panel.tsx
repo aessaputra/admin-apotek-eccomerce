@@ -130,7 +130,7 @@ export const AdminSettingsPanel: React.FC = () => {
                 <Input 
                   size="large" 
                   prefix={<MailOutlined style={{ color: "#98a2b3", marginRight: 4 }} />} 
-                  placeholder="colleague@pharmacy.com" 
+                  placeholder="colleague@sinarfarma.biz.id" 
                   style={{ borderRadius: 8, padding: "8px 12px" }}
                 />
               </Form.Item>
