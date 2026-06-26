@@ -156,6 +156,7 @@ vi.mock("@refinedev/core", () => ({
   useGetIdentity: mocks.useGetIdentity,
   useInvalidate: () => mocks.invalidate,
   useUpdatePassword: () => ({ mutate: mocks.updatePassword, isPending: false }),
+  useNotification: () => ({ open: vi.fn() }),
 }));
 
 vi.mock("@refinedev/antd", () => ({
@@ -543,6 +544,9 @@ vi.mock("@ant-design/icons", () => ({
   EditOutlined: () => <span>edit</span>,
   FileTextOutlined: () => <span>file-text</span>,
   InfoCircleOutlined: () => <span>info</span>,
+  MailOutlined: () => <span>mail</span>,
+  UserAddOutlined: () => <span>user-add</span>,
+  SecurityScanOutlined: () => <span>security-scan</span>,
 }));
 
 vi.mock("../../providers/supabase-client", () => ({
