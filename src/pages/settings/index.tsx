@@ -11,6 +11,7 @@ import { IntegrationAuditPanel } from "./integration-audit-panel";
 import { IntegrationConfigPanel } from "./integration-config-panel";
 import { PaymentSettingsPanel } from "./payment-settings-panel";
 import { ShippingSettingsPanel } from "./shipping-settings-panel";
+import { AdminSettingsPanel } from "./admin-settings-panel";
 
 interface SettingsFormValues {
   store_name: string;
@@ -143,6 +144,11 @@ export const Settings: React.FC = () => {
       key: "shippingSettings",
       label: translate("settings.tabs.shippingSettings", {}, "Pengaturan Pengiriman"),
       children: <ShippingSettingsPanel />,
+    },
+    {
+      key: "adminSettings",
+      label: translate("settings.tabs.adminSettings", {}, "Tambah Admin"),
+      children: <AdminSettingsPanel />,
     },
     {
       key: "paymentSettings",
