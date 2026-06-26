@@ -193,10 +193,11 @@ const authProvider: AuthProvider = {
       });
 
       if (error) {
+        console.error("Supabase updateUser error:", error);
         return {
           success: false,
           error: {
-            message: i18n.t("auth.updatePasswordFailed"),
+            message: `${i18n.t("auth.updatePasswordFailed")}: ${error.message}`,
             name: "AuthError",
           },
         };
