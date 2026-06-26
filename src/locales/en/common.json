@@ -844,7 +844,7 @@
       "formTitle": "Send Invitation",
       "email": "Administrator Email",
       "emailPlaceholder": "colleague@pharmacy.com",
-      "inviteButton": "Send Secure Invitation",
+      "inviteButton": "Send",
       "inviteSuccess": "Admin Invited Successfully",
       "inviteSuccessDescription": "An invitation has been securely dispatched to the user.",
       "inviteError": "Invitation Failed",
