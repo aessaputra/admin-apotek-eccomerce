@@ -843,7 +843,7 @@
       "description": "Empower your team by inviting a new administrator. They will receive an exclusive invitation link with full administrative privileges instantly assigned upon registration.",
       "formTitle": "Send Invitation",
       "email": "Administrator Email",
-      "emailPlaceholder": "colleague@pharmacy.com",
+      "emailPlaceholder": "colleague@sinarfarma.biz.id",
       "inviteButton": "Send",
       "inviteSuccess": "Admin Invited Successfully",
       "inviteSuccessDescription": "An invitation has been securely dispatched to the user.",
