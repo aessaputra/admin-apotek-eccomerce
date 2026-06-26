@@ -72,7 +72,10 @@ async function parseEmailFromRequest(req: Request): Promise<string> {
 async function inviteAndSetAdminProfile(email: string, adminClient: SupabaseClient) {
   const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
     email,
-    { data: { role: "admin" } }
+    { 
+      data: { role: "admin" },
+      redirectTo: "https://admin.sinarfarma.biz.id"
+    }
   );
 
   if (inviteError) {
