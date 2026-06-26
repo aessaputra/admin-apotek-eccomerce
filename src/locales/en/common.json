@@ -833,7 +833,20 @@
       "shippingSettings": "Shipping Settings",
       "integrationConfig": "Technical",
       "integrationAudit": "Configuration Audit",
+      "adminSettings": "Add Admin",
       "paymentSettings": "Payment Settings"
+    },
+    "admin": {
+      "title": "Elevate Access",
+      "description": "Empower your team by inviting a new administrator. They will receive an exclusive invitation link with full administrative privileges instantly assigned upon registration.",
+      "formTitle": "Send Invitation",
+      "email": "Administrator Email",
+      "emailPlaceholder": "colleague@pharmacy.com",
+      "inviteButton": "Send Secure Invitation",
+      "inviteSuccess": "Admin Invited Successfully",
+      "inviteSuccessDescription": "An invitation has been securely dispatched to the user.",
+      "inviteError": "Invitation Failed",
+      "inviteErrorDescription": "Unable to process the request."
     },
     "fields": {
       "storeName": "Store Name",

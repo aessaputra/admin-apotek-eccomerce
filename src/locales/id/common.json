@@ -833,7 +833,20 @@
       "shippingSettings": "Pengaturan Pengiriman",
       "integrationConfig": "Teknis",
       "integrationAudit": "Audit Konfigurasi",
+      "adminSettings": "Tambah Admin",
       "paymentSettings": "Pengaturan Pembayaran"
+    },
+    "admin": {
+      "title": "Tambah Akses Admin",
+      "description": "Undang rekan tim Anda sebagai administrator baru. Mereka akan menerima tautan eksklusif via email dengan hak akses admin otomatis.",
+      "formTitle": "Kirim Undangan",
+      "email": "Email Administrator",
+      "emailPlaceholder": "rekan@farmasi.com",
+      "inviteButton": "Kirim Undangan Aman",
+      "inviteSuccess": "Admin Berhasil Diundang",
+      "inviteSuccessDescription": "Undangan telah berhasil dikirim ke email tersebut.",
+      "inviteError": "Gagal Mengundang",
+      "inviteErrorDescription": "Tidak dapat memproses permintaan undangan saat ini."
     },
     "fields": {
       "storeName": "Nama Toko",
