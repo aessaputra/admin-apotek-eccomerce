@@ -844,7 +844,7 @@
       "formTitle": "Kirim Undangan",
       "email": "Email Administrator",
       "emailPlaceholder": "rekan@farmasi.com",
-      "inviteButton": "Kirim Saja",
+      "inviteButton": "Kirim",
       "inviteSuccess": "Admin Berhasil Diundang",
       "inviteSuccessDescription": "Undangan telah berhasil dikirim ke email tersebut.",
       "inviteError": "Gagal Mengundang",
