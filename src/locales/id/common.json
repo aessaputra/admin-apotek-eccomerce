@@ -202,7 +202,8 @@
     "validation": {
       "skuRequired": "SKU wajib diisi",
       "skuInvalid": "SKU harus 4-50 karakter menggunakan huruf besar, angka, dan tanda hubung.",
-      "skuDuplicate": "SKU ini sudah digunakan oleh produk lain."
+      "skuDuplicate": "SKU ini sudah digunakan oleh produk lain.",
+      "weightRequired": "Dibutuhkan untuk perhitungan ongkos kirim dan pembuatan pesanan kurir."
     },
     "imagesSaveError": "Gagal menyimpan gambar produk",
     "description": {

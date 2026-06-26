@@ -145,7 +145,7 @@ export const ProductCreate: React.FC = () => {
           label={translate("products.fields.weight")}
           name="weight"
           rules={PRODUCT_WEIGHT_RULES}
-          extra="Required for shipping rates and Biteship order creation."
+          extra={translate("products.validation.weightRequired", {}, "Required for shipping rates and Biteship order creation.")}
         >
           <ProductWeightInput />
         </Form.Item>

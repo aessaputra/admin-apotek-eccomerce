@@ -202,7 +202,8 @@
     "validation": {
       "skuRequired": "SKU is required",
       "skuInvalid": "SKU must be 4-50 characters using uppercase letters, numbers, and hyphens.",
-      "skuDuplicate": "This SKU is already used by another product."
+      "skuDuplicate": "This SKU is already used by another product.",
+      "weightRequired": "Required for shipping rates and Biteship order creation."
     },
     "imagesSaveError": "Failed to save product images",
     "description": {
