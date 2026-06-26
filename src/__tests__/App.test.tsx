@@ -38,6 +38,10 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
+vi.mock("../components/auth/auth-interceptor", () => ({
+  AuthInterceptor: () => null,
+}));
+
 vi.mock("react-router", () => ({
   BrowserRouter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   Routes: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -49,6 +53,7 @@ vi.mock("react-router", () => ({
     return <div>{element}{children}</div>;
   },
   Outlet: () => <div>outlet</div>,
+  useNavigate: () => vi.fn(),
 }));
 
 vi.mock("@refinedev/core", () => ({
