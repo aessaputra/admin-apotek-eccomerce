@@ -1129,7 +1129,9 @@
       }
     },
     "forgotPassword": {
-      "title": "Forgot your password?",
+      "title": "Forgot password?",
+      "description": "Enter your email address and we'll send you instructions to reset your password.",
+      "success": "Password reset instructions have been sent to your email.",
       "fields": {
         "email": "Email"
       },

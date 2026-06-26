@@ -1130,6 +1130,8 @@
     },
     "forgotPassword": {
       "title": "Lupa kata sandi?",
+      "description": "Masukkan alamat email Anda dan kami akan mengirimkan instruksi untuk mengatur ulang kata sandi Anda.",
+      "success": "Instruksi reset kata sandi telah dikirim ke email Anda.",
       "fields": {
         "email": "Email"
       },

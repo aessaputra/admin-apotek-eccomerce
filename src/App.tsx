@@ -63,6 +63,7 @@ const HomeBannerEdit = lazy(() => import("./pages/home-banners/edit").then(({ Ho
 const HomeBannerShow = lazy(() => import("./pages/home-banners/show").then(({ HomeBannerShow }) => ({ default: HomeBannerShow })));
 const MfaVerify = lazy(() => import("./pages/auth/mfa-verify").then(({ MfaVerify }) => ({ default: MfaVerify })));
 const Login = lazy(() => import("./pages/auth/login").then(({ Login }) => ({ default: Login })));
+const ForgotPassword = lazy(() => import("./pages/auth/forgot-password").then(({ ForgotPassword }) => ({ default: ForgotPassword })));
 const UpdatePassword = lazy(() => import("./pages/auth/update-password").then(({ UpdatePassword }) => ({ default: UpdatePassword })));
 
 function App() {
@@ -228,7 +229,7 @@ function App() {
                     }
                   >
                     <Route path="/login" element={<Login />} />
-                    <Route path="/forgot-password" element={<AuthPage type="forgotPassword" title={<AuthTitle />} />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/update-password" element={<UpdatePassword />} />
                   </Route>
                 </Routes>
