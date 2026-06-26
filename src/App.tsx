@@ -230,8 +230,8 @@ function App() {
                   >
                     <Route path="/login" element={<Login />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
-                    <Route path="/update-password" element={<UpdatePassword />} />
                   </Route>
+                  <Route path="/update-password" element={<UpdatePassword />} />
                 </Routes>
                 </Suspense>
                 <RefineKbar />
