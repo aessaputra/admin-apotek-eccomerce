@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useUpdatePassword, useTranslation } from "@refinedev/core";
 import { useNavigate } from "react-router";
 import { Alert, Button, Card, Input, Space, Typography } from "antd";
 import { AuthTitle } from "../../components/layout/auth-title";
+import { supabaseClient } from "../../providers/supabase-client";
+import { MFA_VERIFY_ROUTE, setPendingMfaState } from "../../utils/mfa";
 
 export function UpdatePassword() {
   const { translate } = useTranslation();
@@ -12,6 +14,28 @@ export function UpdatePassword() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Memeriksa apakah pengguna memerlukan MFA sebelum mengganti kata sandi
+    async function checkMfaRequirement() {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) return;
+
+      const { data: assuranceLevel, error: assuranceLevelError } = await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (assuranceLevelError) return;
+
+      if (assuranceLevel.currentLevel === "aal1" && assuranceLevel.nextLevel === "aal2") {
+        setPendingMfaState({
+          userId: user.id,
+          email: user.email,
+          returnTo: "/update-password",
+        });
+        navigate(MFA_VERIFY_ROUTE, { replace: true });
+      }
+    }
+    
+    void checkMfaRequirement();
+  }, [navigate]);
 
   async function handleSubmit() {
     setError(null);
