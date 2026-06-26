@@ -74,7 +74,7 @@ async function inviteAndSetAdminProfile(email: string, adminClient: SupabaseClie
     email,
     { 
       data: { role: "admin" },
-      redirectTo: "https://admin.sinarfarma.biz.id"
+      redirectTo: "https://admin.sinarfarma.biz.id/update-password"
     }
   );
 
