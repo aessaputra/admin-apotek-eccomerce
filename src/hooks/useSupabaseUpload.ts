@@ -114,7 +114,11 @@ export function useSupabaseUpload(
       }
 
       if (Array.isArray(value)) {
-        const next = value.filter((u) => u !== url);
+        const pathToRemove = path || url;
+        const next = value.filter((u) => {
+          const uPath = getStoragePathFromReference(u, bucket) || u;
+          return uPath !== pathToRemove;
+        });
         (onChange as (v: string[]) => void)?.(next);
       } else {
         (onChange as (v: string | undefined) => void)?.(undefined);

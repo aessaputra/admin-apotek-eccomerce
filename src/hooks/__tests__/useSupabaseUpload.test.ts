@@ -144,7 +144,7 @@ describe("useSupabaseUpload", () => {
       ),
     );
 
-    result.current.handleRemove("products/remove.png");
+    result.current.handleRemove(`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/media/products/remove.png`);
 
     await waitFor(() => {
       expect(mocks.remove).toHaveBeenCalledWith(["products/remove.png"]);
