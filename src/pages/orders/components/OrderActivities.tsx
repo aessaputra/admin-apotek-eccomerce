@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Timeline, Tag, Spin, Space, Alert, Button, Typography, theme } from "antd";
 import { useTranslation } from "@refinedev/core";
 import { supabaseClient } from "../../../providers/supabase-client";
-import { formatDisplayLabel } from "../helpers";
-import type { Activity } from "../types";
+import { formatDisplayLabel, formatBiteshipStatusLabel } from "../helpers";
+import type { Activity, BiteshipExceptionInfo } from "../types";
 
 const { Text } = Typography;
 
@@ -120,6 +120,22 @@ export const OrderActivities: React.FC<OrderActivitiesProps> = ({ orderId }) => 
     }
   };
 
+  const latestSyncActivity = activities.find(
+    (a) => a.action === "sync_tracking" || a.action === "webhook_tracking" || a.action === "shipment_tracking_exception"
+  );
+
+  const latestBiteshipException = latestSyncActivity && typeof latestSyncActivity.metadata?.biteship_exception_status === "string"
+    ? latestSyncActivity
+    : undefined;
+
+  const biteshipExceptionInfo: BiteshipExceptionInfo | null = latestBiteshipException
+    ? {
+        status: String(latestBiteshipException.metadata.biteship_exception_status),
+        alertType: (String(latestBiteshipException.metadata.biteship_exception_alert_type || "warning") as BiteshipExceptionInfo["alertType"]),
+        messageKey: String(latestBiteshipException.metadata.biteship_exception_message_key || ""),
+      }
+    : null;
+
   if (activityError) {
     return (
       <Alert
@@ -148,7 +164,29 @@ export const OrderActivities: React.FC<OrderActivitiesProps> = ({ orderId }) => 
   }
 
   return (
-    <Timeline
+    <div style={{ display: "flex", flexDirection: "column", gap: token.marginMD }}>
+      {biteshipExceptionInfo && (
+        <Alert
+          type={biteshipExceptionInfo.alertType}
+          showIcon
+          message={translate("orders.biteshipAlertTitle")}
+          description={
+            <Space direction="vertical" size={token.marginXXS}>
+              <Text>
+                {translate(
+                  `orders.biteshipAlerts.${biteshipExceptionInfo.messageKey}`,
+                  {},
+                  translate("orders.biteshipAlertUnknown")
+                )}
+              </Text>
+              <Text type="secondary">
+                {translate("orders.biteshipAlertStatusLabel")}: {formatBiteshipStatusLabel(biteshipExceptionInfo.status)}
+              </Text>
+            </Space>
+          }
+        />
+      )}
+      <Timeline
       items={activities.map((activity) => ({
         dot: getActivityIcon(activity.action),
         children: (
@@ -161,5 +199,6 @@ export const OrderActivities: React.FC<OrderActivitiesProps> = ({ orderId }) => 
         ),
       }))}
     />
+    </div>
   );
 };
