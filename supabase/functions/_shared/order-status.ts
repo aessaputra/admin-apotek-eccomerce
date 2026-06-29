@@ -19,6 +19,7 @@ export function getPersistedBiteshipShipmentStatus(
 const FORWARD_STATUS_MAP: Record<string, string> = {
   allocated: "awaiting_shipment",
   confirmed: "awaiting_shipment",
+  scheduled: "awaiting_shipment",
   picking_up: "awaiting_shipment",
   pickingUp: "awaiting_shipment",
   picked: "shipped",
