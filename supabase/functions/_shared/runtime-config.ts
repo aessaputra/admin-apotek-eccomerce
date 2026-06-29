@@ -313,7 +313,7 @@ export class RuntimeConfigProvider {
     }
 
     for (const cacheKey of this.cache.keys()) {
-      if (cacheKey.includes(`\"${keyName}\"`)) {
+      if (cacheKey.includes(`"${keyName}"`)) {
         this.cache.delete(cacheKey);
       }
     }

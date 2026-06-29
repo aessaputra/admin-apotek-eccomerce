@@ -296,7 +296,7 @@ export function createConfirmMidtransPaymentHandler(
         order_status: transition?.order_status || newOrderStatus,
         applied,
       });
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       logError("payment_confirmation_failed");
       return jsonResponse({ error: "Payment confirmation failed" }, 500);
     }

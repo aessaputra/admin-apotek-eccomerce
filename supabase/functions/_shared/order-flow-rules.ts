@@ -36,7 +36,7 @@ type SettlementSideEffectFlags = {
 export function requiresBiteshipSyncForProviderStatusTransition(
   args: ProviderSyncForStatusTransitionArgs,
 ): boolean {
-  if (!Boolean(args.biteshipOrderId)) {
+  if (!args.biteshipOrderId) {
     return false;
   }
 

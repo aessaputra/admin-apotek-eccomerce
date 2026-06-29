@@ -537,6 +537,7 @@ async function restoreMutationState(
 }
 
 type SupabaseAdminClient = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   from: (tableName: string) => any;
   rpc: (name: string, args?: Record<string, unknown>) => PromiseLike<{
     data: unknown;

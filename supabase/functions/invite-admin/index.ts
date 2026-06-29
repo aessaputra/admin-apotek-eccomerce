@@ -69,6 +69,11 @@ async function parseEmailFromRequest(req: Request): Promise<string> {
   return email;
 }
 
+export interface InviteAdminDependencies {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getAdminClient: () => { auth: { admin: { inviteUserByEmail: any } } };
+}
+
 async function inviteAndSetAdminProfile(email: string, adminClient: SupabaseClient) {
   const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
     email,
@@ -136,8 +141,8 @@ Deno.serve(async (req: Request) => {
     let email: string;
     try {
       email = await parseEmailFromRequest(req);
-    } catch (error: any) {
-      return jsonResponse({ error: error.message }, 400);
+    } catch (error) {
+      return jsonResponse({ error: error instanceof Error ? error.message : "Unknown error" }, 400);
     }
 
     try {
@@ -149,8 +154,8 @@ Deno.serve(async (req: Request) => {
           message: "Admin invited successfully",
         },
       });
-    } catch (error: any) {
-      return jsonResponse({ error: error.message }, 500);
+    } catch (error) {
+      return jsonResponse({ error: error instanceof Error ? error.message : "Unknown error" }, 500);
     }
   } catch (error) {
     console.error("[invite-admin] internal error:", error);

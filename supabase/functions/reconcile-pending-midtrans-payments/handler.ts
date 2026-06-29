@@ -366,7 +366,7 @@ export function createReconcilePendingMidtransPaymentsHandler(
         reconciled_count: results.filter((result) => result.reconciled === true).length,
         results,
       });
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       logError("pending_payment_reconciliation_failed");
       return jsonResponse({ error: "Pending payment reconciliation failed" }, 500);
     }

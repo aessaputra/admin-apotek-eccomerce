@@ -36,6 +36,7 @@ declare const Deno:
   | undefined;
 
 export interface BiteshipAdminClient extends RuntimeConfigAdminClient {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   from: (table: string) => any;
 }
 
@@ -1139,7 +1140,7 @@ export function createBiteshipHandler(
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-    } catch (error: unknown) {
+    } catch (_error: unknown) {
       console.error("[biteship] internal_error", {
         action: "request_failed",
         errorCategory: "unexpected_failure",
