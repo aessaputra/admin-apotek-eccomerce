@@ -5,7 +5,7 @@ import {
   createBiteshipOrder,
   ensureBiteshipOrderConfigSnapshot,
   persistBiteshipShipment,
-  readBiteshipOrderConfigSnapshot,
+  ensureBiteshipOrderConfigSnapshot,
   resolveBiteshipApiKeyFromRuntimeConfig,
   type BiteshipOrderConfigSnapshot,
 } from "../biteship.ts";
@@ -37,7 +37,6 @@ vi.mock("../biteship.ts", () => ({
   getStoreSettings: vi.fn(),
   isBiteshipConfigSnapshotError: vi.fn(() => false),
   persistBiteshipShipment: vi.fn(),
-  readBiteshipOrderConfigSnapshot: vi.fn(),
   resolveBiteshipApiKeyFromRuntimeConfig: vi.fn(async (adminClient: {
     rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: QueryError }>;
   }) => {
@@ -461,7 +460,7 @@ describe("processWebhookSideEffectTask cart cleanup", () => {
     });
     vi.mocked(fetchOrderShippingAddress).mockResolvedValue(null);
     vi.mocked(ensureBiteshipOrderConfigSnapshot).mockResolvedValue(completeSnapshot);
-    vi.mocked(readBiteshipOrderConfigSnapshot).mockResolvedValue(completeSnapshot);
+    vi.mocked(ensureBiteshipOrderConfigSnapshot).mockResolvedValue(completeSnapshot);
   });
 
   it("queues initial settlement side effects only after an applied transition", async () => {
@@ -611,7 +610,7 @@ describe("processWebhookSideEffectTask cart cleanup", () => {
   });
 
   it("blocks Biteship creation retryably when the required snapshot is missing", async () => {
-    vi.mocked(readBiteshipOrderConfigSnapshot).mockRejectedValue(
+    vi.mocked(ensureBiteshipOrderConfigSnapshot).mockRejectedValue(
       new Error("Biteship config snapshot missing for order order-selected-cleanup"),
     );
     const adminClient = new MockAdminClient(createTask({

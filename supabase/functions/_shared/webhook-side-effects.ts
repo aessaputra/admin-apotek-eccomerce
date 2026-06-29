@@ -850,9 +850,9 @@ export async function processWebhookSideEffectTask(
 
     if (needsBiteship) {
       try {
-        biteshipSnapshot = await readBiteshipOrderConfigSnapshot(
+        biteshipSnapshot = await ensureBiteshipOrderConfigSnapshot(
           adminClient,
-          orderId,
+          order,
         );
       } catch (snapshotReadError: unknown) {
         const snapshotError = getBiteshipSnapshotErrorDetails(snapshotReadError);
