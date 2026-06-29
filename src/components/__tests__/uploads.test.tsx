@@ -66,7 +66,7 @@ describe("upload components", () => {
 
     expect(screen.getByTestId("upload-max-count").textContent).toBe("1");
     expect(screen.getByTestId("upload-file-count").textContent).toBe("1");
-    expect(screen.queryByText("+ Upload")).toBeNull();
+    expect(screen.queryByText("buttons.upload")).toBeNull();
 
     const lastProps = mocks.uploadProps[mocks.uploadProps.length - 1] as Record<string, unknown>;
     expect(lastProps["aria-label"]).toBe("profile.fields.avatarUpload");
@@ -100,7 +100,7 @@ describe("upload components", () => {
     render(<CategoryLogoUpload />);
 
     expect(screen.getByTestId("upload-file-count").textContent).toBe("0");
-    expect(screen.getByText("+ Upload")).not.toBeNull();
+    expect(screen.getByText("buttons.upload")).not.toBeNull();
   });
 
   it("renders ProductImageUpload with multiple uploads enabled and hides prompt at max count", () => {
@@ -113,7 +113,7 @@ describe("upload components", () => {
     expect(screen.getByTestId("upload-max-count").textContent).toBe("10");
     expect(screen.getByTestId("upload-multiple").textContent).toBe("true");
     expect(screen.getByTestId("upload-file-count").textContent).toBe("10");
-    expect(screen.queryByText("+ Upload")).toBeNull();
+    expect(screen.queryByText("buttons.upload")).toBeNull();
   });
 
   it("extracts the image url from the Upload file object before delegating removal", () => {
