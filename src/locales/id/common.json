@@ -27,7 +27,8 @@
     "create": "Buat",
     "cancel": "Batal",
     "logout": "Keluar",
-    "retry": "Coba lagi"
+    "retry": "Coba lagi",
+    "upload": "+ Unggah"
   },
   "table": {
     "actions": "Aksi"
@@ -200,10 +201,15 @@
       "inactive": "Nonaktif"
     },
     "validation": {
+      "nameRequired": "Nama wajib diisi",
+      "slugRequired": "Slug wajib diisi",
+      "priceRequired": "Harga wajib diisi",
       "skuRequired": "SKU wajib diisi",
       "skuInvalid": "SKU harus 4-50 karakter menggunakan huruf besar, angka, dan tanda hubung.",
       "skuDuplicate": "SKU ini sudah digunakan oleh produk lain.",
-      "weightRequired": "Dibutuhkan untuk perhitungan ongkos kirim dan pembuatan pesanan kurir."
+      "weightRequired": "Dibutuhkan untuk perhitungan ongkos kirim dan pembuatan pesanan kurir.",
+      "weightRequiredRule": "Berat produk wajib diisi untuk pengiriman",
+      "weightMin": "Berat produk harus lebih besar dari 0 gram"
     },
     "imagesSaveError": "Gagal menyimpan gambar produk",
     "description": {
@@ -225,6 +231,10 @@
       "name": "Nama",
       "slug": "Slug",
       "created": "Dibuat"
+    },
+    "validation": {
+      "nameRequired": "Nama wajib diisi",
+      "slugRequired": "Slug wajib diisi"
     }
   },
   "homeBanners": {
@@ -754,6 +764,12 @@
   "notifications": {
     "success": "Berhasil",
     "error": "Error",
+    "createSuccess": "Berhasil menambahkan {{resource}}",
+    "createError": "Terjadi kesalahan saat menambahkan {{resource}}",
+    "editSuccess": "Berhasil memperbarui {{resource}}",
+    "editError": "Terjadi kesalahan saat memperbarui {{resource}}",
+    "deleteSuccess": "Berhasil menghapus {{resource}}",
+    "deleteError": "Terjadi kesalahan saat menghapus {{resource}}",
     "orders": {
       "new": {
         "title": "Order baru",

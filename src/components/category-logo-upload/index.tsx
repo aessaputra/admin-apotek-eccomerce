@@ -1,4 +1,5 @@
 import { Upload } from "antd";
+import { useTranslation } from "@refinedev/core";
 import { useSupabaseUpload } from "../../hooks/useSupabaseUpload";
 import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 
@@ -11,6 +12,7 @@ export const CategoryLogoUpload: React.FC<CategoryLogoUploadProps> = ({
   value,
   onChange,
 }) => {
+  const { translate } = useTranslation();
   const fileList = value
     ? [{ uid: "-1", name: "logo", url: resolveStoragePublicUrl(value, MEDIA_BUCKET) ?? value, status: "done" as const }]
     : [];
@@ -36,7 +38,7 @@ export const CategoryLogoUpload: React.FC<CategoryLogoUploadProps> = ({
       onRemove={() => handleRemove(value!)}
       customRequest={customRequest}
     >
-      {fileList.length === 0 ? "+ Upload" : null}
+      {fileList.length === 0 ? translate("buttons.upload", "+ Upload") : null}
     </Upload>
   );
 };

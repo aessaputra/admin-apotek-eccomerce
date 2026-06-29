@@ -27,7 +27,8 @@
     "create": "Create",
     "cancel": "Cancel",
     "logout": "Logout",
-    "retry": "Try again"
+    "retry": "Try again",
+    "upload": "+ Upload"
   },
   "table": {
     "actions": "Actions"
@@ -200,10 +201,15 @@
       "inactive": "Inactive"
     },
     "validation": {
+      "nameRequired": "Name is required",
+      "slugRequired": "Slug is required",
+      "priceRequired": "Price is required",
       "skuRequired": "SKU is required",
       "skuInvalid": "SKU must be 4-50 characters using uppercase letters, numbers, and hyphens.",
       "skuDuplicate": "This SKU is already used by another product.",
-      "weightRequired": "Required for shipping rates and Biteship order creation."
+      "weightRequired": "Required for shipping rates and Biteship order creation.",
+      "weightRequiredRule": "Product weight is required for shipping",
+      "weightMin": "Product weight must be greater than 0 gram"
     },
     "imagesSaveError": "Failed to save product images",
     "description": {
@@ -225,6 +231,10 @@
       "name": "Name",
       "slug": "Slug",
       "created": "Created"
+    },
+    "validation": {
+      "nameRequired": "Name is required",
+      "slugRequired": "Slug is required"
     }
   },
   "homeBanners": {
@@ -754,6 +764,12 @@
   "notifications": {
     "success": "Success",
     "error": "Error",
+    "createSuccess": "Successfully created {{resource}}",
+    "createError": "There was an error creating {{resource}}",
+    "editSuccess": "Successfully updated {{resource}}",
+    "editError": "There was an error updating {{resource}}",
+    "deleteSuccess": "Successfully deleted {{resource}}",
+    "deleteError": "There was an error deleting {{resource}}",
     "orders": {
       "new": {
         "title": "New orders",

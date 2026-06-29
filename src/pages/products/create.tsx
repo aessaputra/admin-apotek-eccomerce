@@ -10,14 +10,7 @@ import { slugify } from "../../utils/slugify";
 import { generateSkuCandidate } from "../../utils/sku";
 import { supabaseClient } from "../../providers/supabase-client";
 
-const PRODUCT_WEIGHT_RULES = [
-  { required: true, message: "Product weight is required for shipping" },
-  {
-    type: "number" as const,
-    min: 1,
-    message: "Product weight must be greater than 0 gram",
-  },
-];
+
 
 type ProductFormValues = Record<string, unknown>;
 
@@ -119,7 +112,7 @@ export const ProductCreate: React.FC = () => {
         onValuesChange={handleValuesChange}
         onFinish={handleFinish}
       >
-        <Form.Item label={translate("products.fields.name")} name="name" rules={[{ required: true }]}>
+        <Form.Item label={translate("products.fields.name")} name="name" rules={[{ required: true, message: translate("products.validation.nameRequired") }]}>
           <Input />
         </Form.Item>
         <Form.Item
@@ -129,13 +122,13 @@ export const ProductCreate: React.FC = () => {
         >
           <Input onChange={() => { skuTouchedRef.current = true; }} onBlur={handleSkuBlur} />
         </Form.Item>
-        <Form.Item label={translate("products.fields.slug")} name="slug" rules={[{ required: true }]}>
+        <Form.Item label={translate("products.fields.slug")} name="slug" rules={[{ required: true, message: translate("products.validation.slugRequired") }]}>
           <Input />
         </Form.Item>
         <Form.Item label={translate("products.fields.description")} name="description" getValueFromEvent={(val: string) => val}>
           <DescriptionEditorModal maxLength={5000} />
         </Form.Item>
-        <Form.Item label={translate("products.fields.price")} name="price" rules={[{ required: true }]}>
+        <Form.Item label={translate("products.fields.price")} name="price" rules={[{ required: true, message: translate("products.validation.priceRequired") }]}>
           <InputNumber style={{ width: "100%" }} min={0} />
         </Form.Item>
         <Form.Item label={translate("products.fields.stock")} name="stock" initialValue={0}>
@@ -144,7 +137,14 @@ export const ProductCreate: React.FC = () => {
         <Form.Item
           label={translate("products.fields.weight")}
           name="weight"
-          rules={PRODUCT_WEIGHT_RULES}
+          rules={[
+            { required: true, message: translate("products.validation.weightRequiredRule") },
+            {
+              type: "number",
+              min: 1,
+              message: translate("products.validation.weightMin"),
+            },
+          ]}
           extra={translate("products.validation.weightRequired", {}, "Required for shipping rates and Biteship order creation.")}
         >
           <ProductWeightInput />

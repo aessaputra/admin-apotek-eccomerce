@@ -26,10 +26,10 @@ export const CategoryEdit: React.FC = () => {
         layout="vertical"
         onValuesChange={handleValuesChange}
       >
-        <Form.Item label={translate("categories.fields.name")} name="name" rules={[{ required: true }]}>
+        <Form.Item label={translate("categories.fields.name")} name="name" rules={[{ required: true, message: translate("categories.validation.nameRequired") }]}>
           <Input />
         </Form.Item>
-        <Form.Item label={translate("categories.fields.slug")} name="slug" rules={[{ required: true }]}>
+        <Form.Item label={translate("categories.fields.slug")} name="slug" rules={[{ required: true, message: translate("categories.validation.slugRequired") }]}>
           <Input />
         </Form.Item>
         <Form.Item label={translate("categories.fields.logo")} name="logo_url">

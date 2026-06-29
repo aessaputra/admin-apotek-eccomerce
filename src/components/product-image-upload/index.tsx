@@ -1,4 +1,5 @@
 import { Upload } from "antd";
+import { useTranslation } from "@refinedev/core";
 import { useSupabaseUpload } from "../../hooks/useSupabaseUpload";
 import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 
@@ -11,6 +12,7 @@ export const ProductImageUpload: React.FC<ProductImageUploadProps> = ({
   value = [],
   onChange,
 }) => {
+  const { translate } = useTranslation();
   const fileList = (Array.isArray(value) ? value : []).map((url, i) => ({
     uid: `-${i}-${url}`,
     name: `image-${i + 1}`,
@@ -43,7 +45,7 @@ export const ProductImageUpload: React.FC<ProductImageUploadProps> = ({
       }}
       customRequest={customRequest}
     >
-      {fileList.length < 10 ? "+ Upload" : null}
+      {fileList.length < 10 ? translate("buttons.upload", "+ Upload") : null}
     </Upload>
   );
 };
