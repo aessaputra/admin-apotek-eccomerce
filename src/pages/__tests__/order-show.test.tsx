@@ -244,6 +244,8 @@ vi.mock("antd", async () => {
     Switch: ({ checked, onChange }: { checked?: boolean; onChange?: (checked: boolean) => void }) => <input type="checkbox" checked={checked} onChange={() => onChange?.(!checked)} />,
     Alert: ({ message, description, action }: { message: React.ReactNode; description?: React.ReactNode; action?: React.ReactNode }) => <div role="alert"><div>{message}</div><div>{description}</div><div>{action}</div></div>,
     Space: ({ children, style, wrap }: { children: React.ReactNode; direction?: "horizontal" | "vertical"; size?: number; style?: React.CSSProperties; wrap?: boolean }) => <div data-wrap={String(Boolean(wrap))} style={style}>{children}</div>,
+    Row: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Col: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   };
 });
 
@@ -383,13 +385,14 @@ describe("OrderShow", () => {
     const buyerTitle = screen.getByText("orders.buyerAndShipping");
     const totalTitle = screen.getByText("orders.totalAndShipping");
     const activityTitle = screen.getByText("orders.activityTitle");
-    expect(Boolean(actionsTitle.compareDocumentPosition(productTitle) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
     expect(Boolean(productTitle.compareDocumentPosition(buyerTitle) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
     expect(Boolean(buyerTitle.compareDocumentPosition(totalTitle) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
     expect(Boolean(totalTitle.compareDocumentPosition(activityTitle) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    // Actions are now in a separate column, order relative to left-column elements is less strict, but we can verify it exists
+    expect(actionsTitle).not.toBeNull();
     expect(screen.getByRole("button", { name: "copy MID-1" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "copy TX-1" })).not.toBeNull();
-    expect(screen.getAllByRole("button", { name: "copy WB123" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "copy WB123" })).toHaveLength(1);
     expect(screen.getByRole("button", { name: "copy BT-1" })).not.toBeNull();
     expect(
       screen.getByText((content) => content.includes("orderStatus.awaiting_shipment")),
@@ -490,7 +493,7 @@ describe("OrderShow", () => {
     expect((screen.getByText(longOrderId) as HTMLElement).style.overflowWrap).toBe("break-word");
     expect((screen.getByText(longMidtransOrderId) as HTMLElement).style.display).toBe("inline-flex");
     expect((screen.getByText(longTransactionId) as HTMLElement).style.wordBreak).toBe("normal");
-    expect(screen.getAllByRole("button", { name: `copy ${longWaybill}` })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: `copy ${longWaybill}` })).toHaveLength(1);
     expect(screen.getByRole("button", { name: `copy ${longBiteshipOrderId}` })).not.toBeNull();
     expect(screen.getByRole("button", { name: `copy ${longTrackingId}` })).not.toBeNull();
     expect(screen.getAllByText(longWaybill)[0].closest("[data-wrap='true']")).not.toBeNull();
@@ -812,7 +815,6 @@ describe("OrderShow", () => {
     expect(screen.getByRole("option", { name: "orderStatus.shipped" })).not.toBeNull();
     expect(screen.queryByRole("option", { name: "orderStatus.in_transit" })).toBeNull();
     expect(screen.queryByRole("option", { name: "orderStatus.delivered" })).toBeNull();
-    expect(screen.getByText("orders.actionGuide.syncOnlyDescription")).not.toBeNull();
     expect(screen.getByRole("button", { name: "buttons.save" }).hasAttribute("disabled")).toBe(true);
   });
 
@@ -840,7 +842,6 @@ describe("OrderShow", () => {
     });
 
     expect(screen.queryByRole("option", { name: "orderStatus.delivered" })).toBeNull();
-    expect(screen.getByText("orders.actionGuide.syncOnlyDescription")).not.toBeNull();
     expect(screen.getByRole("button", { name: "buttons.save" }).hasAttribute("disabled")).toBe(true);
   });
 

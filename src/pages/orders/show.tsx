@@ -1,7 +1,7 @@
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { useShow, useTranslation } from "@refinedev/core";
 import { Show } from "@refinedev/antd";
-import { Typography, Table, Tag, Form, Select, Input, Button, Card, App, Timeline, Spin, Tooltip, Switch, Alert, Space, Collapse, theme } from "antd";
+import { Typography, Table, Tag, Form, Select, Input, Button, Card, App, Timeline, Spin, Tooltip, Switch, Alert, Space, Collapse, theme, Row, Col } from "antd";
 import type { TableColumnsType } from "antd";
 import { SyncOutlined, InfoCircleOutlined, LockOutlined, WarningOutlined } from "@ant-design/icons";
 import {
@@ -672,14 +672,6 @@ export const OrderShow: React.FC = () => {
       label: translate("orders.fields.date"),
       value: <Text>{formatAdminDate(record?.created_at)}</Text>,
     },
-    {
-      label: translate("orders.fields.productSubtotal"),
-      value: <Text strong>{formatCurrency(record?.total_amount)}</Text>,
-    },
-    {
-      label: translate("orders.fields.waybillNumber"),
-      value: shipmentMarker,
-    },
   ];
 
   const buyerDetails: DetailListItem[] = [
@@ -731,17 +723,6 @@ export const OrderShow: React.FC = () => {
   return (
     <Show isLoading={isLoading}>
       <div style={pageStackStyle}>
-        <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.orderInfo")}</Title>}>
-          <div style={statusSummaryGridStyle}>
-            {statusSummaryDetails.map((detail) => (
-              <div key={detail.label} style={detailRowStyle}>
-                <Text type="secondary" style={detailLabelStyle}>{detail.label}</Text>
-                <div style={detailValueStyle}>{detail.value}</div>
-              </div>
-            ))}
-          </div>
-        </Card>
-
         {biteshipExceptionInfo && (
           <Alert
             type={biteshipExceptionInfo.alertType}
@@ -763,213 +744,216 @@ export const OrderShow: React.FC = () => {
             }
           />
         )}
+        <Row gutter={[24, 24]}>
+          <Col xs={24} lg={16}>
+            <div style={pageStackStyle}>
+              <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.productList")}</Title>}>
+                <div aria-label={productTableLabel}>
+                  <Table
+                    dataSource={items}
+                    columns={columns}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    scroll={{ x: "max-content" }}
+                    locale={{ emptyText: translate("orders.empty.productItems") }}
+                  />
+                </div>
+              </Card>
 
-        <Card
-          title={
-            <span>
-              {translate("orders.actionsTitle")}
-              {isStatusDropdownLocked && (
-                <Tooltip title={translate("orders.tooltips.webhookControlled")}>
-                  <InfoCircleOutlined aria-label={translate("orders.accessibility.webhookControlled")} style={{ marginLeft: token.marginXS, color: token.colorWarning }} />
-                </Tooltip>
-              )}
-            </span>
-          }
-        >
-          <Text type="secondary">{translate("orders.actionsDescription")}</Text>
+              <div style={detailGridStyle}>
+                <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.buyerAndShipping")}</Title>}>
+                  {renderDetailList(buyerDetails)}
+                </Card>
 
-          <Alert
-            style={{ marginTop: token.marginMD }}
-            type={isStatusDropdownLocked ? "info" : isPaymentSettled ? "success" : "warning"}
-            showIcon
-            message={translate("orders.actionGuide.title")}
-            description={
-              <Space direction="vertical" size={token.marginXXS}>
-                <Text>{actionGuideDescription}</Text>
-                <ol style={{ margin: 0, paddingInlineStart: token.marginLG }}>
-                  <li>{translate("orders.actionGuide.stepPayment")}</li>
-                  <li>{translate("orders.actionGuide.stepFulfillment")}</li>
-                  <li>{translate("orders.actionGuide.stepTracking")}</li>
-                </ol>
-              </Space>
-            }
-          />
+                <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.totalAndShipping")}</Title>}>
+                  {renderDetailList(shipmentAndReferenceDetails)}
+                  <Collapse
+                    bordered={false}
+                    ghost
+                    items={[
+                      {
+                        key: "integration-metadata",
+                        label: translate("orders.integrationMetadata"),
+                        children: renderDetailList(integrationMetadataDetails),
+                      },
+                    ]}
+                  />
+                </Card>
+              </div>
 
-          {hasPaymentGuardedFulfillment && (
-            <Alert
-              style={{ marginTop: token.marginMD }}
-              type="warning"
-              showIcon
-              message={translate("orders.paymentGuard.transitionTitle")}
-              description={translate("orders.paymentGuard.transitionDescription")}
-            />
-          )}
-
-          {showTrackingPaymentGuard && (
-            <Alert
-              style={{ marginTop: token.marginMD }}
-              type="warning"
-              showIcon
-              message={translate("orders.paymentGuard.syncTitle")}
-              description={translate("orders.paymentGuard.syncDescription")}
-            />
-          )}
-
-          {canSyncTracking && (
-            <div style={{ marginTop: token.marginMD }}>
-              <Button type="default" icon={<SyncOutlined spin={syncing} />} onClick={handleSyncTracking} loading={syncing}>
-                {translate("orders.syncTracking")}
-              </Button>
+              <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.activityTitle")}</Title>} styles={{ body: compactCardBodyStyle }}>
+                {activityError ? (
+                  <Alert
+                    type="error"
+                    showIcon
+                    message={translate("orders.activity.loadErrorTitle")}
+                    description={activityError}
+                    action={<Button size="small" onClick={loadActivities}>{translate("buttons.retry", {}, "Coba lagi")}</Button>}
+                  />
+                ) : loadingActivities ? (
+                  <div role="status" aria-live="polite">
+                    <Space>
+                      <Spin size="small" />
+                      <Text type="secondary">{translate("orders.activity.loading", {}, "Memuat aktivitas pesanan...")}</Text>
+                    </Space>
+                  </div>
+                ) : activities.length === 0 ? <Text type="secondary">{translate("orders.noActivities")}</Text> : (
+                  <Timeline items={activities.map((activity) => ({ dot: getActivityIcon(activity.action), children: <div><div>{getActivityText(activity)}</div><Text type="secondary" style={{ fontSize: token.fontSizeSM }}>{formatAdminDate(activity.created_at)}</Text></div> }))} />
+                )}
+              </Card>
             </div>
-          )}
+          </Col>
 
-          {hasProviderManagedShipment && !manualWaybillMode && !isWaybillFullyLocked && (
-            <Alert
-              style={{ marginTop: token.marginMD, marginBottom: token.marginMD }}
-              type="info"
-              showIcon
-              message={translate("orders.providerManagedWaybillHelp")}
-            />
-          )}
+          <Col xs={24} lg={8}>
+            <div style={pageStackStyle}>
+              <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.orderInfo")}</Title>}>
+                <div style={statusSummaryGridStyle}>
+                  {statusSummaryDetails.map((detail) => (
+                    <div key={detail.label} style={detailRowStyle}>
+                      <Text type="secondary" style={detailLabelStyle}>{detail.label}</Text>
+                      <div style={detailValueStyle}>{detail.value}</div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
 
-        <Form form={form} layout="vertical" onFinish={handleUpdate} initialValues={{ status: record?.status ?? "pending", waybill_number: record?.waybill_number ?? "" }}>
-          <Form.Item
-            name="status"
-            label={translate("orders.nextOrderStatus")}
-            rules={[{ required: true }]}
-            tooltip={isStatusDropdownLocked ? translate("orders.tooltips.statusSystemControlled") : undefined}
-          >
-            <Select options={availableStatusOptions} style={{ minWidth: 160 }} disabled={isStatusDropdownLocked || isSaveDisabled} />
-          </Form.Item>
-
-          {showManualWaybillToggle && (
-            <Form.Item label={translate("orders.enableManualWaybill")}>
-              <Switch
-                size="small"
-                checked={manualWaybillMode}
-                onChange={setManualWaybillMode}
-                checkedChildren={translate("orders.waybillModeManual")}
-                unCheckedChildren={translate("orders.waybillModeAuto")}
-              />
-            </Form.Item>
-          )}
-
-          {showManualWaybillField && (
-            <Form.Item
-              name="waybill_number"
-              label={translate("orders.fields.waybillNumber")}
-              tooltip={isWaybillFullyLocked
-                ? translate("orders.tooltips.waybillLocked")
-                : isWaybillAutoGenerated
-                  ? translate("orders.tooltips.waybillAuto")
-                  : translate("orders.tooltips.waybillManual")}
-              dependencies={["status"]}
-              rules={[
-                ({ getFieldValue }) => ({
-                  validator(_, value) {
-                    if (!requiresManualWaybillForSelectedStatus(String(getFieldValue("status") ?? ""))) {
-                      return Promise.resolve();
-                    }
-                    if (String(value ?? "").trim()) return Promise.resolve();
-                    const shippedStatusLabel = translate("orderStatus.shipped", {}, formatDisplayLabel("shipped"));
-                    return Promise.reject(new Error(translate("orders.waybillRequired", { status: shippedStatusLabel })));
-                  },
-                }),
-              ]}
-            >
-              <Input
-                placeholder={translate("orders.waybillPlaceholder")}
-                disabled={isWaybillInputDisabled || isSaveDisabled}
-                suffix={isWaybillFullyLocked ? <LockOutlined aria-label={translate("orders.accessibility.waybillLocked")} style={{ color: token.colorTextTertiary }} /> : undefined}
-              />
-            </Form.Item>
-          )}
-
-          {showOverrideReason && (
-            <>
-              <Alert
-                message={translate("orders.manualWaybillWarning")}
-                type="warning"
-                showIcon
-                icon={<WarningOutlined />}
-                style={{ marginBottom: token.marginMD }}
-              />
-              <Form.Item
-                name="waybill_override_reason"
-                label={translate("orders.waybillOverrideReason")}
-                rules={[{ required: true, message: translate("orders.waybillOverridePlaceholder") }]}
+              <Card
+                title={
+                  <span>
+                    {translate("orders.actionsTitle")}
+                    {isStatusDropdownLocked && (
+                      <Tooltip title={translate("orders.tooltips.webhookControlled")}>
+                        <InfoCircleOutlined aria-label={translate("orders.accessibility.webhookControlled")} style={{ marginLeft: token.marginXS, color: token.colorWarning }} />
+                      </Tooltip>
+                    )}
+                  </span>
+                }
               >
-                <Input.TextArea
-                  placeholder={translate("orders.waybillOverridePlaceholder")}
-                  rows={2}
-                />
-              </Form.Item>
-            </>
-          )}
+                <Text type="secondary">{translate("orders.actionsDescription")}</Text>
 
-          <Form.Item>
-            <Button type="primary" htmlType="submit" loading={saving} disabled={isSaveDisabled}>
-              {translate("buttons.save")}
-            </Button>
-          </Form.Item>
-        </Form>
-        </Card>
+                {hasPaymentGuardedFulfillment && (
+                  <Alert
+                    style={{ marginTop: token.marginMD }}
+                    type="warning"
+                    showIcon
+                    message={translate("orders.paymentGuard.transitionTitle")}
+                    description={translate("orders.paymentGuard.transitionDescription")}
+                  />
+                )}
 
-        <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.productList")}</Title>}>
-          <div aria-label={productTableLabel}>
-            <Table
-              dataSource={items}
-              columns={columns}
-              rowKey="id"
-              pagination={false}
-              size="small"
-              scroll={{ x: "max-content" }}
-              locale={{ emptyText: translate("orders.empty.productItems") }}
-            />
-          </div>
-        </Card>
+                {showTrackingPaymentGuard && (
+                  <Alert
+                    style={{ marginTop: token.marginMD }}
+                    type="warning"
+                    showIcon
+                    message={translate("orders.paymentGuard.syncTitle")}
+                    description={translate("orders.paymentGuard.syncDescription")}
+                  />
+                )}
 
-        <div style={detailGridStyle}>
-          <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.buyerAndShipping")}</Title>}>
-            {renderDetailList(buyerDetails)}
-          </Card>
+                {canSyncTracking && (
+                  <div style={{ marginTop: token.marginMD }}>
+                    <Button type="default" icon={<SyncOutlined spin={syncing} />} onClick={handleSyncTracking} loading={syncing}>
+                      {translate("orders.syncTracking")}
+                    </Button>
+                  </div>
+                )}
 
-          <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.totalAndShipping")}</Title>}>
-            {renderDetailList(shipmentAndReferenceDetails)}
-            <Collapse
-              bordered={false}
-              ghost
-              items={[
-                {
-                  key: "integration-metadata",
-                  label: translate("orders.integrationMetadata"),
-                  children: renderDetailList(integrationMetadataDetails),
-                },
-              ]}
-            />
-          </Card>
-        </div>
+                {hasProviderManagedShipment && !manualWaybillMode && !isWaybillFullyLocked && (
+                  <Alert
+                    style={{ marginTop: token.marginMD, marginBottom: token.marginMD }}
+                    type="info"
+                    showIcon
+                    message={translate("orders.providerManagedWaybillHelp")}
+                  />
+                )}
 
-        <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.activityTitle")}</Title>} styles={{ body: compactCardBodyStyle }}>
-          {activityError ? (
-            <Alert
-              type="error"
-              showIcon
-              message={translate("orders.activity.loadErrorTitle")}
-              description={activityError}
-              action={<Button size="small" onClick={loadActivities}>{translate("buttons.retry", {}, "Coba lagi")}</Button>}
-            />
-          ) : loadingActivities ? (
-            <div role="status" aria-live="polite">
-              <Space>
-                <Spin size="small" />
-                <Text type="secondary">{translate("orders.activity.loading", {}, "Memuat aktivitas pesanan...")}</Text>
-              </Space>
+              <Form form={form} layout="vertical" onFinish={handleUpdate} initialValues={{ status: record?.status ?? "pending", waybill_number: record?.waybill_number ?? "" }}>
+                <Form.Item
+                  name="status"
+                  label={translate("orders.nextOrderStatus")}
+                  rules={[{ required: true }]}
+                  tooltip={isStatusDropdownLocked ? translate("orders.tooltips.statusSystemControlled") : undefined}
+                >
+                  <Select options={availableStatusOptions} style={{ minWidth: 160 }} disabled={isStatusDropdownLocked || isSaveDisabled} />
+                </Form.Item>
+
+                {showManualWaybillToggle && (
+                  <Form.Item label={translate("orders.enableManualWaybill")}>
+                    <Switch
+                      size="small"
+                      checked={manualWaybillMode}
+                      onChange={setManualWaybillMode}
+                      checkedChildren={translate("orders.waybillModeManual")}
+                      unCheckedChildren={translate("orders.waybillModeAuto")}
+                    />
+                  </Form.Item>
+                )}
+
+                {showManualWaybillField && (
+                  <Form.Item
+                    name="waybill_number"
+                    label={translate("orders.fields.waybillNumber")}
+                    tooltip={isWaybillFullyLocked
+                      ? translate("orders.tooltips.waybillLocked")
+                      : isWaybillAutoGenerated
+                        ? translate("orders.tooltips.waybillAuto")
+                        : translate("orders.tooltips.waybillManual")}
+                    dependencies={["status"]}
+                    rules={[
+                      ({ getFieldValue }) => ({
+                        validator(_, value) {
+                          if (!requiresManualWaybillForSelectedStatus(String(getFieldValue("status") ?? ""))) {
+                            return Promise.resolve();
+                          }
+                          if (String(value ?? "").trim()) return Promise.resolve();
+                          const shippedStatusLabel = translate("orderStatus.shipped", {}, formatDisplayLabel("shipped"));
+                          return Promise.reject(new Error(translate("orders.waybillRequired", { status: shippedStatusLabel })));
+                        },
+                      }),
+                    ]}
+                  >
+                    <Input
+                      placeholder={translate("orders.waybillPlaceholder")}
+                      disabled={isWaybillInputDisabled || isSaveDisabled}
+                      suffix={isWaybillFullyLocked ? <LockOutlined aria-label={translate("orders.accessibility.waybillLocked")} style={{ color: token.colorTextTertiary }} /> : undefined}
+                    />
+                  </Form.Item>
+                )}
+
+                {showOverrideReason && (
+                  <>
+                    <Alert
+                      message={translate("orders.manualWaybillWarning")}
+                      type="warning"
+                      showIcon
+                      icon={<WarningOutlined />}
+                      style={{ marginBottom: token.marginMD }}
+                    />
+                    <Form.Item
+                      name="waybill_override_reason"
+                      label={translate("orders.waybillOverrideReason")}
+                      rules={[{ required: true, message: translate("orders.waybillOverridePlaceholder") }]}
+                    >
+                      <Input.TextArea
+                        placeholder={translate("orders.waybillOverridePlaceholder")}
+                        rows={2}
+                      />
+                    </Form.Item>
+                  </>
+                )}
+
+                <Form.Item>
+                  <Button type="primary" htmlType="submit" loading={saving} disabled={isSaveDisabled}>
+                    {translate("buttons.save")}
+                  </Button>
+                </Form.Item>
+              </Form>
+              </Card>
             </div>
-          ) : activities.length === 0 ? <Text type="secondary">{translate("orders.noActivities")}</Text> : (
-            <Timeline items={activities.map((activity) => ({ dot: getActivityIcon(activity.action), children: <div><div>{getActivityText(activity)}</div><Text type="secondary" style={{ fontSize: token.fontSizeSM }}>{formatAdminDate(activity.created_at)}</Text></div> }))} />
-          )}
-        </Card>
+          </Col>
+        </Row>
       </div>
     </Show>
   );
