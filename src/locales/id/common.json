@@ -598,6 +598,22 @@
     "delivered": "Terkirim",
     "cancelled": "Dibatalkan"
   },
+  "biteshipStatus": {
+    "confirmed": "Terkonfirmasi",
+    "scheduled": "Terjadwal",
+    "allocated": "Teralokasi",
+    "picking_up": "Dalam Penjemputan",
+    "picked": "Berhasil Dijemput",
+    "cancelled": "Dibatalkan",
+    "on_hold": "Ditahan",
+    "dropping_off": "Dalam Pengantaran",
+    "return_in_transit": "Dalam Pengembalian",
+    "returned": "Dikembalikan",
+    "rejected": "Paket Ditolak",
+    "disposed": "Dihancurkan",
+    "courier_not_found": "Kurir Tidak Ditemukan",
+    "delivered": "Berhasil Dikirim"
+  },
   "paymentStatus": {
     "pending": "Belum Dibayar",
     "authorize": "Terverifikasi",

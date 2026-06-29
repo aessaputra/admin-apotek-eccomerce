@@ -15,6 +15,7 @@ export interface OrderRecord {
   shipping_address_id?: string | null;
   total_amount: string | number;
   status: string;
+  latest_biteship_status?: string | null;
   customer_completion_stage?: string | null;
   delivered_at?: string | null;
   complaint_window_expires_at?: string | null;

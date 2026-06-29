@@ -598,6 +598,22 @@
     "delivered": "Delivered",
     "cancelled": "Cancelled"
   },
+  "biteshipStatus": {
+    "confirmed": "Confirmed",
+    "scheduled": "Scheduled",
+    "allocated": "Allocated",
+    "picking_up": "Picking Up",
+    "picked": "Picked Up",
+    "cancelled": "Cancelled",
+    "on_hold": "On Hold",
+    "dropping_off": "Dropping Off",
+    "return_in_transit": "Return In Transit",
+    "returned": "Returned",
+    "rejected": "Rejected",
+    "disposed": "Disposed",
+    "courier_not_found": "Courier Not Found",
+    "delivered": "Delivered"
+  },
   "paymentStatus": {
     "pending": "Unpaid",
     "authorize": "Authorize",

@@ -36,9 +36,11 @@ export const OrderShow: React.FC = () => {
   // This means the BiteshipException alert must either move to OrderActivities, or we need to pass it.
   // Since we want to simplify, let's keep the code as clean as possible.
   
-  const currentOrderStatusLabel = record?.status
-    ? translate(`orderStatus.${record.status}`, {}, formatDisplayLabel(record.status))
-    : "-";
+  const currentOrderStatusLabel = record?.latest_biteship_status 
+    ? translate(`biteshipStatus.${record.latest_biteship_status}`, {}, formatDisplayLabel(record.latest_biteship_status))
+    : record?.status
+      ? translate(`orderStatus.${record.status}`, {}, formatDisplayLabel(record.status))
+      : "-";
   const customerCompletionStageLabel = record?.customer_completion_stage
     ? translate(
         `orders.customerCompletionStages.${record.customer_completion_stage}`,

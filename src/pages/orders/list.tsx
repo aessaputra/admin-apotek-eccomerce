@@ -271,9 +271,14 @@ export const OrderList: React.FC = () => {
         <Table.Column
           dataIndex="status"
           title={translate("orders.fields.status")}
-          render={(v: string) => (
-            <Tag color={STATUS_COLORS[v] ?? "default"}>{v ? translate(`orderStatus.${v}`, {}, formatDisplayLabel(v)) : "-"}</Tag>
-          )}
+          render={(v: string, record: any) => {
+            const hasBiteship = record.latest_biteship_status;
+            const labelKey = hasBiteship ? `biteshipStatus.${record.latest_biteship_status}` : `orderStatus.${v}`;
+            const displayVal = hasBiteship ? record.latest_biteship_status : v;
+            return (
+              <Tag color={STATUS_COLORS[v] ?? "default"}>{displayVal ? translate(labelKey, {}, formatDisplayLabel(displayVal)) : "-"}</Tag>
+            );
+          }}
           filterDropdown={createSelectFilterDropdown(
             STATUS_OPTIONS,
             translate("orders.filterStatus"),
