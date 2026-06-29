@@ -31,7 +31,7 @@ export const OrderActionForm: React.FC<OrderActionFormProps> = ({ record, refres
   const hasProviderManagedShipment =
     hasBiteship || !!record?.biteship_tracking_id || record?.waybill_source === "system";
   const currentStatus = record?.status ?? "";
-  const isPaymentSettled = record?.payment_status === "settlement";
+  const isPaymentSettled = record?.payment_status === "settlement" || record?.payment_status === "capture";
   const isTerminalStatus = TERMINAL_STATUSES.includes(currentStatus);
   const canSyncTracking = hasBiteship && !isTerminalStatus && isPaymentSettled;
   const showTrackingPaymentGuard = hasBiteship && !isTerminalStatus && !isPaymentSettled;
