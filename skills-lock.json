@@ -110,7 +110,8 @@
     "systematic-debugging": {
       "source": "obra/superpowers",
       "sourceType": "github",
-      "computedHash": "72e9ab72627e4fd8ed26a582e82309a98ecdc4f6e1c99418430ac05682c9e91d"
+      "skillPath": "skills/systematic-debugging/SKILL.md",
+      "computedHash": "792a368e074981d7e3138edb439e138489b2ac247cd1e5739fab52af680fb17b"
     },
     "testing-strategy": {
       "source": "anthropics/knowledge-work-plugins",
