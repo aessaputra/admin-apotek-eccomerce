@@ -231,6 +231,9 @@
   },
   "categories": {
     "categories": "Kategori",
+    "search": {
+      "placeholder": "Cari kategori berdasarkan nama atau slug"
+    },
     "fields": {
       "logo": "Logo",
       "name": "Nama",

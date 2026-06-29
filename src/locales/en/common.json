@@ -231,6 +231,9 @@
   },
   "categories": {
     "categories": "Categories",
+    "search": {
+      "placeholder": "Search categories by name or slug"
+    },
     "fields": {
       "logo": "Logo",
       "name": "Name",
