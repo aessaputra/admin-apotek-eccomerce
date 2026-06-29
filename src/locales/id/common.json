@@ -178,6 +178,11 @@
   },
   "products": {
     "products": "Produk",
+    "search": {
+      "namePlaceholder": "Cari Produk",
+      "categoryPlaceholder": "Filter berdasarkan kategori",
+      "statusPlaceholder": "Status"
+    },
     "fields": {
       "image": "Gambar",
       "name": "Nama",

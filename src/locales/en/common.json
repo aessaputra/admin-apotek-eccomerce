@@ -178,6 +178,11 @@
   },
   "products": {
     "products": "Products",
+    "search": {
+      "namePlaceholder": "Search Product",
+      "categoryPlaceholder": "Filter by category",
+      "statusPlaceholder": "Status"
+    },
     "fields": {
       "image": "Image",
       "name": "Name",
