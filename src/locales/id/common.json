@@ -181,7 +181,7 @@
     "search": {
       "namePlaceholder": "Cari Produk",
       "categoryPlaceholder": "Filter berdasarkan kategori",
-      "statusPlaceholder": "Status"
+      "statusPlaceholder": "Status Aktif?"
     },
     "fields": {
       "image": "Gambar",

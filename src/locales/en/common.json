@@ -181,7 +181,7 @@
     "search": {
       "namePlaceholder": "Search Product",
       "categoryPlaceholder": "Filter by category",
-      "statusPlaceholder": "Status"
+      "statusPlaceholder": "Active Status?"
     },
     "fields": {
       "image": "Image",

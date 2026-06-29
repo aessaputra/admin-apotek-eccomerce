@@ -123,7 +123,7 @@ export const ProductList: React.FC = () => {
           </Col>
           <Col xs={24} sm={12} md={6}>
             <Select
-              placeholder={translate("products.search.statusPlaceholder", "Status")}
+              placeholder={translate("products.search.statusPlaceholder", "Status Aktif?")}
               allowClear
               style={{ width: "100%" }}
               value={isActive}
