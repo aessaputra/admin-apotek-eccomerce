@@ -200,12 +200,9 @@ describe("AdminOrderNotifications", () => {
     expect(screen.getByText("7")).not.toBeNull();
     expect(screen.getByText("New orders")).not.toBeNull();
     expect(screen.getByText("Latest admin notifications for incoming orders.")).not.toBeNull();
-    expect(screen.getByText("order-1")).not.toBeNull();
+    expect(screen.getByText("#order-1")).not.toBeNull();
     expect(screen.getByText("Alice")).not.toBeNull();
-    expect(screen.getByText("Pending")).not.toBeNull();
-    expect(screen.getByText("Settled")).not.toBeNull();
     expect(screen.getByText(new Date("2026-04-29T10:00:00.000Z").toLocaleString())).not.toBeNull();
-    expect(screen.getByText("Unread")).not.toBeNull();
     expect(screen.getByRole("button", { name: "Open order order-1" })).not.toBeNull();
   });
 
@@ -220,7 +217,6 @@ describe("AdminOrderNotifications", () => {
     render(<AdminOrderNotifications userId="user-1" />);
 
     expect(screen.getByText("Pelanggan tidak tersedia")).not.toBeNull();
-    expect(screen.getByText("Belum dibaca")).not.toBeNull();
     expect(screen.getByLabelText("0 notifikasi order belum dibaca")).not.toBeNull();
   });
 

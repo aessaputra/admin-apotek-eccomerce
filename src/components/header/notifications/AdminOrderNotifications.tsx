@@ -13,17 +13,7 @@ interface AdminOrderNotificationsProps {
   userId?: string;
 }
 
-function formatDisplayLabel(value: string | null | undefined): string {
-  if (!value) {
-    return "-";
-  }
 
-  return value
-    .split(/[_-]/g)
-    .filter(Boolean)
-    .map((part) => (part.length <= 3 ? part.toUpperCase() : `${part.charAt(0).toUpperCase()}${part.slice(1)}`))
-    .join(" ");
-}
 
 function formatCreatedAt(value: string): string {
   const date = new Date(value);
@@ -126,28 +116,16 @@ export const AdminOrderNotifications: React.FC<AdminOrderNotificationsProps> = (
                     backgroundColor: isUnread ? token.colorPrimaryBg : token.colorBgElevated,
                   }}
                 >
-                  <Space direction="vertical" size={4} style={{ width: "100%" }}>
-                    <Space size="small" wrap>
-                      <Text strong>{notification.orderId}</Text>
-                      {isUnread ? (
-                        <Tag color="processing" style={{ marginInlineEnd: 0 }}>
-                          {translate("notifications.orders.new.unread", {}, "Unread")}
-                        </Tag>
-                      ) : null}
-                    </Space>
-                    <Text>{customerName}</Text>
-                    <Space size={4} wrap>
-                      <Tag>{notification.orderStatus ? translate(
-                        `orderStatus.${notification.orderStatus}`,
-                        {},
-                        formatDisplayLabel(notification.orderStatus)
-                      ) : "-"}</Tag>
-                      <Tag>{notification.paymentStatus ? translate(
-                        `paymentStatus.${notification.paymentStatus}`,
-                        {},
-                        formatDisplayLabel(notification.paymentStatus)
-                      ) : "-"}</Tag>
-                    </Space>
+                  <Space direction="vertical" size={2} style={{ width: "100%" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", width: "100%" }}>
+                      <Text strong style={{ fontSize: token.fontSize }}>
+                        {customerName}
+                      </Text>
+                      {isUnread && <Badge dot color={token.colorPrimary} />}
+                    </div>
+                    <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+                      #{notification.orderId}
+                    </Text>
                     <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
                       {formatCreatedAt(notification.createdAt)}
                     </Text>
