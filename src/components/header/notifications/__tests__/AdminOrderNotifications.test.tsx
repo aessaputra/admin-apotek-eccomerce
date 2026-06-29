@@ -24,8 +24,8 @@ const mocks = vi.hoisted(() => {
 
   const translations: Record<"en" | "id", Record<string, string>> = {
     en: {
-      "notifications.orders.new.title": "New orders",
-      "notifications.orders.new.description": "Latest admin notifications for incoming orders.",
+      "notifications.orders.new.title": "Incoming Orders",
+      "notifications.orders.new.description": "Recent orders awaiting your review.",
       "notifications.orders.new.empty": "No new order notifications",
       "notifications.orders.new.unread": "Unread",
       "notifications.orders.new.open": "Open order {{orderId}}",
@@ -35,8 +35,8 @@ const mocks = vi.hoisted(() => {
       "paymentStatus.settlement": "Settled",
     },
     id: {
-      "notifications.orders.new.title": "Order baru",
-      "notifications.orders.new.description": "Notifikasi admin terbaru untuk order masuk.",
+      "notifications.orders.new.title": "Pesanan Masuk",
+      "notifications.orders.new.description": "Daftar pesanan terbaru yang perlu diproses.",
       "notifications.orders.new.empty": "Belum ada notifikasi order baru",
       "notifications.orders.new.unread": "Belum dibaca",
       "notifications.orders.new.open": "Buka order {{orderId}}",
@@ -198,9 +198,8 @@ describe("AdminOrderNotifications", () => {
 
     expect(screen.getByLabelText("7 unread order notifications")).not.toBeNull();
     expect(screen.getByText("7")).not.toBeNull();
-    expect(screen.getByText("New orders")).not.toBeNull();
-    expect(screen.getByText("Latest admin notifications for incoming orders.")).not.toBeNull();
-    expect(screen.getByText("#order-1")).not.toBeNull();
+    expect(screen.getByText("Incoming Orders")).not.toBeNull();
+    expect(screen.getByText("Recent orders awaiting your review.")).not.toBeNull();
     expect(screen.getByText("Alice")).not.toBeNull();
     expect(screen.getByText(new Date("2026-04-29T10:00:00.000Z").toLocaleString())).not.toBeNull();
     expect(screen.getByRole("button", { name: "Open order order-1" })).not.toBeNull();

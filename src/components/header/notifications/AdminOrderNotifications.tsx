@@ -61,12 +61,12 @@ export const AdminOrderNotifications: React.FC<AdminOrderNotificationsProps> = (
         }}
       >
         <Space direction="vertical" size={0}>
-          <Text strong>{translate("notifications.orders.new.title", {}, "New orders")}</Text>
+          <Text strong>{translate("notifications.orders.new.title", {}, "Incoming Orders")}</Text>
           <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
             {translate(
               "notifications.orders.new.description",
               {},
-              "Latest admin notifications for incoming orders."
+              "Recent orders awaiting your review."
             )}
           </Text>
         </Space>
@@ -123,9 +123,6 @@ export const AdminOrderNotifications: React.FC<AdminOrderNotificationsProps> = (
                       </Text>
                       {isUnread && <Badge dot color={token.colorPrimary} />}
                     </div>
-                    <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-                      #{notification.orderId}
-                    </Text>
                     <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
                       {formatCreatedAt(notification.createdAt)}
                     </Text>

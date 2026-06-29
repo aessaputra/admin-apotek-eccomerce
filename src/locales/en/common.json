@@ -797,8 +797,8 @@
     "deleteError": "There was an error deleting {{resource}}",
     "orders": {
       "new": {
-        "title": "New orders",
-        "description": "Latest admin notifications for incoming orders.",
+        "title": "Incoming Orders",
+        "description": "Recent orders awaiting your review.",
         "empty": "No new order notifications",
         "unread": "Unread",
         "open": "Open order {{orderId}}",

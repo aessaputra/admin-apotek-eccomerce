@@ -797,8 +797,8 @@
     "deleteError": "Terjadi kesalahan saat menghapus {{resource}}",
     "orders": {
       "new": {
-        "title": "Order baru",
-        "description": "Notifikasi admin terbaru untuk order masuk.",
+        "title": "Pesanan Masuk",
+        "description": "Daftar pesanan terbaru yang perlu diproses.",
         "empty": "Belum ada notifikasi order baru",
         "unread": "Belum dibaca",
         "open": "Buka order {{orderId}}",
