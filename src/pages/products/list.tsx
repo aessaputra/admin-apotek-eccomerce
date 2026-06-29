@@ -98,8 +98,8 @@ export const ProductList: React.FC = () => {
   return (
     <List>
       <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-        <Row gutter={16}>
-          <Col xs={24} sm={12} md={8}>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={24} md={12}>
             <Input
               allowClear
               placeholder={translate("products.search.namePlaceholder", "Cari Produk")}
@@ -107,7 +107,7 @@ export const ProductList: React.FC = () => {
               onChange={(e) => handleSearchTextChange(e.target.value)}
             />
           </Col>
-          <Col xs={24} sm={12} md={8}>
+          <Col xs={24} sm={12} md={6}>
             <Select
               options={categorySelectProps.options}
               loading={categorySelectProps.loading}
@@ -121,7 +121,7 @@ export const ProductList: React.FC = () => {
               onChange={handleCategoryChange}
             />
           </Col>
-          <Col xs={24} sm={12} md={8}>
+          <Col xs={24} sm={12} md={6}>
             <Select
               placeholder={translate("products.search.statusPlaceholder", "Status")}
               allowClear
