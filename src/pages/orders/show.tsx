@@ -1,14 +1,14 @@
 import React, { useCallback, useMemo } from "react";
 import { useShow, useTranslation } from "@refinedev/core";
 import { Show } from "@refinedev/antd";
-import { Typography, Table, Tag, Card, Alert, Space, Tooltip, theme, Row, Col, Collapse } from "antd";
+import { Typography, Table, Tag, Alert, Space, Tooltip, theme, Row, Col, Collapse } from "antd";
 import type { TableColumnsType } from "antd";
 import { LockOutlined } from "@ant-design/icons";
 import { STATUS_COLORS, PAYMENT_COLORS } from "../../constants/orders";
 import { OrderActivities } from "./components/OrderActivities";
 import { OrderActionForm } from "./components/OrderActionForm";
 import { OrderDetailsCards } from "./components/OrderDetailsCards";
-import { formatDisplayLabel, formatBiteshipStatusLabel } from "./helpers";
+import { formatDisplayLabel } from "./helpers";
 import type { OrderRecord, OrderItem } from "./types";
 
 const { Title, Text } = Typography;

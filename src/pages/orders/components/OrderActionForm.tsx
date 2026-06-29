@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Form, Select, Input, Button, Switch, Alert, Tooltip, App, theme } from "antd";
-import { InfoCircleOutlined, LockOutlined, WarningOutlined, SyncOutlined } from "@ant-design/icons";
+import { Form, Select, Input, Button, Switch, Alert, App, theme } from "antd";
+import { LockOutlined, WarningOutlined, SyncOutlined } from "@ant-design/icons";
 import { useTranslation } from "@refinedev/core";
 import { getAvailableOrderTransitions, getStatusOptions } from "../../../constants/orders";
 import { supabaseClient } from "../../../providers/supabase-client";

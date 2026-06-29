@@ -1,9 +1,7 @@
 import React, { useMemo, useCallback } from "react";
-import { Card, Collapse, Typography, Space, Tag, Tooltip, theme } from "antd";
-import { LockOutlined } from "@ant-design/icons";
+import { Collapse, Typography, Space, Tag, theme } from "antd";
 import { useTranslation } from "@refinedev/core";
 import { getFallbackCourierOption } from "../../../constants/couriers";
-import { STATUS_COLORS, PAYMENT_COLORS } from "../../../constants/orders";
 import { formatDisplayLabel, getMeaningfulValue, hasMeaningfulValue } from "../helpers";
 import type { OrderRecord, DetailListItem } from "../types";
 
