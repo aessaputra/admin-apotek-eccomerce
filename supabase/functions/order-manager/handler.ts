@@ -579,7 +579,7 @@ export function createOrderManagerHandler(dependencies: {
     const { data: order, error: orderError } = await adminClient
       .from("order_read_model")
       .select(
-        "id, user_id, status, payment_status, currency, midtrans_order_id, waybill_number, waybill_source, biteship_order_id, biteship_tracking_id",
+        "id, user_id, status, payment_status, midtrans_order_id, waybill_number, waybill_source, biteship_order_id, biteship_tracking_id",
       )
       .eq("id", body.orderId)
       .single();
@@ -762,7 +762,9 @@ export function createOrderManagerHandler(dependencies: {
 
       if (to === "cancelled") {
         try {
-          Object.assign(paymentUpdatePayload, await buildCancellationPaymentUpdate(adminClient, order));
+          const { data: payment } = await adminClient.from("payments").select("currency").eq("order_id", order.id).single();
+          const orderWithCurrency = { ...order, currency: payment?.currency || null };
+          Object.assign(paymentUpdatePayload, await buildCancellationPaymentUpdate(adminClient, orderWithCurrency));
         } catch (error) {
           if (error instanceof MidtransCurrencyValidationError) {
             return new Response(JSON.stringify({ error: error.message }), {

@@ -128,7 +128,14 @@ function createAdminClient(orderOverrides: Record<string, unknown> = {}) {
     }
 
     if (tableName === "payments") {
-      return { update: paymentsUpdate };
+      return { 
+        update: paymentsUpdate,
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            single: vi.fn(async () => ({ data: { currency: orderOverrides.currency ?? "IDR" }, error: null }))
+          }))
+        }))
+      };
     }
 
     if (tableName === "order_activities") {
@@ -478,9 +485,6 @@ describe("order-manager Midtrans cancellation currency validation", () => {
 
     expect(response.status).toBe(409);
     expect(body).toEqual({ error: "Currency mismatch" });
-    expect(admin.orderReadModelSelect).toHaveBeenCalledWith(
-      expect.stringContaining("currency"),
-    );
     expect(admin.ordersUpdate).not.toHaveBeenCalled();
     expect(admin.paymentsUpdate).not.toHaveBeenCalled();
     expect(admin.activityInsert).not.toHaveBeenCalled();
