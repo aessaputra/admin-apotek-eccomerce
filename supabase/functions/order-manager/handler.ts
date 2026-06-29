@@ -973,8 +973,11 @@ export function createOrderManagerHandler(dependencies: {
         throw configError;
       }
       let trackingId = order.biteship_tracking_id ?? null;
+      let waybill = order.waybill_number ?? null;
+      let orderStatusFromBiteship: string | null = null;
+      let trackingStatusFromBiteship: string | null = null;
 
-      if (!trackingId) {
+      if (!trackingId || !waybill) {
         let orderResp: Response;
         try {
           orderResp = await fetchBiteshipTrackingResource(
@@ -997,66 +1000,84 @@ export function createOrderManagerHandler(dependencies: {
           string,
           unknown
         >;
+        
+        orderStatusFromBiteship = String(biteshipOrderData.status || "");
+        
         const recoveredTrackingId = String(
           ((biteshipOrderData.courier as Record<string, unknown> | undefined)
             ?.tracking_id as string | undefined) || "",
         ).trim();
-
-        if (!recoveredTrackingId) {
-          return new Response(
-            JSON.stringify({
-              error: "Biteship order does not expose a tracking_id yet",
-            }),
-            {
-              status: 409,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            },
-          );
-        }
-
-        trackingId = recoveredTrackingId;
 
         const recoveredWaybill = normalizeWaybillNumber(
           ((biteshipOrderData.courier as Record<string, unknown> | undefined)
             ?.waybill_id as string | undefined) || "",
         );
 
-        await upsertShipmentPatch(adminClient, body.orderId, {
-          provider: "biteship",
-          biteship_order_id: order.biteship_order_id,
-          biteship_tracking_id: trackingId,
-          waybill_number: recoveredWaybill || order.waybill_number || null,
-          waybill_source: recoveredWaybill ? "system" : order.waybill_source,
-          updated_at: new Date().toISOString(),
-        });
+        const shouldPatch = recoveredTrackingId !== trackingId || recoveredWaybill !== waybill;
+
+        trackingId = recoveredTrackingId || trackingId;
+        waybill = recoveredWaybill || waybill;
+
+        if (shouldPatch) {
+          await upsertShipmentPatch(adminClient, body.orderId, {
+            provider: "biteship",
+            biteship_order_id: order.biteship_order_id,
+            biteship_tracking_id: trackingId,
+            waybill_number: waybill || null,
+            waybill_source: waybill ? "system" : order.waybill_source,
+            updated_at: new Date().toISOString(),
+          });
+        }
       }
 
-      let trackingResp: Response;
-      try {
-        trackingResp = await fetchBiteshipTrackingResource(
-          `${BITESHIP_BASE_URL}/trackings/${trackingId}`,
-          authHeader,
-        );
-      } catch (trackingSyncError: unknown) {
-        if (isBiteshipTrackingSyncTimeoutError(trackingSyncError)) {
-          return createBiteshipTrackingTimeoutResponse();
+      let finalTrackingStatus = orderStatusFromBiteship;
+
+      if (trackingId) {
+        let trackingResp: Response;
+        try {
+          trackingResp = await fetchBiteshipTrackingResource(
+            `${BITESHIP_BASE_URL}/trackings/${trackingId}`,
+            authHeader,
+          );
+        } catch (trackingSyncError: unknown) {
+          if (isBiteshipTrackingSyncTimeoutError(trackingSyncError)) {
+            return createBiteshipTrackingTimeoutResponse();
+          }
+
+          throw trackingSyncError;
         }
 
-        throw trackingSyncError;
+        if (!trackingResp.ok) {
+          return createBiteshipTrackingRejectedResponse(trackingResp.status);
+        }
+
+        const trackingData = (await trackingResp.json()) as Record<
+          string,
+          unknown
+        >;
+        trackingStatusFromBiteship = String(trackingData.status || "");
+        
+        const recoveredWaybillFromTracking = String(trackingData.waybill || trackingData.waybill_id || "") || null;
+        if (recoveredWaybillFromTracking) {
+            waybill = normalizeWaybillNumber(recoveredWaybillFromTracking) || waybill;
+        }
+        
+        finalTrackingStatus = trackingStatusFromBiteship || orderStatusFromBiteship;
+      }
+      
+      if (!finalTrackingStatus) {
+         return new Response(
+            JSON.stringify({
+              error: "Biteship order does not expose a tracking_id or status yet",
+            }),
+            {
+              status: 409,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
       }
 
-      if (!trackingResp.ok) {
-        return createBiteshipTrackingRejectedResponse(trackingResp.status);
-      }
-
-      const trackingData = (await trackingResp.json()) as Record<
-        string,
-        unknown
-      >;
-      const trackingStatus = String(trackingData.status || "");
-      const waybill =
-        String(trackingData.waybill || trackingData.waybill_id || "") || null;
-      const statusResolution = resolveBiteshipStatus(trackingStatus, order.status);
+      const statusResolution = resolveBiteshipStatus(finalTrackingStatus, order.status);
       const nextStatus = statusResolution.nextStatus;
 
       if (TERMINAL_STATUSES.has(order.status)) {
@@ -1077,7 +1098,7 @@ export function createOrderManagerHandler(dependencies: {
         return new Response(
           JSON.stringify({
             error: "INVALID_SYNC_TRANSITION",
-            message: `Ignoring Biteship status ${trackingStatus} because it would move the order backward from ${order.status} to ${nextStatus}`,
+            message: `Ignoring Biteship status ${finalTrackingStatus} because it would move the order backward from ${order.status} to ${nextStatus}`,
           }),
           {
             status: 409,
@@ -1134,7 +1155,7 @@ export function createOrderManagerHandler(dependencies: {
             biteship_tracking_id: trackingId,
             waybill_number: syncWaybill,
             waybill_source: syncWaybillSource,
-            latest_biteship_status: trackingStatus,
+            latest_biteship_status: finalTrackingStatus,
             updated_at: operationTimestamp,
           });
           shipmentUpdated = true;
@@ -1173,7 +1194,7 @@ export function createOrderManagerHandler(dependencies: {
           metadata: {
             biteship_order_id: order.biteship_order_id,
             tracking_id: trackingId,
-            biteship_status: trackingStatus,
+            biteship_status: finalTrackingStatus,
             biteship_status_mapped: statusResolution.mapped,
             biteship_exception_status: statusResolution.exception?.status ?? null,
             biteship_exception_alert_type: statusResolution.exception?.alertType ?? null,
