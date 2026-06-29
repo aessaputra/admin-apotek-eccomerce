@@ -46,3 +46,4 @@ _.sln
 # Supabase temp files
 supabase/.temp/
 .vercel
+*.log
