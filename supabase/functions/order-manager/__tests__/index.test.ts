@@ -322,6 +322,10 @@ describe("order-manager Midtrans cancellation currency validation", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({
         status: "picked",
         waybill: "WAYBILL-1",
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        status: "picked",
+        waybill: "WAYBILL-1",
       }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const admin = createAdminClient({
@@ -341,7 +345,7 @@ describe("order-manager Midtrans cancellation currency validation", () => {
     }));
 
     expect(response.status).toBe(200);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(admin.ordersUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: "shipped" }));
     expect(admin.shipmentUpsert).toHaveBeenCalledWith(expect.objectContaining({
       order_id: "order-1",
