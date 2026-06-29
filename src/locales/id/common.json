@@ -178,6 +178,12 @@
   },
   "products": {
     "products": "Produk",
+    "titles": {
+      "list": "Produk",
+      "create": "Buat Produk",
+      "edit": "Edit Produk",
+      "show": "Detail Produk"
+    },
     "search": {
       "namePlaceholder": "Cari nama produk...",
       "categoryPlaceholder": "Semua Kategori",
@@ -231,6 +237,12 @@
   },
   "categories": {
     "categories": "Kategori",
+    "titles": {
+      "list": "Kategori",
+      "create": "Buat Kategori",
+      "edit": "Edit Kategori",
+      "show": "Detail Kategori"
+    },
     "search": {
       "placeholder": "Cari nama atau slug kategori..."
     },

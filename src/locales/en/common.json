@@ -178,6 +178,12 @@
   },
   "products": {
     "products": "Products",
+    "titles": {
+      "list": "Products",
+      "create": "Create Product",
+      "edit": "Edit Product",
+      "show": "Product Details"
+    },
     "search": {
       "namePlaceholder": "Search product name...",
       "categoryPlaceholder": "All Categories",
@@ -231,6 +237,12 @@
   },
   "categories": {
     "categories": "Categories",
+    "titles": {
+      "list": "Categories",
+      "create": "Create Category",
+      "edit": "Edit Category",
+      "show": "Category Details"
+    },
     "search": {
       "placeholder": "Search category name or slug..."
     },
