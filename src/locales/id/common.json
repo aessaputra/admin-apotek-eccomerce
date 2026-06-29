@@ -187,7 +187,12 @@
     "search": {
       "namePlaceholder": "Cari nama produk...",
       "categoryPlaceholder": "Semua Kategori",
-      "statusPlaceholder": "Status Aktif"
+      "statusPlaceholder": "Status Aktif",
+      "sortPlaceholder": "Urutkan..."
+    },
+    "sort": {
+      "newest": "Terbaru",
+      "oldest": "Terlama"
     },
     "fields": {
       "image": "Gambar",

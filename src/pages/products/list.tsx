@@ -32,10 +32,28 @@ export const ProductList: React.FC = () => {
 
   const hasFilterChangedRef = useRef(false);
 
-  const { tableProps, setCurrentPage, setFilters } = useTable({
+  const { tableProps, setCurrentPage, setFilters, sorters, setSorters } = useTable({
     syncWithLocation: true,
     meta: { select: "*, product_images(*), categories(name)" },
+    sorters: {
+      initial: [
+        {
+          field: "created_at",
+          order: "desc",
+        },
+      ],
+    },
   });
+
+  const currentSortOrder = sorters?.find((s) => s.field === "created_at")?.order ?? null;
+
+  const handleSortChange = (value: "desc" | "asc" | null) => {
+    if (value) {
+      setSorters([{ field: "created_at", order: value }]);
+    } else {
+      setSorters([]);
+    }
+  };
 
   const { selectProps: categorySelectProps } = useSelect({
     resource: "categories",
@@ -99,7 +117,7 @@ export const ProductList: React.FC = () => {
     <List>
       <Space direction="vertical" size="middle" style={{ width: "100%" }}>
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={24} md={12}>
+          <Col xs={24} sm={12} md={6}>
             <Input
               allowClear
               placeholder={translate("products.search.namePlaceholder", "Cari nama produk...")}
@@ -131,6 +149,19 @@ export const ProductList: React.FC = () => {
               options={[
                 { label: translate("products.active.yes", "Yes"), value: true },
                 { label: translate("products.active.no", "No"), value: false },
+              ]}
+            />
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Select
+              placeholder={translate("products.search.sortPlaceholder", "Urutkan...")}
+              allowClear
+              style={{ width: "100%" }}
+              value={currentSortOrder}
+              onChange={handleSortChange}
+              options={[
+                { label: translate("products.sort.newest", "Terbaru"), value: "desc" },
+                { label: translate("products.sort.oldest", "Terlama"), value: "asc" },
               ]}
             />
           </Col>

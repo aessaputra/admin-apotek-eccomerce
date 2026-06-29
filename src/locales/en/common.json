@@ -187,7 +187,12 @@
     "search": {
       "namePlaceholder": "Search product name...",
       "categoryPlaceholder": "All Categories",
-      "statusPlaceholder": "Active Status"
+      "statusPlaceholder": "Active Status",
+      "sortPlaceholder": "Sort by..."
+    },
+    "sort": {
+      "newest": "Newest",
+      "oldest": "Oldest"
     },
     "fields": {
       "image": "Image",
