@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo } from "react";
 import { useShow, useTranslation } from "@refinedev/core";
 import { Show } from "@refinedev/antd";
-import { Typography, Table, Tag, Card, Alert, Space, Tooltip, theme, Row, Col } from "antd";
+import { Typography, Table, Tag, Card, Alert, Space, Tooltip, theme, Row, Col, Collapse } from "antd";
 import type { TableColumnsType } from "antd";
 import { LockOutlined } from "@ant-design/icons";
 import { STATUS_COLORS, PAYMENT_COLORS } from "../../constants/orders";
@@ -193,47 +193,88 @@ export const OrderShow: React.FC = () => {
         <Row gutter={[24, 24]}>
           <Col xs={24} lg={16}>
             <div style={pageStackStyle}>
-              <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.productList")}</Title>}>
-                <div aria-label={productTableLabel}>
-                  <Table
-                    dataSource={items}
-                    columns={columns}
-                    rowKey="id"
-                    pagination={false}
-                    size="small"
-                    scroll={{ x: "max-content" }}
-                    locale={{ emptyText: translate("orders.empty.productItems") }}
-                  />
-                </div>
-              </Card>
+              <Collapse
+                defaultActiveKey={["productList"]}
+                style={{ background: token.colorBgContainer }}
+                items={[
+                  {
+                    key: "productList",
+                    label: <Title level={5} style={sectionTitleStyle}>{translate("orders.productList")}</Title>,
+                    children: (
+                      <div aria-label={productTableLabel}>
+                        <Table
+                          dataSource={items}
+                          columns={columns}
+                          rowKey="id"
+                          pagination={false}
+                          size="small"
+                          scroll={{ x: "max-content" }}
+                          locale={{ emptyText: translate("orders.empty.productItems") }}
+                        />
+                      </div>
+                    ),
+                  }
+                ]}
+              />
 
               <OrderDetailsCards record={record} />
 
-              <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.activityTitle")}</Title>} styles={{ body: compactCardBodyStyle }}>
-                <OrderActivities orderId={record?.id} />
-              </Card>
+              <Collapse
+                defaultActiveKey={["activity"]}
+                style={{ background: token.colorBgContainer }}
+                items={[
+                  {
+                    key: "activity",
+                    label: <Title level={5} style={sectionTitleStyle}>{translate("orders.activityTitle")}</Title>,
+                    children: <OrderActivities orderId={record?.id} />,
+                    styles: { body: compactCardBodyStyle }
+                  }
+                ]}
+              />
             </div>
           </Col>
 
           <Col xs={24} lg={8}>
             <div style={pageStackStyle}>
-              <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.orderInfo")}</Title>}>
-                <div style={statusSummaryGridStyle}>
-                  {statusSummaryDetails.map((detail) => (
-                    <div key={detail.label} style={detailRowStyle}>
-                      <Text type="secondary" style={detailLabelStyle}>{detail.label}</Text>
-                      <div style={detailValueStyle}>{detail.value}</div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
+              <Collapse
+                defaultActiveKey={["orderInfo"]}
+                style={{ background: token.colorBgContainer }}
+                items={[
+                  {
+                    key: "orderInfo",
+                    label: <Title level={5} style={sectionTitleStyle}>{translate("orders.orderInfo")}</Title>,
+                    children: (
+                      <div style={statusSummaryGridStyle}>
+                        {statusSummaryDetails.map((detail) => (
+                          <div key={detail.label} style={detailRowStyle}>
+                            <Text type="secondary" style={detailLabelStyle}>{detail.label}</Text>
+                            <div style={detailValueStyle}>{detail.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  }
+                ]}
+              />
 
-              <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.actionsTitle")}</Title>}>
-                <Text type="secondary" style={{ display: "block", marginBottom: token.marginMD }}>
-                  {translate("orders.actionsDescription")}
-                </Text>
-                <OrderActionForm record={record} refreshOrderState={refreshOrderState} />
-              </Card>
+              <Collapse
+                defaultActiveKey={["actions"]}
+                style={{ background: token.colorBgContainer }}
+                items={[
+                  {
+                    key: "actions",
+                    label: <Title level={5} style={sectionTitleStyle}>{translate("orders.actionsTitle")}</Title>,
+                    children: (
+                      <>
+                        <Text type="secondary" style={{ display: "block", marginBottom: token.marginMD }}>
+                          {translate("orders.actionsDescription")}
+                        </Text>
+                        <OrderActionForm record={record} refreshOrderState={refreshOrderState} />
+                      </>
+                    )
+                  }
+                ]}
+              />
             </div>
           </Col>
         </Row>

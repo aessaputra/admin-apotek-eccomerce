@@ -194,11 +194,27 @@ export const OrderDetailsCards: React.FC<OrderDetailsCardsProps> = ({ record }) 
 
   return (
     <div style={detailGridStyle}>
-      <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.buyerAndShipping")}</Title>}>
-        {renderDetailList(buyerDetails)}
-      </Card>
-      <Card title={<Title level={5} style={sectionTitleStyle}>{translate("orders.totalAndShipping")}</Title>}>
-        {renderDetailList(shipmentAndReferenceDetails)}
+      <Collapse
+        defaultActiveKey={["buyer"]}
+        style={{ background: token.colorBgContainer }}
+        items={[
+          {
+            key: "buyer",
+            label: <Title level={5} style={sectionTitleStyle}>{translate("orders.buyerAndShipping")}</Title>,
+            children: renderDetailList(buyerDetails),
+          }
+        ]}
+      />
+      <Collapse
+        defaultActiveKey={["total"]}
+        style={{ background: token.colorBgContainer }}
+        items={[
+          {
+            key: "total",
+            label: <Title level={5} style={sectionTitleStyle}>{translate("orders.totalAndShipping")}</Title>,
+            children: (
+              <>
+                {renderDetailList(shipmentAndReferenceDetails)}
         <Collapse
           bordered={false}
           ghost
@@ -210,7 +226,11 @@ export const OrderDetailsCards: React.FC<OrderDetailsCardsProps> = ({ record }) 
             },
           ]}
         />
-      </Card>
+              </>
+            ),
+          }
+        ]}
+      />
     </div>
   );
 };
