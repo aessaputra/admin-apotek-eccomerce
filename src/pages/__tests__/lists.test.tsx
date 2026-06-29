@@ -64,6 +64,7 @@ vi.mock("@refinedev/antd", async () => {
   return {
     List: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     useTable: mocks.useTable,
+    useSelect: () => ({ selectProps: { options: [], loading: false } }),
     DateField: ({ value }: { value: string }) => <span>{value}</span>,
     ShowButton: ({ recordItemId, resource }: { recordItemId: string; resource?: string }) => (
       <button type="button">show:{resource ?? "default"}:{recordItemId}</button>
@@ -260,6 +261,8 @@ vi.mock("antd", async () => {
     ),
     Image: ({ src }: { src: string }) => <span>{src}</span>,
     Select: ({ placeholder }: { placeholder?: string }) => <select aria-label={placeholder ?? "select"} />,
+    Row: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Col: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   };
 });
 
