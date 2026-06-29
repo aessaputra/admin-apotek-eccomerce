@@ -74,6 +74,25 @@ describe("order flow rules", () => {
     ).toBe(false);
   });
 
+  it("allows downstream Biteship shipping progress if manually overridden", () => {
+    expect(
+      requiresBiteshipSyncForProviderStatusTransition({
+        targetStatus: "in_transit",
+        biteshipOrderId: "BT-1",
+        waybillSource: "manual",
+      }),
+    ).toBe(false);
+
+    expect(
+      requiresBiteshipSyncForProviderStatusTransition({
+        targetStatus: "delivered",
+        biteshipOrderId: "BT-1",
+        waybillSource: "manual",
+      }),
+    ).toBe(false);
+  });
+
+
   it("queues Biteship fulfillment only for awaiting_shipment orders without a provider order yet", () => {
     expect(
       shouldQueueBiteshipFulfillment({

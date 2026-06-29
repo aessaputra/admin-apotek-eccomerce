@@ -40,8 +40,8 @@ export function requiresBiteshipSyncForProviderStatusTransition(
     return false;
   }
 
-  if (args.targetStatus === "shipped") {
-    return args.waybillSource !== "manual";
+  if (args.waybillSource === "manual") {
+    return false;
   }
 
   return (
