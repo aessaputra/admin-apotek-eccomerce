@@ -634,7 +634,7 @@
     "searchName": "Cari nama",
     "searchPhone": "Cari nomor",
     "search": {
-      "placeholder": "Cari pelanggan berdasarkan nama, email, atau telepon",
+      "placeholder": "Cari nama, email, atau telepon...",
       "noResults": "Tidak ada pelanggan ditemukan",
       "loading": "Memuat pelanggan",
       "error": "Gagal memuat pelanggan",
