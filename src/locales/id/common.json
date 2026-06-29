@@ -179,9 +179,9 @@
   "products": {
     "products": "Produk",
     "search": {
-      "namePlaceholder": "Cari Produk",
-      "categoryPlaceholder": "Filter berdasarkan kategori",
-      "statusPlaceholder": "Status Aktif?"
+      "namePlaceholder": "Cari nama produk...",
+      "categoryPlaceholder": "Semua Kategori",
+      "statusPlaceholder": "Semua Status"
     },
     "fields": {
       "image": "Gambar",
@@ -232,7 +232,7 @@
   "categories": {
     "categories": "Kategori",
     "search": {
-      "placeholder": "Cari kategori berdasarkan nama atau slug"
+      "placeholder": "Cari nama atau slug kategori..."
     },
     "fields": {
       "logo": "Logo",

@@ -51,7 +51,7 @@ export const CategoryList: React.FC = () => {
           <Col xs={24} sm={24} md={12}>
             <Input
               allowClear
-              placeholder={translate("categories.search.placeholder", "Cari kategori")}
+              placeholder={translate("categories.search.placeholder", "Cari nama atau slug kategori...")}
               value={searchText}
               onChange={(e) => handleSearchTextChange(e.target.value)}
             />

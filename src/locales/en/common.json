@@ -179,9 +179,9 @@
   "products": {
     "products": "Products",
     "search": {
-      "namePlaceholder": "Search Product",
-      "categoryPlaceholder": "Filter by category",
-      "statusPlaceholder": "Active Status?"
+      "namePlaceholder": "Search product name...",
+      "categoryPlaceholder": "All Categories",
+      "statusPlaceholder": "All Statuses"
     },
     "fields": {
       "image": "Image",
@@ -232,7 +232,7 @@
   "categories": {
     "categories": "Categories",
     "search": {
-      "placeholder": "Search categories by name or slug"
+      "placeholder": "Search category name or slug..."
     },
     "fields": {
       "logo": "Logo",

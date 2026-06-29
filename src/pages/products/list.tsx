@@ -102,7 +102,7 @@ export const ProductList: React.FC = () => {
           <Col xs={24} sm={24} md={12}>
             <Input
               allowClear
-              placeholder={translate("products.search.namePlaceholder", "Cari Produk")}
+              placeholder={translate("products.search.namePlaceholder", "Cari nama produk...")}
               value={searchText}
               onChange={(e) => handleSearchTextChange(e.target.value)}
             />
@@ -114,7 +114,7 @@ export const ProductList: React.FC = () => {
               onSearch={categorySelectProps.onSearch}
               showSearch
               filterOption={false}
-              placeholder={translate("products.search.categoryPlaceholder", "Filter berdasarkan kategori")}
+              placeholder={translate("products.search.categoryPlaceholder", "Semua Kategori")}
               allowClear
               style={{ width: "100%" }}
               value={categoryId}
@@ -123,7 +123,7 @@ export const ProductList: React.FC = () => {
           </Col>
           <Col xs={24} sm={12} md={6}>
             <Select
-              placeholder={translate("products.search.statusPlaceholder", "Status Aktif?")}
+              placeholder={translate("products.search.statusPlaceholder", "Semua Status")}
               allowClear
               style={{ width: "100%" }}
               value={isActive}
