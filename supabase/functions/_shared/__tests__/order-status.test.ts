@@ -61,7 +61,7 @@ describe("resolveBiteshipStatus", () => {
       mapped: false,
     });
 
-    expect(resolveBiteshipStatus("scheduled", "processing")).toEqual({
+    expect(resolveBiteshipStatus("another_mystery_status", "processing")).toEqual({
       nextStatus: "processing",
       mapped: false,
     });
