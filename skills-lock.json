@@ -7,6 +7,12 @@
       "skillPath": "webhook-automation/SKILL.md",
       "computedHash": "1df4d6308b87de01df422a895a6e5a1fece4bd777ba14955e267579b1cfa72dc"
     },
+    "brainstorming": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/brainstorming/SKILL.md",
+      "computedHash": "26a8eb33d548f0c4ead9e7bc13a90c3853398d30345c651245a61a12b869f130"
+    },
     "concise-planning": {
       "source": "sickn33/antigravity-awesome-skills",
       "sourceType": "github",
@@ -85,7 +91,8 @@
     "refine-dev": {
       "source": "itechmeat/llm-code",
       "sourceType": "github",
-      "computedHash": "f7b5bdcc0bb65940a65b9e3822b75b1017d6061918991d0ef53ebd938660761f"
+      "skillPath": "skills/refine-dev/SKILL.md",
+      "computedHash": "418b79c7f53718d19c4e0f64c9529f9aa09853a858ed771edf18824a06ac6ebf"
     },
     "skill-creator": {
       "source": "anthropics/skills",
