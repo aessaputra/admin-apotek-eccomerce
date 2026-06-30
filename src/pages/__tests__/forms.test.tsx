@@ -1132,14 +1132,14 @@ describe("form pages", () => {
     expect(screen.getByRole("tab", { name: "Pengiriman" })).not.toBeNull();
     expect(screen.getByRole("tab", { name: "Pembayaran" })).not.toBeNull();
     expect(screen.getByRole("tab", { name: "Lanjutan" })).not.toBeNull();
-    expect(screen.getByRole("tab", { name: "Audit Konfigurasi" })).not.toBeNull();
+    expect(screen.getByRole("tab", { name: "Riwayat Pengaturan" })).not.toBeNull();
     expect(screen.queryByRole("tab", { name: "Konfigurasi Integrasi" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Integration Config" })).toBeNull();
 
     expect(await screen.findByRole("region", { name: "Pengiriman" })).not.toBeNull();
     expect(await screen.findByRole("region", { name: "Pembayaran" })).not.toBeNull();
     expect(await screen.findByRole("region", { name: "Lanjutan" })).not.toBeNull();
-    expect(await screen.findByRole("region", { name: "Audit Konfigurasi" })).not.toBeNull();
+    expect(await screen.findByRole("region", { name: "Riwayat Pengaturan" })).not.toBeNull();
   });
 
   it("scopes the public settings save affordance to the Store Profile tab", async () => {
@@ -1889,10 +1889,10 @@ describe("form pages", () => {
     });
   }
 
-  it("Audit Konfigurasi manually loads all owner audit keys after clicking Muat audit", async () => {
+  it("Riwayat Pengaturan manually loads all owner audit keys after clicking Muat audit", async () => {
     render(<IntegrationAuditPanel />);
 
-    expect(screen.getByRole("region", { name: "Audit Konfigurasi" })).not.toBeNull();
+    expect(screen.getByRole("region", { name: "Riwayat Pengaturan" })).not.toBeNull();
     expect(screen.getByLabelText("Area")).not.toBeNull();
     expect(screen.getByLabelText("Konfigurasi")).not.toBeNull();
     expect(screen.getByLabelText("Aksi")).not.toBeNull();
@@ -1921,7 +1921,7 @@ describe("form pages", () => {
     expect(bodyText.indexOf("Requestrequest-push-token")).toBeLessThan(bodyText.indexOf("Requestrequest-runtime-read"));
   });
 
-  it("Audit Konfigurasi loads owner-specific keys and explicit key filters only", async () => {
+  it("Riwayat Pengaturan loads owner-specific keys and explicit key filters only", async () => {
     render(<IntegrationAuditPanel />);
 
     fireEvent.change(screen.getByLabelText("Area"), { target: { value: "shipping" } });
@@ -1943,7 +1943,7 @@ describe("form pages", () => {
     ]));
   });
 
-  it("Audit Konfigurasi loads only payment owner keys", async () => {
+  it("Riwayat Pengaturan loads only payment owner keys", async () => {
     render(<IntegrationAuditPanel />);
 
     fireEvent.change(screen.getByLabelText("Area"), { target: { value: "payment" } });
@@ -1956,7 +1956,7 @@ describe("form pages", () => {
     expect(getAuditRequestBodies().some((body) => INTEGRATION_CONFIG_OWNERSHIP.technical.includes(body.key as never))).toBe(false);
   });
 
-  it("Audit Konfigurasi loads only technical owner keys", async () => {
+  it("Riwayat Pengaturan loads only technical owner keys", async () => {
     render(<IntegrationAuditPanel />);
 
     fireEvent.change(screen.getByLabelText("Area"), { target: { value: "technical" } });
@@ -1969,7 +1969,7 @@ describe("form pages", () => {
     expect(getAuditRequestBodies().some((body) => INTEGRATION_CONFIG_OWNERSHIP.shipping.includes(body.key as never))).toBe(false);
   });
 
-  it("Audit Konfigurasi loads only the explicit Midtrans server key", async () => {
+  it("Riwayat Pengaturan loads only the explicit Midtrans server key", async () => {
     render(<IntegrationAuditPanel />);
 
     fireEvent.change(screen.getByLabelText("Konfigurasi"), { target: { value: "midtrans.server_key" } });
@@ -1980,7 +1980,7 @@ describe("form pages", () => {
     ]));
   });
 
-  it("Audit Konfigurasi filters actions after fetch and before the final limit", async () => {
+  it("Riwayat Pengaturan filters actions after fetch and before the final limit", async () => {
     mockAuditRows([
       createAuditRow({ id: "runtime-read", key_name: "midtrans.server_key", action: "runtime_read", request_id: "request-runtime-read-filter", reason: "runtime read content", created_at: "2026-05-20T10:00:00Z" }),
       createAuditRow({ id: "value-updated", key_name: "midtrans.server_key", action: "value_updated", request_id: "request-value-updated-filter", reason: "value updated content", created_at: "2026-05-20T11:00:00Z" }),
@@ -1999,7 +1999,7 @@ describe("form pages", () => {
     expect(getAuditRequestBodies()).toEqual([{ action: "audit", key: "midtrans.server_key", limit: 50 }]);
   });
 
-  it("Audit Konfigurasi sorts visible rows newest first", async () => {
+  it("Riwayat Pengaturan sorts visible rows newest first", async () => {
     mockAuditRows([
       createAuditRow({ id: "oldest", key_name: "midtrans.server_key", action: "secret_rotated", request_id: "request-sort-oldest", created_at: "2026-05-20T08:00:00Z" }),
       createAuditRow({ id: "newest", key_name: "midtrans.server_key", action: "secret_rotated", request_id: "request-sort-newest", created_at: "2026-05-20T12:00:00Z" }),
@@ -2016,7 +2016,7 @@ describe("form pages", () => {
     expect(bodyText.indexOf("request-sort-middle")).toBeLessThan(bodyText.indexOf("request-sort-oldest"));
   });
 
-  it("Audit Konfigurasi displays no more rows than the selected limit", async () => {
+  it("Riwayat Pengaturan displays no more rows than the selected limit", async () => {
     mockAuditRows(Array.from({ length: 55 }, (_, index) => createAuditRow({
       id: `limit-${index + 1}`,
       key_name: "midtrans.server_key",
@@ -2034,7 +2034,7 @@ describe("form pages", () => {
     expect(document.body.textContent).not.toContain("request-limit-51");
   });
 
-  it("Audit Konfigurasi renders missing values as dashes and uses only masked old and new values", async () => {
+  it("Riwayat Pengaturan renders missing values as dashes and uses only masked old and new values", async () => {
     mockAuditRows([
       createAuditRow({
         id: "missing-values",
@@ -2064,7 +2064,7 @@ describe("form pages", () => {
     expect(document.body.textContent).not.toContain("metadata-new-must-not-render");
   });
 
-  it("Audit Konfigurasi renders unknown action labels as safe text", async () => {
+  it("Riwayat Pengaturan renders unknown action labels as safe text", async () => {
     const unsafeAction = "<img src=x onerror=alert(1)>";
     mockAuditRows([
       createAuditRow({
@@ -2084,7 +2084,7 @@ describe("form pages", () => {
     expect(document.body.querySelector("img")).toBeNull();
   });
 
-  it("Audit Konfigurasi clears an incompatible payment key when owner switches to shipping", async () => {
+  it("Riwayat Pengaturan clears an incompatible payment key when owner switches to shipping", async () => {
     render(<IntegrationAuditPanel />);
 
     fireEvent.change(screen.getByLabelText("Area"), { target: { value: "payment" } });
@@ -2103,7 +2103,7 @@ describe("form pages", () => {
     expect(getAuditRequestBodies().some((body) => body.key === "midtrans.server_key")).toBe(false);
   });
 
-  it("Audit Konfigurasi discards partial rows and shows a generic error when any key fails", async () => {
+  it("Riwayat Pengaturan discards partial rows and shows a generic error when any key fails", async () => {
     mocks.functionsInvoke.mockImplementation((_name: string, { body }: { body: Record<string, unknown> }) => {
       if (body.action === "audit" && body.key === "biteship.api_key") {
         return Promise.reject(new Error("raw gateway failure PLAINTEXT_SENTINEL_DO_NOT_RENDER vault-secret-id-do-not-render"));
@@ -2145,7 +2145,7 @@ describe("form pages", () => {
     fireEvent.click(screen.getByRole("button", { name: "Muat audit" }));
 
     expect(await screen.findByRole("alert")).not.toBeNull();
-    expect(document.body.textContent).toContain("Jejak audit konfigurasi tidak dapat dimuat.");
+    expect(document.body.textContent).toContain("Riwayat pengaturan tidak dapat dimuat.");
     expect(document.body.textContent).not.toContain("raw gateway failure");
     expect(document.body.textContent).not.toContain("vault-secret-id-do-not-render");
     expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");

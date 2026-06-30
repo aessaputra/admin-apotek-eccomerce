@@ -162,7 +162,7 @@ export const Settings: React.FC = () => {
     },
     {
       key: "integrationAudit",
-      label: translate("settings.tabs.integrationAudit", {}, "Audit Konfigurasi"),
+      label: translate("settings.tabs.integrationAudit", {}, "Riwayat Pengaturan"),
       children: <IntegrationAuditPanel />,
     },
   ];

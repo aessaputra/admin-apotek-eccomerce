@@ -209,7 +209,7 @@ export const IntegrationAuditPanel: React.FC = () => {
   }, [auditRows, translate]);
 
   return (
-    <section role="region" aria-label={translate("settings.tabs.integrationAudit", {}, "Audit Konfigurasi")}>
+    <section role="region" aria-label={translate("settings.tabs.integrationAudit", {}, "Riwayat Pengaturan")}>
       <Card>
         <Space direction="vertical" size={token.marginMD} style={{ width: "100%" }}>
           <Typography.Text type="secondary">
@@ -268,7 +268,7 @@ export const IntegrationAuditPanel: React.FC = () => {
       </Card>
 
       <Modal
-        title={translate("settings.integration.auditPanel.modalTitle", {}, "Jejak Audit Konfigurasi")}
+        title={translate("settings.integration.auditPanel.modalTitle", {}, "Riwayat Pengaturan")}
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
@@ -278,14 +278,14 @@ export const IntegrationAuditPanel: React.FC = () => {
         <Space direction="vertical" size={token.marginMD} style={{ width: "100%" }}>
           {isLoading ? (
             <div style={{ textAlign: "center", padding: token.marginLG }}>
-              <Spin tip={translate("settings.integration.auditPanel.loading", {}, "Memuat audit konfigurasi...")} />
+              <Spin tip={translate("settings.integration.auditPanel.loading", {}, "Memuat riwayat pengaturan...")} />
             </div>
           ) : null}
           {hasLoadError ? (
             <Alert
               type="error"
               showIcon
-              message={translate("settings.integration.auditPanel.error", {}, "Jejak audit konfigurasi tidak dapat dimuat.")}
+              message={translate("settings.integration.auditPanel.error", {}, "Riwayat pengaturan tidak dapat dimuat.")}
             />
           ) : null}
           {!isLoading && !hasLoadError && auditRows.length === 0 ? (

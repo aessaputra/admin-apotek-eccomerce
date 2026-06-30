@@ -892,7 +892,7 @@
       "storeProfile": "Profil Toko",
       "shippingSettings": "Pengiriman",
       "integrationConfig": "Lanjutan",
-      "integrationAudit": "Audit Konfigurasi",
+      "integrationAudit": "Riwayat Pengaturan",
       "adminSettings": "Tambah Admin",
       "paymentSettings": "Pembayaran"
     },
@@ -1042,7 +1042,7 @@
         "error": "Jejak audit tidak dapat dimuat.",
         "oldValue": "Lama",
         "newValue": "Baru",
-        "open": "Lihat audit konfigurasi",
+        "open": "Lihat riwayat pengaturan",
         "actions": {
           "runtimeRead": "Dibaca runtime",
           "secretRotated": "Secret dirotasi",
@@ -1073,10 +1073,10 @@
         "actionLabel": "Aksi",
         "limitLabel": "Limit",
         "load": "Muat audit",
-        "initial": "Pilih filter, lalu muat audit konfigurasi.",
-        "loading": "Memuat audit konfigurasi...",
+        "initial": "Pilih filter, lalu muat riwayat pengaturan.",
+        "loading": "Memuat riwayat pengaturan...",
         "empty": "Belum ada audit untuk filter ini.",
-        "error": "Jejak audit konfigurasi tidak dapat dimuat.",
+        "error": "Riwayat pengaturan tidak dapat dimuat.",
         "owners": {
           "all": "Semua",
           "payment": "Pembayaran",
@@ -1094,7 +1094,7 @@
         "action": "Detail"
       },
       "technical": {
-        "description": "Kelola token push dan CORS. Audit konfigurasi tersedia di tab Audit Konfigurasi.",
+        "description": "Kelola token push dan CORS. Riwayat pengaturan tersedia di tab Riwayat Pengaturan.",
         "saveSuccess": "Pengaturan lanjutan tersimpan.",
         "saveError": "Pengaturan lanjutan gagal disimpan.",
         "pushToken": {
