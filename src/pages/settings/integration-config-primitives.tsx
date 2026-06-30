@@ -32,7 +32,7 @@ export const SecretReplacementInput: React.FC<SecretReplacementInputProps> = ({
   placeholder = "Leave blank to keep current value",
   saveLabel = "Save",
 }) => (
-  <Space direction="vertical" style={{ width: "100%" }}>
+  <Space.Compact style={{ width: "100%" }}>
     <Input.Password
       aria-label={label}
       value={draft.value}
@@ -41,10 +41,10 @@ export const SecretReplacementInput: React.FC<SecretReplacementInputProps> = ({
       visibilityToggle={false}
       onChange={(event) => onChange({ value: event.target.value })}
     />
-    <Button disabled={saveDisabled || saving} loading={saving} onClick={onSave}>
+    <Button disabled={saveDisabled || saving} loading={saving} onClick={onSave} type="primary">
       {saveLabel}
     </Button>
-  </Space>
+  </Space.Compact>
 );
 
 export interface OperationalConfigRowProps {

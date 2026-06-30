@@ -1,6 +1,6 @@
 import { useTranslation } from "@refinedev/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Button, Card, Modal, Space, Switch, Typography, message, theme } from "antd";
+import { Alert, Card, Modal, Space, Switch, Typography, message, theme } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import {
   integrationConfigClient,
@@ -51,7 +51,7 @@ export const PaymentSettingsPanel: React.FC = () => {
   const serverKeyRow = rowsByKey.get("midtrans.server_key");
   const modeRow = rowsByKey.get("midtrans.is_production");
   const persistedMode = getBooleanValue(modeRow);
-  const modeHasChanged = modeDraft !== persistedMode;
+
 
   useEffect(() => {
     setModeDraft(getBooleanValue(modeRow));
@@ -92,10 +92,10 @@ export const PaymentSettingsPanel: React.FC = () => {
     rotateServerKeyMutation.mutate(secret);
   };
 
-  const saveMode = () => {
-    if (!modeHasChanged) return;
+  const handleModeChange = (checked: boolean) => {
+    setModeDraft(checked);
 
-    if (!persistedMode && modeDraft) {
+    if (!persistedMode && checked) {
       Modal.confirm({
         title: translate("settings.payment.mode.confirmProduction.title", {}, "Aktifkan Produksi?"),
         content: translate(
@@ -106,11 +106,12 @@ export const PaymentSettingsPanel: React.FC = () => {
         okText: translate("settings.payment.mode.confirmProduction.ok", {}, "Aktifkan"),
         cancelText: translate("settings.payment.mode.confirmProduction.cancel", {}, "Batal"),
         onOk: () => updateModeMutation.mutate(true),
+        onCancel: () => setModeDraft(false),
       });
       return;
     }
 
-    updateModeMutation.mutate(modeDraft);
+    updateModeMutation.mutate(checked);
   };
 
   const paymentPanelLabel = translate("settings.tabs.paymentSettings", {}, "Pengaturan Pembayaran");
@@ -173,22 +174,14 @@ export const PaymentSettingsPanel: React.FC = () => {
                   translate("settings.payment.mode.description", {}, "Gunakan Sandbox untuk uji coba. Gunakan Produksi untuk transaksi pelanggan.")
                 )}
               >
-                <Space direction="vertical" style={{ width: "100%" }}>
                   <Switch
                     aria-label={modeLabel}
                     checked={modeDraft}
+                    loading={updateModeMutation.isPending}
                     checkedChildren={translate("settings.payment.mode.production", {}, "Produksi")}
                     unCheckedChildren={translate("settings.payment.mode.sandbox", {}, "Sandbox")}
-                    onChange={setModeDraft}
+                    onChange={handleModeChange}
                   />
-                  <Button
-                    loading={updateModeMutation.isPending}
-                    disabled={!modeHasChanged || updateModeMutation.isPending}
-                    onClick={saveMode}
-                  >
-                    {translate("buttons.save", {}, "Simpan")}
-                  </Button>
-                </Space>
               </OperationalConfigRow>
             ) : null}
           </Space>

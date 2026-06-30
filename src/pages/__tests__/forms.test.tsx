@@ -1365,14 +1365,7 @@ describe("form pages", () => {
 
     const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
     const modeSwitch = await within(paymentPanel).findByRole("switch", { name: "Mode Pembayaran Midtrans" });
-    const modeRow = modeSwitch.closest("div")?.parentElement as HTMLElement;
-    const saveButton = within(modeRow).getByRole("button", { name: "Simpan" }) as HTMLButtonElement;
-
-    expect(saveButton.disabled).toBe(true);
-
     fireEvent.click(modeSwitch);
-    expect(saveButton.disabled).toBe(false);
-    fireEvent.click(saveButton);
 
     const confirm = vi.mocked(Modal.confirm);
     expect(confirm).toHaveBeenCalledWith(expect.objectContaining({
@@ -1414,11 +1407,7 @@ describe("form pages", () => {
 
     const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
     const modeSwitch = await within(paymentPanel).findByRole("switch", { name: "Mode Pembayaran Midtrans" });
-    const modeRow = modeSwitch.closest("div")?.parentElement as HTMLElement;
-    const saveButton = within(modeRow).getByRole("button", { name: "Simpan" });
-
     fireEvent.click(modeSwitch);
-    fireEvent.click(saveButton);
 
     const confirmOptions = vi.mocked(Modal.confirm).mock.calls[0]?.[0];
     confirmOptions?.onCancel?.();
