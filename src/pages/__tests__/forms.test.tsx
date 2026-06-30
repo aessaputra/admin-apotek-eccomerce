@@ -482,6 +482,19 @@ vi.mock("antd", () => {
       );
     },
     Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Empty: ({ description }: { description?: React.ReactNode }) => <div>{description}</div>,
+    Spin: ({ tip }: { tip?: React.ReactNode }) => <div>{tip}</div>,
+    Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+    Collapse: Object.assign(
+      ({ items }: { items?: Array<{ key: string; label: React.ReactNode; children: React.ReactNode }> }) => (
+        <div>{items?.map((item) => <div key={item.key}><div>{item.label}</div><div>{item.children}</div></div>)}</div>
+      ),
+      {
+        Panel: ({ children, header }: { children: React.ReactNode; header?: React.ReactNode }) => (
+          <div><div>{header}</div><div>{children}</div></div>
+        )
+      }
+    ),
     Alert: ({ message, description }: { message: React.ReactNode; description?: React.ReactNode }) => <div role="alert">{message}{description}</div>,
     Descriptions: Object.assign(
       ({ children }: { children: React.ReactNode }) => <dl>{children}</dl>,
@@ -1118,14 +1131,14 @@ describe("form pages", () => {
     expect(screen.getByRole("tab", { name: "Profil Toko" })).not.toBeNull();
     expect(screen.getByRole("tab", { name: "Pengaturan Pengiriman" })).not.toBeNull();
     expect(screen.getByRole("tab", { name: "Pengaturan Pembayaran" })).not.toBeNull();
-    expect(screen.getByRole("tab", { name: "Teknis" })).not.toBeNull();
+    expect(screen.getByRole("tab", { name: "Lanjutan" })).not.toBeNull();
     expect(screen.getByRole("tab", { name: "Audit Konfigurasi" })).not.toBeNull();
     expect(screen.queryByRole("tab", { name: "Konfigurasi Integrasi" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Integration Config" })).toBeNull();
 
     expect(await screen.findByRole("region", { name: "Pengaturan Pengiriman" })).not.toBeNull();
     expect(await screen.findByRole("region", { name: "Pengaturan Pembayaran" })).not.toBeNull();
-    expect(await screen.findByRole("region", { name: "Teknis" })).not.toBeNull();
+    expect(await screen.findByRole("region", { name: "Lanjutan" })).not.toBeNull();
     expect(await screen.findByRole("region", { name: "Audit Konfigurasi" })).not.toBeNull();
   });
 
@@ -1153,7 +1166,7 @@ describe("form pages", () => {
     expect(storeProfileSave.disabled).toBe(true);
     expect(storeProfileSave.style.display).toBe("none");
 
-    fireEvent.click(screen.getByRole("tab", { name: "Teknis" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Lanjutan" }));
     expect(storeProfileSave.disabled).toBe(true);
     expect(storeProfileSave.style.display).toBe("none");
 
@@ -1163,7 +1176,7 @@ describe("form pages", () => {
 
     expect(await screen.findByRole("region", { name: "Pengaturan Pengiriman" })).not.toBeNull();
     expect(await screen.findByRole("region", { name: "Pengaturan Pembayaran" })).not.toBeNull();
-    expect(await screen.findByRole("region", { name: "Teknis" })).not.toBeNull();
+    expect(await screen.findByRole("region", { name: "Lanjutan" })).not.toBeNull();
   });
 
   it("renders settings page with shipping picker controls outside the public settings form path", async () => {
@@ -1884,7 +1897,7 @@ describe("form pages", () => {
     expect(screen.getByLabelText("Konfigurasi")).not.toBeNull();
     expect(screen.getByLabelText("Aksi")).not.toBeNull();
     expect(screen.getByLabelText("Limit")).not.toBeNull();
-    expect(screen.getByText("Pilih filter, lalu muat audit konfigurasi.")).not.toBeNull();
+
     expect(mocks.functionsInvoke.mock.calls.some((call) => call[1]?.body?.action === "audit")).toBe(false);
 
     fireEvent.click(screen.getByRole("button", { name: "Muat audit" }));
@@ -2287,8 +2300,8 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const advancedPanel = await screen.findByRole("region", { name: "Teknis" });
-    expect(advancedPanel.textContent).toContain("Kelola token push dan CORS. Audit konfigurasi tersedia di tab Audit Konfigurasi.");
+    const advancedPanel = await screen.findByRole("region", { name: "Lanjutan" });
+
     expect(advancedPanel.textContent).not.toMatch(/audit\s+teknis/i);
     expect(await within(advancedPanel).findByLabelText("Expo Push Token")).not.toBeNull();
     expect(within(advancedPanel).getByLabelText("Allowed Origins")).not.toBeNull();
@@ -2322,7 +2335,7 @@ describe("form pages", () => {
     }));
   });
 
-  it("advanced technical settings rotates the Expo push token with a hidden reason", async () => {
+  it("advanced advanced settings rotates the Expo push token with a hidden reason", async () => {
     mocks.useForm.mockReturnValue({
       formProps: {},
       saveButtonProps: {},
@@ -2334,7 +2347,7 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const advancedPanel = await screen.findByRole("region", { name: "Teknis" });
+    const advancedPanel = await screen.findByRole("region", { name: "Lanjutan" });
     const pushTokenInput = await within(advancedPanel).findByLabelText("Expo Push Token") as HTMLInputElement;
     const pushTokenRow = pushTokenInput.closest("div")?.parentElement as HTMLElement;
 
@@ -2358,7 +2371,7 @@ describe("form pages", () => {
     await waitFor(() => expect(pushTokenInput.value).toBe(""));
   });
 
-  it("advanced technical settings sends CORS origins updates as arrays", async () => {
+  it("advanced advanced settings sends CORS origins updates as arrays", async () => {
     mocks.useForm.mockReturnValue({
       formProps: {},
       saveButtonProps: {},
@@ -2370,7 +2383,7 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const advancedPanel = await screen.findByRole("region", { name: "Teknis" });
+    const advancedPanel = await screen.findByRole("region", { name: "Lanjutan" });
     const allowedOriginsInput = await within(advancedPanel).findByLabelText("Allowed Origins");
     const allowedOriginsRow = allowedOriginsInput.closest("div")?.parentElement as HTMLElement;
 
@@ -2393,7 +2406,7 @@ describe("form pages", () => {
     expect(advancedPanel.textContent).not.toContain("Reason");
   });
 
-  it("advanced technical settings shows safe loading and gateway errors without raw response internals", async () => {
+  it("advanced advanced settings shows safe loading and gateway errors without raw response internals", async () => {
     mocks.useForm.mockReturnValue({
       formProps: {},
       saveButtonProps: {},
@@ -2422,13 +2435,13 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const advancedPanel = await screen.findByRole("region", { name: "Teknis" });
-    expect(within(advancedPanel).getByText("Loading technical settings...")).not.toBeNull();
+    const advancedPanel = await screen.findByRole("region", { name: "Lanjutan" });
+    expect(within(advancedPanel).getByText("Loading advanced settings...")).not.toBeNull();
 
     resolveSummary?.({ data: { error: "Only admin can manage integration config PLAINTEXT_SENTINEL_DO_NOT_RENDER" }, error: null });
     resolveAudit?.({ data: { error: "Only admin can manage integration config PLAINTEXT_SENTINEL_DO_NOT_RENDER" }, error: null });
 
-    expect(await within(advancedPanel).findByText("Technical settings could not be loaded.")).not.toBeNull();
+    expect(await within(advancedPanel).findByText("Advanced settings could not be loaded.")).not.toBeNull();
     expect(document.body.textContent).not.toContain("Only admin can manage integration config");
     expect(document.body.textContent).not.toContain("PLAINTEXT_SENTINEL_DO_NOT_RENDER");
   });

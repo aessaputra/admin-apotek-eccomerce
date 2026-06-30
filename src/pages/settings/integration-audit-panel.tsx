@@ -1,5 +1,5 @@
 import { useTranslation } from "@refinedev/core";
-import { Alert, Button, Card, Descriptions, Select, Space, Typography, theme } from "antd";
+import { Alert, Button, Card, Collapse, Descriptions, Empty, Modal, Select, Space, Spin, Tag, Typography, theme } from "antd";
 import { useMemo, useState } from "react";
 import {
   integrationConfigClient,
@@ -33,7 +33,7 @@ function getOwnerLabel(owner: AuditOwnerFilter, translate: TranslateFunction): s
   if (owner === "all") return translate("settings.integration.auditPanel.owners.all", {}, "Semua");
   if (owner === "payment") return translate("settings.integration.auditPanel.owners.payment", {}, "Pembayaran");
   if (owner === "shipping") return translate("settings.integration.auditPanel.owners.shipping", {}, "Pengiriman");
-  return translate("settings.integration.auditPanel.owners.technical", {}, "Teknis");
+  return translate("settings.integration.auditPanel.owners.technical", {}, "Lanjutan");
 }
 
 function getActionLabel(action: AuditActionFilter | string, translate: TranslateFunction): string {
@@ -80,49 +80,7 @@ const AuditValue: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <Typography.Text style={wrapValueStyle}>{children}</Typography.Text>
 );
 
-const AuditRowCard: React.FC<{ row: IntegrationConfigAuditRow }> = ({ row }) => {
-  const { translate } = useTranslation();
 
-  return (
-    <Card size="small">
-      <Space direction="vertical" size="small" style={{ width: "100%" }}>
-        <Space direction="vertical" size={0}>
-          <Typography.Text strong>{getRuntimeConfigAuditLabel(row.key_name, translate)}</Typography.Text>
-          <Typography.Text type="secondary">{getActionLabel(row.action, translate)}</Typography.Text>
-        </Space>
-        <Descriptions column={1} size="small" bordered>
-          <Descriptions.Item label={translate("settings.integration.audit.fields.key", {}, "Key")}>
-            <AuditValue>{row.key_name}</AuditValue>
-          </Descriptions.Item>
-          <Descriptions.Item label={translate("settings.integration.audit.fields.timestamp", {}, "Timestamp")}>
-            <AuditValue>{formatAuditDate(row.created_at)}</AuditValue>
-          </Descriptions.Item>
-          <Descriptions.Item label={translate("settings.integration.audit.fields.actorRole", {}, "Actor role")}>
-            <AuditValue>{row.actor_role || "-"}</AuditValue>
-          </Descriptions.Item>
-          <Descriptions.Item label={translate("settings.integration.audit.fields.actorId", {}, "Actor ID")}>
-            <AuditValue>{row.actor_id || "-"}</AuditValue>
-          </Descriptions.Item>
-          <Descriptions.Item label={translate("settings.integration.audit.fields.request", {}, "Request")}>
-            <AuditValue>{row.request_id || "-"}</AuditValue>
-          </Descriptions.Item>
-          <Descriptions.Item label={translate("settings.integration.audit.fields.source", {}, "Source")}>
-            <AuditValue>{row.source || "-"}</AuditValue>
-          </Descriptions.Item>
-          <Descriptions.Item label={translate("settings.integration.audit.fields.reason", {}, "Reason")}>
-            <AuditValue>{row.reason || "-"}</AuditValue>
-          </Descriptions.Item>
-          <Descriptions.Item label={translate("settings.integration.audit.fields.oldValue", {}, "Old")}>
-            <AuditValue>{row.old_masked_value || "-"}</AuditValue>
-          </Descriptions.Item>
-          <Descriptions.Item label={translate("settings.integration.audit.fields.newValue", {}, "New")}>
-            <AuditValue>{row.new_masked_value || "-"}</AuditValue>
-          </Descriptions.Item>
-        </Descriptions>
-      </Space>
-    </Card>
-  );
-};
 
 export const IntegrationAuditPanel: React.FC = () => {
   const { translate } = useTranslation();
@@ -133,7 +91,7 @@ export const IntegrationAuditPanel: React.FC = () => {
   const [selectedLimit, setSelectedLimit] = useState<(typeof LIMIT_OPTIONS)[number]>(50);
   const [auditRows, setAuditRows] = useState<IntegrationConfigAuditRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [hasLoadError, setHasLoadError] = useState(false);
 
   const ownerKeys = useMemo(() => getOwnerKeys(selectedOwner), [selectedOwner]);
@@ -167,6 +125,7 @@ export const IntegrationAuditPanel: React.FC = () => {
   };
 
   const loadAuditRows = async () => {
+    setIsModalOpen(true);
     setIsLoading(true);
     setAuditRows([]);
     setHasLoadError(false);
@@ -177,7 +136,6 @@ export const IntegrationAuditPanel: React.FC = () => {
 
     if (auditResults.some((result) => result.status === "rejected")) {
       setAuditRows([]);
-      setHasLoaded(true);
       setHasLoadError(true);
       setIsLoading(false);
       return;
@@ -190,9 +148,65 @@ export const IntegrationAuditPanel: React.FC = () => {
       .slice(0, selectedLimit);
 
     setAuditRows(nextRows);
-    setHasLoaded(true);
     setIsLoading(false);
   };
+
+  const auditCollapseItems = useMemo(() => {
+    return auditRows.map((row) => {
+      let color = "default";
+      if (row.action === "secret_rotated") color = "volcano";
+      else if (row.action === "value_updated") color = "blue";
+      else if (row.action === "runtime_read") color = "green";
+
+      const label = getRuntimeConfigAuditLabel(row.key_name, translate);
+      const actionLabel = getActionLabel(row.action, translate);
+      const date = formatAuditDate(row.created_at);
+
+      const header = (
+        <Space>
+          <Tag color={color}>{actionLabel}</Tag>
+          <Typography.Text strong>{label}</Typography.Text>
+          <Typography.Text type="secondary" style={{ fontSize: "0.85em" }}>{date}</Typography.Text>
+        </Space>
+      );
+
+      return {
+        key: row.id,
+        label: header,
+        children: (
+          <Descriptions column={1} size="small" bordered>
+            <Descriptions.Item label={translate("settings.integration.audit.fields.key", {}, "Key")}>
+              <AuditValue>{row.key_name}</AuditValue>
+            </Descriptions.Item>
+            <Descriptions.Item label={translate("settings.integration.audit.fields.timestamp", {}, "Timestamp")}>
+              <AuditValue>{date}</AuditValue>
+            </Descriptions.Item>
+            <Descriptions.Item label={translate("settings.integration.audit.fields.actorRole", {}, "Actor role")}>
+              <AuditValue>{row.actor_role || "-"}</AuditValue>
+            </Descriptions.Item>
+            <Descriptions.Item label={translate("settings.integration.audit.fields.actorId", {}, "Actor ID")}>
+              <AuditValue>{row.actor_id || "-"}</AuditValue>
+            </Descriptions.Item>
+            <Descriptions.Item label={translate("settings.integration.audit.fields.request", {}, "Request")}>
+              <AuditValue>{row.request_id || "-"}</AuditValue>
+            </Descriptions.Item>
+            <Descriptions.Item label={translate("settings.integration.audit.fields.source", {}, "Source")}>
+              <AuditValue>{row.source || "-"}</AuditValue>
+            </Descriptions.Item>
+            <Descriptions.Item label={translate("settings.integration.audit.fields.reason", {}, "Reason")}>
+              <AuditValue>{row.reason || "-"}</AuditValue>
+            </Descriptions.Item>
+            <Descriptions.Item label={translate("settings.integration.audit.fields.oldValue", {}, "Old")}>
+              <AuditValue>{row.old_masked_value || "-"}</AuditValue>
+            </Descriptions.Item>
+            <Descriptions.Item label={translate("settings.integration.audit.fields.newValue", {}, "New")}>
+              <AuditValue>{row.new_masked_value || "-"}</AuditValue>
+            </Descriptions.Item>
+          </Descriptions>
+        ),
+      };
+    });
+  }, [auditRows, translate]);
 
   return (
     <section role="region" aria-label={translate("settings.tabs.integrationAudit", {}, "Audit Konfigurasi")}>
@@ -250,8 +264,22 @@ export const IntegrationAuditPanel: React.FC = () => {
           <Button loading={isLoading} onClick={() => void loadAuditRows()}>
             {translate("settings.integration.auditPanel.load", {}, "Muat audit")}
           </Button>
+        </Space>
+      </Card>
+
+      <Modal
+        title={translate("settings.integration.auditPanel.modalTitle", {}, "Jejak Audit Konfigurasi")}
+        open={isModalOpen}
+        onCancel={() => setIsModalOpen(false)}
+        footer={null}
+        width={800}
+        styles={{ body: { maxHeight: "70vh", overflowY: "auto", marginTop: token.marginMD } }}
+      >
+        <Space direction="vertical" size={token.marginMD} style={{ width: "100%" }}>
           {isLoading ? (
-            <Typography.Text>{translate("settings.integration.auditPanel.loading", {}, "Memuat audit konfigurasi...")}</Typography.Text>
+            <div style={{ textAlign: "center", padding: token.marginLG }}>
+              <Spin tip={translate("settings.integration.auditPanel.loading", {}, "Memuat audit konfigurasi...")} />
+            </div>
           ) : null}
           {hasLoadError ? (
             <Alert
@@ -260,19 +288,14 @@ export const IntegrationAuditPanel: React.FC = () => {
               message={translate("settings.integration.auditPanel.error", {}, "Jejak audit konfigurasi tidak dapat dimuat.")}
             />
           ) : null}
-          {!isLoading && !hasLoadError && !hasLoaded ? (
-            <Typography.Text type="secondary">
-              {translate("settings.integration.auditPanel.initial", {}, "Pilih filter, lalu muat audit konfigurasi.")}
-            </Typography.Text>
+          {!isLoading && !hasLoadError && auditRows.length === 0 ? (
+            <Empty description={translate("settings.integration.auditPanel.empty", {}, "Belum ada audit untuk filter ini.")} />
           ) : null}
-          {!isLoading && !hasLoadError && hasLoaded && auditRows.length === 0 ? (
-            <Typography.Text type="secondary">
-              {translate("settings.integration.auditPanel.empty", {}, "Belum ada audit untuk filter ini.")}
-            </Typography.Text>
+          {!isLoading && !hasLoadError && auditRows.length > 0 ? (
+            <Collapse bordered={false} items={auditCollapseItems} />
           ) : null}
-          {!hasLoadError && auditRows.map((row) => <AuditRowCard key={row.id} row={row} />)}
         </Space>
-      </Card>
+      </Modal>
     </section>
   );
 };

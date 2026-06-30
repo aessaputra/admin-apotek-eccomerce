@@ -890,7 +890,7 @@
     "tabs": {
       "storeProfile": "Profil Toko",
       "shippingSettings": "Pengaturan Pengiriman",
-      "integrationConfig": "Teknis",
+      "integrationConfig": "Lanjutan",
       "integrationAudit": "Audit Konfigurasi",
       "adminSettings": "Tambah Admin",
       "paymentSettings": "Pengaturan Pembayaran"
@@ -1003,9 +1003,9 @@
         "runtimeRequired": "Wajib untuk runtime"
       },
       "summary": {
-        "loading": "Memuat pengaturan teknis...",
-        "empty": "Belum ada pengaturan teknis.",
-        "error": "Pengaturan teknis tidak dapat dimuat."
+        "loading": "Memuat pengaturan lanjutan...",
+        "empty": "Belum ada pengaturan lanjutan.",
+        "error": "Pengaturan lanjutan tidak dapat dimuat."
       },
       "rotate": {
         "action": "Rotasi secret",
@@ -1048,7 +1048,7 @@
           "valueUpdated": "Nilai diperbarui"
         },
         "fallback": {
-          "technical": "Konfigurasi teknis"
+          "technical": "Konfigurasi lanjutan"
         },
         "fields": {
           "action": "Aksi",
@@ -1066,7 +1066,7 @@
         }
       },
       "auditPanel": {
-        "description": "Tinjau riwayat perubahan konfigurasi runtime untuk pembayaran, pengiriman, dan teknis.",
+        "description": "Tinjau riwayat perubahan konfigurasi runtime untuk pembayaran, pengiriman, dan lanjutan.",
         "ownerLabel": "Area",
         "keyLabel": "Konfigurasi",
         "actionLabel": "Aksi",
@@ -1080,7 +1080,7 @@
           "all": "Semua",
           "payment": "Pembayaran",
           "shipping": "Pengiriman",
-          "technical": "Teknis"
+          "technical": "Lanjutan"
         },
         "actions": {
           "all": "Semua"
@@ -1094,8 +1094,8 @@
       },
       "technical": {
         "description": "Kelola token push dan CORS. Audit konfigurasi tersedia di tab Audit Konfigurasi.",
-        "saveSuccess": "Pengaturan teknis tersimpan.",
-        "saveError": "Pengaturan teknis gagal disimpan.",
+        "saveSuccess": "Pengaturan lanjutan tersimpan.",
+        "saveError": "Pengaturan lanjutan gagal disimpan.",
         "pushToken": {
           "label": "Expo Push Token",
           "description": "Ganti token Expo tanpa menampilkan nilai saat ini.",

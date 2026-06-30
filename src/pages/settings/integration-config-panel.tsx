@@ -42,10 +42,9 @@ function parseValue(value: string, kind: IntegrationConfigValueKind): unknown {
 
 function withTechnicalDisplay(
   row: IntegrationConfigSummaryRow,
-  displayName: string,
-  description: string
+  displayName: string
 ): IntegrationConfigSummaryRow {
-  return { ...row, display_name: displayName, description };
+  return { ...row, display_name: displayName, description: null };
 }
 
 export const IntegrationConfigPanel: React.FC = () => {
@@ -84,11 +83,11 @@ export const IntegrationConfigPanel: React.FC = () => {
       integrationConfigClient.rotateSecret("push.expo_access_token", secret, TECHNICAL_SAVE_REASON),
     onSuccess: async () => {
       setPushTokenDraft(createBlankSecretReplacementDraft());
-      messageApi.success(translate("settings.integration.technical.saveSuccess", {}, "Technical settings saved."));
+      messageApi.success(translate("settings.integration.technical.saveSuccess", {}, "Advanced settings saved."));
       await refreshTechnicalData();
     },
     onError: () => {
-      messageApi.error(translate("settings.integration.technical.saveError", {}, "Technical settings could not be saved."));
+      messageApi.error(translate("settings.integration.technical.saveError", {}, "Advanced settings could not be saved."));
     },
   });
 
@@ -100,11 +99,11 @@ export const IntegrationConfigPanel: React.FC = () => {
         TECHNICAL_SAVE_REASON
       ),
     onSuccess: async () => {
-      messageApi.success(translate("settings.integration.technical.saveSuccess", {}, "Technical settings saved."));
+      messageApi.success(translate("settings.integration.technical.saveSuccess", {}, "Advanced settings saved."));
       await refreshTechnicalData();
     },
     onError: () => {
-      messageApi.error(translate("settings.integration.technical.saveError", {}, "Technical settings could not be saved."));
+      messageApi.error(translate("settings.integration.technical.saveError", {}, "Advanced settings could not be saved."));
     },
   });
 
@@ -123,7 +122,7 @@ export const IntegrationConfigPanel: React.FC = () => {
     }
   };
 
-  const panelLabel = translate("settings.tabs.integrationConfig", {}, "Teknis");
+  const panelLabel = translate("settings.tabs.integrationConfig", {}, "Lanjutan");
   const pushTokenLabel = translate("settings.integration.technical.pushToken.label", {}, "Expo Push Token");
   const allowedOriginsLabel = translate("settings.integration.technical.allowedOrigins.label", {}, "Allowed Origins");
 
@@ -133,28 +132,21 @@ export const IntegrationConfigPanel: React.FC = () => {
       <section role="region" aria-label={panelLabel}>
         <Card>
           <Space direction="vertical" size={token.marginMD} style={{ width: "100%" }}>
-            <Typography.Text type="secondary">
-              {translate(
-                "settings.integration.technical.description",
-                {},
-                "Kelola token push dan CORS. Audit konfigurasi tersedia di tab Audit Konfigurasi."
-              )}
-            </Typography.Text>
+
             {summaryQuery.isError ? (
-              <Alert type="error" showIcon message={translate("settings.integration.summary.error", {}, "Technical settings could not be loaded.")} />
+              <Alert type="error" showIcon message={translate("settings.integration.summary.error", {}, "Advanced settings could not be loaded.")} />
             ) : null}
             {summaryQuery.isLoading ? (
-              <Typography.Text>{translate("settings.integration.summary.loading", {}, "Loading technical settings...")}</Typography.Text>
+              <Typography.Text>{translate("settings.integration.summary.loading", {}, "Loading advanced settings...")}</Typography.Text>
             ) : null}
             {!summaryQuery.isLoading && !pushTokenRow && !allowedOriginsRow ? (
-              <Typography.Text type="secondary">{translate("settings.integration.summary.empty", {}, "No technical settings found.")}</Typography.Text>
+              <Typography.Text type="secondary">{translate("settings.integration.summary.empty", {}, "No advanced settings found.")}</Typography.Text>
             ) : null}
             {pushTokenRow ? (
               <OperationalConfigRow
                 row={withTechnicalDisplay(
                   pushTokenRow,
-                  pushTokenLabel,
-                  translate("settings.integration.technical.pushToken.description", {}, "Ganti token Expo tanpa menampilkan nilai saat ini.")
+                  pushTokenLabel
                 )}
               >
                 <SecretReplacementInput
@@ -172,8 +164,7 @@ export const IntegrationConfigPanel: React.FC = () => {
               <OperationalConfigRow
                 row={withTechnicalDisplay(
                   allowedOriginsRow,
-                  allowedOriginsLabel,
-                  translate("settings.integration.technical.allowedOrigins.description", {}, "Daftar origin admin yang diizinkan mengakses gateway.")
+                  allowedOriginsLabel
                 )}
               >
                 <Space direction="vertical" style={{ width: "100%" }}>

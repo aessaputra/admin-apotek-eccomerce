@@ -157,7 +157,7 @@ export const Settings: React.FC = () => {
     },
     {
       key: "integrationConfig",
-      label: translate("settings.tabs.integrationConfig", {}, "Teknis"),
+      label: translate("settings.tabs.integrationConfig", {}, "Lanjutan"),
       children: <IntegrationConfigPanel />,
     },
     {
