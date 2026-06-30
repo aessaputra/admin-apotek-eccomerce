@@ -41,9 +41,9 @@
       "subtitle": "Pantau pesanan, penjualan, stok, dan antrean yang perlu ditindaklanjuti dalam 30 hari terakhir."
     },
     "kpis": {
-      "revenue30d": "Omzet 30 Hari",
-      "orders30d": "Pesanan Masuk 30 Hari",
-      "paymentSuccessRate": "Pembayaran Berhasil",
+      "revenue30d": "Omzet",
+      "orders30d": "Pesanan Masuk",
+      "paymentSuccessRate": "Rasio Pembayaran Berhasil",
       "averageOrderValue": "Rata-rata Nilai Pesanan",
       "fulfillmentRisk": "Pesanan Dibayar Belum Terkirim",
       "lowStockSkus": "Produk Stok Menipis",
@@ -59,7 +59,7 @@
       "title": "Butuh Tindak Lanjut",
       "metricsError": {
         "message": "Ringkasan belum tersedia",
-        "description": "Sebagian angka ringkasan belum termuat. Coba lagi dari dashboard atau cek panel tren."
+        "description": "Sebagian angka ringkasan belum termuat. Coba muat ulang halaman atau periksa panel tren."
       },
       "lowStockError": {
         "message": "Gagal memuat data stok menipis",

@@ -30,7 +30,7 @@ import {
   visuallyHiddenStyle,
 } from "./styles";
 
-const { Text, Title, Paragraph } = Typography;
+const { Text, Title } = Typography;
 
 type DashboardTranslate = ReturnType<typeof useTranslation>["translate"];
 
@@ -282,9 +282,6 @@ export const Dashboard: React.FC = () => {
         <Title level={2} style={{ margin: 0 }}>
           {translate("dashboard.overview.title")}
         </Title>
-        <Paragraph type="secondary" style={{ margin: 0 }}>
-          {translate("dashboard.overview.subtitle")}
-        </Paragraph>
       </Space>
 
       <Card title={attentionCardTitle} style={{ marginBottom: token.marginLG }}>
@@ -296,8 +293,6 @@ export const Dashboard: React.FC = () => {
               ) : null}
               {operationalAlerts.map((alert) => {
                 const labels = getOperationalAlertLabels(alert, translate);
-                const compactAlert = alert.kind === "no-risk";
-
                 const retryAction =
                   alert.kind === "metrics-error" ? (
                     <Button size="small" onClick={handleMetricsRetry}>
@@ -311,7 +306,6 @@ export const Dashboard: React.FC = () => {
                     key={alert.kind}
                     type={alert.severity}
                     message={labels.message}
-                    description={compactAlert ? undefined : labels.description}
                     action={retryAction}
                   />
                 );
@@ -321,7 +315,7 @@ export const Dashboard: React.FC = () => {
           <Col xs={24} lg={10}>
             <Row gutter={[16, 16]} style={{ height: "100%" }} align="stretch">
               <Col xs={24} sm={12} lg={24} xl={24} style={{ display: "flex" }}>
-                <Card style={{ ...secondaryKpiCardStyle, flex: 1, width: "100%" }}>
+                <Card style={{ ...secondaryKpiCardStyle, flex: 1, width: "100%" }} hoverable>
                   <Statistic
                     title={translate("dashboard.kpis.fulfillmentRisk")}
                     value={dashboardKpis.fulfillmentRisk}
@@ -337,10 +331,9 @@ export const Dashboard: React.FC = () => {
       </Card>
 
       <Space direction="vertical" size={token.marginXS} style={{ width: "100%" }}>
-        <Text type="secondary">{translate("dashboard.kpis.periodNote")}</Text>
         <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} xl={6}>
-          <Card style={primaryKpiCardStyle}>
+          <Card style={primaryKpiCardStyle} hoverable>
             <Statistic
               title={translate("dashboard.kpis.revenue30d")}
               value={dashboardKpis.revenue}
@@ -352,7 +345,7 @@ export const Dashboard: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} xl={6}>
-          <Card style={primaryKpiCardStyle}>
+          <Card style={primaryKpiCardStyle} hoverable>
             <Statistic
               title={translate("dashboard.kpis.orders30d")}
               value={dashboardKpis.orderCount}
@@ -364,7 +357,7 @@ export const Dashboard: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} xl={6}>
-          <Card style={primaryKpiCardStyle}>
+          <Card style={primaryKpiCardStyle} hoverable>
             <Statistic
               title={translate("dashboard.kpis.paymentSuccessRate")}
               value={dashboardKpis.paymentSuccessRate}
@@ -377,7 +370,7 @@ export const Dashboard: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} xl={6}>
-          <Card style={primaryKpiCardStyle}>
+          <Card style={primaryKpiCardStyle} hoverable>
             <Statistic
               title={translate("dashboard.kpis.averageOrderValue")}
               value={dashboardKpis.averageOrderValue}
@@ -435,6 +428,7 @@ export const Dashboard: React.FC = () => {
       <Row gutter={[16, 16]} style={{ marginTop: token.marginLG }}>
         <Col xs={24} lg={14}>
           <Card
+            hoverable
             title={translate("dashboard.recentOrders")}
             extra={
               <Button type="link" size="small" onClick={() => navigateList("orders")}>
@@ -494,6 +488,7 @@ export const Dashboard: React.FC = () => {
         </Col>
         <Col xs={24} lg={10}>
           <Card
+            hoverable
             title={
               <>
                 <WarningOutlined aria-hidden="true" style={{ color: token.colorWarning, marginRight: token.marginXS }} />

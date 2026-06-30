@@ -41,8 +41,8 @@
       "subtitle": "Monitor orders, sales, stock, and follow-up queues from the last 30 days."
     },
     "kpis": {
-      "revenue30d": "30-Day Sales",
-      "orders30d": "30-Day Orders",
+      "revenue30d": "Sales",
+      "orders30d": "Orders",
       "paymentSuccessRate": "Paid Order Rate",
       "averageOrderValue": "Average Order Value",
       "fulfillmentRisk": "Paid Orders Pending Delivery",
@@ -59,7 +59,7 @@
       "title": "Needs Follow-Up",
       "metricsError": {
         "message": "Summary unavailable",
-        "description": "Some summary figures could not be loaded. Retry the dashboard or check the trend panel."
+        "description": "Some summary figures could not be loaded. Refresh the page or check the trend panel."
       },
       "lowStockError": {
         "message": "Couldn’t load low-stock data",
