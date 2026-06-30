@@ -68,9 +68,10 @@ function formatAuditDate(value: string): string {
 }
 
 function formatAuditValue(masked: string | null, metadataValue: unknown): string {
-  if (masked !== null && masked !== undefined) return masked;
-  if (metadataValue === null || metadataValue === undefined) return "-";
+  if (masked) return masked;
+  if (metadataValue === null || metadataValue === undefined || metadataValue === "") return "-";
   if (typeof metadataValue === "string") return metadataValue;
+  if (Array.isArray(metadataValue)) return metadataValue.join(", ");
   return JSON.stringify(metadataValue);
 }
 
