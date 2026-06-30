@@ -4,6 +4,7 @@
     "Webhook Automation": {
       "source": "claude-office-skills/skills",
       "sourceType": "github",
+      "skillPath": "webhook-automation/SKILL.md",
       "computedHash": "1df4d6308b87de01df422a895a6e5a1fece4bd777ba14955e267579b1cfa72dc"
     },
     "concise-planning": {

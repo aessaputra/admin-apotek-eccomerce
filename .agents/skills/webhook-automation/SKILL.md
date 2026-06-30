@@ -1,322 +1,499 @@
 ---
 name: Webhook Automation
-description: Build, debug, and update Midtrans webhook and payment-notification flows for this pharmacy admin panel. Use this skill whenever the task involves Midtrans notifications, Snap checkout, payment status reconciliation, signature verification, order/payment status transitions, settlement handling, or post-payment side effects, even if the user only says "webhook", "payment callback", or "Midtrans issue".
-version: 1.1.0
+description: Build and manage webhook-based integrations for real-time event processing and API connections
+version: 1.0.0
 author: Claude Office Skills
 category: integration
 tags:
   - webhook
-  - midtrans
-  - payments
+  - api
+  - integration
   - automation
-  - supabase
+  - events
 department: engineering
 models:
   - claude-3-opus
   - claude-3-sonnet
   - gpt-4
+mcp:
+  server: integration-mcp
+  tools:
+    - webhook_create
+    - webhook_receive
+    - http_request
+    - transform_data
 capabilities:
-  - Midtrans notification handling
-  - Snap checkout integration
-  - Payment status reconciliation
-  - Signature verification
-  - Fulfillment side-effect orchestration
+  - Webhook endpoint creation
+  - Event processing
+  - Data transformation
+  - Multi-service orchestration
 input:
-  - Midtrans notification payloads
-  - Order and payment records
-  - Supabase Edge Function code
-  - Midtrans environment configuration
+  - Webhook payloads
+  - API configurations
+  - Transformation rules
+  - Routing logic
 output:
-  - Verified payment transitions
-  - Updated order and payment records
-  - Safe webhook handlers
-  - Auditable operational guidance
+  - Processed events
+  - API responses
+  - Transformed data
+  - Audit logs
 languages:
   - en
 related_skills:
+  - etl-pipeline
   - api-integration
   - zapier-automation
 ---
 
 # Webhook Automation
 
-Use this skill for Midtrans payment notifications in this codebase, not for generic webhook theory. The repo already has a concrete Midtrans flow in `supabase/functions/midtrans-webhook/`, `create-snap-token/`, `confirm-midtrans-payment/`, and `_shared/midtrans.ts`; follow that shape unless the user explicitly wants a redesign.
+Comprehensive skill for building webhook-based integrations and real-time event processing.
 
-## What this skill should optimize for
+## Core Concepts
 
-1. **Trust only verified Midtrans state**. Validate `signature_key`, then verify the transaction again via Midtrans status API before treating a payment as successful.
-2. **Keep handlers idempotent**. Duplicate or stale notifications are normal. Use transaction-aware event keys and guard transitions.
-3. **Map payment changes to business state carefully**. Payment success changes both `payments.status` and `orders.status`, and may trigger stock and shipping side effects.
-4. **Acknowledge quickly, do heavy work safely**. Midtrans expects a timely HTTP response. Keep the critical path short and move fulfillment side effects out of band when possible.
-5. **Match repo terminology**. Use the established names: `midtrans_order_id`, `gross_amount`, `snap_token`, `snap_redirect_url`, `apply_midtrans_webhook_transition`, and `webhook_side_effect_tasks`.
+### Webhook Architecture
 
-## Core Midtrans flow in this repository
+```
+WEBHOOK FLOW:
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Source    │────▶│   Webhook   │────▶│   Handler   │
+│   System    │     │   Endpoint  │     │   Logic     │
+└─────────────┘     └─────────────┘     └──────┬──────┘
+                                               │
+                    ┌──────────────────────────┼───────┐
+                    │                          │       │
+                    ▼                          ▼       ▼
+              ┌──────────┐              ┌──────────┐ ┌──────────┐
+              │  Action  │              │  Action  │ │  Action  │
+              │    A     │              │    B     │ │    C     │
+              └──────────┘              └──────────┘ └──────────┘
+```
 
-### 1. Checkout creation
+### Webhook Types
 
-Use `supabase/functions/create-snap-token/index.ts` as the reference flow.
+```yaml
+webhook_types:
+  incoming:
+    description: "Receive events from external services"
+    use_cases:
+      - Payment notifications (Stripe, PayPal)
+      - Form submissions
+      - CRM updates
+      - CI/CD events
+      
+  outgoing:
+    description: "Send events to external services"
+    use_cases:
+      - Notify external systems
+      - Trigger workflows
+      - Sync data
+      - Alert integrations
+```
 
-- Read the order and ensure it is still payable.
-- Reuse a valid `snap_token` if it already exists.
-- Generate a `midtrans_order_id` if needed.
-- Build the Snap payload from internal order data.
-- Call Midtrans Snap:
-  - Sandbox: `https://app.sandbox.midtrans.com/snap/v1/transactions`
-  - Production: `https://app.midtrans.com/snap/v1/transactions`
-- Authenticate with Basic auth using the resolved `midtrans.server_key` runtime config value from the existing shared Midtrans runtime config helpers.
-- Persist `snap_token`, `snap_redirect_url`, `snap_token_created_at`, and the numeric `gross_amount` back to the order.
+## Webhook Endpoint Setup
 
-### 2. Incoming payment notification
+### Basic Endpoint
 
-Use `supabase/functions/midtrans-webhook/index.ts` as the primary reference.
+```yaml
+webhook_endpoint:
+  url: "https://api.example.com/webhooks/incoming"
+  method: POST
+  
+  authentication:
+    type: signature
+    header: "X-Signature-256"
+    algorithm: "HMAC-SHA256"
+    secret: "${WEBHOOK_SECRET}"
+    
+  validation:
+    required_headers:
+      - "Content-Type"
+      - "X-Request-ID"
+    content_types:
+      - "application/json"
+      - "application/x-www-form-urlencoded"
+      
+  response:
+    success:
+      status: 200
+      body: { "received": true }
+    error:
+      status: 400
+      body: { "error": "Invalid payload" }
+```
 
-Expected request shape:
+### Signature Verification
 
-```json
-{
-  "order_id": "APT-12345678-1712670000000",
-  "status_code": "200",
-  "gross_amount": "150000.00",
-  "signature_key": "...",
-  "transaction_status": "settlement",
-  "transaction_id": "...",
-  "fraud_status": "accept",
-  "payment_type": "bank_transfer",
-  "currency": "IDR"
+```javascript
+// Verify webhook signature
+function verifySignature(payload, signature, secret) {
+  const hmac = crypto.createHmac('sha256', secret);
+  const digest = 'sha256=' + hmac.update(payload).digest('hex');
+  
+  return crypto.timingSafeEqual(
+    Buffer.from(digest),
+    Buffer.from(signature)
+  );
 }
+
+// Usage
+app.post('/webhook', (req, res) => {
+  const signature = req.headers['x-signature-256'];
+  const payload = JSON.stringify(req.body);
+  
+  if (!verifySignature(payload, signature, process.env.WEBHOOK_SECRET)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  
+  // Process webhook...
+  processWebhook(req.body);
+  res.status(200).json({ received: true });
+});
 ```
 
-Required fields for initial validation in this repo:
+## Event Processing
 
-- `order_id`
-- `status_code`
-- `gross_amount`
-- `signature_key`
+### Event Router
 
-### 3. Signature verification
-
-Midtrans notifications in this project do **not** use a generic HMAC header flow. They use Midtrans `signature_key` verification:
-
-```text
-SHA512(order_id + status_code + gross_amount + ServerKey)
+```yaml
+event_router:
+  routes:
+    - event_type: "payment.succeeded"
+      handler: processPayment
+      actions:
+        - update_order_status
+        - send_confirmation_email
+        - notify_fulfillment
+        
+    - event_type: "customer.created"
+      handler: processNewCustomer
+      actions:
+        - create_crm_contact
+        - send_welcome_email
+        - assign_to_sales
+        
+    - event_type: "subscription.cancelled"
+      handler: processChurn
+      actions:
+        - update_subscription_status
+        - trigger_retention_flow
+        - notify_customer_success
+        
+    - event_type: "*"
+      handler: logUnhandled
+      actions:
+        - log_to_monitoring
 ```
 
-Reference implementation: `_shared/midtrans.ts -> verifyMidtransSignature()`.
+### Payload Transformation
 
-```ts
-const rawString = `${orderId}${statusCode}${grossAmount}${serverKey}`;
-const hashBuffer = await crypto.subtle.digest(
-  "SHA-512",
-  new TextEncoder().encode(rawString),
-);
+```yaml
+transformations:
+  - name: stripe_to_internal
+    source: stripe_webhook
+    target: internal_order
+    mapping:
+      id: "data.object.id"
+      amount: "data.object.amount / 100"  # Cents to dollars
+      currency: "data.object.currency | uppercase"
+      customer_email: "data.object.receipt_email"
+      created_at: "data.object.created | timestamp"
+      metadata: "data.object.metadata"
+      
+  - name: github_to_slack
+    source: github_webhook
+    target: slack_message
+    mapping:
+      text: |
+        *{{action | capitalize}} {{repository.name}}*
+        {{#if pull_request}}
+        PR: {{pull_request.title}}
+        By: {{pull_request.user.login}}
+        {{/if}}
+      channel: "{{repository.name}}-notifications"
 ```
 
-Important details:
+## Common Integrations
 
-- Use the resolved `midtrans.server_key` runtime config value, not the client key.
-- Use the original `gross_amount` string from Midtrans when computing the signature.
-- Reject invalid signatures with `401`.
+### Stripe Webhooks
 
-### 4. Re-verify with Midtrans before trusting success
-
-After signature validation, verify transaction status against Midtrans:
-
-- Sandbox base URL: `https://api.sandbox.midtrans.com/v2`
-- Production base URL: `https://api.midtrans.com/v2`
-- Status endpoint: `GET /{order_id}/status`
-
-Reference implementation: `_shared/midtrans.ts -> verifyMidtransTransaction()`.
-
-This repository deliberately does not trust a success-like webhook payload on its own. It checks Midtrans again and only accepts success when the verified status confirms it.
-
-## Success, pending, and failure semantics
-
-Use `_shared/midtrans.ts -> mapMidtransStatus()` and `isConfirmedMidtransSuccess()` as the source of truth.
-
-### Treat as confirmed success
-
-Success requires both a successful status code and a valid transaction state:
-
-- `status_code === "200"`
-- and either:
-  - `transaction_status === "settlement"`
-  - or `transaction_status === "capture" && fraud_status === "accept"`
-
-### Internal mapping used by this repo
-
-| Midtrans status | Fraud status | Internal payment status | Internal order status |
-|---|---|---|---|
-| `settlement` | any/none | `settlement` | `awaiting_shipment` |
-| `capture` | `accept` | `settlement` | `awaiting_shipment` |
-| `capture` | `challenge` | `pending` | unchanged |
-| `capture` | `deny` | `deny` | `cancelled` |
-| `cancel` / `deny` / `expire` | any/none | same as Midtrans | `cancelled` |
-| `refund` | any/none | `refund` | unchanged |
-| `partial_refund` | any/none | `partial_refund` | unchanged |
-| `chargeback` | any/none | `chargeback` | unchanged |
-| `partial_chargeback` | any/none | `partial_chargeback` | unchanged |
-| `authorize` | any/none | `authorize` | unchanged |
-| `pending` | any/none | `pending` | unchanged |
-| `failure` | any/none | `deny` | `cancelled` |
-
-## Idempotency and stale-event handling
-
-This repo uses more than just `order_id` deduplication. Follow the existing event-key pattern so `capture+challenge` and `capture+accept` do not collapse incorrectly.
-
-Reference implementation: `midtrans-webhook/index.ts -> buildWebhookEventKey()`.
-
-```ts
-const webhookEventKey = [
-  payload.transaction_id || payload.order_id,
-  payload.transaction_status,
-  payload.status_code,
-  payload.gross_amount,
-  payload.fraud_status || "",
-].join(":");
+```yaml
+stripe_webhooks:
+  endpoint_secret: "${STRIPE_WEBHOOK_SECRET}"
+  
+  events:
+    - type: "checkout.session.completed"
+      handler: |
+        async function(event) {
+          const session = event.data.object;
+          await fulfillOrder(session);
+          await sendReceipt(session.customer_email);
+        }
+        
+    - type: "invoice.payment_failed"
+      handler: |
+        async function(event) {
+          const invoice = event.data.object;
+          await notifyCustomer(invoice);
+          await createDunningTask(invoice);
+        }
+        
+    - type: "customer.subscription.updated"
+      handler: |
+        async function(event) {
+          const subscription = event.data.object;
+          await syncSubscriptionStatus(subscription);
+        }
 ```
 
-When deciding whether a duplicate or stale event can be ignored, follow `_shared/midtrans.ts -> isIgnorableMidtransNoop()` and the `STALE_PAYMENT_STATUS_MAP` rather than inventing new transition rules.
+### GitHub Webhooks
 
-## Amount and currency safeguards
-
-Do not mark a payment successful unless the amount and currency are consistent.
-
-This repo checks:
-
-1. Expected order amount from stored `gross_amount` or calculated order total.
-2. Verified Midtrans amount from the status API.
-3. Currency consistency between payload and verified status.
-
-If the verified amount does not match the expected order amount, the current implementation returns `409` and keeps the audit trail.
-
-## Persistence pattern used here
-
-Use the existing write order when implementing or modifying the handler:
-
-1. Parse JSON body.
-2. Reject invalid method or malformed payload.
-3. Validate signature.
-4. Persist the raw notification early for auditability.
-5. Re-verify status with Midtrans.
-6. Load the order by `midtrans_order_id`.
-7. Validate amount and currency.
-8. Compute next state via `mapMidtransStatus()`.
-9. Apply transition atomically through `apply_midtrans_webhook_transition`.
-10. Upsert the `payments` record with `buildMidtransPaymentRecord()`.
-11. Insert `order_activities` if the transition was applied.
-12. Trigger side effects for confirmed settlement.
-
-## Side effects after settlement
-
-Settlement is not just a payment-table update.
-
-In this codebase, confirmed settlement can lead to:
-
-- clearing the user cart,
-- saving a `webhook_side_effect_tasks` record,
-- reducing stock,
-- triggering Biteship fulfillment,
-- logging order activity.
-
-Reference files:
-
-- `supabase/functions/_shared/webhook-side-effects.ts`
-- `supabase/functions/midtrans-webhook/index.ts`
-
-If you add or change webhook behavior, preserve the separation between **payment-state transition** and **post-payment fulfillment side effects**.
-
-## HTTP response guidance for Midtrans
-
-Use these practical rules:
-
-- Return `200` when the event is accepted, already satisfied, or safely ignored.
-- Return `401` for invalid signatures.
-- Return `400` for malformed payloads.
-- Return `503` for retryable conditions such as verification failure or order not found during eventual consistency windows.
-- Return `409` for hard business mismatches such as amount inconsistencies.
-
-Midtrans retries some non-2xx responses, so choose error codes deliberately. If the issue is temporary and should be retried, prefer a retry-friendly status rather than burying the event.
-
-## Runtime config, bootstrap env, and endpoints
-
-Provider config source of truth:
-
-- Resolve `midtrans.server_key` and `midtrans.is_production` through Admin Settings, database-backed runtime config, and the existing shared Midtrans runtime config helpers.
-- Do not read provider config directly from Edge Function env.
-
-Obsolete provider env names, retained here only as cleanup candidates and not current setup guidance:
-
-- `MIDTRANS_SERVER_KEY`
-- `MIDTRANS_IS_PRODUCTION`
-
-Bootstrap Edge Function env names that remain current:
-
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-
-Environment switching uses the resolved `midtrans.is_production` runtime config value, not provider env reads.
-
-Snap endpoints:
-
-- Sandbox: `https://app.sandbox.midtrans.com/snap/v1/transactions`
-- Production: `https://app.midtrans.com/snap/v1/transactions`
-
-Status-check endpoints:
-
-- Sandbox: `https://api.sandbox.midtrans.com/v2/{order_id}/status`
-- Production: `https://api.midtrans.com/v2/{order_id}/status`
-
-## Working rules for future edits
-
-When asked to implement or debug Midtrans webhook work:
-
-1. Read these files first:
-   - `supabase/functions/midtrans-webhook/index.ts`
-   - `supabase/functions/_shared/midtrans.ts`
-   - `supabase/functions/_shared/types.ts`
-   - `supabase/functions/create-snap-token/index.ts`
-2. Match the existing response helpers and logging style.
-3. Reuse existing helper functions before adding new ones.
-4. Keep payment logic deterministic and auditable.
-5. Prefer extending transition guards and shared helpers over inlining status logic in multiple places.
-
-## Common mistakes to avoid
-
-- Do not use generic webhook HMAC header logic instead of Midtrans `signature_key`.
-- Do not trust `transaction_status: settlement` without status re-verification for critical updates.
-- Do not ignore `fraud_status` for `capture` events.
-- Do not compare only `order_id`; preserve the repo’s richer event-key pattern.
-- Do not update fulfillment state before the payment transition is durably applied.
-- Do not hardcode production endpoints.
-- Do not assume unknown Midtrans fields are errors; parse defensively.
-
-## Example implementation checklist
-
-Use this checklist when implementing or reviewing a Midtrans webhook task:
-
-```md
-- Parse JSON body safely
-- Require order_id, status_code, gross_amount, signature_key
-- Verify SHA-512 Midtrans signature
-- Persist raw notification for audit trail
-- Fetch canonical Midtrans status via API
-- Load order by midtrans_order_id
-- Validate amount and currency
-- Map Midtrans status to internal payment/order state
-- Apply transition idempotently
-- Upsert payment record
-- Trigger settlement side effects if needed
-- Return the correct HTTP status
+```yaml
+github_webhooks:
+  secret: "${GITHUB_WEBHOOK_SECRET}"
+  
+  events:
+    - type: "push"
+      branches: ["main", "develop"]
+      handler: |
+        async function(event) {
+          await triggerCI(event.repository, event.ref);
+          await notifyTeam(event.commits);
+        }
+        
+    - type: "pull_request"
+      actions: ["opened", "synchronize"]
+      handler: |
+        async function(event) {
+          await runTests(event.pull_request);
+          await requestReview(event.pull_request);
+        }
+        
+    - type: "issues"
+      actions: ["opened"]
+      handler: |
+        async function(event) {
+          await triageIssue(event.issue);
+          await assignOwner(event.issue);
+        }
 ```
 
-## Reference locations
+### Slack Webhooks
 
-- Official docs: Midtrans HTTP notification/webhook docs, notification best practices, and transaction status docs
-- Local implementation:
-  - `supabase/functions/midtrans-webhook/index.ts`
-  - `supabase/functions/_shared/midtrans.ts`
-  - `supabase/functions/create-snap-token/index.ts`
-  - `supabase/functions/confirm-midtrans-payment/index.ts`
-  - `supabase/functions/reconcile-pending-midtrans-payments/index.ts`
+```yaml
+slack_webhooks:
+  incoming:
+    # Receive slash commands and interactions
+    signing_secret: "${SLACK_SIGNING_SECRET}"
+    
+    events:
+      - type: "slash_command"
+        command: "/deploy"
+        handler: handleDeployCommand
+        
+      - type: "interactive_message"
+        callback_id: "approval_*"
+        handler: handleApproval
+        
+  outgoing:
+    # Send messages to Slack
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    
+    templates:
+      alert:
+        blocks:
+          - type: section
+            text: "🚨 *Alert:* {{message}}"
+          - type: context
+            elements:
+              - type: mrkdwn
+                text: "Source: {{source}} | Time: {{timestamp}}"
+```
 
-When this skill and the code disagree, prefer the codebase’s current shared helpers first, then reconcile them with official Midtrans docs before changing behavior.
+## Error Handling
+
+### Retry Strategy
+
+```yaml
+retry_config:
+  enabled: true
+  
+  policy:
+    max_attempts: 5
+    initial_delay: 1000  # ms
+    max_delay: 60000  # ms
+    backoff_multiplier: 2
+    
+  retry_on:
+    status_codes: [408, 429, 500, 502, 503, 504]
+    exceptions: ["ECONNRESET", "ETIMEDOUT"]
+    
+  dead_letter:
+    enabled: true
+    destination: "failed_webhooks_queue"
+    retention_days: 7
+```
+
+### Error Logging
+
+```yaml
+error_handling:
+  logging:
+    level: error
+    include:
+      - request_id
+      - event_type
+      - payload_hash
+      - error_message
+      - stack_trace
+      - retry_count
+      
+  alerting:
+    on_failure:
+      - type: slack
+        channel: "#webhook-alerts"
+        threshold: 5  # failures per minute
+        
+    on_dead_letter:
+      - type: pagerduty
+        severity: warning
+```
+
+## Webhook Testing
+
+### Test Payload Generator
+
+```yaml
+test_payloads:
+  stripe_payment:
+    type: "checkout.session.completed"
+    data:
+      object:
+        id: "cs_test_123"
+        amount_total: 2000
+        currency: "usd"
+        customer_email: "test@example.com"
+        payment_status: "paid"
+        
+  github_push:
+    ref: "refs/heads/main"
+    repository:
+      name: "my-repo"
+      full_name: "org/my-repo"
+    commits:
+      - id: "abc123"
+        message: "Test commit"
+        author:
+          name: "Test User"
+```
+
+### Webhook Debugging
+
+```yaml
+debugging:
+  tools:
+    - name: "Request Bin"
+      url: "https://requestbin.com"
+      use: "Capture and inspect payloads"
+      
+    - name: "ngrok"
+      command: "ngrok http 3000"
+      use: "Expose local server"
+      
+    - name: "Webhook.site"
+      url: "https://webhook.site"
+      use: "Quick webhook testing"
+      
+  logging:
+    enabled: true
+    log_payloads: true
+    log_headers: true
+    mask_secrets: true
+```
+
+## Security Best Practices
+
+### Security Checklist
+
+```yaml
+security:
+  authentication:
+    - Verify webhook signatures
+    - Use HTTPS only
+    - Rotate secrets regularly
+    
+  validation:
+    - Validate payload schema
+    - Check timestamp freshness
+    - Verify source IP if possible
+    
+  processing:
+    - Idempotent handlers
+    - Rate limiting
+    - Timeout protection
+    
+  storage:
+    - Encrypt secrets at rest
+    - Audit logging
+    - No sensitive data in URLs
+```
+
+### IP Allowlisting
+
+```yaml
+ip_allowlist:
+  stripe:
+    - "3.18.12.63"
+    - "3.130.192.231"
+    # ... more IPs
+    
+  github:
+    - "192.30.252.0/22"
+    - "185.199.108.0/22"
+    # ... more ranges
+    
+  slack:
+    - "54.159.240.0/22"
+    # ... more ranges
+```
+
+## Monitoring
+
+### Metrics Dashboard
+
+```
+WEBHOOK METRICS - LAST 24 HOURS
+═══════════════════════════════════════
+
+Received:      12,456
+Processed:     12,398 (99.5%)
+Failed:           58 (0.5%)
+Retried:         123
+
+BY SOURCE:
+Stripe     ████████████░░░░ 5,230
+GitHub     ██████████░░░░░░ 4,120
+Slack      ████░░░░░░░░░░░░ 1,850
+Other      ███░░░░░░░░░░░░░ 1,256
+
+LATENCY (p99):
+Processing: 245ms
+Response:   52ms
+
+ERROR BREAKDOWN:
+Timeout:       25
+Invalid Sig:   18
+Parse Error:   10
+Rate Limited:   5
+```
+
+## Best Practices
+
+1. **Respond Quickly**: Return 200 immediately, process async
+2. **Idempotency**: Handle duplicate events gracefully
+3. **Verify Signatures**: Always validate webhook authenticity
+4. **Log Everything**: Maintain audit trail
+5. **Retry Logic**: Implement exponential backoff
+6. **Dead Letters**: Don't lose failed events
+7. **Rate Limiting**: Protect against flood attacks
+8. **Monitoring**: Alert on failures and latency
