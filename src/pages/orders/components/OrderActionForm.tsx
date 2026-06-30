@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Form, Select, Input, Button, Switch, Alert, App, theme } from "antd";
+import { Form, Select, Input, Button, Switch, Alert, App, theme, Typography } from "antd";
 import { LockOutlined, WarningOutlined, SyncOutlined } from "@ant-design/icons";
 import { useTranslation } from "@refinedev/core";
 import { getAvailableOrderTransitions, getStatusOptions } from "../../../constants/orders";
@@ -221,6 +221,11 @@ export const OrderActionForm: React.FC<OrderActionFormProps> = ({ record, refres
           <Button type="default" icon={<SyncOutlined spin={syncing} />} onClick={handleSyncTracking} loading={syncing}>
             {translate("orders.syncTracking")}
           </Button>
+          <div style={{ marginTop: 4 }}>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {translate("orders.syncTrackingHelp")}
+            </Typography.Text>
+          </div>
         </div>
       )}
 
