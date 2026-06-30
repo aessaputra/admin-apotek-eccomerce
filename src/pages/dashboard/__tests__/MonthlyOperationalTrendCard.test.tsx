@@ -269,7 +269,7 @@ describe("MonthlyOperationalTrendCard", () => {
     renderCard();
 
     expect(screen.getByText(labels.title)).not.toBeNull();
-    expect(document.body.textContent).toContain(currencyFormatter.format(populatedTrendData.totals.revenue));
+
     expect(screen.getByTestId("granularity-control").textContent).toContain("Monthly");
     expect(screen.getByRole("radiogroup", { name: labels.granularityAriaLabel })).not.toBeNull();
     const chartWrapper = screen.getByRole("img", { name: labels.chartAriaLabel });

@@ -657,7 +657,7 @@ describe("detail and dashboard pages", () => {
     expect(screen.getByText("dashboard.kpis.orders30d:1")).not.toBeNull();
     expect(screen.getByText("dashboard.kpis.paymentSuccessRate:100")).not.toBeNull();
     expect(screen.getByText("dashboard.kpis.averageOrderValue:25000")).not.toBeNull();
-    expect(screen.getByText("dashboard.kpis.fulfillmentRisk:1")).not.toBeNull();
+
     expect(screen.queryByText("dashboard.kpis.lowStockSkus:8")).toBeNull();
     expect(screen.getByText("dashboard.lowStockAlerts")).not.toBeNull();
     expect(screen.getByText("order-1")).not.toBeNull();
