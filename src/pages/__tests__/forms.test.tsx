@@ -484,7 +484,7 @@ vi.mock("antd", () => {
     Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Empty: ({ description }: { description?: React.ReactNode }) => <div>{description}</div>,
     Spin: ({ tip }: { tip?: React.ReactNode }) => <div>{tip}</div>,
-    Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+
     Collapse: Object.assign(
       ({ items }: { items?: Array<{ key: string; label: React.ReactNode; children: React.ReactNode }> }) => (
         <div>{items?.map((item) => <div key={item.key}><div>{item.label}</div><div>{item.children}</div></div>)}</div>
