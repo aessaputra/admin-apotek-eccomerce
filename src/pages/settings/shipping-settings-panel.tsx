@@ -60,10 +60,9 @@ function getStringArrayValue(row: IntegrationConfigSummaryRow | undefined): stri
 
 function withShippingDisplay(
   row: IntegrationConfigSummaryRow,
-  displayName: string,
-  description: string
+  displayName: string
 ): IntegrationConfigSummaryRow {
-  return { ...row, display_name: displayName, description };
+  return { ...row, display_name: displayName, description: null };
 }
 
 const CourierPickerTrigger: React.FC<CourierPickerTriggerProps> = ({
@@ -253,13 +252,7 @@ export const ShippingSettingsPanel: React.FC = () => {
       <section role="region" aria-label={shippingPanelLabel}>
         <Card>
           <Space direction="vertical" size={token.marginMD} style={{ width: "100%" }}>
-            <Typography.Text type="secondary">
-              {translate(
-                "settings.shipping.description",
-                {},
-                "Kelola kredensial Biteship, asal pengiriman, kurir aktif, dan data pengirim runtime."
-              )}
-            </Typography.Text>
+
             {summaryQuery.isError ? (
               <Alert type="error" showIcon message={translate("settings.shipping.summary.error", {}, "Pengaturan pengiriman tidak dapat dimuat.")} />
             ) : null}
@@ -285,7 +278,7 @@ export const ShippingSettingsPanel: React.FC = () => {
             ) : null}
             {apiKeyRow ? (
               <OperationalConfigRow
-                row={withShippingDisplay(apiKeyRow, translate("settings.shipping.apiKey.label", {}, "Biteship API Key"), translate("settings.shipping.apiKey.description", {}, ""))}
+                row={withShippingDisplay(apiKeyRow, translate("settings.shipping.apiKey.label", {}, "Biteship API Key"))}
               >
                 <SecretReplacementInput
                   label={translate("settings.shipping.apiKey.label", {}, "Biteship API Key")}
@@ -300,7 +293,7 @@ export const ShippingSettingsPanel: React.FC = () => {
             ) : null}
             {enabledCouriersRow ? (
               <OperationalConfigRow
-                row={withShippingDisplay(enabledCouriersRow, translate("settings.fields.couriers", {}, "Active Couriers"), translate("settings.fields.couriersHelp", {}, "Choose courier services for shipping rate calculation."))}
+                row={withShippingDisplay(enabledCouriersRow, translate("settings.fields.couriers", {}, "Active Couriers"))}
               >
                 <Space direction="vertical" style={{ width: "100%" }}>
                   <CourierPickerTrigger
@@ -324,7 +317,7 @@ export const ShippingSettingsPanel: React.FC = () => {
             ) : null}
             {originAreaIdRow ? (
               <OperationalConfigRow
-                row={withShippingDisplay(originAreaIdRow, translate("settings.fields.originAreaId", {}, "Origin Area"), translate("settings.fields.originAreaIdHelp", {}, ""))}
+                row={withShippingDisplay(originAreaIdRow, translate("settings.fields.originAreaId", {}, "Origin Area"))}
               >
                 <Space direction="vertical" style={{ width: "100%" }}>
                   <BiteshipAreaSearch
@@ -349,7 +342,7 @@ export const ShippingSettingsPanel: React.FC = () => {
             ) : null}
             {originLatitudeRow && originLongitudeRow ? (
               <OperationalConfigRow
-                row={withShippingDisplay(originLatitudeRow, translate("settings.fields.mapLocationPicker", {}, "Store Location"), translate("settings.shipping.location.description", {}, "Pilih titik asal pengiriman pada peta."))}
+                row={withShippingDisplay(originLatitudeRow, translate("settings.fields.mapLocationPicker", {}, "Store Location"))}
               >
                 <Space direction="vertical" style={{ width: "100%" }}>
                   <MapLocationPicker
@@ -376,7 +369,7 @@ export const ShippingSettingsPanel: React.FC = () => {
               </OperationalConfigRow>
             ) : null}
             {shipperNameRow ? (
-              <OperationalConfigRow row={withShippingDisplay(shipperNameRow, translate("settings.shipping.shipperName.label", {}, "Shipper Name"), translate("settings.shipping.shipperName.description", {}, "Nama pengirim pada pesanan Biteship."))}>
+              <OperationalConfigRow row={withShippingDisplay(shipperNameRow, translate("settings.shipping.shipperName.label", {}, "Shipper Name"))}>
                 <Space direction="vertical" style={{ width: "100%" }}>
                   <Input aria-label={translate("settings.shipping.shipperName.label", {}, "Shipper Name")} value={shipperNameDraft} onChange={(event) => setShipperNameDraft(event.target.value)} />
                   <Button loading={updateRuntimeMutation.isPending} onClick={() => saveRuntimeUpdates([{ key: "shop.shipper_name", value: shipperNameDraft }])}>{translate("buttons.save", {}, "Simpan")}</Button>
@@ -384,7 +377,7 @@ export const ShippingSettingsPanel: React.FC = () => {
               </OperationalConfigRow>
             ) : null}
             {shipperPhoneRow ? (
-              <OperationalConfigRow row={withShippingDisplay(shipperPhoneRow, translate("settings.shipping.shipperPhone.label", {}, "Shipper Phone"), translate("settings.shipping.shipperPhone.description", {}, "Nomor kontak pengirim untuk kurir."))}>
+              <OperationalConfigRow row={withShippingDisplay(shipperPhoneRow, translate("settings.shipping.shipperPhone.label", {}, "Shipper Phone"))}>
                 <Space direction="vertical" style={{ width: "100%" }}>
                   <Input aria-label={translate("settings.shipping.shipperPhone.label", {}, "Shipper Phone")} value={shipperPhoneDraft} onChange={(event) => setShipperPhoneDraft(event.target.value)} />
                   <Button loading={updateRuntimeMutation.isPending} onClick={() => saveRuntimeUpdates([{ key: "shop.shipper_phone", value: shipperPhoneDraft }])}>{translate("buttons.save", {}, "Simpan")}</Button>
@@ -392,7 +385,7 @@ export const ShippingSettingsPanel: React.FC = () => {
               </OperationalConfigRow>
             ) : null}
             {shipperEmailRow ? (
-              <OperationalConfigRow row={withShippingDisplay(shipperEmailRow, translate("settings.shipping.shipperEmail.label", {}, "Shipper Email"), translate("settings.shipping.shipperEmail.description", {}, "Email pengirim untuk referensi operasional."))}>
+              <OperationalConfigRow row={withShippingDisplay(shipperEmailRow, translate("settings.shipping.shipperEmail.label", {}, "Shipper Email"))}>
                 <Space direction="vertical" style={{ width: "100%" }}>
                   <Input aria-label={translate("settings.shipping.shipperEmail.label", {}, "Shipper Email")} value={shipperEmailDraft} onChange={(event) => setShipperEmailDraft(event.target.value)} />
                   <Button loading={updateRuntimeMutation.isPending} onClick={() => saveRuntimeUpdates([{ key: "shop.shipper_email", value: shipperEmailDraft }])}>{translate("buttons.save", {}, "Simpan")}</Button>
@@ -400,7 +393,7 @@ export const ShippingSettingsPanel: React.FC = () => {
               </OperationalConfigRow>
             ) : null}
             {addressRow ? (
-              <OperationalConfigRow row={withShippingDisplay(addressRow, translate("settings.fields.storeAddress", {}, "Store Address"), translate("settings.shipping.address.description", {}, ""))}>
+              <OperationalConfigRow row={withShippingDisplay(addressRow, translate("settings.fields.storeAddress", {}, "Store Address"))}>
                 <Space direction="vertical" style={{ width: "100%" }}>
                   <Input.TextArea aria-label={translate("settings.fields.storeAddress", {}, "Store Address")} placeholder={translate("settings.fields.storeAddressPlaceholder", {}, "Alamat asal pengiriman")} rows={3} value={addressDraft} onChange={(event) => setAddressDraft(event.target.value)} />
                   <Button loading={updateRuntimeMutation.isPending} onClick={() => saveRuntimeUpdates([{ key: "shop.address", value: addressDraft }])}>{translate("buttons.save", {}, "Simpan")}</Button>
@@ -408,7 +401,7 @@ export const ShippingSettingsPanel: React.FC = () => {
               </OperationalConfigRow>
             ) : null}
             {organizationRow ? (
-              <OperationalConfigRow row={withShippingDisplay(organizationRow, translate("settings.fields.organization", {}, "Organization"), translate("settings.fields.organizationHelp", {}, "Organization name used as shipper name for deliveries"))}>
+              <OperationalConfigRow row={withShippingDisplay(organizationRow, translate("settings.fields.organization", {}, "Organization"))}>
                 <Space direction="vertical" style={{ width: "100%" }}>
                   <Input aria-label={translate("settings.fields.organization", {}, "Organization")} value={organizationDraft} onChange={(event) => setOrganizationDraft(event.target.value)} />
                   <Button loading={updateRuntimeMutation.isPending} onClick={() => saveRuntimeUpdates([{ key: "shop.organization", value: organizationDraft }])}>{translate("buttons.save", {}, "Simpan")}</Button>
