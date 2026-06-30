@@ -887,13 +887,14 @@
   },
   "settings": {
     "title": "Pengaturan",
+    "settings": "Pengaturan",
     "tabs": {
       "storeProfile": "Profil Toko",
-      "shippingSettings": "Pengaturan Pengiriman",
+      "shippingSettings": "Pengiriman",
       "integrationConfig": "Lanjutan",
       "integrationAudit": "Audit Konfigurasi",
       "adminSettings": "Tambah Admin",
-      "paymentSettings": "Pengaturan Pembayaran"
+      "paymentSettings": "Pembayaran"
     },
     "admin": {
       "title": "Tambah Akses Admin",

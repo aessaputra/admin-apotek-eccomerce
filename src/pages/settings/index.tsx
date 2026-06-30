@@ -142,7 +142,7 @@ export const Settings: React.FC = () => {
     },
     {
       key: "shippingSettings",
-      label: translate("settings.tabs.shippingSettings", {}, "Pengaturan Pengiriman"),
+      label: translate("settings.tabs.shippingSettings", {}, "Pengiriman"),
       children: <ShippingSettingsPanel />,
     },
     {
@@ -152,7 +152,7 @@ export const Settings: React.FC = () => {
     },
     {
       key: "paymentSettings",
-      label: translate("settings.tabs.paymentSettings", {}, "Pengaturan Pembayaran"),
+      label: translate("settings.tabs.paymentSettings", {}, "Pembayaran"),
       children: <PaymentSettingsPanel />,
     },
     {

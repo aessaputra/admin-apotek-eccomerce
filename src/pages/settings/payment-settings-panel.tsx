@@ -113,7 +113,7 @@ export const PaymentSettingsPanel: React.FC = () => {
     updateModeMutation.mutate(checked);
   };
 
-  const paymentPanelLabel = translate("settings.tabs.paymentSettings", {}, "Pengaturan Pembayaran");
+  const paymentPanelLabel = translate("settings.tabs.paymentSettings", {}, "Pembayaran");
   const serverKeyLabel = translate("settings.payment.serverKey.label", {}, "Kunci Server Midtrans");
   const modeLabel = translate("settings.payment.mode.label", {}, "Mode Pembayaran Midtrans");
   const serverKeyDraftValue = serverKeyDraft.value.trim();

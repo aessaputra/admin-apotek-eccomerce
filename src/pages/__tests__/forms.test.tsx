@@ -1129,15 +1129,15 @@ describe("form pages", () => {
     renderWithQueryClient(<Settings />);
 
     expect(screen.getByRole("tab", { name: "Profil Toko" })).not.toBeNull();
-    expect(screen.getByRole("tab", { name: "Pengaturan Pengiriman" })).not.toBeNull();
-    expect(screen.getByRole("tab", { name: "Pengaturan Pembayaran" })).not.toBeNull();
+    expect(screen.getByRole("tab", { name: "Pengiriman" })).not.toBeNull();
+    expect(screen.getByRole("tab", { name: "Pembayaran" })).not.toBeNull();
     expect(screen.getByRole("tab", { name: "Lanjutan" })).not.toBeNull();
     expect(screen.getByRole("tab", { name: "Audit Konfigurasi" })).not.toBeNull();
     expect(screen.queryByRole("tab", { name: "Konfigurasi Integrasi" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "Integration Config" })).toBeNull();
 
-    expect(await screen.findByRole("region", { name: "Pengaturan Pengiriman" })).not.toBeNull();
-    expect(await screen.findByRole("region", { name: "Pengaturan Pembayaran" })).not.toBeNull();
+    expect(await screen.findByRole("region", { name: "Pengiriman" })).not.toBeNull();
+    expect(await screen.findByRole("region", { name: "Pembayaran" })).not.toBeNull();
     expect(await screen.findByRole("region", { name: "Lanjutan" })).not.toBeNull();
     expect(await screen.findByRole("region", { name: "Audit Konfigurasi" })).not.toBeNull();
   });
@@ -1158,11 +1158,11 @@ describe("form pages", () => {
     expect(storeProfileSave.disabled).toBe(false);
     expect(storeProfileSave.style.display).toBe("");
 
-    fireEvent.click(screen.getByRole("tab", { name: "Pengaturan Pengiriman" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Pengiriman" }));
     expect(storeProfileSave.disabled).toBe(true);
     expect(storeProfileSave.style.display).toBe("none");
 
-    fireEvent.click(screen.getByRole("tab", { name: "Pengaturan Pembayaran" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Pembayaran" }));
     expect(storeProfileSave.disabled).toBe(true);
     expect(storeProfileSave.style.display).toBe("none");
 
@@ -1174,8 +1174,8 @@ describe("form pages", () => {
     expect(storeProfileSave.disabled).toBe(false);
     expect(storeProfileSave.style.display).toBe("");
 
-    expect(await screen.findByRole("region", { name: "Pengaturan Pengiriman" })).not.toBeNull();
-    expect(await screen.findByRole("region", { name: "Pengaturan Pembayaran" })).not.toBeNull();
+    expect(await screen.findByRole("region", { name: "Pengiriman" })).not.toBeNull();
+    expect(await screen.findByRole("region", { name: "Pembayaran" })).not.toBeNull();
     expect(await screen.findByRole("region", { name: "Lanjutan" })).not.toBeNull();
   });
 
@@ -1191,7 +1191,7 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const shippingPanel = await screen.findByRole("region", { name: "Pengaturan Pengiriman" });
+    const shippingPanel = await screen.findByRole("region", { name: "Pengiriman" });
     expect(await within(shippingPanel).findByText("BiteshipAreaSearch")).not.toBeNull();
     expect(within(shippingPanel).getByText("MapLocationPicker")).not.toBeNull();
     fireEvent.click(within(shippingPanel).getByRole("button", { name: "CourierPickerModal" }));
@@ -1211,7 +1211,7 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
+    const paymentPanel = await screen.findByRole("region", { name: "Pembayaran" });
     expect(await within(paymentPanel).findByText("Kunci Server Midtrans")).not.toBeNull();
     expect(within(paymentPanel).getByText("Mode Pembayaran Midtrans")).not.toBeNull();
     const serverKeyInput = within(paymentPanel).getByLabelText("Kunci Server Midtrans") as HTMLInputElement;
@@ -1281,7 +1281,7 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
+    const paymentPanel = await screen.findByRole("region", { name: "Pembayaran" });
     expect(await within(paymentPanel).findByText("Pengaturan pembayaran belum tersedia.")).not.toBeNull();
 
     for (const internalText of [
@@ -1335,7 +1335,7 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
+    const paymentPanel = await screen.findByRole("region", { name: "Pembayaran" });
     const serverKeyInput = await within(paymentPanel).findByLabelText("Kunci Server Midtrans") as HTMLInputElement;
     const serverKeyRow = serverKeyInput.closest("div")?.parentElement as HTMLElement;
 
@@ -1376,7 +1376,7 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
+    const paymentPanel = await screen.findByRole("region", { name: "Pembayaran" });
     const modeSwitch = await within(paymentPanel).findByRole("switch", { name: "Mode Pembayaran Midtrans" });
     fireEvent.click(modeSwitch);
 
@@ -1418,7 +1418,7 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const paymentPanel = await screen.findByRole("region", { name: "Pengaturan Pembayaran" });
+    const paymentPanel = await screen.findByRole("region", { name: "Pembayaran" });
     const modeSwitch = await within(paymentPanel).findByRole("switch", { name: "Mode Pembayaran Midtrans" });
     fireEvent.click(modeSwitch);
 
@@ -1450,7 +1450,7 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const shippingPanel = await screen.findByRole("region", { name: "Pengaturan Pengiriman" });
+    const shippingPanel = await screen.findByRole("region", { name: "Pengiriman" });
     const biteshipApiKeyInput = await within(shippingPanel).findByLabelText("Biteship API Key") as HTMLInputElement;
     expect(biteshipApiKeyInput).not.toBeNull();
     expect(within(shippingPanel).getByText("Active Couriers")).not.toBeNull();
@@ -1604,7 +1604,7 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const shippingPanel = await screen.findByRole("region", { name: "Pengaturan Pengiriman" });
+    const shippingPanel = await screen.findByRole("region", { name: "Pengiriman" });
     const alert = await within(shippingPanel).findByRole("alert");
 
     expect(alert.textContent).toContain("Konfigurasi Biteship belum siap");
@@ -1629,7 +1629,7 @@ describe("form pages", () => {
 
     renderWithQueryClient(<Settings />);
 
-    const shippingPanel = await screen.findByRole("region", { name: "Pengaturan Pengiriman" });
+    const shippingPanel = await screen.findByRole("region", { name: "Pengiriman" });
     const getRowWithSaveButton = (label: string): HTMLElement => {
       const labelElement = within(shippingPanel).getByText(label);
       const saveButton = within(shippingPanel).getAllByRole("button", { name: "Simpan" }).find((button) => {

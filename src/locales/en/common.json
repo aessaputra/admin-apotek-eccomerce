@@ -887,13 +887,14 @@
   },
   "settings": {
     "title": "Settings",
+    "settings": "Settings",
     "tabs": {
       "storeProfile": "Store Profile",
-      "shippingSettings": "Shipping Settings",
+      "shippingSettings": "Shipping",
       "integrationConfig": "Advanced",
       "integrationAudit": "Configuration Audit",
       "adminSettings": "Add Admin",
-      "paymentSettings": "Payment Settings"
+      "paymentSettings": "Payment"
     },
     "admin": {
       "title": "Elevate Access",

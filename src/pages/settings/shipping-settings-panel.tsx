@@ -244,7 +244,7 @@ export const ShippingSettingsPanel: React.FC = () => {
     setOriginLongitudeDraft(lng);
   };
 
-  const shippingPanelLabel = translate("settings.tabs.shippingSettings", {}, "Pengaturan Pengiriman");
+  const shippingPanelLabel = translate("settings.tabs.shippingSettings", {}, "Pengiriman");
 
   return (
     <>
