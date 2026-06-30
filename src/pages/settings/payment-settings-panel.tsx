@@ -24,10 +24,9 @@ function getBooleanValue(row: IntegrationConfigSummaryRow | undefined): boolean 
 
 function withPaymentDisplay(
   row: IntegrationConfigSummaryRow,
-  displayName: string,
-  description: string
+  displayName: string
 ): IntegrationConfigSummaryRow {
-  return { ...row, display_name: displayName, description };
+  return { ...row, display_name: displayName, description: null };
 }
 
 export const PaymentSettingsPanel: React.FC = () => {
@@ -126,13 +125,7 @@ export const PaymentSettingsPanel: React.FC = () => {
       <section role="region" aria-label={paymentPanelLabel}>
         <Card>
           <Space direction="vertical" size={token.marginMD} style={{ width: "100%" }}>
-            <Typography.Text type="secondary">
-              {translate(
-                "settings.payment.description",
-                {},
-                "Kelola kunci server dan mode pembayaran Midtrans untuk proses checkout."
-              )}
-            </Typography.Text>
+
             {summaryQuery.isError ? (
               <Alert
                 type="error"
@@ -150,8 +143,7 @@ export const PaymentSettingsPanel: React.FC = () => {
               <OperationalConfigRow
                 row={withPaymentDisplay(
                   serverKeyRow,
-                  serverKeyLabel,
-                  translate("settings.payment.serverKey.description", {}, "Ganti kunci server Midtrans tanpa menampilkan nilai yang sedang aktif.")
+                  serverKeyLabel
                 )}
               >
                 <SecretReplacementInput
@@ -170,8 +162,7 @@ export const PaymentSettingsPanel: React.FC = () => {
               <OperationalConfigRow
                 row={withPaymentDisplay(
                   modeRow,
-                  modeLabel,
-                  translate("settings.payment.mode.description", {}, "Gunakan Sandbox untuk uji coba. Gunakan Produksi untuk transaksi pelanggan.")
+                  modeLabel
                 )}
               >
                   <Switch

@@ -1205,7 +1205,7 @@ describe("form pages", () => {
     expect(serverKeyInput.value).toBe("");
     expect(serverKeyInput.placeholder).toBe("Kosongkan untuk memakai kunci saat ini");
     expect(within(paymentPanel).getByRole("switch", { name: "Mode Pembayaran Midtrans" }).getAttribute("aria-checked")).toBe("false");
-    expect(within(paymentPanel).getByText("Gunakan Sandbox untuk uji coba. Gunakan Produksi untuk transaksi pelanggan.")).not.toBeNull();
+
     expect(within(paymentPanel).queryByRole("button", { name: "Detail" })).toBeNull();
     expect(within(paymentPanel).queryByRole("button", { name: "Details" })).toBeNull();
     expect(paymentPanel.textContent).not.toContain("Ganti kunci server tanpa menampilkan nilai saat ini.");
