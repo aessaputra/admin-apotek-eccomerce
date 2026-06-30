@@ -46,7 +46,6 @@ const mocks = vi.hoisted(() => {
       "dashboard.kpis.orders30d": "Orders",
       "dashboard.kpis.paymentSuccessRate": "Paid Order Rate",
       "dashboard.kpis.averageOrderValue": "Average Order Value",
-      "dashboard.kpis.fulfillmentRisk": "Paid Orders Pending Delivery",
       "dashboard.kpis.lowStockSkus": "Low-Stock Products",
       "dashboard.kpis.unavailable": "Unavailable",
       "dashboard.kpis.periodNote": "Summary figures use the last 30 days. The trend chart follows the selected period.",
@@ -750,7 +749,6 @@ describe("Dashboard", () => {
     expect(screen.getAllByText("Orders").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Paid Order Rate")).not.toBeNull();
     expect(screen.getByText("Average Order Value")).not.toBeNull();
-    expect(screen.getByText("Paid Orders Pending Delivery")).not.toBeNull();
     expect(screen.queryByText("Low-Stock Products")).toBeNull();
     expect(pageText).toContain(currencyFormatter.format(125000));
     expect(pageText).toContain("60%");
@@ -762,15 +760,6 @@ describe("Dashboard", () => {
     expect(screen.queryByText("Total Revenue")).toBeNull();
     expect(screen.queryByText("dashboard.overview.title")).toBeNull();
     expect(screen.queryByText("dashboard.alerts.title")).toBeNull();
-  });
-
-  it("lets the fulfillment-risk KPI fill the attention panel at extra-large widths", () => {
-    setupDashboardQueries();
-
-    render(<Dashboard />);
-
-    expect(screen.getByText("Paid Orders Pending Delivery")).not.toBeNull();
-    expect(mocks.col).toHaveBeenCalledWith({ xs: 24, sm: 12, lg: 24, xl: 24 });
   });
 
   it("renders zero-denominator KPI values without NaN or Infinity", () => {
@@ -796,7 +785,6 @@ describe("Dashboard", () => {
       expect(screen.getByText("No urgent queue items")).not.toBeNull();
       expect(screen.queryByText("Summary data loaded successfully, with no orders or stock items needing immediate follow-up.")).toBeNull();
       expect(screen.queryByText("Paid orders need fulfillment")).toBeNull();
-      expect(screen.queryByText("Paid Orders Pending Delivery")).not.toBeNull();
       expect(screen.queryByText("Active low-stock SKUs")).toBeNull();
       expect(screen.queryByText("Summary unavailable")).toBeNull();
     });
@@ -990,9 +978,7 @@ describe("Dashboard", () => {
     expect(screen.getByText("Incoming, paid, and delivered order counts for the selected period.")).not.toBeNull();
     expect(pageText).toContain("Daily");
     expect(pageText).toContain(currencyFormatter.format(125000));
-    expect(pageText).toContain("Incoming Orders5");
-    expect(pageText).toContain("Paid Orders3");
-    expect(pageText).toContain("Delivered2");
+
   });
 
   it("renders the order trend loading state while the aggregate query is pending", () => {
@@ -1063,7 +1049,6 @@ describe("Dashboard", () => {
     expect(screen.getAllByText("Orders").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Paid Order Rate")).not.toBeNull();
     expect(screen.getByText("Average Order Value")).not.toBeNull();
-    expect(screen.getByText("Paid Orders Pending Delivery")).not.toBeNull();
     expect(screen.queryByText("Low-Stock Products")).toBeNull();
     expect(screen.getByText("Recent Orders")).not.toBeNull();
     expect(screen.getByText("Handed to Courier")).not.toBeNull();

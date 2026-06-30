@@ -327,41 +327,7 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
         <Empty description={labels.emptyDescription} />
       ) : (
         <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-          <Row gutter={[12, 12]}>
-            <Col xs={24} sm={12} lg={6}>
-              <Tooltip title={revenueSummary}>
-                <div style={statTileStyle}>
-                  <Statistic
-                    title={labels.revenue}
-                    value={totals.revenue}
-                    formatter={() => formattedRevenue}
-                    valueStyle={statValueStyle}
-                  />
-                </div>
-              </Tooltip>
-            </Col>
-            <Col xs={24} sm={12} lg={6}>
-              <Tooltip title={countSummary}>
-                <div style={statTileStyle}>
-                  <Statistic title={labels.orderCount} value={totals.orderCount} valueStyle={statValueStyle} />
-                </div>
-              </Tooltip>
-            </Col>
-            <Col xs={24} sm={12} lg={6}>
-              <Tooltip title={countSummary}>
-                <div style={statTileStyle}>
-                  <Statistic title={labels.paidOrders} value={totals.paidOrderCount} valueStyle={statValueStyle} />
-                </div>
-              </Tooltip>
-            </Col>
-            <Col xs={24} sm={12} lg={6}>
-              <Tooltip title={countSummary}>
-                <div style={statTileStyle}>
-                  <Statistic title={labels.completedOrders} value={totals.completedOrderCount} valueStyle={statValueStyle} />
-                </div>
-              </Tooltip>
-            </Col>
-          </Row>
+
 
           <Typography.Paragraph
             id={chartDescriptionId}

@@ -286,7 +286,7 @@ export const Dashboard: React.FC = () => {
 
       <Card title={attentionCardTitle} style={{ marginBottom: token.marginLG }}>
         <Row gutter={[16, 16]} align="stretch">
-          <Col xs={24} lg={14}>
+          <Col xs={24} lg={24}>
             <Space direction="vertical" size={token.marginSM} style={{ width: "100%" }}>
               {shouldShowOperationalAlertsLoading ? (
                 <Alert showIcon type="info" message={translate("dashboard.alerts.loading.message")} />
@@ -312,21 +312,7 @@ export const Dashboard: React.FC = () => {
               })}
             </Space>
           </Col>
-          <Col xs={24} lg={10}>
-            <Row gutter={[16, 16]} style={{ height: "100%" }} align="stretch">
-              <Col xs={24} sm={12} lg={24} xl={24} style={{ display: "flex" }}>
-                <Card style={{ ...secondaryKpiCardStyle, flex: 1, width: "100%" }} hoverable>
-                  <Statistic
-                    title={translate("dashboard.kpis.fulfillmentRisk")}
-                    value={dashboardKpis.fulfillmentRisk}
-                    loading={isKpiMetricsLoading}
-                    prefix={<ClockCircleOutlined aria-hidden="true" style={{ color: token.colorWarning }} />}
-                    valueStyle={secondaryKpiValueStyle}
-                  />
-                </Card>
-              </Col>
-            </Row>
-          </Col>
+
         </Row>
       </Card>
 
