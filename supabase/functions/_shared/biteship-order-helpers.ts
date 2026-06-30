@@ -53,8 +53,17 @@ function getPreferredRecipientName(order: Order): string | null | undefined {
   return order.profiles?.full_name;
 }
 
-function toFiniteCoordinate(value: number | null | undefined): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
+function toFiniteCoordinate(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
 }
 
 function getDestinationCoordinate(order: Order): {
