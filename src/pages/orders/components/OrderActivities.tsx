@@ -69,7 +69,9 @@ export const OrderActivities: React.FC<OrderActivitiesProps> = ({ orderId }) => 
       case "payment_updated": return <Tag color="orange" aria-hidden="true">$</Tag>;
       case "status_update": return <Tag color="blue" aria-hidden="true">↻</Tag>;
       case "sync_tracking": return <Tag color="cyan" aria-hidden="true">⟳</Tag>;
+      case "webhook_tracking": return <Tag color="geekblue" aria-hidden="true">🔔</Tag>;
       case "shipping_created": return <Tag color="purple" aria-hidden="true">📦</Tag>;
+      case "shipment_tracking_exception": return <Tag color="orange" aria-hidden="true">⚠</Tag>;
       case "customer_completed": return <Tag color="green" aria-hidden="true">✓</Tag>;
       default: return <Tag aria-hidden="true">•</Tag>;
     }
@@ -103,6 +105,8 @@ export const OrderActivities: React.FC<OrderActivitiesProps> = ({ orderId }) => 
         );
       case "sync_tracking":
         return translate("orders.activity.trackingSynced", {}, "Tracking synced from Biteship");
+      case "webhook_tracking":
+        return translate("orders.activity.webhookTrackingUpdated", {}, "Status updated automatically from Biteship");
       case "shipping_created":
         return translate("orders.activity.shippingCreated", {}, "Shipping order created in Biteship");
       case 'customer_completed':

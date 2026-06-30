@@ -7,6 +7,7 @@ export const CONFIG_KEYS = {
   biteshipOriginAreaId: "biteship.origin_area_id",
   biteshipOriginLatitude: "biteship.origin_latitude",
   biteshipOriginLongitude: "biteship.origin_longitude",
+  biteshipWebhookSecret: "biteship.webhook_secret",
   biteshipEnabledCouriers: "biteship.enabled_couriers",
   shopShipperName: "shop.shipper_name",
   shopShipperPhone: "shop.shipper_phone",
@@ -181,6 +182,11 @@ const CONFIG_DEFINITIONS = {
     keyName: CONFIG_KEYS.shopOrganization,
     valueKind: "text",
     runtimeRequired: true,
+  },
+  [CONFIG_KEYS.biteshipWebhookSecret]: {
+    keyName: CONFIG_KEYS.biteshipWebhookSecret,
+    valueKind: "secret",
+    runtimeRequired: false,
   },
   [CONFIG_KEYS.corsAllowedOrigins]: {
     keyName: CONFIG_KEYS.corsAllowedOrigins,

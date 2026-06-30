@@ -134,6 +134,7 @@ export const ShippingSettingsPanel: React.FC = () => {
   const { couriers, loading: couriersLoading, error: couriersError, isFallback: couriersFallback } = useBiteshipCouriers();
   const [courierModalOpen, setCourierModalOpen] = useState(false);
   const [apiKeyDraft, setApiKeyDraft] = useState<SecretReplacementDraft>(() => createBlankSecretReplacementDraft());
+  const [webhookSecretDraft, setWebhookSecretDraft] = useState<SecretReplacementDraft>(() => createBlankSecretReplacementDraft());
   const [enabledCouriersDraft, setEnabledCouriersDraft] = useState<string[]>([]);
   const [originAreaIdDraft, setOriginAreaIdDraft] = useState("");
   const [originPostalCodeDraft, setOriginPostalCodeDraft] = useState("");
@@ -161,6 +162,7 @@ export const ShippingSettingsPanel: React.FC = () => {
   );
 
   const apiKeyRow = rowsByKey.get("biteship.api_key");
+  const webhookSecretRow = rowsByKey.get("biteship.webhook_secret");
   const enabledCouriersRow = rowsByKey.get("biteship.enabled_couriers");
   const originPostalCodeRow = rowsByKey.get("biteship.origin_postal_code");
   const originAreaIdRow = rowsByKey.get("biteship.origin_area_id");
@@ -212,6 +214,18 @@ export const ShippingSettingsPanel: React.FC = () => {
     },
   });
 
+  const rotateWebhookSecretMutation = useMutation({
+    mutationFn: (secret: string) => integrationConfigClient.rotateSecret("biteship.webhook_secret", secret, SHIPPING_SAVE_REASON),
+    onSuccess: async () => {
+      setWebhookSecretDraft(createBlankSecretReplacementDraft());
+      messageApi.success(translate("settings.shipping.saveSuccess", {}, "Shipping settings saved."));
+      await refreshShippingSummary();
+    },
+    onError: () => {
+      messageApi.error(translate("settings.shipping.saveError", {}, "Shipping settings could not be saved."));
+    },
+  });
+
   const updateRuntimeMutation = useMutation({
     mutationFn: (updates: ShippingUpdate[]) =>
       Promise.all(updates.map((update) => integrationConfigClient.updateValue(update.key, update.value, SHIPPING_SAVE_REASON))),
@@ -228,6 +242,12 @@ export const ShippingSettingsPanel: React.FC = () => {
     const secret = apiKeyDraft.value.trim();
     if (!secret) return;
     rotateApiKeyMutation.mutate(secret);
+  };
+
+  const saveWebhookSecret = () => {
+    const secret = webhookSecretDraft.value.trim();
+    if (!secret) return;
+    rotateWebhookSecretMutation.mutate(secret);
   };
 
   const saveRuntimeUpdates = (updates: ShippingUpdate[]) => {
@@ -286,7 +306,24 @@ export const ShippingSettingsPanel: React.FC = () => {
                   onChange={setApiKeyDraft}
                   onSave={saveApiKey}
                   saving={rotateApiKeyMutation.isPending}
+                  saveDisabled={!apiKeyDraft.value.trim()}
                   placeholder={translate("settings.shipping.apiKey.placeholder", {}, "Kosongkan jika tidak diganti")}
+                  saveLabel={translate("buttons.save", {}, "Simpan")}
+                />
+              </OperationalConfigRow>
+            ) : null}
+            {webhookSecretRow ? (
+              <OperationalConfigRow
+                row={withShippingDisplay(webhookSecretRow, translate("settings.shipping.webhookSecret.label", {}, "Webhook Secret"))}
+              >
+                <SecretReplacementInput
+                  label={translate("settings.shipping.webhookSecret.label", {}, "Webhook Secret")}
+                  draft={webhookSecretDraft}
+                  onChange={setWebhookSecretDraft}
+                  onSave={saveWebhookSecret}
+                  saving={rotateWebhookSecretMutation.isPending}
+                  saveDisabled={!webhookSecretDraft.value.trim()}
+                  placeholder={translate("settings.shipping.webhookSecret.placeholder", {}, "Kosongkan jika tidak diganti")}
                   saveLabel={translate("buttons.save", {}, "Simpan")}
                 />
               </OperationalConfigRow>

@@ -6,6 +6,7 @@ export const INTEGRATION_CONFIG_OWNERSHIP = {
   payment: ["midtrans.server_key", "midtrans.is_production"],
   shipping: [
     "biteship.api_key",
+    "biteship.webhook_secret",
     "biteship.enabled_couriers",
     "biteship.origin_postal_code",
     "biteship.origin_area_id",
@@ -23,6 +24,7 @@ export const INTEGRATION_CONFIG_OWNERSHIP = {
 export const SECRET_RUNTIME_CONFIG_KEYS = [
   "midtrans.server_key",
   "biteship.api_key",
+  "biteship.webhook_secret",
   "push.expo_access_token",
 ] as const satisfies readonly RuntimeConfigKey[];
 

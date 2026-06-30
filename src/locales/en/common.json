@@ -516,7 +516,7 @@
     "actionGuide": {
       "title": "Order processing steps",
       "settledDescription": "Payment is settled. Continue with the next fulfillment step that matches the shipment evidence.",
-      "syncOnlyDescription": "Biteship manages the next shipment status. Use Sync Tracking to update to In Transit or Delivered.",
+      "syncOnlyDescription": "Shipment status is updated automatically via Biteship webhook. Use Sync Tracking manually if needed.",
       "unsettledDescription": "Payment is not settled yet. Fulfillment and tracking sync stay locked, but cancellation remains available when this status allows it.",
       "lockedDescription": "This order is in a terminal status. Review details and activity history instead of changing fulfillment.",
       "stepPayment": "Confirm payment status first.",
@@ -572,6 +572,8 @@
       "paymentUpdated": "Payment status updated",
       "statusUpdated": "{{actor}} changed status: {{from}} → {{to}}",
       "trackingSynced": "Tracking synced from Biteship",
+      "webhookTrackingUpdated": "Status updated automatically from Biteship",
+      "webhookWaybillUpdated": "Waybill updated automatically from Biteship",
       "shippingCreated": "Shipping order created in Biteship",
       "customerCompleted": "{{actor}} confirmed receipt of the order",
       "unknown": "{{action}}: {{from}} → {{to}}",
@@ -1150,6 +1152,10 @@
       "apiKey": {
         "label": "Biteship API Key",
         "description": "",
+        "placeholder": "Leave blank to keep current"
+      },
+      "webhookSecret": {
+        "label": "Webhook Secret",
         "placeholder": "Leave blank to keep current"
       },
       "postalCode": {

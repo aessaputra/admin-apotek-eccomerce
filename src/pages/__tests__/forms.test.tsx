@@ -1525,6 +1525,7 @@ describe("form pages", () => {
         action: "summary",
         keys: [
           "biteship.api_key",
+          "biteship.webhook_secret",
           "biteship.enabled_couriers",
           "biteship.origin_postal_code",
           "biteship.origin_area_id",
@@ -1823,6 +1824,7 @@ describe("form pages", () => {
       payment: ["midtrans.server_key", "midtrans.is_production"],
       shipping: [
         "biteship.api_key",
+        "biteship.webhook_secret",
         "biteship.enabled_couriers",
         "biteship.origin_postal_code",
         "biteship.origin_area_id",

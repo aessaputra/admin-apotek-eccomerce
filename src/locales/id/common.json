@@ -516,7 +516,7 @@
     "actionGuide": {
       "title": "Langkah pemrosesan pesanan",
       "settledDescription": "Pembayaran telah lunas. Anda dapat melanjutkan proses pengiriman pesanan.",
-      "syncOnlyDescription": "Biteship mengelola status pengiriman berikutnya. Gunakan Sinkronkan Pelacakan untuk memperbarui ke Dalam Perjalanan atau Terkirim.",
+      "syncOnlyDescription": "Status pengiriman diperbarui otomatis melalui webhook Biteship. Gunakan Sinkronkan Pelacakan secara manual jika diperlukan.",
       "unsettledDescription": "Pembayaran belum lunas. Proses pengiriman terkunci hingga pembayaran selesai. Anda masih bisa membatalkan pesanan.",
       "lockedDescription": "Pesanan ini berada di status akhir. Tinjau detail dan riwayat aktivitas tanpa mengubah fulfillment.",
       "stepPayment": "Pastikan status pembayaran terlebih dahulu.",
@@ -572,6 +572,8 @@
       "paymentUpdated": "Status pembayaran diperbarui",
       "statusUpdated": "{{actor}} mengubah status: {{from}} → {{to}}",
       "trackingSynced": "Pelacakan disinkronkan dari Biteship",
+      "webhookTrackingUpdated": "Status diperbarui otomatis dari Biteship",
+      "webhookWaybillUpdated": "Nomor resi diperbarui otomatis dari Biteship",
       "shippingCreated": "Pesanan pengiriman dibuat di Biteship",
       "customerCompleted": "{{actor}} mengonfirmasi penerimaan pesanan",
       "unknown": "{{action}}: {{from}} → {{to}}",
@@ -1150,6 +1152,10 @@
       "apiKey": {
         "label": "Biteship API Key",
         "description": "",
+        "placeholder": "Kosongkan jika tidak diganti"
+      },
+      "webhookSecret": {
+        "label": "Webhook Secret",
         "placeholder": "Kosongkan jika tidak diganti"
       },
       "postalCode": {

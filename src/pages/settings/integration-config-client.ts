@@ -5,6 +5,7 @@ export const RUNTIME_CONFIG_KEYS = [
   "midtrans.server_key",
   "midtrans.is_production",
   "biteship.api_key",
+  "biteship.webhook_secret",
   "biteship.origin_postal_code",
   "biteship.origin_area_id",
   "biteship.origin_latitude",
