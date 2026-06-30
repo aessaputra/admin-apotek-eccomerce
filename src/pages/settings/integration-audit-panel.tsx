@@ -67,6 +67,13 @@ function formatAuditDate(value: string): string {
   return new Date(value).toLocaleString("id-ID");
 }
 
+function formatAuditValue(masked: string | null, metadataValue: unknown): string {
+  if (masked !== null && masked !== undefined) return masked;
+  if (metadataValue === null || metadataValue === undefined) return "-";
+  if (typeof metadataValue === "string") return metadataValue;
+  return JSON.stringify(metadataValue);
+}
+
 function sortNewestFirst(left: IntegrationConfigAuditRow, right: IntegrationConfigAuditRow): number {
   return Date.parse(right.created_at) - Date.parse(left.created_at);
 }
@@ -197,10 +204,10 @@ export const IntegrationAuditPanel: React.FC = () => {
               <AuditValue>{row.reason || "-"}</AuditValue>
             </Descriptions.Item>
             <Descriptions.Item label={translate("settings.integration.audit.fields.oldValue", {}, "Old")}>
-              <AuditValue>{row.old_masked_value || "-"}</AuditValue>
+              <AuditValue>{formatAuditValue(row.old_masked_value, row.metadata?.old_value)}</AuditValue>
             </Descriptions.Item>
             <Descriptions.Item label={translate("settings.integration.audit.fields.newValue", {}, "New")}>
-              <AuditValue>{row.new_masked_value || "-"}</AuditValue>
+              <AuditValue>{formatAuditValue(row.new_masked_value, row.metadata?.new_value)}</AuditValue>
             </Descriptions.Item>
           </Descriptions>
         ),
