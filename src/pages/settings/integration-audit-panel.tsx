@@ -212,13 +212,6 @@ export const IntegrationAuditPanel: React.FC = () => {
     <section role="region" aria-label={translate("settings.tabs.integrationAudit", {}, "Riwayat Pengaturan")}>
       <Card>
         <Space direction="vertical" size={token.marginMD} style={{ width: "100%" }}>
-          <Typography.Text type="secondary">
-            {translate(
-              "settings.integration.auditPanel.description",
-              {},
-              "Tinjau riwayat perubahan konfigurasi runtime untuk pembayaran, pengiriman, dan teknis."
-            )}
-          </Typography.Text>
           <Space wrap style={{ width: "100%" }}>
             <Space direction="vertical" size={token.marginXXS}>
               <Typography.Text>{translate("settings.integration.auditPanel.ownerLabel", {}, "Area")}</Typography.Text>
