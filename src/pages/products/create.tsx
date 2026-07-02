@@ -112,8 +112,15 @@ export const ProductCreate: React.FC = () => {
         onValuesChange={handleValuesChange}
         onFinish={handleFinish}
       >
-        <Form.Item label={translate("products.fields.name")} name="name" rules={[{ required: true, message: translate("products.validation.nameRequired") }]}>
-          <Input />
+        <Form.Item
+          label={translate("products.fields.name")}
+          name="name"
+          rules={[
+            { required: true, message: translate("products.validation.nameRequired") },
+            { max: 50, message: "Nama produk maksimal 50 karakter." },
+          ]}
+        >
+          <Input maxLength={50} showCount />
         </Form.Item>
         <Form.Item
           label={translate("products.fields.sku")}
@@ -122,11 +129,18 @@ export const ProductCreate: React.FC = () => {
         >
           <Input onChange={() => { skuTouchedRef.current = true; }} onBlur={handleSkuBlur} />
         </Form.Item>
-        <Form.Item label={translate("products.fields.slug")} name="slug" rules={[{ required: true, message: translate("products.validation.slugRequired") }]}>
-          <Input />
+        <Form.Item
+          label={translate("products.fields.slug")}
+          name="slug"
+          rules={[
+            { required: true, message: translate("products.validation.slugRequired") },
+            { max: 75, message: "Slug produk maksimal 75 karakter." },
+          ]}
+        >
+          <Input maxLength={75} showCount />
         </Form.Item>
         <Form.Item label={translate("products.fields.description")} name="description" getValueFromEvent={(val: string) => val}>
-          <DescriptionEditorModal maxLength={5000} />
+          <DescriptionEditorModal maxLength={500} />
         </Form.Item>
         <Form.Item label={translate("products.fields.price")} name="price" rules={[{ required: true, message: translate("products.validation.priceRequired") }]}>
           <InputNumber style={{ width: "100%" }} min={0} />
