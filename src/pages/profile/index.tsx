@@ -492,8 +492,20 @@ const ProfileForms: React.FC<{ userId: string }> = ({ userId }) => {
       contentProps={{ style: { display: "flex", flexDirection: "column", gap: token.marginLG } }}
     >
       <Form {...formProps} layout="vertical">
-        <Form.Item label={translate("profile.fields.fullName")} name="full_name">
-          <Input placeholder={translate("profile.fields.fullNamePlaceholder")} />
+        <Form.Item
+          label={translate("profile.fields.fullName")}
+          name="full_name"
+          rules={[
+            { whitespace: true, message: "Nama tidak boleh hanya spasi." },
+            { min: 2, message: "Nama harus minimal 2 karakter." },
+            { max: 100, message: "Nama maksimal 100 karakter." },
+          ]}
+        >
+          <Input
+            placeholder={translate("profile.fields.fullNamePlaceholder")}
+            maxLength={100}
+            showCount
+          />
         </Form.Item>
         <Form.Item label={translate("profile.fields.avatar")} name="avatar_url">
           <AvatarUpload />
