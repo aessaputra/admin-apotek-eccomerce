@@ -498,12 +498,12 @@ const ProfileForms: React.FC<{ userId: string }> = ({ userId }) => {
           rules={[
             { whitespace: true, message: "Nama tidak boleh hanya spasi." },
             { min: 2, message: "Nama harus minimal 2 karakter." },
-            { max: 100, message: "Nama maksimal 100 karakter." },
+            { max: 60, message: "Nama maksimal 60 karakter." },
           ]}
         >
           <Input
             placeholder={translate("profile.fields.fullNamePlaceholder")}
-            maxLength={100}
+            maxLength={60}
             showCount
           />
         </Form.Item>
