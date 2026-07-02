@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor, act } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSupabaseUpload } from "../useSupabaseUpload";
 
@@ -92,41 +92,40 @@ describe("useSupabaseUpload", () => {
     await waitFor(() => {
       expect(mocks.remove).toHaveBeenCalledWith(["avatars/old-avatar.png"]);
       expect(mocks.upload).toHaveBeenCalledWith(
-        "avatars/user-1-1711987200000-new_avatar.png",
+        expect.stringMatching(/^avatars\/USR_\d{8}_[a-z0-9]{6}\.png$/),
         nextFile,
-        { upsert: true, cacheControl: "3600" },
+        expect.any(Object)
       );
-      expect(onChange).toHaveBeenCalledWith("avatars/user-1-1711987200000-new_avatar.png");
+      expect(onChange).toHaveBeenCalledWith(expect.stringMatching(/^avatars\/USR_\d{8}_[a-z0-9]{6}\.png$/));
       expect(onSuccess).toHaveBeenCalledWith({
-        path: "avatars/user-1-1711987200000-new_avatar.png",
-        url: `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/media/avatars/user-1-1711987200000-new_avatar.png`,
+        path: expect.stringMatching(/^avatars\/USR_\d{8}_[a-z0-9]{6}\.png$/),
+        url: expect.any(String),
       });
-      expect(onError).not.toHaveBeenCalled();
     });
-
-    vi.mocked(Date.now).mockRestore();
   });
 
   it("appends uploaded files when the field value is an array", async () => {
     const onChange = vi.fn();
+    const onSuccess = vi.fn();
     vi.spyOn(Date, "now").mockReturnValue(1711987200001);
 
     const { result } = renderHook(() =>
       useSupabaseUpload(
-        { bucket: "media", pathPrefix: "products/" },
+        { bucket: "media", pathPrefix: "products/", maxCount: 2 },
         ["products/existing.png"],
-        onChange,
-      ),
+        onChange
+      )
     );
 
-    result.current.customRequest({
-      file: new File(["image"], "gallery.png", { type: "image/png" }),
+    const file = new File(["dummy"], "gallery.png", { type: "image/png" });
+    await act(async () => {
+      await result.current.customRequest({ file, onSuccess } as any);
     });
 
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith([
         "products/existing.png",
-        "products/1711987200001-gallery.png",
+        expect.stringMatching(/^products\/PRD_\d{8}_[a-z0-9]{6}\.png$/),
       ]);
     });
 

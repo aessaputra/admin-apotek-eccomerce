@@ -199,8 +199,11 @@ export const HomeBannerMediaInput: React.FC<HomeBannerMediaInputProps> = ({
     try {
       const file = options.file as RcFile;
       const nextWarnings = await analyzeFileWarnings(file);
-      const safeName = sanitizeFilename(file.name);
-      const path = `${getHomeBannerStoragePrefix(resolvedPlacementKey)}${Date.now()}-${safeName}`;
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const d = new Date();
+      const yyyymmdd = d.getFullYear().toString() + (d.getMonth() + 1).toString().padStart(2, '0') + d.getDate().toString().padStart(2, '0');
+      const randomHex = Math.random().toString(36).substring(2, 8);
+      const path = `${getHomeBannerStoragePrefix(resolvedPlacementKey)}BNR_${yyyymmdd}_${randomHex}.${fileExt}`;
 
       const { error } = await supabaseClient.storage.from(MEDIA_BUCKET).upload(path, file, {
         upsert: true,

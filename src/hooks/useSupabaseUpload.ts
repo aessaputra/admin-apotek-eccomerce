@@ -71,11 +71,20 @@ export function useSupabaseUpload(
           }
         }
 
-        const safeName = sanitizeFilename(rcFile.name);
-        // Get current user ID if includeUserId is enabled (required for avatar RLS policy)
-        const { data: { user } } = await supabaseClient.auth.getUser();
-        const userIdPrefix = includeUserId && user ? `${user.id}-` : '';
-        const path = `${pathPrefix}${userIdPrefix}${Date.now()}-${safeName}`;
+        const fileExt = rcFile.name.split('.').pop()?.toLowerCase() || 'jpg';
+        const d = new Date();
+        const yyyymmdd = d.getFullYear().toString() + (d.getMonth() + 1).toString().padStart(2, '0') + d.getDate().toString().padStart(2, '0');
+        const randomHex = Math.random().toString(36).substring(2, 8);
+        
+        let prefix = 'IMG';
+        if (pathPrefix.startsWith('avatars/')) prefix = 'USR';
+        else if (pathPrefix.startsWith('products/')) prefix = 'PRD';
+        else if (pathPrefix.startsWith('categories/')) prefix = 'CTG';
+        else if (pathPrefix.startsWith('banners/')) prefix = 'BNR';
+
+        // UUID is no longer needed in the path because we rely on the owner column in RLS
+        const fileName = `${prefix}_${yyyymmdd}_${randomHex}.${fileExt}`;
+        const path = `${pathPrefix}${fileName}`;
 
         const { error } = await supabaseClient.storage
           .from(bucket)
