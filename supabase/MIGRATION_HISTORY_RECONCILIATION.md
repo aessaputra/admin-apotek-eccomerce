@@ -106,3 +106,74 @@ Hasil kanonis repo setelah penyelarasan:
 
 1. `20260421111409_add_customer_completion_stage.sql`
 2. `20260421111439_refine_customer_order_bucket_derivation.sql`
+
+## 2026-07-03 constraint migrations reconciliation
+
+On 2026-07-03, the remote `supabase_migrations.schema_migrations` table contained 31 entries that did not have corresponding canonical files in the repo. These entries appeared to be auto-generated or applied outside the canonical workflow and covered constraints such as `product_images_sort_order_max_chk`, `order_items_quantity_positive_chk`, and `order_items_source_cart_item_id_fkey`.
+
+### Remote-only entries removed from history
+
+The following 31 remote-only entries were marked `reverted` using `supabase migration repair --status reverted` so that local/remote history parity could be restored and the normal `db push`/`db pull` workflow could function:
+
+- `20260703080532`
+- `20260703081305`
+- `20260703083145`
+- `20260703085636`
+- `20260703085814`
+- `20260703090423`
+- `20260703093114`
+- `20260703093537`
+- `20260703095302`
+- `20260703100752`
+- `20260703100916`
+- `20260703101452`
+- `20260703101733`
+- `20260703102000`
+- `20260703102237`
+- `20260703102455`
+- `20260703102558`
+- `20260703103533`
+- `20260703105500`
+- `20260703105832`
+- `20260703110025`
+- `20260703110223`
+- `20260703111119`
+- `20260703113522`
+- `20260703113850`
+- `20260703115839`
+- `20260703130604`
+- `20260703131105`
+- `20260703132026`
+- `20260703140000`
+- `20260703141844`
+
+Marking these as `reverted` only removed the metadata rows; it did **not** roll back any schema objects. The required constraints remain present in the live database.
+
+### Canonical local migrations added
+
+Two canonical migrations were added to the repo to represent the intended schema changes:
+
+1. `20260703133123_add_product_images_sort_order_max_constraint.sql`
+2. `20260703140000_fix_order_items_constraints.sql`
+
+A migration test was also added:
+
+- `supabase/migrations/__tests__/order-items-constraints-migration.test.ts`
+
+### Why this exception was made
+
+The previous operational decision was to avoid manual edits to live migration history. That still applies for typical drift. In this case, the drift was large (31 entries), the remote-only entries had no canonical source files, and the absence of parity blocked `db push` entirely. Restoring parity via `migration repair` was the least-risk path because:
+
+1. The live schema already contained the required constraints.
+2. The two canonical local migrations use guarded SQL (`if not exists`, `drop constraint if exists`) so they are safe to re-apply.
+3. A clean history is required for future `db push`/`db pull` operations.
+
+### Current expected live state
+
+After reconciliation, the following constraints must exist in the live database:
+
+- `public.product_images.product_images_sort_order_max_chk` (`sort_order <= 9`)
+- `public.order_items.order_items_quantity_positive_chk` (`quantity > 0`)
+- `public.order_items.order_items_source_cart_item_id_fkey` (FK to `public.cart_items(id)` with `ON DELETE SET NULL`)
+
+If any of these constraints are missing in a fresh restore, re-apply the two canonical migrations above.
