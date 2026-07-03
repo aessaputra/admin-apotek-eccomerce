@@ -226,7 +226,10 @@
       "weightRequired": "Dibutuhkan untuk perhitungan ongkos kirim dan pembuatan pesanan kurir.",
       "weightRequiredRule": "Berat produk wajib diisi untuk pengiriman",
       "weightMin": "Berat produk harus lebih besar dari 0 gram",
-      "weightMax": "Berat produk maksimal 20.000 gram (20 kg)"
+      "weightMax": "Berat produk maksimal 20.000 gram (20 kg)",
+      "nameMax": "Nama produk maksimal 120 karakter.",
+      "stockMin": "Stok produk tidak boleh negatif.",
+      "stockMax": "Stok produk maksimal 99.999."
     },
     "imagesSaveError": "Gagal menyimpan gambar produk",
     "description": {
@@ -260,7 +263,9 @@
     },
     "validation": {
       "nameRequired": "Nama wajib diisi",
-      "slugRequired": "Slug wajib diisi"
+      "nameMax": "Nama maksimal 50 karakter",
+      "slugRequired": "Slug wajib diisi",
+      "slugMax": "Slug maksimal 75 karakter"
     }
   },
   "homeBanners": {

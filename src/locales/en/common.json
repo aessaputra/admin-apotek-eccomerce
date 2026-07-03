@@ -226,7 +226,10 @@
       "weightRequired": "Required for shipping rates and Biteship order creation.",
       "weightRequiredRule": "Product weight is required for shipping",
       "weightMin": "Product weight must be greater than 0 gram",
-      "weightMax": "Product weight max 20,000 grams (20 kg)"
+      "weightMax": "Product weight max 20,000 grams (20 kg)",
+      "nameMax": "Product name must be at most 120 characters.",
+      "stockMin": "Stock cannot be negative.",
+      "stockMax": "Product stock must be at most 99,999."
     },
     "imagesSaveError": "Failed to save product images",
     "description": {
@@ -260,7 +263,9 @@
     },
     "validation": {
       "nameRequired": "Name is required",
-      "slugRequired": "Slug is required"
+      "nameMax": "Name cannot exceed 50 characters",
+      "slugRequired": "Slug is required",
+      "slugMax": "Slug cannot exceed 75 characters"
     }
   },
   "homeBanners": {

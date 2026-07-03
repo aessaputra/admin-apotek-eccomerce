@@ -155,10 +155,10 @@ export const ProductEdit: React.FC = () => {
           name="name"
           rules={[
             { required: true, message: translate("products.validation.nameRequired") },
-            { max: 50, message: "Nama produk maksimal 50 karakter." },
+            { max: 120, message: translate("products.validation.nameMax") },
           ]}
         >
-          <Input maxLength={50} showCount />
+          <Input maxLength={120} showCount />
         </Form.Item>
         <Form.Item
           label={translate("products.fields.sku")}
@@ -183,8 +183,15 @@ export const ProductEdit: React.FC = () => {
         <Form.Item label={translate("products.fields.price")} name="price" rules={[{ required: true, message: translate("products.validation.priceRequired") }]}>
           <InputNumber style={{ width: "100%" }} min={0} />
         </Form.Item>
-        <Form.Item label={translate("products.fields.stock")} name="stock">
-          <InputNumber style={{ width: "100%" }} min={0} />
+        <Form.Item
+          label={translate("products.fields.stock")}
+          name="stock"
+          rules={[
+            { type: "number", min: 0, message: translate("products.validation.stockMin", {}, "Stock cannot be negative.") },
+            { type: "number", max: 99999, message: translate("products.validation.stockMax") },
+          ]}
+        >
+          <InputNumber style={{ width: "100%" }} min={0} max={99999} />
         </Form.Item>
         <Form.Item
           label={translate("products.fields.weight")}
