@@ -225,7 +225,8 @@
       "skuDuplicate": "This SKU is already used by another product.",
       "weightRequired": "Required for shipping rates and Biteship order creation.",
       "weightRequiredRule": "Product weight is required for shipping",
-      "weightMin": "Product weight must be greater than 0 gram"
+      "weightMin": "Product weight must be greater than 0 gram",
+      "weightMax": "Product weight max 20,000 grams (20 kg)"
     },
     "imagesSaveError": "Failed to save product images",
     "description": {
