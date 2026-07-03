@@ -225,7 +225,8 @@
       "skuDuplicate": "SKU ini sudah digunakan oleh produk lain.",
       "weightRequired": "Dibutuhkan untuk perhitungan ongkos kirim dan pembuatan pesanan kurir.",
       "weightRequiredRule": "Berat produk wajib diisi untuk pengiriman",
-      "weightMin": "Berat produk harus lebih besar dari 0 gram"
+      "weightMin": "Berat produk harus lebih besar dari 0 gram",
+      "weightMax": "Berat produk maksimal 20.000 gram (20 kg)"
     },
     "imagesSaveError": "Gagal menyimpan gambar produk",
     "description": {

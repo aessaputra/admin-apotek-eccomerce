@@ -196,6 +196,11 @@ export const ProductEdit: React.FC = () => {
               min: 1,
               message: translate("products.validation.weightMin"),
             },
+            {
+              type: "number",
+              max: 20000,
+              message: translate("products.validation.weightMax"),
+            },
           ]}
           extra={translate("products.validation.weightRequired", {}, "Required for shipping rates and Biteship order creation.")}
         >

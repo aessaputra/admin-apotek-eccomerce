@@ -15,6 +15,7 @@ export const ProductWeightInput: React.FC<ProductWeightInputProps> = ({ value, o
         onChange={onChange}
         style={{ width: "100%" }}
         min={1}
+        max={20000}
       />
       <Typography.Text
         style={{
