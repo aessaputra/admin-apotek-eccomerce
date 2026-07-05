@@ -387,6 +387,34 @@ async function ensureAwaitingShipmentSideEffectsQueued(
   triggerWebhookSideEffectProcessor(orderId);
 }
 
+async function restoreOrderStockDeductions(
+  adminClient: SupabaseAdminClient,
+  orderId: string,
+): Promise<void> {
+  const { data: deductions, error: queryError } = await adminClient
+    .from("order_item_stock_deductions")
+    .select("product_id")
+    .eq("order_id", orderId);
+
+  if (queryError || !deductions || deductions.length === 0) {
+    return;
+  }
+
+  for (const row of deductions as Array<{ product_id: string }>) {
+    const { error: rpcError } = await adminClient.rpc(
+      "reverse_order_item_stock_deduction",
+      { p_order_id: orderId, p_product_id: row.product_id },
+    );
+
+    if (rpcError) {
+      console.error(
+        "[order-manager] Stock restoration failed for product:",
+        { orderId, productId: row.product_id, code: "stock_restoration_failed" },
+      );
+    }
+  }
+}
+
 async function buildCancellationPaymentUpdate(
   adminClient: SupabaseAdminClient,
   order: {
@@ -892,6 +920,16 @@ export function createOrderManagerHandler(dependencies: {
       if (activityError) {
         console.error("[order-manager] Failed to log activity:", activityError);
         // Don't throw - order already updated, just log the error
+      }
+
+      // Restore stock deductions when cancelling a post-settlement order
+      if (to === "cancelled") {
+        try {
+          await restoreOrderStockDeductions(adminClient, body.orderId);
+        } catch (stockRestoreError) {
+          console.error("[order-manager] Failed to restore stock on cancellation:", stockRestoreError);
+          // Non-blocking: order is already cancelled, stock can be fixed manually
+        }
       }
 
       // Enqueue courier fulfillment if moving to awaiting_shipment

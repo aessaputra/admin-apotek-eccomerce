@@ -87,6 +87,10 @@ function createAdminClient(orderOverrides: Record<string, unknown> = {}) {
   const sideEffectTaskEq = vi.fn(() => ({ maybeSingle: sideEffectTaskMaybeSingle }));
   const sideEffectTaskSelect = vi.fn(() => ({ eq: sideEffectTaskEq }));
   const sideEffectTaskUpsert = vi.fn(async () => ({ error: null }));
+  const stockDeductionRows: Array<{ product_id: string }> = orderOverrides.stockDeductionRows as Array<{ product_id: string }> ?? [];
+  const stockDeductionSelect = vi.fn(() => ({
+    eq: vi.fn(() => ({ data: stockDeductionRows, error: null })),
+  }));
   const orderRow = {
     id: "order-1",
     user_id: "user-1",
@@ -153,6 +157,12 @@ function createAdminClient(orderOverrides: Record<string, unknown> = {}) {
       };
     }
 
+    if (tableName === "order_item_stock_deductions") {
+      return {
+        select: stockDeductionSelect,
+      };
+    }
+
     throw new Error(`Unexpected table: ${tableName}`);
   });
 
@@ -180,6 +190,10 @@ function createAdminClient(orderOverrides: Record<string, unknown> = {}) {
       };
     }
 
+    if (name === "reverse_order_item_stock_deduction") {
+      return { data: null, error: null };
+    }
+
     return { data: null, error: null };
   });
 
@@ -198,6 +212,7 @@ function createAdminClient(orderOverrides: Record<string, unknown> = {}) {
     from,
     orderReadModelSelect,
     rpc,
+    stockDeductionSelect,
   };
 }
 
@@ -492,5 +507,103 @@ describe("order-manager Midtrans cancellation currency validation", () => {
     expect(admin.ordersUpdate).not.toHaveBeenCalled();
     expect(admin.paymentsUpdate).not.toHaveBeenCalled();
     expect(admin.activityInsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("order-manager stock restoration on cancellation", () => {
+  beforeEach(() => {
+    midtransMocks.resolveMidtransTransactionRuntimeConfig.mockClear();
+    midtransMocks.verifyMidtransTransaction.mockReset();
+    midtransMocks.verifyMidtransTransaction.mockResolvedValue({
+      order_id: "MIDTRANS-MANAGER-ORDER",
+      transaction_id: "transaction-cancel",
+      transaction_status: "cancel",
+      fraud_status: "",
+      status_code: "200",
+      gross_amount: "150000.00",
+      payment_type: "bank_transfer",
+      currency: "IDR",
+    });
+    midtransMocks.cancelMidtransTransaction.mockClear();
+  });
+
+  it("calls reverse_order_item_stock_deduction for each deducted product on cancel", async () => {
+    const admin = createAdminClient({
+      status: "processing",
+      payment_status: "pending",
+      stockDeductionRows: [
+        { product_id: "product-a" },
+        { product_id: "product-b" },
+      ],
+    });
+    const handler = createOrderManagerHandler({
+      requireAdmin: vi.fn(async () => ({ userId: "admin-user" })),
+      getAdminClient: () => admin.adminClient as never,
+    });
+
+    const response = await handler(createRequest());
+
+    expect(response.status).toBe(200);
+    expect(admin.from).toHaveBeenCalledWith("order_item_stock_deductions");
+    expect(admin.rpc).toHaveBeenCalledWith(
+      "reverse_order_item_stock_deduction",
+      { p_order_id: "order-1", p_product_id: "product-a" },
+    );
+    expect(admin.rpc).toHaveBeenCalledWith(
+      "reverse_order_item_stock_deduction",
+      { p_order_id: "order-1", p_product_id: "product-b" },
+    );
+  });
+
+  it("skips stock restoration when no deduction records exist", async () => {
+    const admin = createAdminClient({
+      status: "pending",
+      payment_status: "pending",
+      stockDeductionRows: [],
+    });
+    const handler = createOrderManagerHandler({
+      requireAdmin: vi.fn(async () => ({ userId: "admin-user" })),
+      getAdminClient: () => admin.adminClient as never,
+    });
+
+    const response = await handler(createRequest());
+
+    expect(response.status).toBe(200);
+    expect(admin.rpc).not.toHaveBeenCalledWith(
+      "reverse_order_item_stock_deduction",
+      expect.anything(),
+    );
+  });
+
+  it("does not fail the cancel response when stock restoration errors", async () => {
+    const admin = createAdminClient({
+      status: "processing",
+      payment_status: "pending",
+      stockDeductionRows: [{ product_id: "product-fail" }],
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (admin.rpc as ReturnType<typeof vi.fn>).mockImplementation(async (name: string) => {
+      if (name === "reverse_order_item_stock_deduction") {
+        return { data: null, error: { message: "restoration failed" } };
+      }
+      if (name === "get_runtime_integration_config_versions") {
+        return { data: [], error: null };
+      }
+      return { data: null, error: null };
+    });
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const handler = createOrderManagerHandler({
+      requireAdmin: vi.fn(async () => ({ userId: "admin-user" })),
+      getAdminClient: () => admin.adminClient as never,
+    });
+
+    const response = await handler(createRequest());
+
+    expect(response.status).toBe(200);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[order-manager] Stock restoration failed for product:",
+      expect.objectContaining({ code: "stock_restoration_failed" }),
+    );
+    consoleErrorSpy.mockRestore();
   });
 });
