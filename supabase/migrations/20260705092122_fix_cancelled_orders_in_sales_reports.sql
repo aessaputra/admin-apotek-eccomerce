@@ -12,7 +12,7 @@ select
   avg(orm.total_amount) as average_order_value
 from public.order_read_model orm
 where orm.payment_status = 'settlement'::public.payment_status
-  and orm.status != 'cancelled'::public.order_status
+  and orm.status != 'cancelled'
 group by date_trunc('day', orm.created_at)::date
 order by date_trunc('day', orm.created_at)::date desc;
 
@@ -32,7 +32,7 @@ join public.order_read_model orm on orm.id = oi.order_id
 join public.products p on p.id = oi.product_id
 left join public.categories c on c.id = p.category_id
 where orm.payment_status = 'settlement'::public.payment_status
-  and orm.status != 'cancelled'::public.order_status
+  and orm.status != 'cancelled'
 group by p.id, p.name, c.name
 order by sum(oi.quantity) desc;
 
@@ -50,7 +50,7 @@ select
 from public.order_read_model orm
 join public.profiles u on u.id = orm.user_id
 where orm.payment_status = 'settlement'::public.payment_status
-  and orm.status != 'cancelled'::public.order_status
+  and orm.status != 'cancelled'
 group by u.id, u.full_name, u.phone_number
 order by sum(orm.total_amount) desc;
 
@@ -71,7 +71,7 @@ from public.order_items oi
 join public.order_read_model orm on orm.id = oi.order_id
 left join public.products p on p.id = oi.product_id
 where orm.payment_status = 'settlement'::public.payment_status
-  and orm.status != 'cancelled'::public.order_status;
+  and orm.status != 'cancelled';
 
 -- 5. Recreate admin_operational_metrics RPC with cancelled filter
 create or replace function public.admin_operational_metrics(
@@ -132,10 +132,10 @@ begin
   metrics as (
     select
       pg_catalog.date_trunc(normalized_granularity, timezone('Asia/Jakarta', orm.created_at))::date as bucket_start,
-      count(orm.id) filter (where orm.status != 'cancelled'::public.order_status)::bigint as order_count,
-      count(orm.id) filter (where orm.payment_status = 'settlement'::public.payment_status and orm.status != 'cancelled'::public.order_status)::bigint as paid_order_count,
-      count(orm.id) filter (where orm.payment_status = 'settlement'::public.payment_status and orm.status = 'delivered'::public.order_status)::bigint as completed_order_count,
-      coalesce(sum(orm.total_amount) filter (where orm.payment_status = 'settlement'::public.payment_status and orm.status != 'cancelled'::public.order_status), 0)::numeric as revenue
+      count(orm.id) filter (where orm.status != 'cancelled')::bigint as order_count,
+      count(orm.id) filter (where orm.payment_status = 'settlement'::public.payment_status and orm.status != 'cancelled')::bigint as paid_order_count,
+      count(orm.id) filter (where orm.payment_status = 'settlement'::public.payment_status and orm.status = 'delivered')::bigint as completed_order_count,
+      coalesce(sum(orm.total_amount) filter (where orm.payment_status = 'settlement'::public.payment_status and orm.status != 'cancelled'), 0)::numeric as revenue
     from public.order_read_model orm
     where orm.created_at >= (normalized_start_date::timestamp at time zone 'Asia/Jakarta')
       and orm.created_at < ((normalized_end_date + 1)::timestamp at time zone 'Asia/Jakarta')
@@ -192,7 +192,7 @@ begin
       orm.total_amount
     from public.order_read_model orm
     where orm.payment_status = 'settlement'::public.payment_status
-      and orm.status != 'cancelled'::public.order_status
+      and orm.status != 'cancelled'
       and orm.created_at::date between p_start_date and p_end_date
   ),
   daily_sales_summary as (
