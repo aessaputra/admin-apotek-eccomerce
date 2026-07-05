@@ -284,9 +284,9 @@ export const Dashboard: React.FC = () => {
         </Title>
       </Space>
 
-      <Card title={attentionCardTitle} style={{ marginBottom: token.marginLG }}>
-        <Row gutter={[16, 16]} align="stretch">
-          <Col xs={24} lg={24}>
+      <Row gutter={[16, 16]} align="stretch" style={{ marginBottom: token.marginLG }}>
+        <Col xs={24} xl={6}>
+          <Card title={attentionCardTitle} style={{ height: "100%", borderColor: token.colorWarningBorder, backgroundColor: token.colorWarningBg }}>
             <Space direction="vertical" size={token.marginSM} style={{ width: "100%" }}>
               {shouldShowOperationalAlertsLoading ? (
                 <Alert showIcon type="info" message={translate("dashboard.alerts.loading.message")} />
@@ -311,10 +311,110 @@ export const Dashboard: React.FC = () => {
                 );
               })}
             </Space>
-          </Col>
+          </Card>
+        </Col>
+        <Col xs={24} xl={12}>
+          <Card
+            hoverable
+            style={{ height: "100%" }}
+            title={translate("dashboard.recentOrders")}
+            extra={
+              <Button type="link" size="small" onClick={() => navigateList("orders")}>
+                {translate("dashboard.viewAllOrders")}
+              </Button>
+            }
+          >
+            <Table
+              dataSource={recentOrders}
+              rowKey="id"
+              pagination={false}
+              size="small"
+              scroll={{ x: "max-content" }}
+              loading={recentOrdersQuery?.isLoading}
+              locale={{ emptyText: recentOrdersEmptyText }}
+              aria-label={translate("dashboard.tables.recentOrdersAriaLabel")}
+            >
+              <Table.Column
+                dataIndex="id"
+                title={translate("dashboard.orderId")}
+                width={128}
+                render={(value: string) => {
+                  const formattedOrderId = formatDashboardOrderId(value);
+                  const isTruncated = formattedOrderId !== value;
 
-        </Row>
-      </Card>
+                  return (
+                    <Tooltip title={isTruncated ? value : undefined}>
+                      <Text code aria-label={isTruncated ? `${translate("dashboard.fullOrderId")}: ${value}` : undefined} title={isTruncated ? value : undefined}>
+                        {formattedOrderId}
+                      </Text>
+                      {isTruncated ? <span style={visuallyHiddenStyle}>{value}</span> : null}
+                    </Tooltip>
+                  );
+                }}
+              />
+              <Table.Column
+                dataIndex="total_amount"
+                title={translate("dashboard.orderTotal")}
+                responsive={["sm"]}
+                render={(v) => currencyFormatter.format(Number(v ?? 0))}
+              />
+              <Table.Column
+                dataIndex="status"
+                title={translate("dashboard.orderStatus")}
+                render={(v: string) => (
+                  <Tag color={STATUS_COLORS[v] ?? "default"}>{v ? translate(`orderStatus.${v}`) : "-"}</Tag>
+                )}
+              />
+              <Table.Column
+                dataIndex="created_at"
+                title={translate("dashboard.orderDate")}
+                responsive={["md"]}
+                render={(v) => (v ? dashboardDateFormatter.format(new Date(v)) : "-")}
+              />
+            </Table>
+          </Card>
+        </Col>
+        <Col xs={24} xl={6}>
+          <Card
+            hoverable
+            style={{ height: "100%" }}
+            title={
+              <>
+                <WarningOutlined aria-hidden="true" style={{ color: token.colorWarning, marginRight: token.marginXS }} />
+                {translate("dashboard.lowStockAlerts")}
+              </>
+            }
+            extra={
+              <Button type="link" size="small" onClick={() => navigateList("products")}>
+                {translate("dashboard.viewAllProducts")}
+              </Button>
+            }
+          >
+            <Table
+              dataSource={lowStockProducts}
+              rowKey="id"
+              pagination={false}
+              size="small"
+              scroll={{ x: "max-content" }}
+              loading={lowStockQuery?.isLoading}
+              locale={{ emptyText: lowStockEmptyText }}
+              aria-label={translate("dashboard.tables.lowStockAriaLabel")}
+            >
+              <Table.Column dataIndex="name" title={translate("dashboard.productName")} render={(value: string) => <Text ellipsis={{ tooltip: value }}>{value}</Text>} />
+              <Table.Column
+                dataIndex="stock"
+                title={translate("dashboard.currentStock")}
+                width={80}
+                render={(v: number) => (
+                  <Text type={v === 0 ? "danger" : "warning"} strong>
+                    {v}
+                  </Text>
+                )}
+              />
+            </Table>
+          </Card>
+        </Col>
+      </Row>
 
       <Space direction="vertical" size={token.marginXS} style={{ width: "100%" }}>
         <Row gutter={[16, 16]}>
@@ -410,108 +510,7 @@ export const Dashboard: React.FC = () => {
         </Col>
       </Row>
 
-      {/* Recent orders + Low stock */}
-      <Row gutter={[16, 16]} style={{ marginTop: token.marginLG }}>
-        <Col xs={24} lg={14}>
-          <Card
-            hoverable
-            title={translate("dashboard.recentOrders")}
-            extra={
-              <Button type="link" size="small" onClick={() => navigateList("orders")}>
-                {translate("dashboard.viewAllOrders")}
-              </Button>
-            }
-          >
-            <Table
-              dataSource={recentOrders}
-              rowKey="id"
-              pagination={false}
-              size="small"
-              scroll={{ x: "max-content" }}
-              loading={recentOrdersQuery?.isLoading}
-              locale={{ emptyText: recentOrdersEmptyText }}
-              aria-label={translate("dashboard.tables.recentOrdersAriaLabel")}
-            >
-              <Table.Column
-                dataIndex="id"
-                title={translate("dashboard.orderId")}
-                width={128}
-                render={(value: string) => {
-                  const formattedOrderId = formatDashboardOrderId(value);
-                  const isTruncated = formattedOrderId !== value;
 
-                  return (
-                    <Tooltip title={isTruncated ? value : undefined}>
-                      <Text code aria-label={isTruncated ? `${translate("dashboard.fullOrderId")}: ${value}` : undefined} title={isTruncated ? value : undefined}>
-                        {formattedOrderId}
-                      </Text>
-                      {isTruncated ? <span style={visuallyHiddenStyle}>{value}</span> : null}
-                    </Tooltip>
-                  );
-                }}
-              />
-              <Table.Column
-                dataIndex="total_amount"
-                title={translate("dashboard.orderTotal")}
-                responsive={["sm"]}
-                render={(v) => currencyFormatter.format(Number(v ?? 0))}
-              />
-              <Table.Column
-                dataIndex="status"
-                title={translate("dashboard.orderStatus")}
-                render={(v: string) => (
-                  <Tag color={STATUS_COLORS[v] ?? "default"}>{v ? translate(`orderStatus.${v}`) : "-"}</Tag>
-                )}
-              />
-              <Table.Column
-                dataIndex="created_at"
-                title={translate("dashboard.orderDate")}
-                responsive={["md"]}
-                render={(v) => (v ? dashboardDateFormatter.format(new Date(v)) : "-")}
-              />
-            </Table>
-          </Card>
-        </Col>
-        <Col xs={24} lg={10}>
-          <Card
-            hoverable
-            title={
-              <>
-                <WarningOutlined aria-hidden="true" style={{ color: token.colorWarning, marginRight: token.marginXS }} />
-                {translate("dashboard.lowStockAlerts")}
-              </>
-            }
-            extra={
-              <Button type="link" size="small" onClick={() => navigateList("products")}>
-                {translate("dashboard.viewAllProducts")}
-              </Button>
-            }
-          >
-            <Table
-              dataSource={lowStockProducts}
-              rowKey="id"
-              pagination={false}
-              size="small"
-              scroll={{ x: "max-content" }}
-              loading={lowStockQuery?.isLoading}
-              locale={{ emptyText: lowStockEmptyText }}
-              aria-label={translate("dashboard.tables.lowStockAriaLabel")}
-            >
-              <Table.Column dataIndex="name" title={translate("dashboard.productName")} render={(value: string) => <Text ellipsis={{ tooltip: value }}>{value}</Text>} />
-              <Table.Column
-                dataIndex="stock"
-                title={translate("dashboard.currentStock")}
-                width={80}
-                render={(v: number) => (
-                  <Text type={v === 0 ? "danger" : "warning"} strong>
-                    {v}
-                  </Text>
-                )}
-              />
-            </Table>
-          </Card>
-        </Col>
-      </Row>
     </>
   );
 };
