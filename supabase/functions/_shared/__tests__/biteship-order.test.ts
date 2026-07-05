@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildBiteshipOrderDestinationFields,
@@ -8,6 +8,7 @@ import {
   buildBiteshipOrderPayloadFromSnapshot,
   buildBiteshipOrderPayload,
   createBiteshipOrder,
+  cancelBiteshipOrder,
   ensureBiteshipOrderConfigSnapshot,
   persistBiteshipShipment,
   resolveBiteshipApiKeyFromRuntimeConfig,
@@ -789,5 +790,43 @@ describe("Biteship runtime API key", () => {
     await expect(
       createBiteshipOrder(baseOrder, "runtime-biteship-key-sentinel", baseSnapshot),
     ).rejects.toThrow("biteship_order_retrieve_failed");
+  });
+});
+
+describe("cancelBiteshipOrder", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("calls the cancellation endpoint with the correct payload and authorization", async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(JSON.stringify({ success: true, message: "Order cancelled" }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await cancelBiteshipOrder("biteship-order-123", "test-api-key", "Test Reason");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.biteship.com/v1/orders/biteship-order-123/cancel",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "biteship_test.test-api-key",
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({ cancellation_reason: "Test Reason" }),
+      })
+    );
+  });
+
+  it("throws an error if the cancellation API returns a non-ok response", async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(JSON.stringify({ error: "Cannot cancel order in transit" }), { status: 400 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      cancelBiteshipOrder("biteship-order-123", "test-api-key", "Test Reason")
+    ).rejects.toThrow(/Cannot cancel order in transit/);
   });
 });

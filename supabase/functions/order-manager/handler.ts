@@ -32,6 +32,7 @@ import {
 import {
   getBiteshipAuthorizationHeader,
   resolveBiteshipApiKeyFromRuntimeConfig,
+  cancelBiteshipOrder,
 } from "../_shared/biteship.ts";
 
 type TransitionPayload = {
@@ -929,6 +930,16 @@ export function createOrderManagerHandler(dependencies: {
         } catch (stockRestoreError) {
           console.error("[order-manager] Failed to restore stock on cancellation:", stockRestoreError);
           // Non-blocking: order is already cancelled, stock can be fixed manually
+        }
+
+        if (order.biteship_order_id) {
+          try {
+            const biteshipApiKey = await resolveBiteshipApiKeyFromRuntimeConfig(adminClient);
+            await cancelBiteshipOrder(order.biteship_order_id, biteshipApiKey, "Cancelled by Admin");
+          } catch (biteshipCancelError) {
+            console.error("[order-manager] Failed to cancel biteship order on cancellation:", biteshipCancelError);
+            // Non-blocking: order is already cancelled, biteship cancellation can be done manually if needed
+          }
         }
       }
 

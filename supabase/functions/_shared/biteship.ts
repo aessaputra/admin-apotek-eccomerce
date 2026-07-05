@@ -1468,6 +1468,62 @@ export async function getStoreSettings(): Promise<StoreSettings> {
   };
 }
 
+/**
+ * Attempts to cancel an existing Biteship order.
+ * Required cancellation reason must be provided (defaults to "Cancelled by Admin").
+ */
+export const cancelBiteshipOrder = async (
+  biteshipOrderId: string,
+  apiKey: string,
+  cancellationReason: string = "Cancelled by Admin",
+): Promise<void> => {
+  const BITESHIP_BASE_URL = "https://api.biteship.com/v1";
+
+  console.log(`[biteship] Cancelling order ${biteshipOrderId}`);
+
+  const authKey = getBiteshipAuthorizationHeader(apiKey);
+
+  const response = await fetch(`${BITESHIP_BASE_URL}/orders/${biteshipOrderId}/cancel`, {
+    method: "POST",
+    headers: {
+      "Authorization": authKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ cancellation_reason: cancellationReason }),
+  });
+
+  if (!response.ok) {
+    const errorBodyText = await response.text();
+    let errorData: any = {};
+    try {
+      errorData = JSON.parse(errorBodyText);
+    } catch {
+      // Ignore parse error
+    }
+
+    console.error(
+      `[biteship] API Error on cancellation:`,
+      JSON.stringify(
+        {
+          status: response.status,
+          code: errorData.code || "unknown_error",
+          error: errorData.error,
+        },
+        null,
+        2
+      )
+    );
+
+    throw new Error(
+      `Biteship API Error: Failed to cancel order. Status: ${response.status}. Reason: ${
+        errorData.error || response.statusText
+      }`
+    );
+  }
+
+  console.log(`[biteship] Successfully cancelled order ${biteshipOrderId}`);
+};
+
 export async function persistBiteshipShipment(
   adminClient: BiteshipShipmentAdminClient,
   params: PersistBiteshipShipmentParams,

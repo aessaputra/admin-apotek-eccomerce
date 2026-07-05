@@ -14,6 +14,11 @@ const midtransMocks = vi.hoisted(() => ({
   cancelMidtransTransaction: vi.fn(async () => undefined),
 }));
 
+const biteshipMocks = vi.hoisted(() => ({
+  resolveBiteshipApiKeyFromRuntimeConfig: vi.fn(async () => "test-biteship-key"),
+  cancelBiteshipOrder: vi.fn(async () => undefined),
+}));
+
 vi.mock("../../_shared/midtrans.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../_shared/midtrans.ts")>();
   return {
@@ -22,6 +27,15 @@ vi.mock("../../_shared/midtrans.ts", async (importOriginal) => {
       midtransMocks.resolveMidtransTransactionRuntimeConfig,
     verifyMidtransTransaction: midtransMocks.verifyMidtransTransaction,
     cancelMidtransTransaction: midtransMocks.cancelMidtransTransaction,
+  };
+});
+
+vi.mock("../../_shared/biteship.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../_shared/biteship.ts")>();
+  return {
+    ...actual,
+    resolveBiteshipApiKeyFromRuntimeConfig: biteshipMocks.resolveBiteshipApiKeyFromRuntimeConfig,
+    cancelBiteshipOrder: biteshipMocks.cancelBiteshipOrder,
   };
 });
 
