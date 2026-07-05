@@ -316,6 +316,22 @@ vi.mock("antd", async () => {
       </div>
     ),
     Table,
+    List: Object.assign(
+      ({ dataSource, renderItem, locale }: { dataSource?: any[], renderItem?: (item: any) => React.ReactNode, locale?: { emptyText?: React.ReactNode } }) => (
+        <div role="list">
+          {(!dataSource || dataSource.length === 0) && locale?.emptyText ? <div>{locale.emptyText}</div> : null}
+          {dataSource?.map((item, i) => <React.Fragment key={i}>{renderItem?.(item)}</React.Fragment>)}
+        </div>
+      ),
+      {
+        Item: ({ children, extra }: { children?: React.ReactNode, extra?: React.ReactNode }) => (
+          <div role="listitem">
+            {children}
+            {extra}
+          </div>
+        )
+      }
+    ),
     Tag: ({ children }: { children?: React.ReactNode }) => <span>{children}</span>,
     Typography: {
       Paragraph: ({ children, id }: { children?: React.ReactNode; id?: string }) => <p id={id}>{children}</p>,
@@ -330,8 +346,8 @@ vi.mock("antd", async () => {
       }) => <span aria-label={ariaLabel} title={title}>{children}</span>,
       Title: ({ children }: { children?: React.ReactNode }) => <h3>{children}</h3>,
     },
-    Button: ({ children, onClick }: { children?: React.ReactNode; onClick?: () => void }) => (
-      <button type="button" onClick={onClick}>{children}</button>
+    Button: ({ children, onClick, "aria-label": ariaLabel }: { children?: React.ReactNode; onClick?: () => void; "aria-label"?: string }) => (
+      <button type="button" onClick={onClick} aria-label={ariaLabel}>{children}</button>
     ),
     Empty: ({ description }: { description?: React.ReactNode }) => <div>{description}</div>,
     Skeleton: () => <div data-testid="monthly-trend-skeleton" />,
@@ -373,6 +389,7 @@ vi.mock("@ant-design/icons", () => ({
   InboxOutlined: () => <span aria-hidden="true" data-testid="inbox-icon" />,
   PercentageOutlined: () => <span aria-hidden="true" data-testid="percentage-icon" />,
   WarningOutlined: () => <span aria-hidden="true" data-testid="warning-icon" />,
+  ArrowRightOutlined: () => <span aria-hidden="true" data-testid="arrow-right-icon" />,
 }));
 
 const currencyFormatter = new Intl.NumberFormat("id-ID", {
@@ -525,7 +542,7 @@ describe("Dashboard", () => {
     render(<Dashboard />);
 
     expect(screen.getByRole("table", { name: "Recent orders table" })).not.toBeNull();
-    expect(screen.getByRole("table", { name: "Low stock products table" })).not.toBeNull();
+    // Low stock is now a List, no longer a table with aria-label
     expect(screen.getByLabelText("Full order ID: order-1234567890")).not.toBeNull();
     expect(screen.getByText("order-1234567890")).not.toBeNull();
     expect(mocks.tableColumn).toHaveBeenCalledWith({ dataIndex: "total_amount", responsive: ["sm"] });
