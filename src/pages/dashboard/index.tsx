@@ -109,7 +109,7 @@ const hasOperationalMetricRows = (rows: readonly OperationalMetricRow[]): boolea
 export const Dashboard: React.FC = () => {
   const { translate } = useTranslation();
   const getLocale = useGetLocale();
-  const { list: navigateList } = useNavigation();
+  const { list: navigateList, show: navigateShow } = useNavigation();
   const { token } = theme.useToken();
   const [trendGranularity, setTrendGranularity] = useState<OperationalTrendGranularity>("day");
   const locale = getDashboardLocale(getLocale());
@@ -229,7 +229,7 @@ export const Dashboard: React.FC = () => {
     !activeTrendMetricsQuery?.isError &&
     !lowStockQuery?.isError;
   const operationalAlerts = dashboardKpis.alerts.filter(
-    (alert) => alert.active && (alert.kind !== "no-risk" || operationalAlertsSucceeded),
+    (alert) => alert.active && (alert.kind !== "no-risk" || operationalAlertsSucceeded) && alert.kind !== "low-stock-risk" && alert.kind !== "low-stock-error",
   );
   const shouldShowOperationalAlertsLoading =
     operationalAlertsLoading && !operationalAlerts.some((alert) => alert.kind !== "no-risk");
@@ -334,6 +334,10 @@ export const Dashboard: React.FC = () => {
               loading={actionableOrdersQuery?.isLoading}
               locale={{ emptyText: actionableOrdersEmptyText }}
               aria-label={translate("dashboard.tables.recentOrdersAriaLabel")}
+              onRow={(record) => ({
+                onClick: () => navigateShow("orders", record.id),
+                style: { cursor: "pointer" },
+              })}
             >
               <Table.Column
                 dataIndex="id"
@@ -399,13 +403,24 @@ export const Dashboard: React.FC = () => {
               locale={{ emptyText: lowStockEmptyText }}
               renderItem={(item) => (
                 <List.Item
+                  onClick={() => navigateShow("products", item.id)}
+                  style={{ 
+                    cursor: "pointer", 
+                    padding: `${token.paddingSM}px`, 
+                    borderRadius: token.borderRadius,
+                    transition: "background-color 0.3s ease"
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = token.colorFillAlter; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                   extra={
-                    <Text type={item.stock === 0 ? "danger" : "warning"} strong>
-                      {item.stock}
-                    </Text>
+                    <Tag bordered={false} color={item.stock === 0 ? "error" : "warning"} style={{ marginRight: 0 }}>
+                      {translate("products.fields.stock")}: {item.stock}
+                    </Tag>
                   }
                 >
-                  <Text ellipsis={{ tooltip: item.name }} style={{ maxWidth: '100%' }}>{item.name}</Text>
+                  <Text ellipsis={{ tooltip: item.name }} style={{ maxWidth: '100%', fontSize: token.fontSize }}>
+                    {item.name}
+                  </Text>
                 </List.Item>
               )}
             />

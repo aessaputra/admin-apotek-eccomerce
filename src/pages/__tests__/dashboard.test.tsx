@@ -940,17 +940,17 @@ describe("Dashboard", () => {
 
       render(<Dashboard />);
 
-      expect(screen.getAllByText("Couldn’t load low-stock data").length).toBeGreaterThanOrEqual(2);
+      expect(screen.getAllByText("Couldn’t load low-stock data").length).toBe(1);
       expect(screen.queryByText("No urgent queue items")).toBeNull();
       expect(document.body.textContent).not.toContain("stock table leaked");
     });
 
-    it("renders a low-stock warning when active SKU count is above zero", () => {
+    it("operational alerts removed low-stock warning based on user preference", () => {
       setupDashboardQueries({ monthlyMetricRows: healthyMonthlyMetricRows, lowStockTotal: 2 });
 
       render(<Dashboard />);
 
-      expect(screen.getByText("2 active products are low on stock")).not.toBeNull();
+      expect(screen.queryByText("2 active products are low on stock")).toBeNull();
       expect(screen.queryByText("No urgent queue items")).toBeNull();
     });
 

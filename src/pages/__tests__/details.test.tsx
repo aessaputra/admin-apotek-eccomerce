@@ -178,8 +178,8 @@ vi.mock("antd", async () => {
     ),
     Space,
     Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
-    Button: ({ children, disabled, onClick, style }: { children: React.ReactNode; disabled?: boolean; onClick?: () => void; style?: React.CSSProperties }) => (
-      <button type="button" disabled={disabled} style={style} onClick={onClick}>{children}</button>
+    Button: ({ children, disabled, onClick, style, ...rest }: { children?: React.ReactNode; disabled?: boolean; onClick?: () => void; style?: React.CSSProperties; [key: string]: unknown }) => (
+      <button type="button" disabled={disabled} style={style} onClick={onClick} {...rest}>{children}</button>
     ),
     Image: ({ src }: { src: string }) => <span>{src}</span>,
     Card: ({ title, extra, children }: { title?: React.ReactNode; extra?: React.ReactNode; children: React.ReactNode }) => (
@@ -219,6 +219,24 @@ vi.mock("antd", async () => {
     Table,
     Descriptions,
     Empty,
+    List: Object.assign(
+      ({ children, renderItem, dataSource }: { children?: React.ReactNode; renderItem?: (item: any) => React.ReactNode; dataSource?: any[] }) => (
+        <div>
+          {dataSource && renderItem ? dataSource.map((item, i) => <div key={item.id ?? i}>{renderItem(item)}</div>) : children}
+        </div>
+      ),
+      {
+        Item: Object.assign(
+          ({ children, extra }: { children?: React.ReactNode; extra?: React.ReactNode }) => (
+            <div>
+              {children}
+              {extra}
+            </div>
+          ),
+          { Meta: ({ title }: { title?: React.ReactNode }) => <div>{title}</div> }
+        )
+      }
+    ),
     theme: {
       useToken: () => ({
         token: {
