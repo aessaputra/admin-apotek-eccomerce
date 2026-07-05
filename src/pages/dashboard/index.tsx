@@ -1,5 +1,5 @@
 import { useGetLocale, useList, useTranslation, useNavigation } from "@refinedev/core";
-import { Alert, Button, Card, Col, Row, Space, Statistic, Table, Tag, Tooltip, Typography, theme } from "antd";
+import { Alert, Button, Card, Col, Row, Space, Statistic, Table, Tag, Tooltip, Typography, theme, List } from "antd";
 import { useMemo, useState } from "react";
 import {
   CheckCircleOutlined,
@@ -8,6 +8,7 @@ import {
   BankOutlined,
   PercentageOutlined,
   WarningOutlined,
+  ArrowRightOutlined,
 } from "@ant-design/icons";
 import { STATUS_COLORS } from "../../constants/orders";
 import { buildDashboardKpiViewModel, type DashboardKpiAlert, type DashboardKpiAlertKind } from "./dashboardKpis";
@@ -286,7 +287,7 @@ export const Dashboard: React.FC = () => {
 
       <Row gutter={[16, 16]} align="stretch" style={{ marginBottom: token.marginLG }}>
         <Col xs={24} xl={6}>
-          <Card title={attentionCardTitle} style={{ height: "100%", borderColor: token.colorWarningBorder, backgroundColor: token.colorWarningBg }}>
+          <Card title={attentionCardTitle} style={{ height: "100%", display: "flex", flexDirection: "column", borderColor: token.colorWarningBorder, backgroundColor: token.colorWarningBg }} styles={{ body: { flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" } }}>
             <Space direction="vertical" size={token.marginSM} style={{ width: "100%" }}>
               {shouldShowOperationalAlertsLoading ? (
                 <Alert showIcon type="info" message={translate("dashboard.alerts.loading.message")} />
@@ -319,9 +320,9 @@ export const Dashboard: React.FC = () => {
             style={{ height: "100%" }}
             title={translate("dashboard.recentOrders")}
             extra={
-              <Button type="link" size="small" onClick={() => navigateList("orders")}>
-                {translate("dashboard.viewAllOrders")}
-              </Button>
+              <Tooltip title={translate("dashboard.viewAllOrders")}>
+                <Button type="text" shape="circle" icon={<ArrowRightOutlined />} onClick={() => navigateList("orders")} aria-label={translate("dashboard.viewAllOrders")} />
+              </Tooltip>
             }
           >
             <Table
@@ -385,33 +386,29 @@ export const Dashboard: React.FC = () => {
               </>
             }
             extra={
-              <Button type="link" size="small" onClick={() => navigateList("products")}>
-                {translate("dashboard.viewAllProducts")}
-              </Button>
+              <Tooltip title={translate("dashboard.viewAllProducts")}>
+                <Button type="text" shape="circle" icon={<ArrowRightOutlined />} onClick={() => navigateList("products")} aria-label={translate("dashboard.viewAllProducts")} />
+              </Tooltip>
             }
           >
-            <Table
+            <List
               dataSource={lowStockProducts}
               rowKey="id"
-              pagination={false}
               size="small"
-              scroll={{ x: "max-content" }}
               loading={lowStockQuery?.isLoading}
               locale={{ emptyText: lowStockEmptyText }}
-              aria-label={translate("dashboard.tables.lowStockAriaLabel")}
-            >
-              <Table.Column dataIndex="name" title={translate("dashboard.productName")} render={(value: string) => <Text ellipsis={{ tooltip: value }}>{value}</Text>} />
-              <Table.Column
-                dataIndex="stock"
-                title={translate("dashboard.currentStock")}
-                width={80}
-                render={(v: number) => (
-                  <Text type={v === 0 ? "danger" : "warning"} strong>
-                    {v}
-                  </Text>
-                )}
-              />
-            </Table>
+              renderItem={(item) => (
+                <List.Item
+                  extra={
+                    <Text type={item.stock === 0 ? "danger" : "warning"} strong>
+                      {item.stock}
+                    </Text>
+                  }
+                >
+                  <Text ellipsis={{ tooltip: item.name }} style={{ maxWidth: '100%' }}>{item.name}</Text>
+                </List.Item>
+              )}
+            />
           </Card>
         </Col>
       </Row>
