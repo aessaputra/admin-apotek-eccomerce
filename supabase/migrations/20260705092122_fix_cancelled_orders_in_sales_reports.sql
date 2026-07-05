@@ -132,7 +132,7 @@ begin
   metrics as (
     select
       pg_catalog.date_trunc(normalized_granularity, timezone('Asia/Jakarta', orm.created_at))::date as bucket_start,
-      count(orm.id)::bigint as order_count,
+      count(orm.id) filter (where orm.status != 'cancelled'::public.order_status)::bigint as order_count,
       count(orm.id) filter (where orm.payment_status = 'settlement'::public.payment_status and orm.status != 'cancelled'::public.order_status)::bigint as paid_order_count,
       count(orm.id) filter (where orm.payment_status = 'settlement'::public.payment_status and orm.status = 'delivered'::public.order_status)::bigint as completed_order_count,
       coalesce(sum(orm.total_amount) filter (where orm.payment_status = 'settlement'::public.payment_status and orm.status != 'cancelled'::public.order_status), 0)::numeric as revenue
