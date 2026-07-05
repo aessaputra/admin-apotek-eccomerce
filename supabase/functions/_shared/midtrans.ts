@@ -544,6 +544,20 @@ export const mapMidtransStatus = (
   let newOrderStatus = currentOrderStatus;
   let shouldReduceStock = false;
 
+  const isOrderCancelled = currentOrderStatus === "cancelled";
+  const isSuccessTransaction =
+    transactionStatus === "settlement" ||
+    (transactionStatus === "capture" &&
+      (fraudStatus || "").toLowerCase() === "accept");
+
+  if (isOrderCancelled && isSuccessTransaction) {
+    return {
+      newPaymentStatus: currentPaymentStatus,
+      newOrderStatus: currentOrderStatus,
+      shouldReduceStock: false,
+    };
+  }
+
   if (transactionStatus === "capture") {
     if (fraudStatus === "deny") {
       newPaymentStatus = "deny";

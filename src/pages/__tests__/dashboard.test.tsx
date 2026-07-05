@@ -877,7 +877,6 @@ describe("Dashboard", () => {
     it("shows table error states instead of healthy empty copy when dashboard tables fail", () => {
       setupDashboardQueries({
         monthlyMetricRows: healthyMonthlyMetricRows,
-        recentOrders: [],
         lowStockProducts: [],
         lowStockTotal: 0,
         lowStockQuery: { isError: true, error: new Error("stock table leaked") },

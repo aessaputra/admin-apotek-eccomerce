@@ -5,6 +5,7 @@ import {
   calculateMidtransGrossAmount,
   DEFAULT_MIDTRANS_ORDER_CURRENCY,
   isIgnorableMidtransNoop,
+  mapMidtransStatus,
   resolveMidtransTransactionRuntimeConfig,
   resolveMidtransWebhookRuntimeConfig,
   validateMidtransTransitionCurrency,
@@ -601,6 +602,35 @@ describe("Midtrans runtime config resolution", () => {
       isProduction: false,
       serverKeyVersionNumber: 6,
       isProductionVersionNumber: 2,
+    });
+  });
+});
+
+describe("mapMidtransStatus", () => {
+  it("should return unchanged status if order is cancelled and settlement arrives", () => {
+    const result = mapMidtransStatus("settlement", "", "pending", "cancelled");
+    expect(result).toEqual({
+      newPaymentStatus: "pending",
+      newOrderStatus: "cancelled",
+      shouldReduceStock: false,
+    });
+  });
+
+  it("should return unchanged status if order is cancelled and capture accept arrives", () => {
+    const result = mapMidtransStatus("capture", "accept", "pending", "cancelled");
+    expect(result).toEqual({
+      newPaymentStatus: "pending",
+      newOrderStatus: "cancelled",
+      shouldReduceStock: false,
+    });
+  });
+
+  it("should map settlement to processing if order is pending", () => {
+    const result = mapMidtransStatus("settlement", "", "pending", "pending");
+    expect(result).toEqual({
+      newPaymentStatus: "settlement",
+      newOrderStatus: "processing",
+      shouldReduceStock: true,
     });
   });
 });
