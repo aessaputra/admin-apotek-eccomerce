@@ -26,7 +26,7 @@ interface DashboardQueryState {
 }
 
 interface DashboardQueryOptions {
-  recentOrders?: { id: string; total_amount: string | number; status: string; created_at: string }[];
+  actionableOrders?: { id: string; total_amount: string | number; status: string; created_at: string }[];
   kpiMetricRows?: OperationalMetricRow[];
   kpiQuery?: Partial<DashboardQueryState>;
   lowStockQuery?: Partial<DashboardQueryState>;
@@ -436,7 +436,7 @@ const healthyMonthlyMetricRows = [
 ];
 
 const setupDashboardQueries = ({
-  recentOrders,
+  actionableOrders,
   kpiMetricRows,
   kpiQuery = {},
   lowStockQuery = {},
@@ -464,7 +464,7 @@ const setupDashboardQueries = ({
     if (params.resource === "orders") {
       return {
         result: {
-          data: recentOrders ?? [
+          data: actionableOrders ?? [
             {
               id: "order-1234567890",
               total_amount: 10000,
@@ -552,7 +552,7 @@ describe("Dashboard", () => {
 
   it("does not duplicate accessible text when an order ID is already short", () => {
     setupDashboardQueries({
-      recentOrders: [
+      actionableOrders: [
         {
           id: "order-1",
           total_amount: 10000,
@@ -560,6 +560,7 @@ describe("Dashboard", () => {
           created_at: "2026-04-01T00:00:00.000Z",
         },
       ],
+      lowStockTotal: 0,
     });
 
     render(<Dashboard />);
@@ -955,14 +956,24 @@ describe("Dashboard", () => {
     });
 
     it("preserves recent order and low-stock query contracts plus View All navigation", () => {
-      setupDashboardQueries();
+      setupDashboardQueries({
+        actionableOrders: [
+          {
+            id: "order-1",
+            total_amount: 10000,
+            status: "shipped",
+            created_at: "2026-04-01T00:00:00.000Z",
+          },
+        ],
+      });
 
       render(<Dashboard />);
 
       expect(mocks.useList).toHaveBeenCalledWith({
         resource: "orders",
-        pagination: { currentPage: 1, pageSize: 5 },
+        pagination: { currentPage: 1, pageSize: 10 },
         sorters: [{ field: "created_at", order: "desc" }],
+        filters: [{ field: "status", operator: "in", value: ["processing", "awaiting_shipment"] }],
         queryOptions: { staleTime: 60_000 },
       });
       expect(mocks.useList).toHaveBeenCalledWith(
@@ -1067,7 +1078,7 @@ describe("Dashboard", () => {
     expect(screen.getByText("Paid Order Rate")).not.toBeNull();
     expect(screen.getByText("Average Order Value")).not.toBeNull();
     expect(screen.queryByText("Low-Stock Products")).toBeNull();
-    expect(screen.getByText("Recent Orders")).not.toBeNull();
+    expect(screen.getAllByText("Needs Follow-Up").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Handed to Courier")).not.toBeNull();
     expect(screen.queryByText("Low-Stock Products")).toBeNull();
     expect(screen.getAllByText("Low Stock").length).toBeGreaterThanOrEqual(1);

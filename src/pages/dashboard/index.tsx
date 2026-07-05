@@ -146,11 +146,12 @@ export const Dashboard: React.FC = () => {
     [translate],
   );
 
-  // Recent 5 orders
-  const { result: recentOrdersResult, query: recentOrdersQuery } = useList({
+  // Actionable orders
+  const { result: actionableOrdersResult, query: actionableOrdersQuery } = useList({
     resource: "orders",
-    pagination: { currentPage: 1, pageSize: 5 },
+    pagination: { currentPage: 1, pageSize: 10 },
     sorters: [{ field: "created_at", order: "desc" }],
+    filters: [{ field: "status", operator: "in", value: ["processing", "awaiting_shipment"] }],
     queryOptions: { staleTime: DASHBOARD_QUERY_STALE_TIME_MS },
   });
 
@@ -189,7 +190,7 @@ export const Dashboard: React.FC = () => {
     queryOptions: { enabled: !isDailyTrend, staleTime: DASHBOARD_QUERY_STALE_TIME_MS },
   });
 
-  const recentOrders = (recentOrdersResult?.data ?? []) as {
+  const actionableOrders = (actionableOrdersResult?.data ?? []) as {
     id: string;
     total_amount: string | number;
     status: string;
@@ -248,7 +249,7 @@ export const Dashboard: React.FC = () => {
   );
   const metricsUnavailableText = translate("dashboard.kpis.unavailable");
   const renderUnavailableMetric = (): string => metricsUnavailableText || unavailableMetricValue;
-  const recentOrdersEmptyText = recentOrdersQuery?.isError ? (
+  const actionableOrdersEmptyText = actionableOrdersQuery?.isError ? (
     <Alert
       type="error"
       showIcon
@@ -286,53 +287,52 @@ export const Dashboard: React.FC = () => {
       </Space>
 
       <Row gutter={[16, 16]} align="stretch" style={{ marginBottom: token.marginLG }}>
-        <Col xs={24} xl={6}>
-          <Card title={attentionCardTitle} style={{ height: "100%", display: "flex", flexDirection: "column", borderColor: token.colorWarningBorder, backgroundColor: token.colorWarningBg }} styles={{ body: { flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" } }}>
-            <Space direction="vertical" size={token.marginSM} style={{ width: "100%" }}>
-              {shouldShowOperationalAlertsLoading ? (
-                <Alert showIcon type="info" message={translate("dashboard.alerts.loading.message")} />
-              ) : null}
-              {operationalAlerts.map((alert) => {
-                const labels = getOperationalAlertLabels(alert, translate);
-                const retryAction =
-                  alert.kind === "metrics-error" ? (
-                    <Button size="small" onClick={handleMetricsRetry}>
-                      {translate("dashboard.retry")}
-                    </Button>
-                  ) : undefined;
-
-                return (
-                  <Alert
-                    showIcon
-                    key={alert.kind}
-                    type={alert.severity}
-                    message={labels.message}
-                    action={retryAction}
-                  />
-                );
-              })}
-            </Space>
-          </Card>
-        </Col>
-        <Col xs={24} xl={12}>
+        <Col xs={24} xl={18}>
           <Card
             hoverable
-            style={{ height: "100%" }}
-            title={translate("dashboard.recentOrders")}
+            style={{ height: "100%", borderColor: token.colorWarningBorder, borderWidth: 1 }}
+            title={attentionCardTitle}
             extra={
               <Tooltip title={translate("dashboard.viewAllOrders")}>
                 <Button type="text" shape="circle" icon={<ArrowRightOutlined />} onClick={() => navigateList("orders")} aria-label={translate("dashboard.viewAllOrders")} />
               </Tooltip>
             }
           >
+            {Boolean(shouldShowOperationalAlertsLoading || operationalAlerts.length > 0) && (
+              <Space direction="vertical" size={token.marginSM} style={{ width: "100%", marginBottom: token.marginMD }}>
+                {shouldShowOperationalAlertsLoading ? (
+                  <Alert showIcon type="info" message={translate("dashboard.alerts.loading.message")} />
+                ) : null}
+                {operationalAlerts.map((alert) => {
+                  const labels = getOperationalAlertLabels(alert, translate);
+                  const retryAction =
+                    alert.kind === "metrics-error" ? (
+                      <Button size="small" onClick={handleMetricsRetry}>
+                        {translate("dashboard.retry")}
+                      </Button>
+                    ) : undefined;
+
+                  return (
+                    <Alert
+                      showIcon
+                      key={alert.kind}
+                      type={alert.severity}
+                      message={labels.message}
+                      action={retryAction}
+                    />
+                  );
+                })}
+              </Space>
+            )}
+
             <Table
-              dataSource={recentOrders}
+              dataSource={actionableOrders}
               rowKey="id"
               pagination={false}
               size="small"
               scroll={{ x: "max-content" }}
-              loading={recentOrdersQuery?.isLoading}
-              locale={{ emptyText: recentOrdersEmptyText }}
+              loading={actionableOrdersQuery?.isLoading}
+              locale={{ emptyText: actionableOrdersEmptyText }}
               aria-label={translate("dashboard.tables.recentOrdersAriaLabel")}
             >
               <Table.Column
