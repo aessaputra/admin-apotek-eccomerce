@@ -414,7 +414,7 @@ export const Dashboard: React.FC = () => {
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                   extra={
                     <Tag bordered={false} color={item.stock === 0 ? "error" : "warning"} style={{ marginRight: 0 }}>
-                      {translate("products.fields.stock")}: {item.stock}
+                      {item.stock}
                     </Tag>
                   }
                 >
