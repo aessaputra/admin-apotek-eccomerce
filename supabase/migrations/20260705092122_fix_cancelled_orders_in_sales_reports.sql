@@ -88,7 +88,8 @@ returns table (
   revenue numeric
 )
 language plpgsql
-security definer
+stable
+security invoker
 set search_path = ''
 as $$
 declare
@@ -99,10 +100,6 @@ declare
   first_bucket_start date;
   last_bucket_start date;
 begin
-  if not (select auth.role() = 'authenticated' and (auth.jwt() ->> 'role') = 'admin') then
-    raise exception 'Unauthorized';
-  end if;
-
   normalized_granularity := lower(coalesce(p_granularity, 'day'));
   if normalized_granularity not in ('day', 'week', 'month', 'year') then
     normalized_granularity := 'day';
