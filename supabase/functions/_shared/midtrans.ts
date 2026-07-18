@@ -191,6 +191,13 @@ export class MidtransRuntimeConfigError extends Error {
   }
 }
 
+export class MidtransTransactionNotFoundError extends Error {
+  constructor(message = "Midtrans transaction not found") {
+    super(message);
+    this.name = "MidtransTransactionNotFoundError";
+  }
+}
+
 export class MidtransCurrencyValidationError extends Error {
   constructor(message: "Currency validation failed" | "Currency mismatch") {
     super(message);
@@ -234,6 +241,12 @@ export const verifyMidtransTransaction = async (
   });
 
   const data = await response.json();
+
+  if (response.status === 404 || String(data.status_code) === "404") {
+    throw new MidtransTransactionNotFoundError(
+      `Midtrans transaction not found: ${data.status_message || response.statusText}`,
+    );
+  }
 
   if (!response.ok) {
     throw new Error(

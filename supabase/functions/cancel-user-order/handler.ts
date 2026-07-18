@@ -7,6 +7,7 @@ import {
   resolveMidtransTransactionRuntimeConfig,
   MidtransCurrencyValidationError,
   MidtransRuntimeConfigError,
+  MidtransTransactionNotFoundError,
   validateMidtransTransitionCurrency,
   verifyMidtransTransaction,
 } from "../_shared/midtrans.ts";
@@ -215,11 +216,33 @@ export function createCancelUserOrderHandler(
         throw configError;
       }
 
-      let verifiedStatus = await verifyTransaction(
-        midtransOrderId,
-        runtimeConfig.serverKey,
-        { isProduction: runtimeConfig.isProduction },
-      );
+      let verifiedStatus: {
+        transaction_status: string;
+        currency?: string;
+        fraud_status?: string;
+        payment_type?: string;
+        transaction_id?: string;
+      };
+
+      try {
+        verifiedStatus = await verifyTransaction(
+          midtransOrderId,
+          runtimeConfig.serverKey,
+          { isProduction: runtimeConfig.isProduction },
+        );
+      } catch (error) {
+        if (error instanceof MidtransTransactionNotFoundError) {
+          await cancelLocallyPendingOrder(adminClient, order);
+
+          return jsonResponse({
+            cancelled: true,
+            order_status: "cancelled",
+            payment_status: "cancel",
+            applied: true,
+          });
+        }
+        throw error;
+      }
 
       if (verifiedStatus.transaction_status === "settlement") {
         return jsonResponse(

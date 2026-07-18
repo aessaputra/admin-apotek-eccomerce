@@ -21,6 +21,7 @@ import {
   mapMidtransStatus,
   resolveMidtransTransactionRuntimeConfig,
   MidtransCurrencyValidationError,
+  MidtransTransactionNotFoundError,
   validateMidtransTransitionCurrency,
   verifyMidtransTransaction,
 } from "../_shared/midtrans.ts";
@@ -444,11 +445,26 @@ async function buildCancellationPaymentUpdate(
     midtransOrderId,
   );
 
-  let verifiedStatus = await verifyMidtransTransaction(
-    midtransOrderId,
-    runtimeConfig.serverKey,
-    { isProduction: runtimeConfig.isProduction },
-  );
+  let verifiedStatus: {
+    transaction_status: string;
+    currency?: string;
+    transaction_id?: string;
+    fraud_status?: string;
+  };
+
+  try {
+    verifiedStatus = await verifyMidtransTransaction(
+      midtransOrderId,
+      runtimeConfig.serverKey,
+      { isProduction: runtimeConfig.isProduction },
+    );
+  } catch (error) {
+    if (error instanceof MidtransTransactionNotFoundError) {
+      return { status: "cancel" };
+    }
+    throw error;
+  }
+
   if (verifiedStatus.transaction_status === "settlement") {
     throw new Error("Paid Midtrans transactions must be refunded through a refund flow before marking payment as refunded");
   }
@@ -801,8 +817,12 @@ export function createOrderManagerHandler(dependencies: {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
           }
-
-          throw error;
+          if (error instanceof MidtransTransactionNotFoundError) {
+            // Already handled by buildCancellationPaymentUpdate but just in case
+            Object.assign(paymentUpdatePayload, { status: "cancel" });
+          } else {
+            throw error;
+          }
         }
       }
 
