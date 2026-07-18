@@ -112,6 +112,9 @@ export interface SnapPayload {
     order_id: string;
     gross_amount: number;
   };
+  credit_card?: {
+    secure: boolean;
+  };
   item_details: SnapItemDetail[];
   customer_details: {
     first_name: string;

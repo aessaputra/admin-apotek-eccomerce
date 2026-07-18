@@ -931,6 +931,9 @@ export const buildSnapPayload = (order: Order, user: AuthUser): SnapPayload => {
       order_id: order.midtrans_order_id,
       gross_amount: persistedGrossAmount ?? calculatedGrossAmount,
     },
+    credit_card: {
+      secure: true,
+    },
     item_details: itemDetails,
     customer_details: customerDetails,
   };
