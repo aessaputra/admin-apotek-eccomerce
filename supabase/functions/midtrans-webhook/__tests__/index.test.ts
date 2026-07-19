@@ -108,6 +108,7 @@ function createWebhookFlowAdminClient(options: {
   statefulPaymentWrites?: boolean;
   transitionError?: { message: string };
   transitionResult?: Record<string, unknown>;
+  existingPaymentOverrides?: Record<string, unknown> | null;
 } = {}) {
   const paymentSnapshot = {
     order_id: "order-1",
@@ -149,7 +150,10 @@ function createWebhookFlowAdminClient(options: {
     data: paymentSnapshot,
     error: null,
   }));
-  const existingPaymentMaybeSingle = vi.fn(async () => ({ data: null, error: null }));
+  const existingPaymentMaybeSingle = vi.fn(async () => ({
+    data: options.existingPaymentOverrides === undefined ? null : options.existingPaymentOverrides,
+    error: null,
+  }));
   const existingPaymentOrderMaybeSingle = vi.fn(async () => ({
     data: options.existingPaymentOrderId === undefined && options.existingRawNotification === undefined
       ? null
@@ -1002,5 +1006,40 @@ describe("midtrans-webhook settlement side-effect queueing", () => {
     expect(orderActivitiesInsert).not.toHaveBeenCalled();
     expect(webhookSideEffects.ensureSettlementSideEffectsQueued).not.toHaveBeenCalled();
     expect(webhookSideEffects.triggerWebhookSideEffectProcessor).not.toHaveBeenCalled();
+  });
+
+  it("preserves existing redirect_url and snap_token when upserting payment record during webhook transition", async () => {
+    const existingPaymentData = {
+      paid_at: null,
+      redirect_url: "https://app.sandbox.midtrans.com/snap/v2/vtweb/sentinel-redirect-url",
+      snap_token: "sentinel-snap-token",
+      snap_token_created_at: "2026-05-24T00:00:00.000Z",
+    };
+
+    const { adminClient, paymentsUpsert } = createWebhookFlowAdminClient({
+      existingPaymentOverrides: existingPaymentData,
+    });
+
+    const payload = makePayload("");
+    payload.signature_key = await makeSignature(payload);
+    stubVerifiedMidtransStatus(payload);
+    const handler = createMidtransWebhookHandler({
+      getAdminClient: () => adminClient as never,
+    });
+
+    const response = await handler(createRequest(payload));
+    expect(response.status).toBe(200);
+
+    expect(paymentsUpsert).toHaveBeenCalledTimes(2);
+    
+    const upsertedRecord1 = paymentsUpsert.mock.calls[0][0];
+    expect(upsertedRecord1).toBeDefined();
+    expect(upsertedRecord1!.redirect_url).toBeUndefined();
+
+    const upsertedRecord2 = paymentsUpsert.mock.calls[1][0];
+    expect(upsertedRecord2).toBeDefined();
+    expect(upsertedRecord2!.redirect_url).toBe(existingPaymentData.redirect_url);
+    expect(upsertedRecord2!.snap_token).toBe(existingPaymentData.snap_token);
+    expect(upsertedRecord2!.snap_token_created_at).toBe(existingPaymentData.snap_token_created_at);
   });
 });

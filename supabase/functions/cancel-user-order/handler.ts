@@ -51,7 +51,7 @@ async function upsertPaymentRecord(
 ): Promise<void> {
   const { data: existingPayment } = await adminClient
     .from("payments")
-    .select("paid_at")
+    .select("paid_at, redirect_url, snap_token, snap_token_created_at")
     .eq("order_id", order.id)
     .order("updated_at", { ascending: false })
     .order("created_at", { ascending: false })
@@ -65,6 +65,9 @@ async function upsertPaymentRecord(
       verifiedStatus,
       nextPaymentStatus: status,
       existingPaidAt: existingPayment?.paid_at,
+      existingRedirectUrl: existingPayment?.redirect_url,
+      existingSnapToken: existingPayment?.snap_token,
+      existingSnapTokenCreatedAt: existingPayment?.snap_token_created_at,
     }),
     { onConflict: "midtrans_order_id" },
   );

@@ -784,12 +784,18 @@ export const buildMidtransPaymentRecord = ({
   verifiedStatus,
   nextPaymentStatus,
   existingPaidAt,
+  existingRedirectUrl,
+  existingSnapToken,
+  existingSnapTokenCreatedAt,
 }: {
   order: Order;
   payload?: MidtransWebhookPayload | null;
   verifiedStatus: MidtransStatusResponse;
   nextPaymentStatus: PaymentStatus;
   existingPaidAt: string | null | undefined;
+  existingRedirectUrl?: string | null;
+  existingSnapToken?: string | null;
+  existingSnapTokenCreatedAt?: string | null;
 }) => {
   const orderReference =
     payload?.order_id ||
@@ -863,7 +869,15 @@ export const buildMidtransPaymentRecord = ({
       verifiedStatus.channel_response_message ||
       payload?.channel_response_message ||
       null,
-    redirect_url: verifiedStatus.redirect_url || payload?.redirect_url || null,
+    redirect_url:
+      verifiedStatus.redirect_url ||
+      payload?.redirect_url ||
+      existingRedirectUrl ||
+      null,
+    ...(existingSnapToken ? { snap_token: existingSnapToken } : {}),
+    ...(existingSnapTokenCreatedAt
+      ? { snap_token_created_at: existingSnapTokenCreatedAt }
+      : {}),
     raw_notification: payload ?? verifiedStatus,
   };
 };

@@ -28,7 +28,15 @@ interface AdminClient {
   from: (table: string) => {
     select: (columns?: string) => {
       eq: (column: string, value: unknown) => {
-        maybeSingle: () => Promise<{ data: { paid_at?: string | null } | null; error: { message: string } | null }>;
+        maybeSingle: () => Promise<{
+          data: {
+            paid_at?: string | null;
+            redirect_url?: string | null;
+            snap_token?: string | null;
+            snap_token_created_at?: string | null;
+          } | null;
+          error: { message: string } | null;
+        }>;
       };
     };
     upsert: (
@@ -91,7 +99,7 @@ async function upsertPaymentRecord(
 ): Promise<void> {
   const { data: existingPayment } = await adminClient
     .from("payments")
-    .select("paid_at")
+    .select("paid_at, redirect_url, snap_token, snap_token_created_at")
     .eq("midtrans_order_id", order.midtrans_order_id)
     .maybeSingle();
 
@@ -102,6 +110,9 @@ async function upsertPaymentRecord(
       verifiedStatus,
       nextPaymentStatus: status,
       existingPaidAt: existingPayment?.paid_at,
+      existingRedirectUrl: existingPayment?.redirect_url,
+      existingSnapToken: existingPayment?.snap_token,
+      existingSnapTokenCreatedAt: existingPayment?.snap_token_created_at,
     }),
     { onConflict: "midtrans_order_id" },
   );

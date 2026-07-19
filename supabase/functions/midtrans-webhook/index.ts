@@ -399,7 +399,7 @@ async function upsertPaymentRecord(
 ): Promise<void> {
   const { data: existingPayment } = await adminClient
     .from("payments")
-    .select("paid_at")
+    .select("paid_at, redirect_url, snap_token, snap_token_created_at")
     .eq("midtrans_order_id", payload.order_id)
     .maybeSingle();
 
@@ -409,6 +409,9 @@ async function upsertPaymentRecord(
     verifiedStatus,
     nextPaymentStatus: status,
     existingPaidAt: existingPayment?.paid_at,
+    existingRedirectUrl: existingPayment?.redirect_url,
+    existingSnapToken: existingPayment?.snap_token,
+    existingSnapTokenCreatedAt: existingPayment?.snap_token_created_at,
   });
   paymentPayload.raw_notification = buildVerifiedRawNotification(payload);
 
