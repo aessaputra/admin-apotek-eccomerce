@@ -248,20 +248,6 @@ function buildOrderStatusNotification(
   NotificationInsertPayload,
   "type" | "title" | "body" | "ctaRoute" | "data" | "priority" | "sourceEventKey"
 > | null {
-  if (nextStatus === "processing") {
-    return {
-      type: "order_processing",
-      title: "Pesanan diproses",
-      body: "Pesananmu sedang kami siapkan. Kami akan memberi kabar saat siap dikirim.",
-      ctaRoute: ORDER_DETAIL_NOTIFICATION_ROUTE,
-      data: {
-        orderId,
-      },
-      priority: "normal",
-      sourceEventKey: `order_processing:${orderId}`,
-    };
-  }
-
   if (nextStatus === "awaiting_shipment") {
     return {
       type: "order_awaiting_shipment",
@@ -287,7 +273,7 @@ function buildOrderStatusNotification(
         shipmentStage: "shipped",
       },
       priority: "high",
-      sourceEventKey: `order_shipped:manual:${orderId}`,
+      sourceEventKey: `order_shipped_delivery:${orderId}`,
     };
   }
 
@@ -302,7 +288,7 @@ function buildOrderStatusNotification(
         shipmentStage: "in_transit",
       },
       priority: "normal",
-      sourceEventKey: `order_shipped:in_transit:${orderId}`,
+      sourceEventKey: `order_shipped_delivery:${orderId}`,
     };
   }
 

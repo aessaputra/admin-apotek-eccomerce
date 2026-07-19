@@ -63,7 +63,7 @@ function buildShipmentNotification(
       ctaRoute: TRACK_SHIPMENT_NOTIFICATION_ROUTE,
       data: { orderId, shipmentStage: "shipped" },
       priority: "high",
-      sourceEventKey: `order_shipped:webhook:${orderId}`,
+      sourceEventKey: `order_shipped_delivery:${orderId}`,
     };
   }
 
@@ -75,7 +75,7 @@ function buildShipmentNotification(
       ctaRoute: TRACK_SHIPMENT_NOTIFICATION_ROUTE,
       data: { orderId, shipmentStage: "in_transit" },
       priority: "normal",
-      sourceEventKey: `order_shipped:webhook_in_transit:${orderId}`,
+      sourceEventKey: `order_shipped_delivery:${orderId}`,
     };
   }
 

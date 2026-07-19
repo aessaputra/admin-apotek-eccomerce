@@ -231,11 +231,7 @@ describe("confirm-order-received handler", () => {
       actor_id: "user-1",
       actor_type: "customer",
     }));
-    expect(admin.notificationInsert).toHaveBeenCalledWith(expect.objectContaining({
-      user_id: "user-1",
-      type: "order_completed",
-      source_event_key: "order_completed:order-1",
-    }));
+    expect(admin.notificationInsert).not.toHaveBeenCalled();
   });
 
   it("keeps already-completed orders idempotent without updating orders again", async () => {
@@ -258,7 +254,7 @@ describe("confirm-order-received handler", () => {
     });
     expect(admin.ordersUpdate).not.toHaveBeenCalled();
     expect(admin.activityInsert).not.toHaveBeenCalled();
-    expect(admin.notificationInsert).toHaveBeenCalledTimes(1);
+    expect(admin.notificationInsert).not.toHaveBeenCalled();
   });
 
   it("returns a safe failure for order read database errors", async () => {
@@ -283,21 +279,7 @@ describe("confirm-order-received handler", () => {
 
     expect(response.status).toBe(200);
     expect(admin.activityInsert).toHaveBeenCalledTimes(1);
-    expect(admin.notificationInsert).toHaveBeenCalledTimes(1);
+    expect(admin.notificationInsert).not.toHaveBeenCalled();
     expect(errorSpy).toHaveBeenCalled();
-  });
-
-  it("returns a safe failure when durable notification insert fails", async () => {
-    const { handler, logError } = createHandler({
-      notificationError: { message: "permission denied for notifications" },
-    });
-
-    const response = await handler(createRequest());
-    const payload = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(payload).toEqual({ error: "Internal server error" });
-    expect(JSON.stringify(payload)).not.toContain("notifications");
-    expect(logError).toHaveBeenCalledWith("confirm_order_received_failed");
   });
 });

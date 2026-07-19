@@ -105,23 +105,7 @@ async function ensureOrderCompletedNotification(
   userId: string | null,
   orderId: string,
 ): Promise<void> {
-  await insertNotificationOrThrow(
-    adminClient,
-    {
-      userId,
-      type: "order_completed",
-      title: "Pesanan selesai",
-      body: "Terima kasih. Pesananmu sudah selesai dan tercatat di riwayat pesanan.",
-      ctaRoute: ORDER_DETAIL_NOTIFICATION_ROUTE,
-      data: {
-        orderId,
-        completionStage: "completed",
-      },
-      priority: "normal",
-      sourceEventKey: `order_completed:${orderId}`,
-    },
-    "[confirm-order-received]",
-  );
+  // No-op to disable completed push notifications and reduce notification noise
 }
 
 export function createConfirmOrderReceivedHandler(
