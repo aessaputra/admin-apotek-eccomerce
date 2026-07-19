@@ -9,16 +9,19 @@ type HookResult = {
   unreadCount: number;
   loading: boolean;
   markAsReadAndOpen: (notification: AdminOrderNotification) => Promise<string>;
+  markAllAsRead: () => Promise<void>;
 };
 
 const mocks = vi.hoisted(() => {
   const navigate = vi.fn();
   const markAsReadAndOpen = vi.fn(async (notification: AdminOrderNotification) => notification.route);
+  const markAllAsRead = vi.fn(async () => {});
   const hookState: HookResult = {
     notifications: [],
     unreadCount: 0,
     loading: false,
     markAsReadAndOpen,
+    markAllAsRead,
   };
   let locale: "en" | "id" = "en";
 
@@ -31,6 +34,8 @@ const mocks = vi.hoisted(() => {
       "notifications.orders.new.open": "Open order {{orderId}}",
       "notifications.orders.new.customerUnavailable": "Customer unavailable",
       "notifications.orders.new.badgeLabel": "{{count}} unread order notifications",
+      "notifications.orders.new.markAllAsRead": "Mark all as read",
+      "notifications.orders.new.itemsCount": "{{count}} Items",
       "orderStatus.pending": "Pending",
       "paymentStatus.settlement": "Settled",
     },
@@ -42,6 +47,8 @@ const mocks = vi.hoisted(() => {
       "notifications.orders.new.open": "Buka order {{orderId}}",
       "notifications.orders.new.customerUnavailable": "Pelanggan tidak tersedia",
       "notifications.orders.new.badgeLabel": "{{count}} notifikasi order belum dibaca",
+      "notifications.orders.new.markAllAsRead": "Tandai semua sebagai dibaca",
+      "notifications.orders.new.itemsCount": "{{count}} Barang",
       "orderStatus.pending": "Menunggu",
       "paymentStatus.settlement": "Lunas",
     },
@@ -58,16 +65,19 @@ const mocks = vi.hoisted(() => {
     navigate.mockReset();
     markAsReadAndOpen.mockReset();
     markAsReadAndOpen.mockImplementation(async (notification: AdminOrderNotification) => notification.route);
+    markAllAsRead.mockReset();
     translate.mockClear();
     hookState.notifications = [];
     hookState.unreadCount = 0;
     hookState.loading = false;
     hookState.markAsReadAndOpen = markAsReadAndOpen;
+    hookState.markAllAsRead = markAllAsRead;
   };
 
   return {
     hookState,
     markAsReadAndOpen,
+    markAllAsRead,
     navigate,
     reset,
     setLocale: (nextLocale: "en" | "id") => {
@@ -128,12 +138,14 @@ vi.mock("antd", () => {
       children,
       icon,
       "aria-label": ariaLabel,
+      onClick,
     }: {
       children?: ReactNode;
       icon?: ReactNode;
       "aria-label"?: string;
+      onClick?: () => void;
     }) => (
-      <button type="button" aria-label={ariaLabel}>
+      <button type="button" aria-label={ariaLabel} onClick={onClick}>
         {icon}
         {children}
       </button>
@@ -182,6 +194,8 @@ const createNotification = (overrides: Partial<AdminOrderNotification> = {}): Ad
   createdAt: "2026-04-29T10:00:00.000Z",
   readAt: null,
   sourceEventKey: "admin:new-order:order-1",
+  totalAmount: null,
+  itemCount: null,
   ...overrides,
 });
 
@@ -244,5 +258,35 @@ describe("AdminOrderNotifications", () => {
 
     expect(screen.getByText("99+")).not.toBeNull();
     expect(screen.getByLabelText("150 unread order notifications")).not.toBeNull();
+  });
+
+  it("renders order status, item count, and formatted price when provided", () => {
+    mocks.hookState.notifications = [
+      createNotification({
+        orderStatus: "pending",
+        itemCount: 3,
+        totalAmount: 250000,
+      }),
+    ];
+
+    render(<AdminOrderNotifications userId="user-1" />);
+
+    expect(screen.getByText("Pending")).not.toBeNull();
+    expect(screen.getByText("3 Items")).not.toBeNull();
+    expect(screen.getByText("Rp 250.000")).not.toBeNull();
+    expect(screen.getByText("#order-1")).not.toBeNull();
+  });
+
+  it("renders mark all as read button and invokes handler on click", () => {
+    mocks.hookState.notifications = [createNotification()];
+    mocks.hookState.unreadCount = 1;
+
+    render(<AdminOrderNotifications userId="user-1" />);
+
+    const markAllBtn = screen.getByRole("button", { name: "Mark all as read" });
+    expect(markAllBtn).not.toBeNull();
+
+    fireEvent.click(markAllBtn);
+    expect(mocks.markAllAsRead).toHaveBeenCalledTimes(1);
   });
 });

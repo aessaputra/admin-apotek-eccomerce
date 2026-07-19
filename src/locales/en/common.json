@@ -830,7 +830,9 @@
         "customerUnavailable": "Customer unavailable",
         "loadError": "New order notifications could not be loaded. Please refresh the page.",
         "realtimeError": "Live order notifications are temporarily unavailable. Please refresh the page.",
-        "badgeLabel": "{{count}} unread order notifications"
+        "badgeLabel": "{{count}} unread order notifications",
+        "markAllAsRead": "Mark all as read",
+        "itemsCount": "{{count}} Items"
       }
     }
   },

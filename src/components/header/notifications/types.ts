@@ -25,4 +25,6 @@ export interface AdminOrderNotification {
   createdAt: string;
   readAt: string | null;
   sourceEventKey: string | null;
+  totalAmount: number | null;
+  itemCount: number | null;
 }

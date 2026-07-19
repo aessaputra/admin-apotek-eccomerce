@@ -12,6 +12,7 @@ interface UseAdminOrderNotificationsResult {
   unreadCount: number;
   loading: boolean;
   markAsReadAndOpen: (notification: AdminOrderNotification) => Promise<string>;
+  markAllAsRead: () => Promise<void>;
 }
 
 interface NotificationFeedState {
@@ -80,6 +81,8 @@ function normalizeNotification(row: NotificationRow): AdminOrderNotification | n
     customerName: getStringValue(data, "customerName"),
     orderStatus: getStringValue(data, "orderStatus"),
     paymentStatus: getStringValue(data, "paymentStatus"),
+    totalAmount: typeof data.totalAmount === "number" ? data.totalAmount : null,
+    itemCount: typeof data.itemCount === "number" ? data.itemCount : null,
     createdAt: row.created_at,
     readAt: row.read_at,
     sourceEventKey: row.source_event_key,
@@ -287,10 +290,32 @@ export function useAdminOrderNotifications({ userId }: UseAdminOrderNotification
     return notification.route;
   }, [userId]);
 
+  const markAllAsRead = useCallback(async () => {
+    if (!userId) return;
+
+    const readAt = new Date().toISOString();
+    setFeedState((currentState) => ({
+      notifications: currentState.notifications.map((notification) => ({
+        ...notification,
+        readAt: notification.readAt ?? readAt,
+      })),
+      unreadCount: 0,
+    }));
+
+    await supabaseClient
+      .from("notifications")
+      .update({ read_at: readAt })
+      .eq("user_id", userId)
+      .eq("type", ORDER_NOTIFICATION_TYPE)
+      .eq("data->>audience", ADMIN_DASHBOARD_AUDIENCE)
+      .is("read_at", null);
+  }, [userId]);
+
   return {
     notifications: feedState.notifications,
     unreadCount: feedState.unreadCount,
     loading,
     markAsReadAndOpen,
+    markAllAsRead,
   };
 }

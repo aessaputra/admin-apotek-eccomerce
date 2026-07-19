@@ -25,12 +25,40 @@ function formatCreatedAt(value: string): string {
   return date.toLocaleString();
 }
 
+function getStatusTagColor(status: string | null): string {
+  switch (status) {
+    case "pending":
+      return "warning";
+    case "processing":
+    case "paid":
+    case "awaiting_shipment":
+      return "processing";
+    case "shipped":
+    case "in_transit":
+      return "cyan";
+    case "delivered":
+      return "success";
+    case "cancelled":
+      return "error";
+    default:
+      return "default";
+  }
+}
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    minimumFractionDigits: 0,
+  }).format(value);
+}
+
 export const AdminOrderNotifications: React.FC<AdminOrderNotificationsProps> = ({ userId }) => {
   const { token } = useToken();
   const { translate } = useTranslation();
   const navigate = useNavigate();
   const [openingNotificationId, setOpeningNotificationId] = useState<string | null>(null);
-  const { notifications, unreadCount, loading, markAsReadAndOpen } = useAdminOrderNotifications({ userId });
+  const { notifications, unreadCount, loading, markAsReadAndOpen, markAllAsRead } = useAdminOrderNotifications({ userId });
 
   const handleOpenNotification = async (notification: AdminOrderNotification) => {
     setOpeningNotificationId(notification.id);
@@ -58,6 +86,9 @@ export const AdminOrderNotifications: React.FC<AdminOrderNotificationsProps> = (
         style={{
           padding: `${token.paddingSM}px ${token.padding}px`,
           borderBottom: `1px solid ${token.colorBorderSecondary}`,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
         }}
       >
         <Space direction="vertical" size={0}>
@@ -70,6 +101,16 @@ export const AdminOrderNotifications: React.FC<AdminOrderNotificationsProps> = (
             )}
           </Text>
         </Space>
+        {unreadCount > 0 && (
+          <Button
+            type="link"
+            size="small"
+            onClick={() => void markAllAsRead()}
+            style={{ padding: 0, fontSize: token.fontSizeSM }}
+          >
+            {translate("notifications.orders.new.markAllAsRead", {}, "Mark all as read")}
+          </Button>
+        )}
       </div>
 
       {loading ? (
@@ -116,14 +157,47 @@ export const AdminOrderNotifications: React.FC<AdminOrderNotificationsProps> = (
                     backgroundColor: isUnread ? token.colorPrimaryBg : token.colorBgElevated,
                   }}
                 >
-                  <Space direction="vertical" size={2} style={{ width: "100%" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", width: "100%" }}>
+                  <Space direction="vertical" size={4} style={{ width: "100%" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
                       <Text strong style={{ fontSize: token.fontSize }}>
                         {customerName}
                       </Text>
-                      {isUnread && <Badge dot color={token.colorPrimary} />}
+                      <Space size={8} style={{ alignItems: "center" }}>
+                        {notification.orderStatus && (
+                          <Tag
+                            color={getStatusTagColor(notification.orderStatus)}
+                            style={{ margin: 0 }}
+                          >
+                            {translate(`orderStatus.${notification.orderStatus}`, {}, notification.orderStatus)}
+                          </Tag>
+                        )}
+                        {isUnread && <Badge dot color={token.colorPrimary} />}
+                      </Space>
                     </div>
-                    <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 8px", fontSize: token.fontSizeSM }}>
+                      <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+                        #{notification.orderId}
+                      </Text>
+                      {notification.itemCount !== null && (
+                        <>
+                          <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>•</Text>
+                          <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+                            {translate("notifications.orders.new.itemsCount", { count: notification.itemCount }, `${notification.itemCount} Barang`)}
+                          </Text>
+                        </>
+                      )}
+                      {notification.totalAmount !== null && (
+                        <>
+                          <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>•</Text>
+                          <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+                            {formatCurrency(notification.totalAmount)}
+                          </Text>
+                        </>
+                      )}
+                    </div>
+
+                    <Text type="secondary" style={{ fontSize: token.fontSizeSM - 1, display: "block" }}>
                       {formatCreatedAt(notification.createdAt)}
                     </Text>
                   </Space>

@@ -830,7 +830,9 @@
         "customerUnavailable": "Pelanggan tidak tersedia",
         "loadError": "Notifikasi order baru gagal dimuat. Silakan muat ulang halaman.",
         "realtimeError": "Notifikasi order langsung sedang tidak tersedia. Silakan muat ulang halaman.",
-        "badgeLabel": "{{count}} notifikasi order belum dibaca"
+        "badgeLabel": "{{count}} notifikasi order belum dibaca",
+        "markAllAsRead": "Tandai semua sebagai dibaca",
+        "itemsCount": "{{count}} Barang"
       }
     }
   },
