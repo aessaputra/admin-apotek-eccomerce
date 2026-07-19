@@ -86,31 +86,30 @@ export const AdminOrderNotifications: React.FC<AdminOrderNotificationsProps> = (
         style={{
           padding: `${token.paddingSM}px ${token.padding}px`,
           borderBottom: `1px solid ${token.colorBorderSecondary}`,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
         }}
       >
-        <Space direction="vertical" size={0}>
-          <Text strong>{translate("notifications.orders.new.title", {}, "Incoming Orders")}</Text>
-          <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-            {translate(
-              "notifications.orders.new.description",
-              {},
-              "Recent orders awaiting your review."
-            )}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+          <Text strong style={{ fontSize: token.fontSize }}>
+            {translate("notifications.orders.new.title", {}, "Incoming Orders")}
           </Text>
-        </Space>
-        {unreadCount > 0 && (
-          <Button
-            type="link"
-            size="small"
-            onClick={() => void markAllAsRead()}
-            style={{ padding: 0, fontSize: token.fontSizeSM }}
-          >
-            {translate("notifications.orders.new.markAllAsRead", {}, "Mark all as read")}
-          </Button>
-        )}
+          {unreadCount > 0 && (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => void markAllAsRead()}
+              style={{ padding: 0, fontSize: token.fontSizeSM, height: "auto" }}
+            >
+              {translate("notifications.orders.new.markAllAsRead", {}, "Mark all as read")}
+            </Button>
+          )}
+        </div>
+        <Text type="secondary" style={{ fontSize: token.fontSizeSM, display: "block", marginTop: 2 }}>
+          {translate(
+            "notifications.orders.new.description",
+            {},
+            "Recent orders awaiting your review."
+          )}
+        </Text>
       </div>
 
       {loading ? (
@@ -135,6 +134,9 @@ export const AdminOrderNotifications: React.FC<AdminOrderNotificationsProps> = (
               "Customer unavailable"
             );
             const isOpening = openingNotificationId === notification.id;
+            const displayOrderId = notification.orderId.length > 8
+              ? notification.orderId.slice(0, 8)
+              : notification.orderId;
 
             return (
               <List.Item style={{ padding: 0 }}>
@@ -155,6 +157,7 @@ export const AdminOrderNotifications: React.FC<AdminOrderNotificationsProps> = (
                     padding: `${token.paddingSM}px ${token.padding}px`,
                     textAlign: "left",
                     backgroundColor: isUnread ? token.colorPrimaryBg : token.colorBgElevated,
+                    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                   }}
                 >
                   <Space direction="vertical" size={4} style={{ width: "100%" }}>
@@ -175,9 +178,9 @@ export const AdminOrderNotifications: React.FC<AdminOrderNotificationsProps> = (
                       </Space>
                     </div>
 
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 8px", fontSize: token.fontSizeSM }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "2px 6px", fontSize: token.fontSizeSM }}>
                       <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
-                        #{notification.orderId}
+                        #{displayOrderId}
                       </Text>
                       {notification.itemCount !== null && (
                         <>
@@ -190,7 +193,7 @@ export const AdminOrderNotifications: React.FC<AdminOrderNotificationsProps> = (
                       {notification.totalAmount !== null && (
                         <>
                           <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>•</Text>
-                          <Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+                          <Text strong style={{ fontSize: token.fontSizeSM, color: token.colorTextHeading }}>
                             {formatCurrency(notification.totalAmount)}
                           </Text>
                         </>
