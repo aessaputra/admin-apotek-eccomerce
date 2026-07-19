@@ -40,6 +40,13 @@ export function cleanStreetAddress(
   return cleaned;
 }
 
+export function formatLevel3Display(name: string): string {
+  const trimmed = (name ?? "").trim();
+  if (!trimmed) return "";
+  const cleaned = trimmed.replace(/^(kecamatan|kec\.?)\s+/i, "").trim();
+  return `Kecamatan ${cleaned}`;
+}
+
 export function formatAddress(address?: {
   street_address?: string | null;
   area_name?: string | null;
@@ -53,7 +60,8 @@ export function formatAddress(address?: {
   const city = address.city || "";
   const province = address.province || "";
   const postal = address.postal_code || "";
-  const district = address.area_name ? address.area_name.split(",")[0].trim() : undefined;
+  const rawDistrict = address.area_name ? address.area_name.split(",")[0].trim() : undefined;
+  const district = rawDistrict ? formatLevel3Display(rawDistrict) : undefined;
 
   const cleanedStreet = cleanStreetAddress(street, city, province, postal, district);
 

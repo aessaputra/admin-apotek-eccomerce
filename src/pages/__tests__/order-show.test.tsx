@@ -372,7 +372,7 @@ describe("OrderShow", () => {
     expect(screen.getByText("Alice Customer")).not.toBeNull();
     expect(screen.getByText("alice@example.com")).not.toBeNull();
     expect(screen.getByText("Alice Receiver")).not.toBeNull();
-    expect(screen.getByText("Jl. Merdeka No. 1, Coblong, Bandung, Jawa Barat, 40111, ID")).not.toBeNull();
+    expect(screen.getByText("Jl. Merdeka No. 1, Kecamatan Coblong, Bandung, Jawa Barat, 40111, ID")).not.toBeNull();
     expect(screen.getByText("Dekat apotek")).not.toBeNull();
     expect(screen.queryByText("orders.fields.status")).toBeNull();
     expect(screen.getAllByText("paymentStatus.settlement")).toHaveLength(1);
