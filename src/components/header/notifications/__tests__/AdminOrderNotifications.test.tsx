@@ -274,7 +274,7 @@ describe("AdminOrderNotifications", () => {
     expect(screen.getByText("Pending")).not.toBeNull();
     expect(screen.getByText("3 Items")).not.toBeNull();
     expect(screen.getByText("Rp 250.000")).not.toBeNull();
-    expect(screen.getByText("#order-1")).not.toBeNull();
+    expect(screen.getByText("#APT-ORDER-1")).not.toBeNull();
   });
 
   it("renders mark all as read button and invokes handler on click", () => {

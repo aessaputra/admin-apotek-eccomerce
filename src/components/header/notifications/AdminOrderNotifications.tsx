@@ -134,9 +134,7 @@ export const AdminOrderNotifications: React.FC<AdminOrderNotificationsProps> = (
               "Customer unavailable"
             );
             const isOpening = openingNotificationId === notification.id;
-            const displayOrderId = notification.orderId.length > 8
-              ? notification.orderId.slice(0, 8)
-              : notification.orderId;
+            const displayOrderId = `APT-${notification.orderId.slice(0, 8).toUpperCase()}`;
 
             return (
               <List.Item style={{ padding: 0 }}>
