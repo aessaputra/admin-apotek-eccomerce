@@ -45,13 +45,20 @@ Specifically, the new design will show:
    - Add translation key `notifications.orders.new.markAllAsRead` ("Tandai semua sebagai dibaca" / "Mark all as read").
    - Update order status tag translations if required.
 
+4. **`supabase/migrations/` (New Migration File)**
+   - Replace the trigger `orders_admin_new_order_notifications_trigger` on `public.orders` to be a `CONSTRAINT TRIGGER` that is `DEFERRABLE INITIALLY DEFERRED`.
+   - Update the trigger function `private.notify_admins_of_new_order()` to calculate the sum of items from `public.order_items` for the inserted order and save it as `itemCount` in the notification JSON payload.
+   - Include `totalAmount` (sourced from `new.total_amount`) in the notification JSON payload.
+
 ## Testing Decisions
 
-We will verify the implementation with unit and component tests inside:
+We will verify the implementation with unit and component tests:
 - **`src/components/header/notifications/__tests__/AdminOrderNotifications.test.tsx`**
   - Verify that the "Mark all as read" button renders and invokes `markAllAsRead` when clicked.
   - Verify that the notification card displays the new metadata (Order ID, items summary, status tags, etc.).
   - Verify layout styling changes are correctly applied.
+- **`supabase/migrations/__tests__/` (New migration test file)**
+  - Verify that when a new order and its items are inserted within a transaction, the deferred trigger correctly creates a notification record containing the right `itemCount` and `totalAmount` in the JSON data payload.
 
 ## Out of Scope
 
@@ -70,3 +77,4 @@ The UI layout follows the ASCII design mockup:
 +---------------------------------------------------------+
 ```
 It utilizes Ant Design v5 Design Tokens (`token.colorPrimary`, `token.colorPrimaryBg`, `token.borderRadiusLG`, etc.) to match the existing dark/light mode system cleanly.
+
