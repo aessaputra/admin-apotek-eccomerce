@@ -2,6 +2,7 @@ import React, { useMemo, useCallback } from "react";
 import { Collapse, Typography, Space, Tag, theme } from "antd";
 import { useTranslation } from "@refinedev/core";
 import { getFallbackCourierOption } from "../../../constants/couriers";
+import { formatAddress } from "../../../utils/formatters";
 import { formatDisplayLabel, getMeaningfulValue, hasMeaningfulValue } from "../helpers";
 import type { OrderRecord, DetailListItem } from "../types";
 
@@ -117,17 +118,7 @@ export const OrderDetailsCards: React.FC<OrderDetailsCardsProps> = ({ record }) 
     </div>
   );
 
-  const shippingAddressText = [
-    record?.shipping_address?.street_address,
-    record?.shipping_address?.area_name,
-    record?.shipping_address?.city,
-    record?.shipping_address?.province,
-    record?.shipping_address?.postal_code,
-    record?.shipping_address?.country_code,
-  ]
-    .map((part) => part?.trim())
-    .filter((part): part is string => Boolean(part))
-    .join(", ");
+  const shippingAddressText = formatAddress(record?.shipping_address);
 
   const getWaybillSourceBadge = () => {
     if (!record?.waybill_number) return null;
