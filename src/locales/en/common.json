@@ -149,7 +149,7 @@
       "revenueTrendAriaLabel": "Revenue trend line chart",
       "revenueTrendDescription": "Sales from settled paid orders across the selected period."
     },
-    "nearExpiryAlerts": "Expiry Risk",
+    "nearExpiryAlerts": "Expiry Products",
     "noNearExpiry": "All products are safe from expiry",
     "viewNearExpiry": "View Products"
   },
