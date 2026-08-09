@@ -164,7 +164,13 @@ COMMENT ON FUNCTION public.auto_deactivate_expired_products() IS
   'Atomically deactivates products that have passed their expiry_date (runs daily via pg_cron)';
 
 -- 6. Schedule daily cron at 00:00 WIB (17:00 UTC)
-SELECT cron.unschedule('auto-deactivate-expired-products-daily');
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'auto-deactivate-expired-products-daily') THEN
+    PERFORM cron.unschedule('auto-deactivate-expired-products-daily');
+  END IF;
+END;
+$$;
 
 SELECT cron.schedule(
   'auto-deactivate-expired-products-daily',
