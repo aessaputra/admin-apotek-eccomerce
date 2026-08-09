@@ -179,7 +179,7 @@ export const Dashboard: React.FC = () => {
     resource: "products",
     pagination: { currentPage: 1, pageSize: 1 },
     filters: [
-      { field: "expiry_date", operator: "nnull", value: true },
+      { field: "expiry_date", operator: "nnull", value: null },
       { field: "expiry_date", operator: "lte", value: thirtyDaysFromNow },
       { field: "is_active", operator: "eq", value: true },
     ],
