@@ -87,7 +87,7 @@
       },
       "nearExpiry": {
         "message": "{{count}} produk mendekati kedaluwarsa",
-        "description": "Produk aktif dengan tanggal kedaluwarsa kurang dari 30 hari perlu ditinjau."
+        "description": "Produk aktif ED <30 hari perlu ditinjau."
       },
       "expiredProducts": {
         "message": "{{count}} produk sudah kedaluwarsa",
@@ -149,9 +149,9 @@
       "revenueTrendAriaLabel": "Grafik garis tren omzet",
       "revenueTrendDescription": "Omzet dari pesanan dibayar yang settlement sesuai periode yang dipilih."
     },
-    "nearExpiryAlerts": "Mendekati Kedaluwarsa",
+    "nearExpiryAlerts": "Risiko Kedaluwarsa",
     "noNearExpiry": "Semua produk aman dari kedaluwarsa",
-    "viewNearExpiry": "Lihat obat mendekati ED"
+    "viewNearExpiry": "Lihat Produk"
   },
   "salesReports": {
     "salesReports": "Laporan Penjualan",

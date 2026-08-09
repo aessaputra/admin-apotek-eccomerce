@@ -87,7 +87,7 @@
       },
       "nearExpiry": {
         "message": "{{count}} products nearing expiry",
-        "description": "Active products with expiry dates within 30 days need review."
+        "description": "Active items expiring in <30 days."
       },
       "expiredProducts": {
         "message": "{{count}} products have expired",
@@ -149,9 +149,9 @@
       "revenueTrendAriaLabel": "Revenue trend line chart",
       "revenueTrendDescription": "Sales from settled paid orders across the selected period."
     },
-    "nearExpiryAlerts": "Near Expiry",
+    "nearExpiryAlerts": "Expiry Risk",
     "noNearExpiry": "All products are safe from expiry",
-    "viewNearExpiry": "View near-expiry products"
+    "viewNearExpiry": "View Products"
   },
   "salesReports": {
     "salesReports": "Sales Reports",

@@ -471,17 +471,17 @@ export const Dashboard: React.FC = () => {
               ) : nearExpiryQuery?.isError ? (
                 <Alert type="error" showIcon message={translate("dashboard.alerts.metricsError.message")} />
               ) : nearExpiryCount > 0 ? (
-                <Alert
-                  type="warning"
-                  showIcon
-                  message={translate("dashboard.alerts.nearExpiry.message", { count: nearExpiryCount })}
-                  description={translate("dashboard.alerts.nearExpiry.description")}
-                  action={
-                    <Button size="small" onClick={() => navigateList("products")}>
-                      {translate("dashboard.viewNearExpiry")}
-                    </Button>
-                  }
-                />
+                <Space direction="vertical" style={{ width: "100%" }} size="middle">
+                  <Alert
+                    type="warning"
+                    showIcon
+                    message={translate("dashboard.alerts.nearExpiry.message", { count: nearExpiryCount })}
+                    description={translate("dashboard.alerts.nearExpiry.description")}
+                  />
+                  <Button type="default" block onClick={() => navigateList("products")}>
+                    {translate("dashboard.viewNearExpiry")}
+                  </Button>
+                </Space>
               ) : (
                 <Alert
                   type="success"
