@@ -47,3 +47,7 @@ _.sln
 supabase/.temp/
 .vercel
 *.log
+
+# Graphify knowledge graph outputs
+graphify-out/
+
