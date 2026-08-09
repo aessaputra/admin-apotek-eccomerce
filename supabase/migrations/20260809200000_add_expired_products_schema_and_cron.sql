@@ -19,6 +19,10 @@ CREATE INDEX IF NOT EXISTS idx_products_active_expiry
   WHERE is_active = true AND expiry_date IS NOT NULL;
 
 -- 3. Update private admin function to include expiry_date and batch_number
+-- Must drop dependent view and function first because Postgres does not allow changing function return table signature via CREATE OR REPLACE.
+DROP VIEW IF EXISTS public.admin_products;
+DROP FUNCTION IF EXISTS private.admin_products_for_current_user();
+
 CREATE OR REPLACE FUNCTION private.admin_products_for_current_user()
 RETURNS TABLE (
   id uuid,
