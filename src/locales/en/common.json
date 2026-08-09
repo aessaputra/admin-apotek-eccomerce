@@ -86,7 +86,7 @@
         "description": "Summary and stock counts are still loading. Queue status will update shortly."
       },
       "nearExpiry": {
-        "message": "{{count}} product(s) expiring in 30 days"
+        "message": "{{count}} item(s) expiring < 30d"
       },
       "expiredProducts": {
         "message": "{{count}} products have expired",
@@ -148,9 +148,9 @@
       "revenueTrendAriaLabel": "Revenue trend line chart",
       "revenueTrendDescription": "Sales from settled paid orders across the selected period."
     },
-    "nearExpiryAlerts": "Expiring Soon",
-    "noNearExpiry": "All products are safe from expiry",
-    "viewNearExpiry": "Review Products"
+    "nearExpiryAlerts": "Expiry Alerts",
+    "noNearExpiry": "No products near expiry",
+    "viewNearExpiry": "Review"
   },
   "salesReports": {
     "salesReports": "Sales Reports",

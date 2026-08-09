@@ -86,7 +86,7 @@
         "description": "Ringkasan dan jumlah stok masih dimuat. Status antrean akan diperbarui sebentar lagi."
       },
       "nearExpiry": {
-        "message": "{{count}} produk perlu ditindak"
+        "message": "{{count}} produk ED < 30 hari"
       },
       "expiredProducts": {
         "message": "{{count}} produk sudah kedaluwarsa",
@@ -148,9 +148,9 @@
       "revenueTrendAriaLabel": "Grafik garis tren omzet",
       "revenueTrendDescription": "Omzet dari pesanan dibayar yang settlement sesuai periode yang dipilih."
     },
-    "nearExpiryAlerts": "Hampir Kedaluwarsa",
-    "noNearExpiry": "Semua produk aman dari kedaluwarsa",
-    "viewNearExpiry": "Periksa Produk"
+    "nearExpiryAlerts": "Peringatan ED",
+    "noNearExpiry": "Tidak ada produk mendekati ED",
+    "viewNearExpiry": "Tinjau"
   },
   "salesReports": {
     "salesReports": "Laporan Penjualan",
