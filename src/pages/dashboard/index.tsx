@@ -485,7 +485,6 @@ export const Dashboard: React.FC = () => {
                     type="warning"
                     showIcon
                     message={translate("dashboard.alerts.nearExpiry.message", { count: nearExpiryCount })}
-                    description={translate("dashboard.alerts.nearExpiry.description")}
                   />
                   <Button type="default" block onClick={() => navigateList("products")}>
                     {translate("dashboard.viewNearExpiry")}

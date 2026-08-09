@@ -86,8 +86,7 @@
         "description": "Summary and stock counts are still loading. Queue status will update shortly."
       },
       "nearExpiry": {
-        "message": "{{count}} products expiring soon",
-        "description": "Expiring within the next 30 days."
+        "message": "{{count}} product(s) expiring in 30 days"
       },
       "expiredProducts": {
         "message": "{{count}} products have expired",

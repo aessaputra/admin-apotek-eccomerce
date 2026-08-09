@@ -86,8 +86,7 @@
         "description": "Ringkasan dan jumlah stok masih dimuat. Status antrean akan diperbarui sebentar lagi."
       },
       "nearExpiry": {
-        "message": "{{count}} produk segera kedaluwarsa",
-        "description": "Kedaluwarsa dalam 30 hari ke depan."
+        "message": "{{count}} produk kedaluwarsa dalam 30 hari"
       },
       "expiredProducts": {
         "message": "{{count}} produk sudah kedaluwarsa",
