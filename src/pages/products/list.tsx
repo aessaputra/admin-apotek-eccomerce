@@ -6,7 +6,7 @@ import {
   DeleteButton,
   useSelect,
 } from "@refinedev/antd";
-import { useTranslation, CrudFilters, useUpdate } from "@refinedev/core";
+import { useTranslation, CrudFilter, CrudFilters, useUpdate } from "@refinedev/core";
 import { useEffect, useRef, useState } from "react";
 import { Table, Image, Space, Tooltip, Input, Select, Row, Col, Tag, Typography, Popconfirm, Button } from "antd";
 import dayjs from "dayjs";
@@ -18,16 +18,68 @@ dayjs.extend(isSameOrBefore);
 
 const PRODUCT_SEARCH_DEBOUNCE_MS = 400;
 
-interface ProductImage { url: string }
+interface ProductImage {
+  url: string;
+}
+
 interface ProductRecord {
   id: string;
   name?: string;
   sku?: string;
+  slug?: string;
   product_images?: ProductImage[];
   categories?: { name: string } | null;
   batch_number?: string;
   expiry_date?: string;
   is_active?: boolean;
+}
+
+type TranslateFn = ReturnType<typeof useTranslation>["translate"];
+
+function buildExpiryFilters(status: string | null): CrudFilter[] {
+  if (!status) return [];
+
+  const todayStr = dayjs().format("YYYY-MM-DD");
+  const thirtyDaysStr = dayjs().add(30, "day").format("YYYY-MM-DD");
+
+  switch (status) {
+    case "expired":
+      return [{ field: "expiry_date", operator: "lte", value: todayStr }];
+    case "nearExpiry":
+      return [
+        { field: "expiry_date", operator: "gt", value: todayStr },
+        { field: "expiry_date", operator: "lte", value: thirtyDaysStr },
+      ];
+    case "safe":
+      return [{ field: "expiry_date", operator: "gt", value: thirtyDaysStr }];
+    default:
+      return [];
+  }
+}
+
+function renderExpiryStatusCell(dateStr: string | undefined, translate: TranslateFn) {
+  if (!dateStr) return "-";
+
+  const today = dayjs();
+  const expDate = dayjs(dateStr);
+  const isExpired = expDate.isSameOrBefore(today, "day");
+  const isNearExpiry = !isExpired && expDate.diff(today, "day") <= 30;
+
+  const tagColor = isExpired ? "error" : isNearExpiry ? "warning" : "success";
+  const tagLabelKey = isExpired
+    ? "products.expiryStatus.expired"
+    : isNearExpiry
+    ? "products.expiryStatus.nearExpiry"
+    : "products.expiryStatus.safe";
+
+  return (
+    <Space direction="vertical" size={2}>
+      <Tag color={tagColor}>{translate(tagLabelKey)}</Tag>
+      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        {dateStr}
+      </Typography.Text>
+    </Space>
+  );
 }
 
 export const ProductList: React.FC = () => {
@@ -46,23 +98,14 @@ export const ProductList: React.FC = () => {
     syncWithLocation: true,
     meta: { select: "*, product_images(*), categories(name)" },
     sorters: {
-      initial: [
-        {
-          field: "created_at",
-          order: "desc",
-        },
-      ],
+      initial: [{ field: "created_at", order: "desc" }],
     },
   });
 
   const currentSortOrder = sorters?.find((s) => s.field === "created_at")?.order ?? null;
 
   const handleSortChange = (value: "desc" | "asc" | null) => {
-    if (value) {
-      setSorters([{ field: "created_at", order: value }]);
-    } else {
-      setSorters([]);
-    }
+    setSorters(value ? [{ field: "created_at", order: value }] : []);
   };
 
   const { selectProps: categorySelectProps } = useSelect({
@@ -80,9 +123,7 @@ export const ProductList: React.FC = () => {
   }, [searchText]);
 
   useEffect(() => {
-    if (!hasFilterChangedRef.current) {
-      return;
-    }
+    if (!hasFilterChangedRef.current) return;
 
     const filters: CrudFilters = [];
 
@@ -99,19 +140,7 @@ export const ProductList: React.FC = () => {
       filters.push({ field: "is_active", operator: "eq", value: isActive });
     }
 
-    if (expiryStatus) {
-      const todayStr = dayjs().format("YYYY-MM-DD");
-      const thirtyDaysStr = dayjs().add(30, "day").format("YYYY-MM-DD");
-
-      if (expiryStatus === "expired") {
-        filters.push({ field: "expiry_date", operator: "lte", value: todayStr });
-      } else if (expiryStatus === "nearExpiry") {
-        filters.push({ field: "expiry_date", operator: "gt", value: todayStr });
-        filters.push({ field: "expiry_date", operator: "lte", value: thirtyDaysStr });
-      } else if (expiryStatus === "safe") {
-        filters.push({ field: "expiry_date", operator: "gt", value: thirtyDaysStr });
-      }
-    }
+    filters.push(...buildExpiryFilters(expiryStatus));
 
     if (typeof setCurrentPage === "function") {
       setCurrentPage(1);
@@ -142,10 +171,10 @@ export const ProductList: React.FC = () => {
     setExpiryStatus(value);
   };
 
-  const handleDeactivate = (id: string) => {
+  const handleDeactivateProduct = (productId: string) => {
     updateProduct({
       resource: "products",
-      id,
+      id: productId,
       values: { is_active: false },
     });
   };
@@ -243,26 +272,7 @@ export const ProductList: React.FC = () => {
           <Table.Column
             dataIndex="expiry_date"
             title={translate("products.fields.expiryDate", "Tanggal ED")}
-            render={(v) => {
-              if (!v) return "-";
-              const today = dayjs();
-              const expDate = dayjs(v);
-              const isExpired = expDate.isSameOrBefore(today, "day");
-              const isNearExpiry = !isExpired && expDate.diff(today, "day") <= 30;
-
-              return (
-                <Space direction="vertical" size={2}>
-                  {isExpired ? (
-                    <Tag color="error">{translate("products.expiryStatus.expired", "Kedaluwarsa")}</Tag>
-                  ) : isNearExpiry ? (
-                    <Tag color="warning">{translate("products.expiryStatus.nearExpiry", "Hampir ED")}</Tag>
-                  ) : (
-                    <Tag color="success">{translate("products.expiryStatus.safe", "Aman")}</Tag>
-                  )}
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>{v}</Typography.Text>
-                </Space>
-              );
-            }}
+            render={(v) => renderExpiryStatusCell(v, translate)}
           />
           <Table.Column
             dataIndex={["categories", "name"]}
@@ -281,9 +291,10 @@ export const ProductList: React.FC = () => {
             width={140}
             fixed="right"
             render={(_, record: ProductRecord) => {
-              const isExpiredOrNear = record.expiry_date
-                ? dayjs(record.expiry_date).diff(dayjs(), "day") <= 30
-                : false;
+              const isEligibleForDeactivation =
+                record.is_active &&
+                record.expiry_date &&
+                dayjs(record.expiry_date).diff(dayjs(), "day") <= 30;
 
               return (
                 <Space size="small">
@@ -302,10 +313,10 @@ export const ProductList: React.FC = () => {
                       <DeleteButton hideText size="small" recordItemId={record.id} />
                     </span>
                   </Tooltip>
-                  {record.is_active && isExpiredOrNear && (
+                  {isEligibleForDeactivation && (
                     <Popconfirm
                       title={translate("products.expiryActions.deactivateConfirm", "Nonaktifkan produk ini?")}
-                      onConfirm={() => handleDeactivate(record.id)}
+                      onConfirm={() => handleDeactivateProduct(record.id)}
                       okText={translate("products.expiryActions.deactivate", "Nonaktifkan")}
                       cancelText="Batal"
                     >
