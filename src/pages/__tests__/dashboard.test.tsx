@@ -260,6 +260,9 @@ vi.mock("antd", async () => {
 
       return <div>{children}</div>;
     },
+    Grid: {
+      useBreakpoint: () => ({ xs: false, sm: true, md: true, lg: true, xl: true, xxl: true }),
+    },
     Row: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
     Radio: {
       Group: ({

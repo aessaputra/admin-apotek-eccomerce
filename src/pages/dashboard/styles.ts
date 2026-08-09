@@ -52,3 +52,36 @@ export const visuallyHiddenStyle: CSSProperties = {
   whiteSpace: "nowrap",
   border: 0,
 };
+
+export const getDashboardGranularityContainerStyle = (
+  _token: GlobalToken,
+  isMobile?: boolean,
+): CSSProperties => ({
+  display: "flex",
+  width: isMobile ? "100%" : undefined,
+  justifyContent: isMobile ? "center" : "flex-end",
+  minWidth: 0,
+});
+
+export const getDashboardGranularityRadioStyle = (
+  token: GlobalToken,
+  isMobile?: boolean,
+): CSSProperties => ({
+  display: "flex",
+  width: isMobile ? "100%" : undefined,
+  flexWrap: isMobile ? undefined : "wrap",
+  gap: token.marginXXS,
+  justifyContent: isMobile ? undefined : "flex-end",
+});
+
+export const getDashboardGranularityOptionStyle = (
+  _token: GlobalToken,
+  isMobile?: boolean,
+): CSSProperties =>
+  isMobile
+    ? {
+        flex: 1,
+        textAlign: "center",
+      }
+    : {};
+

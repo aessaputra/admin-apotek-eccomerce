@@ -1,5 +1,5 @@
 import { useGetLocale, useList, useTranslation, useNavigation } from "@refinedev/core";
-import { Alert, Button, Card, Col, Row, Space, Spin, Statistic, Table, Tag, Tooltip, Typography, theme, List } from "antd";
+import { Alert, Button, Card, Col, Grid, Row, Space, Spin, Statistic, Table, Tag, Tooltip, Typography, theme, List } from "antd";
 import { useMemo, useState } from "react";
 import {
   CheckCircleOutlined,
@@ -111,6 +111,12 @@ export const Dashboard: React.FC = () => {
   const getLocale = useGetLocale();
   const { list: navigateList, show: navigateShow } = useNavigation();
   const { token } = theme.useToken();
+  const screens = Grid.useBreakpoint();
+  const isMobile = Boolean(screens.xs && !screens.md);
+  const cardBodyStyle = useMemo(
+    () => ({ padding: isMobile ? token.paddingSM : token.padding }),
+    [isMobile, token],
+  );
   const [trendGranularity, setTrendGranularity] = useState<OperationalTrendGranularity>("day");
   const locale = getDashboardLocale(getLocale());
   const currencyFormatter = useMemo(
@@ -312,6 +318,7 @@ export const Dashboard: React.FC = () => {
           <Card
             hoverable
             style={{ height: "100%", borderColor: token.colorWarningBorder, borderWidth: 1 }}
+            styles={{ body: cardBodyStyle }}
             title={attentionCardTitle}
             extra={
               <Tooltip title={translate("dashboard.viewAllOrders")}>
@@ -404,6 +411,7 @@ export const Dashboard: React.FC = () => {
           <Card
             hoverable
             style={{ height: "100%" }}
+            styles={{ body: cardBodyStyle }}
             title={
               <>
                 <WarningOutlined aria-hidden="true" style={{ color: token.colorWarning, marginRight: token.marginXS }} />
@@ -451,6 +459,7 @@ export const Dashboard: React.FC = () => {
           <Card
             hoverable
             style={{ height: "100%" }}
+            styles={{ body: cardBodyStyle }}
             title={
               <>
                 <ClockCircleOutlined aria-hidden="true" style={{ color: token.colorWarning, marginRight: token.marginXS }} />
@@ -497,7 +506,7 @@ export const Dashboard: React.FC = () => {
       <Space direction="vertical" size={token.marginXS} style={{ width: "100%" }}>
         <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} xl={6}>
-          <Card style={primaryKpiCardStyle} hoverable>
+          <Card style={primaryKpiCardStyle} styles={{ body: cardBodyStyle }} hoverable>
             <Statistic
               title={translate("dashboard.kpis.revenue30d")}
               value={dashboardKpis.revenue}
@@ -509,7 +518,7 @@ export const Dashboard: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} xl={6}>
-          <Card style={primaryKpiCardStyle} hoverable>
+          <Card style={primaryKpiCardStyle} styles={{ body: cardBodyStyle }} hoverable>
             <Statistic
               title={translate("dashboard.kpis.orders30d")}
               value={dashboardKpis.orderCount}
@@ -521,7 +530,7 @@ export const Dashboard: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} xl={6}>
-          <Card style={primaryKpiCardStyle} hoverable>
+          <Card style={primaryKpiCardStyle} styles={{ body: cardBodyStyle }} hoverable>
             <Statistic
               title={translate("dashboard.kpis.paymentSuccessRate")}
               value={dashboardKpis.paymentSuccessRate}
@@ -534,7 +543,7 @@ export const Dashboard: React.FC = () => {
           </Card>
         </Col>
         <Col xs={24} sm={12} xl={6}>
-          <Card style={primaryKpiCardStyle} hoverable>
+          <Card style={primaryKpiCardStyle} styles={{ body: cardBodyStyle }} hoverable>
             <Statistic
               title={translate("dashboard.kpis.averageOrderValue")}
               value={dashboardKpis.averageOrderValue}
