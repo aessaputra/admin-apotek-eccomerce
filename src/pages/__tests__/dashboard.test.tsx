@@ -316,6 +316,7 @@ vi.mock("antd", async () => {
       </div>
     ),
     Table,
+    Spin: ({ children }: { children?: React.ReactNode }) => <div data-testid="spin">{children}</div>,
     List: Object.assign(
       ({ dataSource, renderItem, locale }: { dataSource?: any[], renderItem?: (item: any) => React.ReactNode, locale?: { emptyText?: React.ReactNode } }) => (
         <div role="list">

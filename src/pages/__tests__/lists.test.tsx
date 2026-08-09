@@ -46,6 +46,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@refinedev/core", () => ({
   useTranslation: () => ({ translate: mocks.translate }),
+  useUpdate: () => ({ mutate: vi.fn(), isLoading: false }),
 }));
 
 vi.mock("react-router", () => ({

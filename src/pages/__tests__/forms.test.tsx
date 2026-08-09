@@ -440,6 +440,22 @@ vi.mock("antd", () => {
         ))}
       </select>
     ),
+    DatePicker: ({
+      placeholder,
+      onChange,
+      value,
+    }: {
+      placeholder?: string;
+      onChange?: (date: unknown) => void;
+      value?: unknown;
+    }) => (
+      <input
+        aria-label={placeholder ?? "DatePicker"}
+        placeholder={placeholder}
+        value={value ? String(value) : ""}
+        onChange={(e) => onChange?.(e.target.value)}
+      />
+    ),
     Switch: ({ checked, onChange, checkedChildren, unCheckedChildren, "aria-label": ariaLabel }: { checked?: boolean; onChange?: (checked: boolean) => void; checkedChildren?: React.ReactNode; unCheckedChildren?: React.ReactNode; "aria-label"?: string }) => (
       <button type="button" role="switch" aria-checked={checked ? "true" : "false"} aria-label={ariaLabel ?? "switch"} onClick={() => onChange?.(!checked)}>
         {checked ? checkedChildren : unCheckedChildren}

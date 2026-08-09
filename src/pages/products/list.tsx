@@ -6,29 +6,39 @@ import {
   DeleteButton,
   useSelect,
 } from "@refinedev/antd";
-import { useTranslation, CrudFilters } from "@refinedev/core";
+import { useTranslation, CrudFilters, useUpdate } from "@refinedev/core";
 import { useEffect, useRef, useState } from "react";
-import { Table, Image, Space, Tooltip, Input, Select, Row, Col } from "antd";
+import { Table, Image, Space, Tooltip, Input, Select, Row, Col, Tag, Typography, Popconfirm, Button } from "antd";
+import dayjs from "dayjs";
+import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 import { buildProductSearchFilter } from "../../utils/productSearch";
+
+dayjs.extend(isSameOrBefore);
 
 const PRODUCT_SEARCH_DEBOUNCE_MS = 400;
 
 interface ProductImage { url: string }
 interface ProductRecord {
   id: string;
+  name?: string;
   sku?: string;
   product_images?: ProductImage[];
   categories?: { name: string } | null;
+  batch_number?: string;
+  expiry_date?: string;
+  is_active?: boolean;
 }
 
 export const ProductList: React.FC = () => {
   const { translate } = useTranslation();
+  const { mutate: updateProduct } = useUpdate();
 
   const [searchText, setSearchText] = useState("");
   const [debouncedSearchText, setDebouncedSearchText] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [isActive, setIsActive] = useState<boolean | null>(null);
+  const [expiryStatus, setExpiryStatus] = useState<string | null>(null);
 
   const hasFilterChangedRef = useRef(false);
 
@@ -89,6 +99,20 @@ export const ProductList: React.FC = () => {
       filters.push({ field: "is_active", operator: "eq", value: isActive });
     }
 
+    if (expiryStatus) {
+      const todayStr = dayjs().format("YYYY-MM-DD");
+      const thirtyDaysStr = dayjs().add(30, "day").format("YYYY-MM-DD");
+
+      if (expiryStatus === "expired") {
+        filters.push({ field: "expiry_date", operator: "lte", value: todayStr });
+      } else if (expiryStatus === "nearExpiry") {
+        filters.push({ field: "expiry_date", operator: "gt", value: todayStr });
+        filters.push({ field: "expiry_date", operator: "lte", value: thirtyDaysStr });
+      } else if (expiryStatus === "safe") {
+        filters.push({ field: "expiry_date", operator: "gt", value: thirtyDaysStr });
+      }
+    }
+
     if (typeof setCurrentPage === "function") {
       setCurrentPage(1);
     }
@@ -96,7 +120,7 @@ export const ProductList: React.FC = () => {
     if (typeof setFilters === "function") {
       setFilters(filters, "replace");
     }
-  }, [debouncedSearchText, categoryId, isActive, setCurrentPage, setFilters]);
+  }, [debouncedSearchText, categoryId, isActive, expiryStatus, setCurrentPage, setFilters]);
 
   const handleSearchTextChange = (value: string) => {
     hasFilterChangedRef.current = true;
@@ -113,11 +137,24 @@ export const ProductList: React.FC = () => {
     setIsActive(value);
   };
 
+  const handleExpiryStatusChange = (value: string | null) => {
+    hasFilterChangedRef.current = true;
+    setExpiryStatus(value);
+  };
+
+  const handleDeactivate = (id: string) => {
+    updateProduct({
+      resource: "products",
+      id,
+      values: { is_active: false },
+    });
+  };
+
   return (
     <List>
       <Space direction="vertical" size="middle" style={{ width: "100%" }}>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={6}>
+        <Row gutter={[12, 12]}>
+          <Col xs={24} sm={12} md={5}>
             <Input
               allowClear
               placeholder={translate("products.search.namePlaceholder", "Cari nama produk...")}
@@ -125,7 +162,7 @@ export const ProductList: React.FC = () => {
               onChange={(e) => handleSearchTextChange(e.target.value)}
             />
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={5}>
             <Select
               options={categorySelectProps.options}
               loading={categorySelectProps.loading}
@@ -139,7 +176,7 @@ export const ProductList: React.FC = () => {
               onChange={handleCategoryChange}
             />
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={4}>
             <Select
               placeholder={translate("products.search.statusPlaceholder", "Status Aktif")}
               allowClear
@@ -152,7 +189,22 @@ export const ProductList: React.FC = () => {
               ]}
             />
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={5}>
+            <Select
+              placeholder={translate("products.search.expiryPlaceholder", "Status Kedaluwarsa")}
+              allowClear
+              style={{ width: "100%" }}
+              value={expiryStatus}
+              onChange={handleExpiryStatusChange}
+              options={[
+                { label: translate("products.expiryStatus.all", "Semua"), value: null },
+                { label: translate("products.expiryStatus.expired", "Kedaluwarsa"), value: "expired" },
+                { label: translate("products.expiryStatus.nearExpiry", "Mendekati ED (<30 Hari)"), value: "nearExpiry" },
+                { label: translate("products.expiryStatus.safe", "Aman"), value: "safe" },
+              ]}
+            />
+          </Col>
+          <Col xs={24} sm={12} md={5}>
             <Select
               placeholder={translate("products.search.sortPlaceholder", "Urutkan...")}
               allowClear
@@ -184,40 +236,89 @@ export const ProductList: React.FC = () => {
           <Table.Column dataIndex="sku" title={translate("products.fields.sku")} />
           <Table.Column dataIndex="slug" title={translate("products.fields.slug")} />
           <Table.Column
+            dataIndex="batch_number"
+            title={translate("products.fields.batchNumber", "Nomor Batch")}
+            render={(v) => (v ? <Typography.Text code>{v}</Typography.Text> : "-")}
+          />
+          <Table.Column
+            dataIndex="expiry_date"
+            title={translate("products.fields.expiryDate", "Tanggal ED")}
+            render={(v) => {
+              if (!v) return "-";
+              const today = dayjs();
+              const expDate = dayjs(v);
+              const isExpired = expDate.isSameOrBefore(today, "day");
+              const isNearExpiry = !isExpired && expDate.diff(today, "day") <= 30;
+
+              return (
+                <Space direction="vertical" size={2}>
+                  {isExpired ? (
+                    <Tag color="error">{translate("products.expiryStatus.expired", "Kedaluwarsa")}</Tag>
+                  ) : isNearExpiry ? (
+                    <Tag color="warning">{translate("products.expiryStatus.nearExpiry", "Hampir ED")}</Tag>
+                  ) : (
+                    <Tag color="success">{translate("products.expiryStatus.safe", "Aman")}</Tag>
+                  )}
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>{v}</Typography.Text>
+                </Space>
+              );
+            }}
+          />
+          <Table.Column
             dataIndex={["categories", "name"]}
             title={translate("products.fields.category")}
             render={(_, record: ProductRecord) => record.categories?.name ?? "-"}
           />
           <Table.Column dataIndex="price" title={translate("products.fields.price")} render={(v) => `Rp ${Number(v || 0).toLocaleString("id-ID")}`} />
           <Table.Column dataIndex="stock" title={translate("products.fields.stock")} />
-          <Table.Column dataIndex="weight" title={translate("products.fields.weight")} render={(v) => v != null ? `${v} g` : "-"} />
+          <Table.Column dataIndex="weight" title={translate("products.fields.weight")} render={(v) => (v != null ? `${v} g` : "-")} />
           <Table.Column dataIndex="is_active" title={translate("products.fields.active")} render={(v) => (v ? translate("products.active.yes") : translate("products.active.no"))} />
           <Table.Column
             title={translate("table.actions")}
             dataIndex="actions"
             key="actions"
             align="center"
-            width={100}
+            width={140}
             fixed="right"
-            render={(_, record: ProductRecord) => (
-              <Space size="small">
-                <Tooltip title={translate("actions.show")}>
-                  <span>
-                    <ShowButton hideText size="small" recordItemId={record.id} />
-                  </span>
-                </Tooltip>
-                <Tooltip title={translate("actions.edit")}>
-                  <span>
-                    <EditButton hideText size="small" recordItemId={record.id} />
-                  </span>
-                </Tooltip>
-                <Tooltip title={translate("actions.delete")}>
-                  <span>
-                    <DeleteButton hideText size="small" recordItemId={record.id} />
-                  </span>
-                </Tooltip>
-              </Space>
-            )}
+            render={(_, record: ProductRecord) => {
+              const isExpiredOrNear = record.expiry_date
+                ? dayjs(record.expiry_date).diff(dayjs(), "day") <= 30
+                : false;
+
+              return (
+                <Space size="small">
+                  <Tooltip title={translate("actions.show")}>
+                    <span>
+                      <ShowButton hideText size="small" recordItemId={record.id} />
+                    </span>
+                  </Tooltip>
+                  <Tooltip title={translate("actions.edit")}>
+                    <span>
+                      <EditButton hideText size="small" recordItemId={record.id} />
+                    </span>
+                  </Tooltip>
+                  <Tooltip title={translate("actions.delete")}>
+                    <span>
+                      <DeleteButton hideText size="small" recordItemId={record.id} />
+                    </span>
+                  </Tooltip>
+                  {record.is_active && isExpiredOrNear && (
+                    <Popconfirm
+                      title={translate("products.expiryActions.deactivateConfirm", "Nonaktifkan produk ini?")}
+                      onConfirm={() => handleDeactivate(record.id)}
+                      okText={translate("products.expiryActions.deactivate", "Nonaktifkan")}
+                      cancelText="Batal"
+                    >
+                      <Tooltip title={translate("products.expiryActions.deactivate", "Nonaktifkan")}>
+                        <Button danger size="small" type="text" style={{ fontSize: 12 }}>
+                          OFF
+                        </Button>
+                      </Tooltip>
+                    </Popconfirm>
+                  )}
+                </Space>
+              );
+            }}
           />
         </Table>
       </Space>
