@@ -148,9 +148,9 @@
       "revenueTrendAriaLabel": "Grafik garis tren omzet",
       "revenueTrendDescription": "Omzet dari pesanan dibayar yang settlement sesuai periode yang dipilih."
     },
-    "nearExpiryAlerts": "Peringatan ED",
-    "noNearExpiry": "Stok produk dalam kondisi aman",
-    "viewNearExpiry": "Periksa Stok"
+    "nearExpiryAlerts": "Hampir Kedaluwarsa",
+    "noNearExpiry": "Semua produk aman dari kedaluwarsa",
+    "viewNearExpiry": "Periksa Produk"
   },
   "salesReports": {
     "salesReports": "Laporan Penjualan",
