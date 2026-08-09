@@ -50,4 +50,5 @@ supabase/.temp/
 
 # Graphify knowledge graph outputs
 graphify-out/
+graphify*
 
