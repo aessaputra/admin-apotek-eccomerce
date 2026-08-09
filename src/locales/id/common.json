@@ -84,6 +84,14 @@
       "loading": {
         "message": "Memeriksa antrean tindak lanjut",
         "description": "Ringkasan dan jumlah stok masih dimuat. Status antrean akan diperbarui sebentar lagi."
+      },
+      "nearExpiry": {
+        "message": "{{count}} produk mendekati kedaluwarsa",
+        "description": "Produk aktif dengan tanggal kedaluwarsa kurang dari 30 hari perlu ditinjau."
+      },
+      "expiredProducts": {
+        "message": "{{count}} produk sudah kedaluwarsa",
+        "description": "Produk kedaluwarsa telah otomatis dinonaktifkan."
       }
     },
     "recentOrders": "Pesanan Terbaru",
@@ -102,7 +110,8 @@
     "currentStock": "Stok",
     "tables": {
       "recentOrdersAriaLabel": "Tabel pesanan terbaru",
-      "lowStockAriaLabel": "Tabel produk stok menipis"
+      "lowStockAriaLabel": "Tabel produk stok menipis",
+      "nearExpiryAriaLabel": "Tabel produk mendekati kedaluwarsa"
     },
     "monthlyTrends": {
       "title": "Tren Pesanan",
@@ -139,7 +148,10 @@
       "revenueTrendTitle": "Tren Omzet",
       "revenueTrendAriaLabel": "Grafik garis tren omzet",
       "revenueTrendDescription": "Omzet dari pesanan dibayar yang settlement sesuai periode yang dipilih."
-    }
+    },
+    "nearExpiryAlerts": "Mendekati Kedaluwarsa",
+    "noNearExpiry": "Semua produk aman dari kedaluwarsa",
+    "viewNearExpiry": "Lihat obat mendekati ED"
   },
   "salesReports": {
     "salesReports": "Laporan Penjualan",
@@ -188,7 +200,8 @@
       "namePlaceholder": "Cari nama produk...",
       "categoryPlaceholder": "Semua Kategori",
       "statusPlaceholder": "Status Aktif",
-      "sortPlaceholder": "Urutkan..."
+      "sortPlaceholder": "Urutkan...",
+      "expiryPlaceholder": "Status Kedaluwarsa"
     },
     "sort": {
       "newest": "Terbaru",
@@ -206,7 +219,9 @@
       "description": "Deskripsi",
       "images": "Gambar",
       "created": "Dibuat",
-      "weight": "Berat (gram)"
+      "weight": "Berat (gram)",
+      "expiryDate": "Tanggal Kedaluwarsa",
+      "batchNumber": "Nomor Batch"
     },
     "active": {
       "yes": "Ya",
@@ -242,6 +257,20 @@
         "addDescription": "Tambah deskripsi",
         "edit": "Edit"
       }
+    },
+    "placeholder": {
+      "expiryDate": "Pilih tanggal ED",
+      "batchNumber": "Opsional (misal: BCH-2026-0801)"
+    },
+    "expiryStatus": {
+      "all": "Semua",
+      "expired": "Kedaluwarsa",
+      "nearExpiry": "Mendekati ED (<30 Hari)",
+      "safe": "Aman"
+    },
+    "expiryActions": {
+      "deactivate": "Nonaktifkan",
+      "deactivateConfirm": "Nonaktifkan produk ini?"
     }
   },
   "categories": {

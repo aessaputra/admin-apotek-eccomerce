@@ -84,6 +84,14 @@
       "loading": {
         "message": "Checking the follow-up queue",
         "description": "Summary and stock counts are still loading. Queue status will update shortly."
+      },
+      "nearExpiry": {
+        "message": "{{count}} products nearing expiry",
+        "description": "Active products with expiry dates within 30 days need review."
+      },
+      "expiredProducts": {
+        "message": "{{count}} products have expired",
+        "description": "Expired products have been automatically deactivated."
       }
     },
     "recentOrders": "Recent Orders",
@@ -102,7 +110,8 @@
     "currentStock": "Stock",
     "tables": {
       "recentOrdersAriaLabel": "Recent orders table",
-      "lowStockAriaLabel": "Low stock products table"
+      "lowStockAriaLabel": "Low stock products table",
+      "nearExpiryAriaLabel": "Near expiry products table"
     },
     "monthlyTrends": {
       "title": "Order Trends",
@@ -139,7 +148,10 @@
       "revenueTrendTitle": "Revenue Trend",
       "revenueTrendAriaLabel": "Revenue trend line chart",
       "revenueTrendDescription": "Sales from settled paid orders across the selected period."
-    }
+    },
+    "nearExpiryAlerts": "Near Expiry",
+    "noNearExpiry": "All products are safe from expiry",
+    "viewNearExpiry": "View near-expiry products"
   },
   "salesReports": {
     "salesReports": "Sales Reports",
@@ -188,7 +200,8 @@
       "namePlaceholder": "Search product name...",
       "categoryPlaceholder": "All Categories",
       "statusPlaceholder": "Active Status",
-      "sortPlaceholder": "Sort by..."
+      "sortPlaceholder": "Sort by...",
+      "expiryPlaceholder": "Expiry Status"
     },
     "sort": {
       "newest": "Newest",
@@ -206,7 +219,9 @@
       "description": "Description",
       "images": "Images",
       "created": "Created",
-      "weight": "Weight (gram)"
+      "weight": "Weight (gram)",
+      "expiryDate": "Expiry Date",
+      "batchNumber": "Batch Number"
     },
     "active": {
       "yes": "Yes",
@@ -242,6 +257,20 @@
         "addDescription": "Add description",
         "edit": "Edit"
       }
+    },
+    "placeholder": {
+      "expiryDate": "Select expiry date",
+      "batchNumber": "Optional (e.g. BCH-2026-0801)"
+    },
+    "expiryStatus": {
+      "all": "All",
+      "expired": "Expired",
+      "nearExpiry": "Near Expiry (<30 Days)",
+      "safe": "Safe"
+    },
+    "expiryActions": {
+      "deactivate": "Deactivate",
+      "deactivateConfirm": "Deactivate this product?"
     }
   },
   "categories": {
