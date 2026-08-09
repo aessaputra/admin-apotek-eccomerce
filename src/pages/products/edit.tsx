@@ -1,7 +1,8 @@
 import { useEffect } from "react";
+import dayjs from "dayjs";
 import { Edit, useForm, useSelect } from "@refinedev/antd";
 import { useTranslation } from "@refinedev/core";
-import { Form, Input, InputNumber, Select, message } from "antd";
+import { Form, Input, InputNumber, Select, DatePicker, message } from "antd";
 import { ProductImageUpload } from "../../components/product-image-upload";
 import { DescriptionEditorModal } from "../../components/description-editor-modal";
 import { ProductWeightInput } from "../../components/product-weight-input";
@@ -212,6 +213,33 @@ export const ProductEdit: React.FC = () => {
           extra={translate("products.validation.weightRequired", {}, "Required for shipping rates and Biteship order creation.")}
         >
           <ProductWeightInput />
+        </Form.Item>
+        <Form.Item
+          label={translate("products.fields.expiryDate", "Tanggal Kedaluwarsa")}
+          name="expiry_date"
+          getValueProps={(value) => ({
+            value: value ? dayjs(value) : undefined,
+          })}
+          getValueFromEvent={(date: unknown) =>
+            date && typeof (date as { format?: unknown }).format === "function"
+              ? (date as { format: (f: string) => string }).format("YYYY-MM-DD")
+              : null
+          }
+        >
+          <DatePicker
+            style={{ width: "100%" }}
+            format="YYYY-MM-DD"
+            placeholder={translate("products.placeholder.expiryDate", "Pilih tanggal ED")}
+          />
+        </Form.Item>
+        <Form.Item
+          label={translate("products.fields.batchNumber", "Nomor Batch")}
+          name="batch_number"
+        >
+          <Input
+            placeholder={translate("products.placeholder.batchNumber", "Opsional (misal: BCH-2026-0801)")}
+            allowClear
+          />
         </Form.Item>
         <Form.Item label={translate("products.fields.category")} name="category_id">
           <Select {...selectProps} />
