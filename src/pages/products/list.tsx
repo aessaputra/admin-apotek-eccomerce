@@ -241,7 +241,6 @@ export const ProductList: React.FC = () => {
                 { label: translate("products.expiryStatus.all", "Semua"), value: null },
                 { label: translate("products.expiryStatus.expired", "Kedaluwarsa"), value: "expired" },
                 { label: translate("products.expiryStatus.nearExpiry", "Mendekati ED"), value: "nearExpiry" },
-                { label: translate("products.expiryStatus.safe", "Aman"), value: "safe" },
               ]}
             />
           </Col>
