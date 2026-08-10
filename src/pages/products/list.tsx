@@ -8,11 +8,12 @@ import {
 } from "@refinedev/antd";
 import { useTranslation, CrudFilter, CrudFilters, useUpdate } from "@refinedev/core";
 import { useEffect, useRef, useState } from "react";
-import { Table, Image, Space, Tooltip, Input, Select, Row, Col, Tag, Typography, Popconfirm, Button } from "antd";
+import { Table, Image, Space, Tooltip, Input, Select, Row, Col, Tag, Typography, Popconfirm, Button, Grid } from "antd";
 import dayjs from "dayjs";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 import { buildProductSearchFilter } from "../../utils/productSearch";
+import { ProductCard } from "./components/ProductCard";
 
 dayjs.extend(isSameOrBefore);
 
@@ -179,6 +180,9 @@ export const ProductList: React.FC = () => {
     });
   };
 
+  const screens = Grid.useBreakpoint();
+  const isMobile = screens.md === false;
+
   return (
     <List>
       <Space direction="vertical" size="middle" style={{ width: "100%" }}>
@@ -247,91 +251,99 @@ export const ProductList: React.FC = () => {
             />
           </Col>
         </Row>
-        <Table {...tableProps} rowKey="id">
-          <Table.Column
-            dataIndex={["product_images", 0, "url"]}
-            title={translate("products.fields.image")}
-            width={80}
-            render={(_, record: ProductRecord) => {
-              const previewUrl = resolveStoragePublicUrl(record.product_images?.[0]?.url ?? null, MEDIA_BUCKET);
-              return previewUrl ? (
-                <Image src={previewUrl} alt="" width={40} height={40} style={{ objectFit: "cover" }} />
-              ) : (
-                "-"
-              );
-            }}
-          />
-          <Table.Column dataIndex="name" title={translate("products.fields.name")} />
-          <Table.Column dataIndex="sku" title={translate("products.fields.sku")} />
-          <Table.Column dataIndex="slug" title={translate("products.fields.slug")} />
-          <Table.Column
-            dataIndex="batch_number"
-            title={translate("products.fields.batchNumber", "Nomor Batch")}
-            render={(v) => (v ? <Typography.Text code>{v}</Typography.Text> : "-")}
-          />
-          <Table.Column
-            dataIndex="expiry_date"
-            title={translate("products.fields.expiryDate", "Tanggal ED")}
-            render={(v) => renderExpiryStatusCell(v, translate)}
-          />
-          <Table.Column
-            dataIndex={["categories", "name"]}
-            title={translate("products.fields.category")}
-            render={(_, record: ProductRecord) => record.categories?.name ?? "-"}
-          />
-          <Table.Column dataIndex="price" title={translate("products.fields.price")} render={(v) => `Rp ${Number(v || 0).toLocaleString("id-ID")}`} />
-          <Table.Column dataIndex="stock" title={translate("products.fields.stock")} />
-          <Table.Column dataIndex="weight" title={translate("products.fields.weight")} render={(v) => (v != null ? `${v} g` : "-")} />
-          <Table.Column dataIndex="is_active" title={translate("products.fields.active")} render={(v) => (v ? translate("products.active.yes") : translate("products.active.no"))} />
-          <Table.Column
-            title={translate("table.actions")}
-            dataIndex="actions"
-            key="actions"
-            align="center"
-            width={140}
-            fixed="right"
-            render={(_, record: ProductRecord) => {
-              const isEligibleForDeactivation =
-                record.is_active &&
-                record.expiry_date &&
-                dayjs(record.expiry_date).diff(dayjs(), "day") <= 30;
+        {isMobile ? (
+          <Space direction="vertical" style={{ width: "100%" }}>
+            {(tableProps.dataSource as ProductRecord[] | undefined)?.map((record) => (
+              <ProductCard key={record.id} record={record} onDeactivate={handleDeactivateProduct} />
+            ))}
+          </Space>
+        ) : (
+          <Table {...tableProps} rowKey="id" scroll={{ x: "max-content" }}>
+            <Table.Column
+              dataIndex={["product_images", 0, "url"]}
+              title={translate("products.fields.image")}
+              width={80}
+              render={(_, record: ProductRecord) => {
+                const previewUrl = resolveStoragePublicUrl(record.product_images?.[0]?.url ?? null, MEDIA_BUCKET);
+                return previewUrl ? (
+                  <Image src={previewUrl} alt="" width={40} height={40} style={{ objectFit: "cover" }} />
+                ) : (
+                  "-"
+                );
+              }}
+            />
+            <Table.Column dataIndex="name" title={translate("products.fields.name")} />
+            <Table.Column dataIndex="sku" title={translate("products.fields.sku")} />
+            <Table.Column dataIndex="slug" title={translate("products.fields.slug")} />
+            <Table.Column
+              dataIndex="batch_number"
+              title={translate("products.fields.batchNumber", "Nomor Batch")}
+              render={(v) => (v ? <Typography.Text code>{v}</Typography.Text> : "-")}
+            />
+            <Table.Column
+              dataIndex="expiry_date"
+              title={translate("products.fields.expiryDate", "Tanggal ED")}
+              render={(v) => renderExpiryStatusCell(v, translate)}
+            />
+            <Table.Column
+              dataIndex={["categories", "name"]}
+              title={translate("products.fields.category")}
+              render={(_, record: ProductRecord) => record.categories?.name ?? "-"}
+            />
+            <Table.Column dataIndex="price" title={translate("products.fields.price")} render={(v) => `Rp ${Number(v || 0).toLocaleString("id-ID")}`} />
+            <Table.Column dataIndex="stock" title={translate("products.fields.stock")} />
+            <Table.Column dataIndex="weight" title={translate("products.fields.weight")} render={(v) => (v != null ? `${v} g` : "-")} />
+            <Table.Column dataIndex="is_active" title={translate("products.fields.active")} render={(v) => (v ? translate("products.active.yes") : translate("products.active.no"))} />
+            <Table.Column
+              title={translate("table.actions")}
+              dataIndex="actions"
+              key="actions"
+              align="center"
+              width={140}
+              fixed="right"
+              render={(_, record: ProductRecord) => {
+                const isEligibleForDeactivation =
+                  record.is_active &&
+                  record.expiry_date &&
+                  dayjs(record.expiry_date).diff(dayjs(), "day") <= 30;
 
-              return (
-                <Space size="small">
-                  <Tooltip title={translate("actions.show")}>
-                    <span>
-                      <ShowButton hideText size="small" recordItemId={record.id} />
-                    </span>
-                  </Tooltip>
-                  <Tooltip title={translate("actions.edit")}>
-                    <span>
-                      <EditButton hideText size="small" recordItemId={record.id} />
-                    </span>
-                  </Tooltip>
-                  <Tooltip title={translate("actions.delete")}>
-                    <span>
-                      <DeleteButton hideText size="small" recordItemId={record.id} />
-                    </span>
-                  </Tooltip>
-                  {isEligibleForDeactivation && (
-                    <Popconfirm
-                      title={translate("products.expiryActions.deactivateConfirm", "Nonaktifkan produk ini?")}
-                      onConfirm={() => handleDeactivateProduct(record.id)}
-                      okText={translate("products.expiryActions.deactivate", "Nonaktifkan")}
-                      cancelText="Batal"
-                    >
-                      <Tooltip title={translate("products.expiryActions.deactivate", "Nonaktifkan")}>
-                        <Button danger size="small" type="text" style={{ fontSize: 12 }}>
-                          OFF
-                        </Button>
-                      </Tooltip>
-                    </Popconfirm>
-                  )}
-                </Space>
-              );
-            }}
-          />
-        </Table>
+                return (
+                  <Space size="small">
+                    <Tooltip title={translate("actions.show")}>
+                      <span>
+                        <ShowButton hideText size="small" recordItemId={record.id} />
+                      </span>
+                    </Tooltip>
+                    <Tooltip title={translate("actions.edit")}>
+                      <span>
+                        <EditButton hideText size="small" recordItemId={record.id} />
+                      </span>
+                    </Tooltip>
+                    <Tooltip title={translate("actions.delete")}>
+                      <span>
+                        <DeleteButton hideText size="small" recordItemId={record.id} />
+                      </span>
+                    </Tooltip>
+                    {isEligibleForDeactivation && (
+                      <Popconfirm
+                        title={translate("products.expiryActions.deactivateConfirm", "Nonaktifkan produk ini?")}
+                        onConfirm={() => handleDeactivateProduct(record.id)}
+                        okText={translate("products.expiryActions.deactivate", "Nonaktifkan")}
+                        cancelText="Batal"
+                      >
+                        <Tooltip title={translate("products.expiryActions.deactivate", "Nonaktifkan")}>
+                          <Button danger size="small" type="text" style={{ fontSize: 12 }}>
+                            OFF
+                          </Button>
+                        </Tooltip>
+                      </Popconfirm>
+                    )}
+                  </Space>
+                );
+              }}
+            />
+          </Table>
+        )}
       </Space>
     </List>
   );
