@@ -46,6 +46,7 @@ vi.mock("@refinedev/core", () => ({
   useShow: mocks.useShow,
   useList: mocks.useList,
   useNavigation: () => ({ list: mocks.list }),
+  useGo: () => vi.fn(),
 }));
 
 vi.mock("../../hooks/useBanToggle", () => ({
