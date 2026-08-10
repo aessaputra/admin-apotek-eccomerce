@@ -1,5 +1,6 @@
-import { useGetLocale, useList, useTranslation, useNavigation } from "@refinedev/core";
+import { useGetLocale, useList, useTranslation, useNavigation, useGo } from "@refinedev/core";
 import { Alert, Button, Card, Col, Grid, Row, Space, Spin, Statistic, Table, Tag, Tooltip, Typography, theme, List } from "antd";
+import dayjs from "dayjs";
 import { useMemo, useState } from "react";
 import {
   CheckCircleOutlined,
@@ -110,6 +111,7 @@ export const Dashboard: React.FC = () => {
   const { translate } = useTranslation();
   const getLocale = useGetLocale();
   const { list: navigateList, show: navigateShow } = useNavigation();
+  const go = useGo();
   const { token } = theme.useToken();
   const screens = Grid.useBreakpoint();
   const isMobile = Boolean(screens.xs && !screens.md);
@@ -174,19 +176,34 @@ export const Dashboard: React.FC = () => {
     queryOptions: { staleTime: DASHBOARD_QUERY_STALE_TIME_MS },
   });
 
-  // Near Expiry products (expiry <= today + 30 days, active only)
-  const thirtyDaysFromNow = useMemo(() => {
-    const date = new Date();
-    date.setDate(date.getDate() + 30);
-    return date.toISOString();
+  const { todayStr, thirtyDaysStr } = useMemo(() => {
+    const today = dayjs().format("YYYY-MM-DD");
+    const thirtyDays = dayjs().add(30, "day").format("YYYY-MM-DD");
+    return { todayStr: today, thirtyDaysStr: thirtyDays };
   }, []);
+
+  const handleNavigateNearExpiry = () => {
+    go({
+      to: { resource: "products", action: "list" },
+      query: {
+        pageSize: 10,
+        currentPage: 1,
+        sorters: [{ field: "created_at", order: "desc" }],
+        filters: [
+          { field: "expiry_date", operator: "gt", value: todayStr },
+          { field: "expiry_date", operator: "lte", value: thirtyDaysStr },
+        ],
+      },
+    });
+  };
 
   const { result: nearExpiryResult, query: nearExpiryQuery } = useList({
     resource: "products",
     pagination: { currentPage: 1, pageSize: 1 },
     filters: [
       { field: "expiry_date", operator: "nnull", value: null },
-      { field: "expiry_date", operator: "lte", value: thirtyDaysFromNow },
+      { field: "expiry_date", operator: "gt", value: todayStr },
+      { field: "expiry_date", operator: "lte", value: thirtyDaysStr },
       { field: "is_active", operator: "eq", value: true },
     ],
     meta: { count: "exact" },
@@ -458,8 +475,8 @@ export const Dashboard: React.FC = () => {
         <Col xs={24} md={12} xl={6}>
           <Card
             hoverable
-            style={{ height: "100%" }}
-            styles={{ body: cardBodyStyle }}
+            style={{ height: "100%", display: "flex", flexDirection: "column" }}
+            styles={{ body: { ...cardBodyStyle, flex: 1, display: "flex", flexDirection: "column" } }}
             title={
               <>
                 <ClockCircleOutlined aria-hidden="true" style={{ color: token.colorWarning, marginRight: token.marginXS }} />
@@ -468,11 +485,11 @@ export const Dashboard: React.FC = () => {
             }
             extra={
               <Tooltip title={translate("dashboard.viewNearExpiry")}>
-                <Button type="text" shape="circle" icon={<ArrowRightOutlined />} onClick={() => navigateList("products")} aria-label={translate("dashboard.tables.nearExpiryAriaLabel")} />
+                <Button type="text" shape="circle" icon={<ArrowRightOutlined />} onClick={handleNavigateNearExpiry} aria-label={translate("dashboard.tables.nearExpiryAriaLabel")} />
               </Tooltip>
             }
           >
-            <Space direction="vertical" style={{ width: "100%" }}>
+            <div style={{ display: "flex", flexDirection: "column", flex: 1, width: "100%" }}>
               {nearExpiryQuery?.isLoading ? (
                 <Space align="center" style={{ width: "100%", padding: token.padding, justifyContent: "center" }}>
                   <Spin size="small" />
@@ -480,16 +497,17 @@ export const Dashboard: React.FC = () => {
               ) : nearExpiryQuery?.isError ? (
                 <Alert type="error" showIcon message={translate("dashboard.alerts.metricsError.message")} />
               ) : nearExpiryCount > 0 ? (
-                <Space direction="vertical" style={{ width: "100%" }} size="middle">
+                <div style={{ display: "flex", flexDirection: "column", flex: 1, justifyContent: "space-between" }}>
                   <Alert
                     type="warning"
                     showIcon
                     message={translate("dashboard.alerts.nearExpiry.message", { count: nearExpiryCount })}
+                    description={translate("dashboard.alerts.nearExpiry.description")}
                   />
-                  <Button type="default" block onClick={() => navigateList("products")}>
+                  <Button type="default" block onClick={handleNavigateNearExpiry} style={{ marginTop: "auto" }}>
                     {translate("dashboard.viewNearExpiry")}
                   </Button>
-                </Space>
+                </div>
               ) : (
                 <Alert
                   type="success"
@@ -497,7 +515,7 @@ export const Dashboard: React.FC = () => {
                   message={translate("dashboard.noNearExpiry")}
                 />
               )}
-            </Space>
+            </div>
           </Card>
         </Col>
       </Row>

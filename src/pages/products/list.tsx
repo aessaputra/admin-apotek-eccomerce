@@ -103,13 +103,34 @@ export const ProductList: React.FC = () => {
 
   const hasFilterChangedRef = useRef(false);
 
-  const { tableProps, setCurrentPage, setFilters, sorters, setSorters } = useTable({
+  const { tableProps, setCurrentPage, setFilters, sorters, setSorters, filters } = useTable({
     syncWithLocation: true,
     meta: { select: "*, product_images(*), categories(name)" },
     sorters: {
       initial: [{ field: "created_at", order: "desc" }],
     },
   });
+
+  useEffect(() => {
+    if (hasFilterChangedRef.current || !filters) return;
+
+    const hasNearExpiryFilter =
+      filters.some((f) => "field" in f && f.field === "expiry_date" && f.operator === "gt") &&
+      filters.some((f) => "field" in f && f.field === "expiry_date" && f.operator === "lte");
+
+    if (hasNearExpiryFilter && expiryStatus !== "nearExpiry") {
+      setExpiryStatus("nearExpiry");
+      return;
+    }
+
+    const hasExpiredFilter =
+      filters.some((f) => "field" in f && f.field === "expiry_date" && f.operator === "lte") &&
+      !filters.some((f) => "field" in f && f.field === "expiry_date" && f.operator === "gt");
+
+    if (hasExpiredFilter && expiryStatus !== "expired") {
+      setExpiryStatus("expired");
+    }
+  }, [filters, expiryStatus]);
 
   const currentSortOrder = sorters?.find((s) => s.field === "created_at")?.order ?? null;
 

@@ -253,6 +253,7 @@ vi.mock("antd", async () => {
       );
     },
     Tooltip: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Popconfirm: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Tag: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
     Alert: ({ message, description }: { message: React.ReactNode; description?: React.ReactNode }) => <div><div>{message}</div><div>{description}</div></div>,
     Button: ({ children, onClick, loading }: { children: React.ReactNode; onClick?: () => void; loading?: boolean }) => (
@@ -788,5 +789,33 @@ describe("list pages", () => {
 
     expect(screen.getByText("orders.empty.listErrorTitle")).not.toBeNull();
     expect(screen.getByText("orders.empty.listErrorDescription")).not.toBeNull();
+  });
+
+  it("initializes ProductList expiryStatus filter dropdown state when mounted with near-expiry URL filters", () => {
+    mocks.useTable.mockReturnValue({
+      tableProps: {
+        dataSource: [
+          {
+            id: "prod-1",
+            name: "Product ED Test",
+            sku: "SKU-ED",
+            expiry_date: "2026-08-25",
+            is_active: true,
+          },
+        ],
+      },
+      filters: [
+        { field: "expiry_date", operator: "gt", value: "2026-08-10" },
+        { field: "expiry_date", operator: "lte", value: "2026-09-09" },
+      ],
+      sorters: [],
+      setFilters: vi.fn(),
+      setSorters: vi.fn(),
+    });
+
+    render(<ProductList />);
+
+    expect(screen.getByRole("combobox", { name: "Status Kedaluwarsa" })).not.toBeNull();
+    expect(screen.getByText("Product ED Test")).not.toBeNull();
   });
 });
