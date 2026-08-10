@@ -1,9 +1,12 @@
 import React from "react";
 import dayjs from "dayjs";
+import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import { useShow, useTranslation } from "@refinedev/core";
 import { Show, NumberField } from "@refinedev/antd";
 import { Typography, Image, Tag, Space, Row, Col, Card } from "antd";
 import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
+
+dayjs.extend(isSameOrBefore);
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -44,6 +47,11 @@ export const ProductShow: React.FC = () => {
   const images = (record?.product_images ?? [])
     .slice()
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
+  const today = dayjs();
+  const expDate = record?.expiry_date ? dayjs(record.expiry_date) : null;
+  const isExpired = expDate ? expDate.isSameOrBefore(today, "day") : false;
+  const isNearExpiry = !isExpired && expDate ? expDate.diff(today, "day") <= 30 : false;
 
   return (
     <Show isLoading={isLoading}>
@@ -104,11 +112,31 @@ export const ProductShow: React.FC = () => {
             <Text>{record?.categories?.name ?? "-"}</Text>
 
             <Title level={5}>{translate("products.fields.expiryDate", "Tanggal Kedaluwarsa")}</Title>
-            <Text>
-              {record?.expiry_date && dayjs(record.expiry_date).isValid()
-                ? dayjs(record.expiry_date).format("DD MMM YYYY")
-                : record?.expiry_date || "-"}
-            </Text>
+            {expDate?.isValid() ? (
+              <Space wrap>
+                {isExpired && (
+                  <Tag color="error" bordered={false} style={{ fontWeight: 500 }}>
+                    {translate("products.expiryStatus.expired", "Kedaluwarsa")}
+                  </Tag>
+                )}
+                {isNearExpiry && (
+                  <Tag color="warning" bordered={false} style={{ fontWeight: 500 }}>
+                    {translate("products.expiryStatus.nearExpiry", "Mendekati ED")}
+                  </Tag>
+                )}
+                <Text
+                  type={isExpired ? "danger" : undefined}
+                  style={{
+                    fontWeight: isExpired || isNearExpiry ? 500 : "normal",
+                    color: isNearExpiry ? "#d48806" : undefined,
+                  }}
+                >
+                  {expDate.format("DD MMM YYYY")}
+                </Text>
+              </Space>
+            ) : (
+              <Text type="secondary">-</Text>
+            )}
 
             <Title level={5}>{translate("products.fields.batchNumber", "Nomor Batch")}</Title>
             <Text>{record?.batch_number ? <Text code>{record.batch_number}</Text> : "-"}</Text>
