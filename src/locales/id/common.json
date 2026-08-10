@@ -264,7 +264,7 @@
     "expiryStatus": {
       "all": "Semua",
       "expired": "Kedaluwarsa",
-      "nearExpiry": "Mendekati ED (<30 Hari)",
+      "nearExpiry": "Mendekati ED",
       "safe": "Aman"
     },
     "expiryActions": {

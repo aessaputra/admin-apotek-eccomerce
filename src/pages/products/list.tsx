@@ -73,11 +73,15 @@ function renderExpiryStatusCell(dateStr: string | undefined, translate: Translat
     ? "products.expiryStatus.nearExpiry"
     : "products.expiryStatus.safe";
 
+  const formattedDate = expDate.isValid() ? expDate.format("DD MMM YYYY") : dateStr;
+
   return (
     <Space direction="vertical" size={2}>
-      <Tag color={tagColor}>{translate(tagLabelKey)}</Tag>
+      <Tag color={tagColor} bordered={false} style={{ fontWeight: 500 }}>
+        {translate(tagLabelKey)}
+      </Tag>
       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-        {dateStr}
+        {formattedDate}
       </Typography.Text>
     </Space>
   );
@@ -232,7 +236,7 @@ export const ProductList: React.FC = () => {
               options={[
                 { label: translate("products.expiryStatus.all", "Semua"), value: null },
                 { label: translate("products.expiryStatus.expired", "Kedaluwarsa"), value: "expired" },
-                { label: translate("products.expiryStatus.nearExpiry", "Mendekati ED (<30 Hari)"), value: "nearExpiry" },
+                { label: translate("products.expiryStatus.nearExpiry", "Mendekati ED"), value: "nearExpiry" },
                 { label: translate("products.expiryStatus.safe", "Aman"), value: "safe" },
               ]}
             />

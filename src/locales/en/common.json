@@ -264,7 +264,7 @@
     "expiryStatus": {
       "all": "All",
       "expired": "Expired",
-      "nearExpiry": "Near Expiry (<30 Days)",
+      "nearExpiry": "Near Expiry",
       "safe": "Safe"
     },
     "expiryActions": {

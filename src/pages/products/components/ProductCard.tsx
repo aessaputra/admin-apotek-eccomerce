@@ -103,9 +103,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({ record }) => {
                 {record.sku}
               </Typography.Text>
             )}
-            <Tag color={tagColor} style={{ fontSize: 10, margin: 0 }}>
+            <Tag color={tagColor} bordered={false} style={{ fontSize: 10, margin: 0, fontWeight: 500 }}>
               {tagLabel}
             </Tag>
+            {expDate?.isValid() && (
+              <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                • {expDate.format("DD MMM YYYY")}
+              </Typography.Text>
+            )}
           </Space>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
             <Typography.Text type="danger" style={{ fontWeight: 600 }}>

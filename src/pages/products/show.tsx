@@ -1,4 +1,5 @@
 import React from "react";
+import dayjs from "dayjs";
 import { useShow, useTranslation } from "@refinedev/core";
 import { Show, NumberField } from "@refinedev/antd";
 import { Typography, Image, Tag, Space, Row, Col, Card } from "antd";
@@ -102,8 +103,18 @@ export const ProductShow: React.FC = () => {
             <Title level={5}>{translate("products.fields.category")}</Title>
             <Text>{record?.categories?.name ?? "-"}</Text>
 
+            <Title level={5}>{translate("products.fields.expiryDate", "Tanggal Kedaluwarsa")}</Title>
+            <Text>
+              {record?.expiry_date && dayjs(record.expiry_date).isValid()
+                ? dayjs(record.expiry_date).format("DD MMM YYYY")
+                : record?.expiry_date || "-"}
+            </Text>
+
+            <Title level={5}>{translate("products.fields.batchNumber", "Nomor Batch")}</Title>
+            <Text>{record?.batch_number ? <Text code>{record.batch_number}</Text> : "-"}</Text>
+
             <Title level={5}>{translate("products.fields.active")}</Title>
-            <Tag color={record?.is_active ? "green" : "default"}>
+            <Tag color={record?.is_active ? "green" : "default"} bordered={false} style={{ fontWeight: 500 }}>
               {record?.is_active ? translate("products.status.active") : translate("products.status.inactive")}
             </Tag>
 
