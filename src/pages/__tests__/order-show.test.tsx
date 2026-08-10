@@ -246,6 +246,9 @@ vi.mock("antd", async () => {
     Space: ({ children, style, wrap }: { children: React.ReactNode; direction?: "horizontal" | "vertical"; size?: number; style?: React.CSSProperties; wrap?: boolean }) => <div data-wrap={String(Boolean(wrap))} style={style}>{children}</div>,
     Row: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Col: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Grid: {
+      useBreakpoint: () => ({ xs: false, sm: true, md: true, lg: true, xl: true, xxl: true }),
+    },
   };
 });
 

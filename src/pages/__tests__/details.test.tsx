@@ -237,6 +237,9 @@ vi.mock("antd", async () => {
         )
       }
     ),
+    Grid: {
+      useBreakpoint: () => ({ xs: false, sm: true, md: true, lg: true, xl: true, xxl: true }),
+    },
     theme: {
       useToken: () => ({
         token: {

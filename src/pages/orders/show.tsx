@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo } from "react";
 import { useShow, useTranslation } from "@refinedev/core";
 import { Show } from "@refinedev/antd";
-import { Typography, Table, Tag, Alert, Space, Tooltip, theme, Row, Col, Collapse } from "antd";
+import { Typography, Table, Tag, Alert, Space, Tooltip, theme, Row, Col, Collapse, Grid } from "antd";
 import type { TableColumnsType } from "antd";
 import { LockOutlined } from "@ant-design/icons";
 import { STATUS_COLORS, PAYMENT_COLORS } from "../../constants/orders";
@@ -17,6 +17,8 @@ const LOCKED_STATUSES = ["delivered", "cancelled"];
 export const OrderShow: React.FC = () => {
   const { translate } = useTranslation();
   const { token } = theme.useToken();
+  const screens = Grid.useBreakpoint();
+  const isDesktop = Boolean(screens?.lg);
   const { result: record, query } = useShow<OrderRecord>();
   const { isLoading } = query;
   const orderLoadError = query.error;
@@ -189,97 +191,122 @@ export const OrderShow: React.FC = () => {
     );
   }
 
+  const productListSection = (
+    <Collapse
+      defaultActiveKey={["productList"]}
+      style={{ background: token.colorBgContainer }}
+      items={[
+        {
+          key: "productList",
+          label: <Title level={5} style={sectionTitleStyle}>{translate("orders.productList")}</Title>,
+          children: (
+            <div aria-label={productTableLabel}>
+              <Table
+                dataSource={items}
+                columns={columns}
+                rowKey="id"
+                pagination={false}
+                size="small"
+                scroll={{ x: "max-content" }}
+                locale={{ emptyText: translate("orders.empty.productItems") }}
+              />
+            </div>
+          ),
+        }
+      ]}
+    />
+  );
+
+  const orderDetailsSection = <OrderDetailsCards record={record} />;
+
+  const activitySection = (
+    <Collapse
+      defaultActiveKey={["activity"]}
+      style={{ background: token.colorBgContainer }}
+      items={[
+        {
+          key: "activity",
+          label: <Title level={5} style={sectionTitleStyle}>{translate("orders.activityTitle")}</Title>,
+          children: <OrderActivities orderId={record?.id} />,
+          styles: { body: compactCardBodyStyle }
+        }
+      ]}
+    />
+  );
+
+  const orderInfoSection = (
+    <Collapse
+      defaultActiveKey={["orderInfo"]}
+      style={{ background: token.colorBgContainer }}
+      items={[
+        {
+          key: "orderInfo",
+          label: <Title level={5} style={sectionTitleStyle}>{translate("orders.orderInfo")}</Title>,
+          children: (
+            <div style={statusSummaryGridStyle}>
+              {statusSummaryDetails.map((detail) => (
+                <div key={detail.label} style={detailRowStyle}>
+                  <Text type="secondary" style={detailLabelStyle}>{detail.label}</Text>
+                  <div style={detailValueStyle}>{detail.value}</div>
+                </div>
+              ))}
+            </div>
+          )
+        }
+      ]}
+    />
+  );
+
+  const actionsSection = (
+    <Collapse
+      defaultActiveKey={["actions"]}
+      style={{ background: token.colorBgContainer }}
+      items={[
+        {
+          key: "actions",
+          label: <Title level={5} style={sectionTitleStyle}>{translate("orders.actionsTitle")}</Title>,
+          children: (
+            <>
+              <Text type="secondary" style={{ display: "block", marginBottom: token.marginMD }}>
+                {translate("orders.actionsDescription")}
+              </Text>
+              <OrderActionForm record={record} refreshOrderState={refreshOrderState} />
+            </>
+          )
+        }
+      ]}
+    />
+  );
+
   return (
     <Show isLoading={isLoading}>
       <div style={pageStackStyle}>
-        <Row gutter={[24, 24]}>
-          <Col xs={24} lg={16}>
-            <div style={pageStackStyle}>
-              <Collapse
-                defaultActiveKey={["productList"]}
-                style={{ background: token.colorBgContainer }}
-                items={[
-                  {
-                    key: "productList",
-                    label: <Title level={5} style={sectionTitleStyle}>{translate("orders.productList")}</Title>,
-                    children: (
-                      <div aria-label={productTableLabel}>
-                        <Table
-                          dataSource={items}
-                          columns={columns}
-                          rowKey="id"
-                          pagination={false}
-                          size="small"
-                          scroll={{ x: "max-content" }}
-                          locale={{ emptyText: translate("orders.empty.productItems") }}
-                        />
-                      </div>
-                    ),
-                  }
-                ]}
-              />
+        {isDesktop ? (
+          <Row gutter={[24, 24]}>
+            <Col xs={24} lg={16}>
+              <div style={pageStackStyle}>
+                {productListSection}
+                {orderDetailsSection}
+                {activitySection}
+              </div>
+            </Col>
 
-              <OrderDetailsCards record={record} />
-
-              <Collapse
-                defaultActiveKey={["activity"]}
-                style={{ background: token.colorBgContainer }}
-                items={[
-                  {
-                    key: "activity",
-                    label: <Title level={5} style={sectionTitleStyle}>{translate("orders.activityTitle")}</Title>,
-                    children: <OrderActivities orderId={record?.id} />,
-                    styles: { body: compactCardBodyStyle }
-                  }
-                ]}
-              />
-            </div>
-          </Col>
-
-          <Col xs={24} lg={8}>
-            <div style={pageStackStyle}>
-              <Collapse
-                defaultActiveKey={["orderInfo"]}
-                style={{ background: token.colorBgContainer }}
-                items={[
-                  {
-                    key: "orderInfo",
-                    label: <Title level={5} style={sectionTitleStyle}>{translate("orders.orderInfo")}</Title>,
-                    children: (
-                      <div style={statusSummaryGridStyle}>
-                        {statusSummaryDetails.map((detail) => (
-                          <div key={detail.label} style={detailRowStyle}>
-                            <Text type="secondary" style={detailLabelStyle}>{detail.label}</Text>
-                            <div style={detailValueStyle}>{detail.value}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )
-                  }
-                ]}
-              />
-
-              <Collapse
-                defaultActiveKey={["actions"]}
-                style={{ background: token.colorBgContainer }}
-                items={[
-                  {
-                    key: "actions",
-                    label: <Title level={5} style={sectionTitleStyle}>{translate("orders.actionsTitle")}</Title>,
-                    children: (
-                      <>
-                        <Text type="secondary" style={{ display: "block", marginBottom: token.marginMD }}>
-                          {translate("orders.actionsDescription")}
-                        </Text>
-                        <OrderActionForm record={record} refreshOrderState={refreshOrderState} />
-                      </>
-                    )
-                  }
-                ]}
-              />
-            </div>
-          </Col>
-        </Row>
+            <Col xs={24} lg={8}>
+              <div style={pageStackStyle}>
+                {orderInfoSection}
+                {actionsSection}
+              </div>
+            </Col>
+          </Row>
+        ) : (
+          <div style={pageStackStyle}>
+            {orderInfoSection}
+            {actionsSection}
+            {orderDetailsSection}
+            {productListSection}
+            {activitySection}
+          </div>
+        )}
       </div>
     </Show>
   );

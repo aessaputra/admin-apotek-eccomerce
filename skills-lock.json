@@ -94,6 +94,12 @@
       "skillPath": "skills/refine-dev/SKILL.md",
       "computedHash": "418b79c7f53718d19c4e0f64c9529f9aa09853a858ed771edf18824a06ac6ebf"
     },
+    "responsive-design": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/ui-design/skills/responsive-design/SKILL.md",
+      "computedHash": "794cc7f1b2f79d398135d19ef3fe32c406dde926b9bdf86ee3fe7b939a0be906"
+    },
     "skill-creator": {
       "source": "anthropics/skills",
       "sourceType": "github",

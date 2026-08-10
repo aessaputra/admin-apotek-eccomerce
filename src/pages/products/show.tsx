@@ -1,6 +1,7 @@
+import React from "react";
 import { useShow, useTranslation } from "@refinedev/core";
 import { Show, NumberField } from "@refinedev/antd";
-import { Typography, Image, Tag, Space } from "antd";
+import { Typography, Image, Tag, Space, Row, Col, Card } from "antd";
 import { MEDIA_BUCKET, resolveStoragePublicUrl } from "../../utils/storage";
 
 const { Title, Text, Paragraph } = Typography;
@@ -20,6 +21,8 @@ interface ProductRecord {
   price: string | number;
   stock?: number | null;
   weight?: number | null;
+  batch_number?: string | null;
+  expiry_date?: string | null;
   is_active?: boolean | null;
   category_id?: string | null;
   created_at?: string;
@@ -43,70 +46,76 @@ export const ProductShow: React.FC = () => {
 
   return (
     <Show isLoading={isLoading}>
-      <Title level={5}>{translate("products.fields.image")}</Title>
-      {images.length > 0 ? (
-        <Space wrap size="middle">
-          {images.map((img) => (
-            (() => {
-              const previewUrl = resolveStoragePublicUrl(img.url, MEDIA_BUCKET);
+      <Row gutter={[24, 24]}>
+        <Col xs={24} md={10}>
+          <Card title={translate("products.fields.image")}>
+            {images.length > 0 ? (
+              <Space wrap size="middle">
+                {images.map((img) => {
+                  const previewUrl = resolveStoragePublicUrl(img.url, MEDIA_BUCKET);
 
-              return previewUrl ? (
-                <Image
-                  key={img.id}
-                  src={previewUrl}
-                  alt=""
-                  width={120}
-                  height={120}
-                  style={{ objectFit: "cover", borderRadius: 8 }}
-                />
-              ) : null;
-            })()
-          ))}
-        </Space>
-      ) : (
-        <Text type="secondary">-</Text>
-      )}
+                  return previewUrl ? (
+                    <Image
+                      key={img.id}
+                      src={previewUrl}
+                      alt=""
+                      width={120}
+                      height={120}
+                      style={{ objectFit: "cover", borderRadius: 8 }}
+                    />
+                  ) : null;
+                })}
+              </Space>
+            ) : (
+              <Text type="secondary">-</Text>
+            )}
+          </Card>
+        </Col>
+        <Col xs={24} md={14}>
+          <Card>
+            <Title level={5}>{translate("products.fields.name")}</Title>
+            <Text>{record?.name ?? "-"}</Text>
 
-      <Title level={5}>{translate("products.fields.name")}</Title>
-      <Text>{record?.name ?? "-"}</Text>
+            <Title level={5}>{translate("products.fields.sku")}</Title>
+            <Text>{record?.sku ?? "-"}</Text>
 
-      <Title level={5}>{translate("products.fields.sku")}</Title>
-      <Text>{record?.sku ?? "-"}</Text>
+            <Title level={5}>{translate("products.fields.slug")}</Title>
+            <Text>{record?.slug ?? "-"}</Text>
 
-      <Title level={5}>{translate("products.fields.slug")}</Title>
-      <Text>{record?.slug ?? "-"}</Text>
+            <Title level={5}>{translate("products.fields.description")}</Title>
+            <Paragraph style={{ whiteSpace: "pre-wrap", marginBottom: 0 }}>
+              {record?.description || "-"}
+            </Paragraph>
 
-      <Title level={5}>{translate("products.fields.description")}</Title>
-      <Paragraph style={{ whiteSpace: "pre-wrap", marginBottom: 0 }}>
-        {record?.description || "-"}
-      </Paragraph>
+            <Title level={5}>{translate("products.fields.price")}</Title>
+            <NumberField
+              value={record?.price}
+              options={{ style: "currency", currency: "IDR" }}
+            />
 
-      <Title level={5}>{translate("products.fields.price")}</Title>
-      <NumberField
-        value={record?.price}
-        options={{ style: "currency", currency: "IDR" }}
-      />
+            <Title level={5}>{translate("products.fields.stock")}</Title>
+            <Text>{record?.stock ?? 0}</Text>
 
-      <Title level={5}>{translate("products.fields.stock")}</Title>
-      <Text>{record?.stock ?? 0}</Text>
+            <Title level={5}>{translate("products.fields.weight")}</Title>
+            <Text>{record?.weight != null ? `${record.weight} gram` : "-"}</Text>
 
-      <Title level={5}>{translate("products.fields.weight")}</Title>
-      <Text>{record?.weight != null ? `${record.weight} gram` : "-"}</Text>
+            <Title level={5}>{translate("products.fields.category")}</Title>
+            <Text>{record?.categories?.name ?? "-"}</Text>
 
-      <Title level={5}>{translate("products.fields.category")}</Title>
-      <Text>{record?.categories?.name ?? "-"}</Text>
+            <Title level={5}>{translate("products.fields.active")}</Title>
+            <Tag color={record?.is_active ? "green" : "default"}>
+              {record?.is_active ? translate("products.status.active") : translate("products.status.inactive")}
+            </Tag>
 
-      <Title level={5}>{translate("products.fields.active")}</Title>
-      <Tag color={record?.is_active ? "green" : "default"}>
-        {record?.is_active ? translate("products.status.active") : translate("products.status.inactive")}
-      </Tag>
-
-      {record?.created_at && (
-        <>
-          <Title level={5}>{translate("products.fields.created")}</Title>
-          <Text>{new Date(record.created_at).toLocaleString("id-ID")}</Text>
-        </>
-      )}
+            {record?.created_at && (
+              <>
+                <Title level={5}>{translate("products.fields.created")}</Title>
+                <Text>{new Date(record.created_at).toLocaleString("id-ID")}</Text>
+              </>
+            )}
+          </Card>
+        </Col>
+      </Row>
     </Show>
   );
 };

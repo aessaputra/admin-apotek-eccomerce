@@ -63,6 +63,7 @@ export const OrderDetailsCards: React.FC<OrderDetailsCardsProps> = ({ record }) 
     gap: token.marginXS,
     maxWidth: "100%",
     minWidth: 0,
+    overflowWrap: "break-word",
   };
 
   const currencyFormatter = useMemo(

@@ -1,5 +1,5 @@
 import { Line } from "@ant-design/charts";
-import { Alert, Button, Card, Col, Empty, Radio, Row, Skeleton, Space, Statistic, Tooltip, Typography, theme } from "antd";
+import { Alert, Button, Card, Col, Empty, Grid, Radio, Row, Skeleton, Space, Typography, theme } from "antd";
 import type { RadioChangeEvent } from "antd";
 import { useId, useMemo } from "react";
 import type {
@@ -9,8 +9,9 @@ import type {
   OperationalTrendGranularity,
 } from "./monthlyOperationalTrends";
 import {
-  getDashboardTrendStatTileStyle,
-  getDashboardTrendStatValueStyle,
+  getDashboardGranularityContainerStyle,
+  getDashboardGranularityRadioStyle,
+  getDashboardGranularityOptionStyle,
   visuallyHiddenStyle,
 } from "./styles";
 
@@ -96,6 +97,29 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
   locale = "id-ID",
 }) => {
   const { token } = theme.useToken();
+  const screens = Grid.useBreakpoint();
+  const isMobile = Boolean(screens.xs && !screens.md);
+  const granularityContainerStyle = useMemo(
+    () => getDashboardGranularityContainerStyle(token, isMobile),
+    [token, isMobile],
+  );
+  const granularityRadioStyle = useMemo(
+    () => getDashboardGranularityRadioStyle(token, isMobile),
+    [token, isMobile],
+  );
+  const granularityOptionStyle = useMemo(
+    () => getDashboardGranularityOptionStyle(token, isMobile),
+    [token, isMobile],
+  );
+  const mappedGranularityOptions = useMemo(
+    () =>
+      granularityOptions.map((option) => ({
+        label: option.label,
+        value: option.value,
+        style: granularityOptionStyle,
+      })),
+    [granularityOptions, granularityOptionStyle],
+  );
   const chartDescriptionId = useId();
   const revenueChartDescriptionId = useId();
   const compactNumberFormatter = useMemo(
@@ -114,44 +138,6 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
         maximumFractionDigits: 0,
       }),
     [locale],
-  );
-  const formattedRevenue = useMemo(() => currencyFormatter.format(totals.revenue), [currencyFormatter, totals.revenue]);
-  const revenueSummary = useMemo(
-    () =>
-      [
-        labels.periodLabel,
-        `${labels.revenue}: ${formattedRevenue}`,
-        `${labels.orderCount}: ${totals.orderCount}`,
-        `${labels.paidOrders}: ${totals.paidOrderCount}`,
-        `${labels.completedOrders}: ${totals.completedOrderCount}`,
-      ].join(" · "),
-    [
-      formattedRevenue,
-      labels.completedOrders,
-      labels.orderCount,
-      labels.paidOrders,
-      labels.periodLabel,
-      labels.revenue,
-      totals.completedOrderCount,
-      totals.orderCount,
-      totals.paidOrderCount,
-    ],
-  );
-  const countSummary = useMemo(
-    () =>
-      [
-        `${labels.orderCount}: ${totals.orderCount}`,
-        `${labels.paidOrders}: ${totals.paidOrderCount}`,
-        `${labels.completedOrders}: ${totals.completedOrderCount}`,
-      ].join(" · "),
-    [
-      labels.completedOrders,
-      labels.orderCount,
-      labels.paidOrders,
-      totals.completedOrderCount,
-      totals.orderCount,
-      totals.paidOrderCount,
-    ],
   );
   const countChartData = useMemo<CountTrendChartPoint[]>(
     () => [
@@ -283,9 +269,6 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
     onGranularityChange(event.target.value as OperationalTrendGranularity);
   };
 
-  const statTileStyle = getDashboardTrendStatTileStyle(token);
-  const statValueStyle = getDashboardTrendStatValueStyle(token);
-
   return (
     <Card style={{ height: "100%" }}>
       <Row gutter={[16, 12]} align="middle" justify="space-between" style={{ marginBottom: token.marginMD }}>
@@ -297,16 +280,16 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
             <Typography.Text type="secondary">{labels.periodLabel}</Typography.Text>
           </Space>
         </Col>
-        <Col xs={24} md={12} style={{ display: "flex", justifyContent: "flex-end", minWidth: 0 }}>
+        <Col xs={24} md={12} style={granularityContainerStyle}>
           <Radio.Group
             aria-label={labels.granularityAriaLabel}
             optionType="button"
             buttonStyle="solid"
             size="middle"
             value={granularity}
-            options={granularityOptions.map((option) => ({ label: option.label, value: option.value }))}
+            options={mappedGranularityOptions}
             onChange={handleGranularityChange}
-            style={{ display: "flex", flexWrap: "wrap", gap: token.marginXXS, justifyContent: "flex-end" }}
+            style={granularityRadioStyle}
           />
         </Col>
       </Row>
@@ -373,7 +356,7 @@ export const MonthlyOperationalTrendCard: React.FC<MonthlyOperationalTrendCardPr
               </thead>
               <tbody>
                 {data.rows.map((row, index) => (
-                  <tr key={index}>
+                  <tr key={row.monthStart || index}>
                     <th scope="row">{row.monthLabel}</th>
                     <td>{row.orderCount}</td>
                     <td>{row.paidOrderCount}</td>

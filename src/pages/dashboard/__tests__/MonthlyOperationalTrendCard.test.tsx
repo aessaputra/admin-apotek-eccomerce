@@ -90,6 +90,9 @@ vi.mock("antd", () => ({
   ),
   Col: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Empty: ({ description }: { description?: React.ReactNode }) => <div>{description}</div>,
+  Grid: {
+    useBreakpoint: () => ({ xs: false, sm: true, md: true, lg: true, xl: true, xxl: true }),
+  },
   Row: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Radio: {
     Group: ({ "aria-label": ariaLabel, options, value }: { "aria-label"?: string; options?: { label: string; value: string }[]; value?: string }) => (

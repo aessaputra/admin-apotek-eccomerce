@@ -264,6 +264,19 @@ vi.mock("antd", async () => {
     Select: ({ placeholder }: { placeholder?: string }) => <select aria-label={placeholder ?? "select"} />,
     Row: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Col: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Typography: {
+      Text: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+      Title: ({ children }: { children: React.ReactNode }) => <h3>{children}</h3>,
+    },
+    Grid: {
+      useBreakpoint: () => ({ xs: false, sm: true, md: true, lg: true, xl: true, xxl: true }),
+    },
+    Card: ({ children, title }: { children: React.ReactNode; title?: React.ReactNode }) => (
+      <div><div>{title}</div><div>{children}</div></div>
+    ),
+    List: ({ dataSource = [], renderItem }: { dataSource?: unknown[]; renderItem?: (item: unknown) => React.ReactNode }) => (
+      <div>{dataSource.map((item, idx) => <div key={idx}>{renderItem ? renderItem(item) : null}</div>)}</div>
+    ),
   };
 });
 
