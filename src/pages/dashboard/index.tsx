@@ -497,14 +497,14 @@ export const Dashboard: React.FC = () => {
               ) : nearExpiryQuery?.isError ? (
                 <Alert type="error" showIcon message={translate("dashboard.alerts.metricsError.message")} />
               ) : nearExpiryCount > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", flex: 1, justifyContent: "space-between" }}>
+                <div style={{ display: "flex", flexDirection: "column", flex: 1, justifyContent: "space-between", gap: token.marginMD }}>
                   <Alert
                     type="warning"
                     showIcon
                     message={translate("dashboard.alerts.nearExpiry.message", { count: nearExpiryCount })}
                     description={translate("dashboard.alerts.nearExpiry.description")}
                   />
-                  <Button type="default" block onClick={handleNavigateNearExpiry} style={{ marginTop: "auto" }}>
+                  <Button type="default" block onClick={handleNavigateNearExpiry} style={{ marginTop: token.marginMD }}>
                     {translate("dashboard.viewNearExpiry")}
                   </Button>
                 </div>
