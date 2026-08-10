@@ -66,14 +66,20 @@ function renderExpiryStatusCell(dateStr: string | undefined, translate: Translat
   const isExpired = expDate.isSameOrBefore(today, "day");
   const isNearExpiry = !isExpired && expDate.diff(today, "day") <= 30;
 
-  const tagColor = isExpired ? "error" : isNearExpiry ? "warning" : "success";
+  const formattedDate = expDate.isValid() ? expDate.format("DD MMM YYYY") : dateStr;
+
+  if (!isExpired && !isNearExpiry) {
+    return (
+      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        {formattedDate}
+      </Typography.Text>
+    );
+  }
+
+  const tagColor = isExpired ? "error" : "warning";
   const tagLabelKey = isExpired
     ? "products.expiryStatus.expired"
-    : isNearExpiry
-    ? "products.expiryStatus.nearExpiry"
-    : "products.expiryStatus.safe";
-
-  const formattedDate = expDate.isValid() ? expDate.format("DD MMM YYYY") : dateStr;
+    : "products.expiryStatus.nearExpiry";
 
   return (
     <Space direction="vertical" size={2}>

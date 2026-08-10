@@ -42,12 +42,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ record }) => {
   const isExpired = expDate ? expDate.isSameOrBefore(today, "day") : false;
   const isNearExpiry = !isExpired && expDate ? expDate.diff(today, "day") <= 30 : false;
 
-  const tagColor = isExpired ? "error" : isNearExpiry ? "warning" : "success";
+  const showTag = isExpired || isNearExpiry;
+  const tagColor = isExpired ? "error" : "warning";
   const tagLabel = isExpired
     ? translate("products.expiryStatus.expired", "Kedaluwarsa")
-    : isNearExpiry
-    ? translate("products.expiryStatus.nearExpiry", "Mendekati ED")
-    : translate("products.expiryStatus.safe", "Aman");
+    : translate("products.expiryStatus.nearExpiry", "Mendekati ED");
 
   const actionItems = [
     {
@@ -103,12 +102,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({ record }) => {
                 {record.sku}
               </Typography.Text>
             )}
-            <Tag color={tagColor} bordered={false} style={{ fontSize: 10, margin: 0, fontWeight: 500 }}>
-              {tagLabel}
-            </Tag>
+            {showTag && (
+              <Tag color={tagColor} bordered={false} style={{ fontSize: 10, margin: 0, fontWeight: 500 }}>
+                {tagLabel}
+              </Tag>
+            )}
             {expDate?.isValid() && (
               <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-                • {expDate.format("DD MMM YYYY")}
+                {showTag ? `• ${expDate.format("DD MMM YYYY")}` : expDate.format("DD MMM YYYY")}
               </Typography.Text>
             )}
           </Space>
