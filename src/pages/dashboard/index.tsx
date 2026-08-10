@@ -475,8 +475,8 @@ export const Dashboard: React.FC = () => {
         <Col xs={24} md={12} xl={6}>
           <Card
             hoverable
-            style={{ height: "100%" }}
-            styles={{ body: cardBodyStyle }}
+            style={{ height: "100%", display: "flex", flexDirection: "column" }}
+            styles={{ body: { ...cardBodyStyle, flex: 1, display: "flex", flexDirection: "column" } }}
             title={
               <>
                 <ClockCircleOutlined aria-hidden="true" style={{ color: token.colorWarning, marginRight: token.marginXS }} />
@@ -489,7 +489,7 @@ export const Dashboard: React.FC = () => {
               </Tooltip>
             }
           >
-            <Space direction="vertical" style={{ width: "100%" }}>
+            <div style={{ display: "flex", flexDirection: "column", flex: 1, width: "100%" }}>
               {nearExpiryQuery?.isLoading ? (
                 <Space align="center" style={{ width: "100%", padding: token.padding, justifyContent: "center" }}>
                   <Spin size="small" />
@@ -497,16 +497,16 @@ export const Dashboard: React.FC = () => {
               ) : nearExpiryQuery?.isError ? (
                 <Alert type="error" showIcon message={translate("dashboard.alerts.metricsError.message")} />
               ) : nearExpiryCount > 0 ? (
-                <Space direction="vertical" style={{ width: "100%" }} size="middle">
+                <div style={{ display: "flex", flexDirection: "column", flex: 1, justifyContent: "space-between" }}>
                   <Alert
                     type="warning"
                     showIcon
                     message={translate("dashboard.alerts.nearExpiry.message", { count: nearExpiryCount })}
                   />
-                  <Button type="default" block onClick={handleNavigateNearExpiry}>
+                  <Button type="default" block onClick={handleNavigateNearExpiry} style={{ marginTop: "auto" }}>
                     {translate("dashboard.viewNearExpiry")}
                   </Button>
-                </Space>
+                </div>
               ) : (
                 <Alert
                   type="success"
@@ -514,7 +514,7 @@ export const Dashboard: React.FC = () => {
                   message={translate("dashboard.noNearExpiry")}
                 />
               )}
-            </Space>
+            </div>
           </Card>
         </Col>
       </Row>
