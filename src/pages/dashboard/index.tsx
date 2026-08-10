@@ -1,5 +1,6 @@
-import { useGetLocale, useList, useTranslation, useNavigation } from "@refinedev/core";
+import { useGetLocale, useList, useTranslation, useNavigation, useGo } from "@refinedev/core";
 import { Alert, Button, Card, Col, Grid, Row, Space, Spin, Statistic, Table, Tag, Tooltip, Typography, theme, List } from "antd";
+import dayjs from "dayjs";
 import { useMemo, useState } from "react";
 import {
   CheckCircleOutlined,
@@ -110,6 +111,7 @@ export const Dashboard: React.FC = () => {
   const { translate } = useTranslation();
   const getLocale = useGetLocale();
   const { list: navigateList, show: navigateShow } = useNavigation();
+  const go = useGo();
   const { token } = theme.useToken();
   const screens = Grid.useBreakpoint();
   const isMobile = Boolean(screens.xs && !screens.md);
@@ -174,19 +176,34 @@ export const Dashboard: React.FC = () => {
     queryOptions: { staleTime: DASHBOARD_QUERY_STALE_TIME_MS },
   });
 
-  // Near Expiry products (expiry <= today + 30 days, active only)
-  const thirtyDaysFromNow = useMemo(() => {
-    const date = new Date();
-    date.setDate(date.getDate() + 30);
-    return date.toISOString();
+  const { todayStr, thirtyDaysStr } = useMemo(() => {
+    const today = dayjs().format("YYYY-MM-DD");
+    const thirtyDays = dayjs().add(30, "day").format("YYYY-MM-DD");
+    return { todayStr: today, thirtyDaysStr: thirtyDays };
   }, []);
+
+  const handleNavigateNearExpiry = () => {
+    go({
+      to: { resource: "products", action: "list" },
+      query: {
+        pageSize: 10,
+        currentPage: 1,
+        sorters: [{ field: "created_at", order: "desc" }],
+        filters: [
+          { field: "expiry_date", operator: "gt", value: todayStr },
+          { field: "expiry_date", operator: "lte", value: thirtyDaysStr },
+        ],
+      },
+    });
+  };
 
   const { result: nearExpiryResult, query: nearExpiryQuery } = useList({
     resource: "products",
     pagination: { currentPage: 1, pageSize: 1 },
     filters: [
       { field: "expiry_date", operator: "nnull", value: null },
-      { field: "expiry_date", operator: "lte", value: thirtyDaysFromNow },
+      { field: "expiry_date", operator: "gt", value: todayStr },
+      { field: "expiry_date", operator: "lte", value: thirtyDaysStr },
       { field: "is_active", operator: "eq", value: true },
     ],
     meta: { count: "exact" },
@@ -468,7 +485,7 @@ export const Dashboard: React.FC = () => {
             }
             extra={
               <Tooltip title={translate("dashboard.viewNearExpiry")}>
-                <Button type="text" shape="circle" icon={<ArrowRightOutlined />} onClick={() => navigateList("products")} aria-label={translate("dashboard.tables.nearExpiryAriaLabel")} />
+                <Button type="text" shape="circle" icon={<ArrowRightOutlined />} onClick={handleNavigateNearExpiry} aria-label={translate("dashboard.tables.nearExpiryAriaLabel")} />
               </Tooltip>
             }
           >
@@ -486,7 +503,7 @@ export const Dashboard: React.FC = () => {
                     showIcon
                     message={translate("dashboard.alerts.nearExpiry.message", { count: nearExpiryCount })}
                   />
-                  <Button type="default" block onClick={() => navigateList("products")}>
+                  <Button type="default" block onClick={handleNavigateNearExpiry}>
                     {translate("dashboard.viewNearExpiry")}
                   </Button>
                 </Space>

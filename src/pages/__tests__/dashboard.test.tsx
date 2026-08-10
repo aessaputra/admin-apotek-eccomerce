@@ -72,6 +72,7 @@ const mocks = vi.hoisted(() => {
       "dashboard.viewAll": "View All",
       "dashboard.viewAllOrders": "View all orders",
       "dashboard.viewAllProducts": "View all products",
+      "dashboard.viewNearExpiry": "Review",
       "dashboard.orderTotal": "Total",
       "dashboard.orderStatus": "Status",
       "dashboard.orderDate": "Date",
@@ -123,6 +124,7 @@ const mocks = vi.hoisted(() => {
     return params?.count !== undefined ? translated.replace(/\{\{count\}\}/g, String(params.count)) : translated;
   });
   const navigateList = vi.fn();
+  const go = vi.fn();
   const col = vi.fn<(props: { xs?: number; sm?: number; lg?: number; xl?: number }) => void>();
   const line = vi.fn<(props: LineMockProps) => void>();
   const tableColumn = vi.fn<(props: { dataIndex?: string | readonly string[]; responsive?: readonly string[] }) => void>();
@@ -131,6 +133,7 @@ const mocks = vi.hoisted(() => {
     useList,
     translate,
     navigateList,
+    go,
     col,
     line,
     tableColumn,
@@ -142,6 +145,7 @@ vi.mock("@refinedev/core", () => ({
   useList: mocks.useList,
   useTranslation: () => ({ translate: mocks.translate }),
   useNavigation: () => ({ list: mocks.navigateList }),
+  useGo: () => mocks.go,
 }));
 
 vi.mock("@ant-design/charts", async () => {
@@ -482,6 +486,13 @@ const setupDashboardQueries = ({
     }
 
     if (params.resource === "products") {
+      const isNearExpiryQuery = params.filters?.some((f) => "field" in f && f.field === "expiry_date");
+      if (isNearExpiryQuery) {
+        return {
+          result: { data: [{ id: "near-1" }], total: 2 },
+          query: { isLoading: false, isError: false, error: null },
+        };
+      }
       return {
         result: { data: lowStockRows, total: lowStockTotal },
         query: { isLoading: false, isError: false, error: null, ...lowStockQuery },
@@ -993,6 +1004,32 @@ describe("Dashboard", () => {
 
       expect(mocks.navigateList).toHaveBeenCalledWith("orders");
       expect(mocks.navigateList).toHaveBeenCalledWith("products");
+    });
+
+    it("navigates to products list with near expiry query filters when Tinjau button is clicked", () => {
+      setupDashboardQueries({
+        lowStockTotal: 2,
+      });
+
+      render(<Dashboard />);
+
+      const reviewButton = screen.getByRole("button", { name: "Review" });
+      fireEvent.click(reviewButton);
+
+      expect(mocks.go).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: { resource: "products", action: "list" },
+          query: expect.objectContaining({
+            pageSize: 10,
+            currentPage: 1,
+            sorters: [{ field: "created_at", order: "desc" }],
+            filters: expect.arrayContaining([
+              expect.objectContaining({ field: "expiry_date", operator: "gt" }),
+              expect.objectContaining({ field: "expiry_date", operator: "lte" }),
+            ]),
+          }),
+        }),
+      );
     });
   });
 
