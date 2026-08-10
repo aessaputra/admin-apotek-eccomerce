@@ -218,7 +218,7 @@ export const OrderActionForm: React.FC<OrderActionFormProps> = ({ record, refres
 
       {canSyncTracking && (
         <div style={{ marginTop: token.marginMD }}>
-          <Button type="default" icon={<SyncOutlined spin={syncing} />} onClick={handleSyncTracking} loading={syncing}>
+          <Button type="default" icon={<SyncOutlined spin={syncing} />} onClick={handleSyncTracking} loading={syncing} style={{ width: "100%", minHeight: 40 }}>
             {translate("orders.syncTracking")}
           </Button>
           <div style={{ marginTop: 4 }}>
@@ -245,7 +245,7 @@ export const OrderActionForm: React.FC<OrderActionFormProps> = ({ record, refres
           rules={[{ required: true }]}
           tooltip={isStatusDropdownLocked ? translate("orders.tooltips.statusSystemControlled") : undefined}
         >
-          <Select options={availableStatusOptions} style={{ minWidth: 160 }} disabled={isStatusDropdownLocked || isSaveDisabled} />
+          <Select options={availableStatusOptions} style={{ width: "100%", minHeight: 40 }} disabled={isStatusDropdownLocked || isSaveDisabled} />
         </Form.Item>
 
         {showManualWaybillToggle && (
@@ -285,6 +285,7 @@ export const OrderActionForm: React.FC<OrderActionFormProps> = ({ record, refres
           >
             <Input
               placeholder={translate("orders.waybillPlaceholder")}
+              style={{ width: "100%", minHeight: 40 }}
               disabled={isWaybillInputDisabled || isSaveDisabled}
               suffix={isWaybillFullyLocked ? <LockOutlined aria-label={translate("orders.accessibility.waybillLocked")} style={{ color: token.colorTextTertiary }} /> : undefined}
             />
@@ -308,13 +309,14 @@ export const OrderActionForm: React.FC<OrderActionFormProps> = ({ record, refres
               <Input.TextArea
                 placeholder={translate("orders.waybillOverridePlaceholder")}
                 rows={2}
+                style={{ width: "100%" }}
               />
             </Form.Item>
           </>
         )}
 
         <Form.Item>
-          <Button type="primary" htmlType="submit" loading={saving} disabled={isSaveDisabled}>
+          <Button type="primary" htmlType="submit" loading={saving} disabled={isSaveDisabled} style={{ width: "100%", minHeight: 40 }}>
             {translate("buttons.save")}
           </Button>
         </Form.Item>
