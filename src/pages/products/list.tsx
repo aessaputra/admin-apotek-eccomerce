@@ -58,7 +58,7 @@ function buildExpiryFilters(status: string | null): CrudFilter[] {
   }
 }
 
-function renderExpiryStatusCell(dateStr: string | undefined, translate: TranslateFn) {
+function renderExpiryStatusCell(dateStr: string | undefined, _translate: TranslateFn) {
   if (!dateStr) return "-";
 
   const today = dayjs();
@@ -68,28 +68,26 @@ function renderExpiryStatusCell(dateStr: string | undefined, translate: Translat
 
   const formattedDate = expDate.isValid() ? expDate.format("DD MMM YYYY") : dateStr;
 
-  if (!isExpired && !isNearExpiry) {
+  if (isExpired) {
     return (
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+      <Typography.Text type="danger" style={{ fontSize: 12, fontWeight: 500 }}>
         {formattedDate}
       </Typography.Text>
     );
   }
 
-  const tagColor = isExpired ? "error" : "warning";
-  const tagLabelKey = isExpired
-    ? "products.expiryStatus.expired"
-    : "products.expiryStatus.nearExpiry";
-
-  return (
-    <Space direction="vertical" size={2}>
-      <Tag color={tagColor} bordered={false} style={{ fontWeight: 500 }}>
-        {translate(tagLabelKey)}
-      </Tag>
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+  if (isNearExpiry) {
+    return (
+      <Typography.Text style={{ fontSize: 12, color: "#d48806", fontWeight: 500 }}>
         {formattedDate}
       </Typography.Text>
-    </Space>
+    );
+  }
+
+  return (
+    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+      {formattedDate}
+    </Typography.Text>
   );
 }
 
